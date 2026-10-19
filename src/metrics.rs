@@ -1,6 +1,7 @@
 mod cognitive;
 mod cognitive_pmd;
 mod cyclomatic;
+pub mod nesting;
 mod parameters;
 
 use tree_sitter::Node;

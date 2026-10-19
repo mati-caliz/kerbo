@@ -9,7 +9,7 @@ fn analyze_source(language: Language, source: &str) -> FileAnalysis {
     parser
         .set_language(&language.grammar())
         .expect("la gramática carga");
-    analyze(&mut parser, language, source.as_bytes()).expect("el archivo se parsea")
+    analyze(&mut parser, language, source.as_bytes(), None).expect("el archivo se parsea")
 }
 
 fn function_named<'analysis>(analysis: &'analysis FileAnalysis, name: &str) -> &'analysis FunctionMetrics {
@@ -53,7 +53,7 @@ fn measures_go_like_cyclop_gocognit_funlen_and_revive() {
         1,
         "func_literal se mide dentro de su función"
     );
-    assert_eq!(decide.cyclomatic, Some(7));
+    assert_eq!(decide.cyclomatic, Some(8), "cyclop cuenta también el default");
     assert_eq!(decide.cognitive, Some(9));
     assert_eq!(decide.parameters, Some(4));
     assert_eq!(decide.lines, Some(18));
@@ -344,4 +344,24 @@ fn empty_file_has_no_lines() {
     let analysis = analyze_source(Language::Go, "");
     assert_eq!(analysis.file_lines, 0);
     assert!(analysis.functions.is_empty());
+}
+
+#[test]
+fn counts_go_recursion_and_unnamed_parameters_like_gocognit_and_revive() {
+    let analysis = analyze_source(
+        Language::Go,
+        "package a\n\nfunc walk(n int) int {\n\tif n > 0 {\n\t\treturn walk(n - 1)\n\t}\n\treturn 0\n}\n\nfunc ignore(*T, string) {}\n\nfunc (r R) walk(n int) int {\n\treturn walk(n)\n}\n",
+    );
+    let walk = analysis.functions.first().expect("hay funciones");
+    assert_eq!(walk.cognitive, Some(2), "gocognit suma la llamada recursiva");
+    assert_eq!(
+        function_named(&analysis, "ignore").parameters,
+        Some(0),
+        "revive cuenta nombres"
+    );
+    assert_eq!(
+        analysis.functions.last().and_then(|method| method.cognitive),
+        Some(0),
+        "un método no es recursión para gocognit"
+    );
 }

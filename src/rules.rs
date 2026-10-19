@@ -23,10 +23,11 @@ pub enum RuleId {
     TestDisabled,
     TestRemoved,
     TypeEscape,
+    NestingDepth,
 }
 
 impl RuleId {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::FileLength,
         Self::FunctionLength,
         Self::CyclomaticComplexity,
@@ -36,6 +37,7 @@ impl RuleId {
         Self::TestDisabled,
         Self::TestRemoved,
         Self::TypeEscape,
+        Self::NestingDepth,
     ];
 
     pub const fn index(self) -> usize {
@@ -49,6 +51,7 @@ impl RuleId {
             Self::TestDisabled => 6,
             Self::TestRemoved => 7,
             Self::TypeEscape => 8,
+            Self::NestingDepth => 9,
         }
     }
 
@@ -63,6 +66,7 @@ impl RuleId {
             Self::TestDisabled => "test-disabled",
             Self::TestRemoved => "test-removed",
             Self::TypeEscape => "type-escape",
+            Self::NestingDepth => "nesting-depth",
         }
     }
 
@@ -77,6 +81,7 @@ impl RuleId {
             Self::TestDisabled => "El cambio saltea o enfoca un test, y deja otros sin correr",
             Self::TestRemoved => "El cambio borra tests",
             Self::TypeEscape => "El cambio escapa del sistema de tipos",
+            Self::NestingDepth => "Demasiados bloques anidados",
         }
     }
 }
@@ -147,7 +152,38 @@ pub fn evaluate(file: &FileIdentity, analysis: &FileAnalysis, limits: Limits) ->
             *occurrence = occurrence.saturating_add(1);
             diagnostic(file, &finding, analysis.file_lines, *occurrence)
         })
+        .chain(nesting_diagnostics(file, analysis, limits))
         .collect()
+}
+
+fn nesting_diagnostics<'analysis>(
+    file: &'analysis FileIdentity,
+    analysis: &'analysis FileAnalysis,
+    limits: Limits,
+) -> impl Iterator<Item = Diagnostic> + 'analysis {
+    let limit = limits.get(RuleId::NestingDepth);
+    let mut occurrences: HashMap<usize, usize> = HashMap::new();
+    analysis.nesting.iter().filter_map(move |found| {
+        let limit = limit.filter(|&limit| found.depth > limit)?;
+        let occurrence = occurrences.entry(found.depth).or_default();
+        *occurrence = occurrence.saturating_add(1);
+        Some(Diagnostic {
+            path: file.display.clone(),
+            line: found.line,
+            column: found.column,
+            end_line: found.line,
+            rule: RuleId::NestingDepth,
+            message: format!(
+                "Este bloque está {} niveles adentro (máximo {limit})",
+                found.depth
+            ),
+            value: found.depth,
+            limit,
+            fingerprint: format!("nesting-depth:{}:{}#{occurrence}", file.relative, found.depth),
+            relative_path: file.relative.clone(),
+            absolute_path: file.absolute.clone(),
+        })
+    })
 }
 
 fn function_findings(function: &FunctionMetrics, limits: Limits) -> impl Iterator<Item = Finding<'_>> {
@@ -217,9 +253,11 @@ fn message(finding: &Finding<'_>, name: &str) -> String {
             format!("La función `{name}` tiene complejidad cognitiva {value} (máximo {limit})")
         }
         RuleId::ParameterCount => format!("La función `{name}` recibe {value} parámetros (máximo {limit})"),
-        RuleId::SuppressionAdded | RuleId::TestDisabled | RuleId::TestRemoved | RuleId::TypeEscape => {
-            finding.rule.description().to_owned()
-        }
+        RuleId::SuppressionAdded
+        | RuleId::TestDisabled
+        | RuleId::TestRemoved
+        | RuleId::TypeEscape
+        | RuleId::NestingDepth => finding.rule.description().to_owned(),
     }
 }
 

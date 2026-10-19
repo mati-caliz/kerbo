@@ -1,6 +1,6 @@
 use super::{
     CaseShape, CognitiveShape, CountedLines, GuardShape, LineSpan, LogicalShape, NO_PARTIAL_UNITS,
-    ParameterShape, Profile, SpanBounds, TestFiles,
+    NestingStyle, ParameterShape, Profile, RecursionShape, SpanBounds, TestFiles,
 };
 
 pub static GO: Profile = Profile {
@@ -42,7 +42,12 @@ pub static GO: Profile = Profile {
     decision_parents: &[],
     nested_units_add_to_cyclomatic: false,
     cases: CaseShape {
-        kinds: &["expression_case", "type_case", "communication_case"],
+        kinds: &[
+            "expression_case",
+            "type_case",
+            "communication_case",
+            "default_case",
+        ],
         default_marker: None,
         wildcard_pattern: None,
     },
@@ -67,7 +72,13 @@ pub static GO: Profile = Profile {
         leaking_branch_parent: None,
         pmd: None,
         skipped_units: &[],
+        recursion: Some(RecursionShape {
+            unit: "function_declaration",
+            call: "call_expression",
+            callee: "identifier",
+        }),
     },
+    nesting: NestingStyle::ControlFlow,
     comments: &["comment"],
     literals: &["raw_string_literal", "interpreted_string_literal"],
     function_length_skips_iife: false,

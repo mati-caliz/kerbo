@@ -50,6 +50,7 @@ struct Walker<'tree, 'context> {
     source: &'context [u8],
     pending: Vec<Visit<'tree>>,
     leaked_nesting: usize,
+    recursive_name: Option<&'context str>,
 }
 
 pub(super) fn cognitive(unit: Node<'_>, profile: &Profile, source: &[u8]) -> usize {
@@ -58,6 +59,12 @@ pub(super) fn cognitive(unit: Node<'_>, profile: &Profile, source: &[u8]) -> usi
         source,
         pending: Vec::new(),
         leaked_nesting: 0,
+        recursive_name: profile
+            .cognitive
+            .recursion
+            .filter(|recursion| unit.kind() == recursion.unit)
+            .and_then(|_| unit.child_by_field_name("name"))
+            .and_then(|name| name.utf8_text(source).ok()),
     };
     walker.push_children(unit, 0);
     let mut score: usize = 0;
@@ -110,6 +117,9 @@ impl<'tree> Walker<'tree, '_> {
     }
 
     fn flat_increment(&self, node: Node<'_>) -> usize {
+        if self.is_recursive_call(node) {
+            return 1;
+        }
         if self.profile.cognitive.labeled_jumps.contains(&node.kind()) {
             return usize::from(node.named_child_count() > 0);
         }
@@ -130,6 +140,16 @@ impl<'tree> Walker<'tree, '_> {
             previous = Some(operator);
         }
         increments
+    }
+
+    fn is_recursive_call(&self, node: Node<'_>) -> bool {
+        let (Some(recursion), Some(name)) = (self.profile.cognitive.recursion, self.recursive_name) else {
+            return false;
+        };
+        node.kind() == recursion.call
+            && node.child_by_field_name("function").is_some_and(|callee| {
+                callee.kind() == recursion.callee && callee.utf8_text(self.source).ok() == Some(name)
+            })
     }
 
     fn sequence_operator<'source>(&'source self, node: Node<'_>) -> Option<&'source str> {

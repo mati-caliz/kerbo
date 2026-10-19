@@ -31,6 +31,7 @@ pub struct Profile {
     pub cases: CaseShape,
     pub logical: LogicalShape,
     pub cognitive: CognitiveShape,
+    pub nesting: NestingStyle,
     pub comments: Kinds,
     pub literals: Kinds,
     pub function_length_skips_iife: bool,
@@ -106,6 +107,14 @@ pub struct CognitiveShape {
     pub leaking_branch_parent: Option<&'static str>,
     pub pmd: Option<PmdShape>,
     pub skipped_units: Kinds,
+    pub recursion: Option<RecursionShape>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct RecursionShape {
+    pub unit: &'static str,
+    pub call: &'static str,
+    pub callee: &'static str,
 }
 
 #[derive(Debug)]
@@ -122,6 +131,13 @@ pub struct PmdShape {
 pub struct ShortCircuit {
     pub container: &'static str,
     pub conditional: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NestingStyle {
+    Unmeasured,
+    Blocks,
+    ControlFlow,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

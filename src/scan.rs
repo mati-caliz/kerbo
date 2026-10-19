@@ -11,7 +11,7 @@ use crate::analysis::analyze;
 use crate::config::Config;
 use crate::language::{Language, Stack};
 use crate::limits::LimitOverride;
-use crate::rules::{Diagnostic, FileIdentity, evaluate};
+use crate::rules::{Diagnostic, FileIdentity, RuleId, evaluate};
 
 const PATH_SEPARATOR: &str = "/";
 
@@ -112,8 +112,14 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
     }
     let mut parser = Parser::new();
     parser.set_language(&file.language.grammar()).ok()?;
-    let analysis = analyze(&mut parser, file.language, source).ok()?;
     let limits = config.limits_for(relative, file.language, file.is_test);
+    let analysis = analyze(
+        &mut parser,
+        file.language,
+        source,
+        limits.get(RuleId::NestingDepth),
+    )
+    .ok()?;
     Some(evaluate(&file.identity, &analysis, limits))
 }
 
@@ -177,7 +183,6 @@ fn check_file(
     };
     let source = fs::read(&file.identity.absolute).map_err(|error| failure(error.to_string()))?;
     let parser = pool.parser(file.language).map_err(failure)?;
-    let analysis = analyze(parser, file.language, &source).map_err(|error| failure(error.to_string()))?;
     let configured =
         request
             .config
@@ -188,6 +193,8 @@ fn check_file(
         .fold(configured, |limits, &limit_override| {
             limits.with_override(limit_override)
         });
+    let analysis = analyze(parser, file.language, &source, limits.get(RuleId::NestingDepth))
+        .map_err(|error| failure(error.to_string()))?;
     Ok(evaluate(&file.identity, &analysis, limits))
 }
 

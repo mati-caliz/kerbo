@@ -36,9 +36,7 @@ pub(super) fn parameter_count(unit: Node<'_>, profile: &Profile, source: &[u8]) 
         })
         .map(|(_, declaration)| declaration);
     let count = if shape.names_per_declaration {
-        declarations
-            .map(|declaration| declared_names(declaration).max(1))
-            .sum()
+        declarations.map(declared_names).sum()
     } else {
         declarations.count()
     };

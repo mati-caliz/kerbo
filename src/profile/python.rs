@@ -1,6 +1,6 @@
 use super::{
-    CaseShape, CognitiveShape, GuardShape, LineSpan, LogicalShape, NO_PARTIAL_UNITS, ParameterShape, Profile,
-    TestFiles,
+    CaseShape, CognitiveShape, GuardShape, LineSpan, LogicalShape, NO_PARTIAL_UNITS, NestingStyle,
+    ParameterShape, Profile, TestFiles,
 };
 
 pub static PYTHON: Profile = Profile {
@@ -92,7 +92,9 @@ pub static PYTHON: Profile = Profile {
         leaking_branch_parent: None,
         pmd: None,
         skipped_units: &[],
+        recursion: None,
     },
+    nesting: NestingStyle::Unmeasured,
     comments: &["comment"],
     literals: &["string"],
     function_length_skips_iife: false,

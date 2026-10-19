@@ -1,6 +1,6 @@
 use super::{
-    CaseShape, CognitiveShape, GuardShape, LineSpan, LogicalShape, ParameterShape, PartialUnits, Profile,
-    ShortCircuit, TestFiles,
+    CaseShape, CognitiveShape, GuardShape, LineSpan, LogicalShape, NestingStyle, ParameterShape,
+    PartialUnits, Profile, ShortCircuit, TestFiles,
 };
 
 const FUNCTIONS: &[&str] = &[
@@ -150,7 +150,9 @@ pub static ECMASCRIPT: Profile = Profile {
         leaking_branch_parent: Some("ternary_expression"),
         pmd: None,
         skipped_units: &[],
+        recursion: None,
     },
+    nesting: NestingStyle::Blocks,
     comments: &["comment", "html_comment"],
     literals: &["string", "template_string"],
     function_length_skips_iife: true,

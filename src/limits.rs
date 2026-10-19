@@ -31,6 +31,9 @@ const GO_STRICT: [Option<usize>; 5] = [Some(400), Some(80), Some(10), Some(15), 
 const PYTHON_STRICT: [Option<usize>; 5] = [None, None, Some(10), None, Some(6)];
 const JAVA_STRICT: [Option<usize>; 5] = [Some(500), Some(80), Some(8), Some(15), Some(5)];
 const ECMASCRIPT_STRICT: [Option<usize>; 5] = [Some(400), Some(120), Some(10), Some(15), Some(4)];
+const NESTING_STRICT: Option<usize> = Some(4);
+const NESTING_RECOMMENDED: Option<usize> = Some(5);
+const NESTING_MINIMAL: Option<usize> = Some(6);
 const RECOMMENDED: [Option<usize>; 5] = [Some(750), Some(150), Some(15), Some(20), Some(6)];
 const MINIMAL: [Option<usize>; 5] = [Some(1500), Some(300), Some(25), Some(30), Some(8)];
 
@@ -70,11 +73,12 @@ impl Limits {
 
 impl Preset {
     pub fn limits(self, language: Language, is_test: bool) -> Limits {
-        let base = Limits::with_metrics(match self {
-            Self::Strict => strict(language),
-            Self::Recommended => RECOMMENDED,
-            Self::Minimal => MINIMAL,
-        });
+        let (metrics, nesting) = match self {
+            Self::Strict => (strict(language), NESTING_STRICT),
+            Self::Recommended => (RECOMMENDED, NESTING_RECOMMENDED),
+            Self::Minimal => (MINIMAL, NESTING_MINIMAL),
+        };
+        let base = Limits::with_metrics(metrics).with_rule(RuleId::NestingDepth, nesting);
         if !is_test {
             return base;
         }

@@ -4,12 +4,14 @@ use tree_sitter::Parser;
 
 use crate::language::Language;
 use crate::lines::LineMap;
+use crate::metrics::nesting::{NestingFinding, find_deep_nesting};
 use crate::metrics::{FunctionMetrics, measure_functions};
 
 #[derive(Debug)]
 pub struct FileAnalysis {
     pub file_lines: usize,
     pub functions: Vec<FunctionMetrics>,
+    pub nesting: Vec<NestingFinding>,
 }
 
 #[derive(Debug)]
@@ -21,7 +23,12 @@ impl fmt::Display for ParseFailed {
     }
 }
 
-pub fn analyze(parser: &mut Parser, language: Language, source: &[u8]) -> Result<FileAnalysis, ParseFailed> {
+pub fn analyze(
+    parser: &mut Parser,
+    language: Language,
+    source: &[u8],
+    nesting_limit: Option<usize>,
+) -> Result<FileAnalysis, ParseFailed> {
     let tree = parser.parse(source, None).ok_or(ParseFailed)?;
     let root = tree.root_node();
     let profile = language.profile();
@@ -31,5 +38,6 @@ pub fn analyze(parser: &mut Parser, language: Language, source: &[u8]) -> Result
     Ok(FileAnalysis {
         file_lines,
         functions: measure_functions(root, source, profile, &line_map),
+        nesting: find_deep_nesting(root, profile.nesting, nesting_limit),
     })
 }

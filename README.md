@@ -176,11 +176,12 @@ pestaña de cambios del pull request) y falla el job si hay problemas.
 | `cyclomatic-complexity` | 10 | 10 | 8 | 10 |
 | `cognitive-complexity` | 15 | — | 15 | 15 |
 | `parameter-count` | 4 | 6 (sin `self` ni `cls`) | 5 (sin `@Override`) | 4 |
+| `nesting-depth` | 4 bloques | — | — | 4 bloques de control |
 
 Cada lenguaje cuenta como su herramienta de referencia: ESLint y sonarjs, ruff, Checkstyle y PMD,
 cyclop, gocognit, funlen y revive. Esas diferencias de criterio no están documentadas en ningún
 lado; cada una salió de comparar contra repos reales y quedó fijada en un test de
-`src/metrics/tests.rs`. En los tests de TypeScript no se mide el largo de función, y en los de
+`src/metrics/tests.rs` (el anidamiento, en `src/metrics/nesting/tests.rs`). En los tests de TypeScript no se mide el largo de función, y en los de
 Python no se cuentan los parámetros.
 
 Esos son los umbrales del preset `strict`. Más reglas y la capa para agentes de IA están en la

@@ -48,6 +48,11 @@ pub const fn explain(rule: RuleId) -> Explanation {
             why: "Borrar un test que falla hace pasar el gate sin arreglar nada.",
             example: "Si el código que probaba se fue, decilo en el commit; si no, el test vuelve.",
         },
+        RuleId::NestingDepth => Explanation {
+            fix: "sacá el bloque interno a una función o invertí la condición con un retorno temprano",
+            why: "Cada nivel de anidamiento es una condición más que el lector tiene que sostener para entender una línea.",
+            example: "for (...) { if (ok) { ... } } se vuelve for (...) { if (!ok) continue; ... }",
+        },
         RuleId::TypeEscape => Explanation {
             fix: "tipá el valor; con datos externos, unknown y validación",
             why: "any y as unknown as apagan el compilador justo donde más falta hace.",
