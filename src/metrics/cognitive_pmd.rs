@@ -1,5 +1,9 @@
 use tree_sitter::Node;
 
+mod recursion;
+
+use recursion::{Call, Receiver, Recursion, item_count};
+
 use crate::profile::{PmdShape, Profile};
 use crate::syntax::logical_operator;
 
@@ -9,7 +13,7 @@ const ALTERNATIVE_FIELD: &str = "alternative";
 const NAME_FIELD: &str = "name";
 const OBJECT_FIELD: &str = "object";
 const ARGUMENTS_FIELD: &str = "arguments";
-const PARAMETERS_FIELD: &str = "parameters";
+const IDENTIFIER_KIND: &str = "identifier";
 
 #[derive(Debug, Clone, Copy)]
 enum Event<'tree> {
@@ -21,12 +25,6 @@ enum Event<'tree> {
     EndBooleanRun,
 }
 
-#[derive(Debug)]
-struct Recursion<'source> {
-    name: &'source str,
-    arity: usize,
-}
-
 struct PmdWalker<'tree, 'context> {
     profile: &'context Profile,
     shape: &'context PmdShape,
@@ -35,7 +33,7 @@ struct PmdWalker<'tree, 'context> {
     complexity: usize,
     nesting: usize,
     boolean_run: Option<&'context str>,
-    recursion: Option<Recursion<'context>>,
+    recursion: Recursion<'context>,
 }
 
 pub(super) fn cognitive(unit: Node<'_>, profile: &Profile, shape: &PmdShape, source: &[u8]) -> usize {
@@ -47,37 +45,13 @@ pub(super) fn cognitive(unit: Node<'_>, profile: &Profile, shape: &PmdShape, sou
         complexity: 0,
         nesting: 0,
         boolean_run: None,
-        recursion: recursion_target(unit, source),
+        recursion: Recursion::of(unit, source),
     };
     walker.push_children(unit);
     while let Some(event) = walker.events.pop() {
         walker.apply(event);
     }
     walker.complexity
-}
-
-fn recursion_target<'source>(unit: Node<'_>, source: &'source [u8]) -> Option<Recursion<'source>> {
-    let name = unit.child_by_field_name(NAME_FIELD)?.utf8_text(source).ok()?;
-    let arity = arity_of(unit);
-    let mut cursor = unit.parent()?.walk();
-    let same_signature = unit
-        .parent()?
-        .named_children(&mut cursor)
-        .filter(|sibling| sibling.kind() == unit.kind())
-        .filter(|sibling| {
-            sibling
-                .child_by_field_name(NAME_FIELD)
-                .and_then(|other| other.utf8_text(source).ok())
-                == Some(name)
-        })
-        .filter(|&sibling| arity_of(sibling) == arity)
-        .count();
-    (same_signature == 1).then_some(Recursion { name, arity })
-}
-
-fn arity_of(unit: Node<'_>) -> usize {
-    unit.child_by_field_name(PARAMETERS_FIELD)
-        .map_or(0, |parameters| parameters.named_child_count())
 }
 
 impl<'tree, 'context> PmdWalker<'tree, 'context> {
@@ -112,7 +86,7 @@ impl<'tree, 'context> PmdWalker<'tree, 'context> {
             self.wrap_children(node, Event::IncreaseNesting);
             return;
         }
-        if kind == self.shape.block {
+        if self.shape.blocks.contains(&kind) {
             self.visit_block(node);
             return;
         }
@@ -153,20 +127,35 @@ impl<'tree, 'context> PmdWalker<'tree, 'context> {
     }
 
     fn is_recursive_call(&self, call: Node<'_>) -> bool {
-        let Some(recursion) = &self.recursion else {
-            return false;
-        };
-        let same_name = call
+        let Some(name) = call
             .child_by_field_name(NAME_FIELD)
             .and_then(|name| name.utf8_text(self.source).ok())
-            .is_some_and(|name| name == recursion.name);
-        let on_itself = call
-            .child_by_field_name(OBJECT_FIELD)
-            .is_none_or(|object| object.kind() == self.shape.this);
-        let arity = call
-            .child_by_field_name(ARGUMENTS_FIELD)
-            .map_or(0, |arguments| arguments.named_child_count());
-        same_name && on_itself && arity == recursion.arity
+        else {
+            return false;
+        };
+        let receiver = match call.child_by_field_name(OBJECT_FIELD) {
+            None => Receiver::Implicit,
+            Some(object) if object.kind() == self.shape.this => Receiver::This,
+            Some(object) if object.kind() == IDENTIFIER_KIND => object
+                .utf8_text(self.source)
+                .map_or(Receiver::Other, Receiver::Named),
+            Some(object)
+                if object.kind() == self.shape.invocation
+                    && object.child_by_field_name(OBJECT_FIELD).is_none() =>
+            {
+                object
+                    .child_by_field_name(NAME_FIELD)
+                    .and_then(|factory| factory.utf8_text(self.source).ok())
+                    .map_or(Receiver::Other, Receiver::Returned)
+            }
+            Some(_) => Receiver::Other,
+        };
+        let arity = call.child_by_field_name(ARGUMENTS_FIELD).map_or(0, item_count);
+        self.recursion.matches(&Call {
+            name,
+            arity,
+            receiver,
+        })
     }
 
     fn visit_if(&mut self, node: Node<'tree>) {
@@ -210,3 +199,6 @@ impl<'tree, 'context> PmdWalker<'tree, 'context> {
         self.events.extend(children.map(Event::Visit));
     }
 }
+
+#[cfg(test)]
+mod tests;

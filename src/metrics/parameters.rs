@@ -7,7 +7,6 @@ const IDENTIFIER_KIND: &str = "identifier";
 const MODIFIERS_KIND: &str = "modifiers";
 const DECORATED_KIND: &str = "decorated_definition";
 const DECORATOR_KIND: &str = "decorator";
-const BLOCK_KIND: &str = "block";
 const DUMMY_PREFIX: char = '_';
 
 pub(super) fn parameter_count(unit: Node<'_>, profile: &Profile, source: &[u8]) -> Option<usize> {
@@ -105,11 +104,9 @@ fn is_method(unit: Node<'_>, shape: &ParameterShape) -> bool {
     let Some(container) = shape.method_container else {
         return false;
     };
-    let mut parent = unit.parent();
-    while let Some(node) = parent.filter(|node| node.kind() == DECORATED_KIND || node.kind() == BLOCK_KIND) {
-        parent = node.parent();
-    }
-    parent.is_some_and(|node| node.kind() == container)
+    std::iter::successors(unit.parent(), Node::parent)
+        .find(|node| node.kind() == container || shape.checked_units.contains(&node.kind()))
+        .is_some_and(|scope| scope.kind() == container)
 }
 
 fn annotates_with(modifiers: Node<'_>, annotation_name: &str, source: &[u8]) -> bool {
@@ -132,7 +129,41 @@ fn declared_names(declaration: Node<'_>) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use tree_sitter::Parser;
+
     use super::is_dummy_name;
+    use crate::analysis::analyze;
+    use crate::language::Language;
+    use crate::limits::Limits;
+
+    #[test]
+    fn methods_defined_under_a_condition_still_skip_self_like_ruff() {
+        let source = "class A:\n    if flag:\n        def kill(self, signal):\n            pass\n\ndef outer(self):\n    def inner(self):\n        pass\n";
+        let mut parser = Parser::new();
+        parser
+            .set_language(&Language::Python.grammar())
+            .expect("la gramática carga");
+        let counts: Vec<(String, Option<usize>)> = analyze(
+            &mut parser,
+            Language::Python,
+            source.as_bytes(),
+            Limits::default(),
+        )
+        .expect("el archivo se parsea")
+        .functions
+        .into_iter()
+        .map(|function| (function.name, function.parameters))
+        .collect();
+        assert_eq!(
+            counts,
+            [
+                ("kill".to_owned(), Some(1)),
+                ("outer".to_owned(), Some(1)),
+                ("inner".to_owned(), Some(1))
+            ],
+            "un def bajo un if de la clase es método; adentro de una función, no"
+        );
+    }
 
     #[test]
     fn recognizes_ruff_dummy_names() {

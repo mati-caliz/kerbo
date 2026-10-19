@@ -1,6 +1,6 @@
 use tree_sitter::Node;
 
-use super::number::numeric_value;
+use super::number::{java_integer_value, numeric_value};
 use super::{field_is, named_children, operator, text};
 
 const LITERALS: &[&str] = &[
@@ -12,6 +12,13 @@ const LITERALS: &[&str] = &[
     "hex_floating_point_literal",
 ];
 const IGNORED_VALUES: &[f64] = &[-1.0, 0.0, 1.0, 2.0];
+const IGNORED_INTEGERS: &[i64] = &[-1, 0, 1, 2];
+const INTEGER_LITERALS: &[&str] = &[
+    "decimal_integer_literal",
+    "hex_integer_literal",
+    "octal_integer_literal",
+    "binary_integer_literal",
+];
 const EXEMPT_CONTEXTS: &[&str] = &[
     "annotation",
     "marker_annotation",
@@ -77,12 +84,26 @@ pub fn reported<'tree>(node: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> 
     }
     let sign = sign(node, source);
     let negative = sign.is_some_and(|(_, operator)| operator == MINUS);
-    let value = numeric_value(text(node, source)).map(|value| if negative { -value } else { value });
-    let ignored = value.is_some_and(|value| {
-        IGNORED_VALUES
-            .iter()
-            .any(|&ignored| (value - ignored).abs() < f64::EPSILON)
-    });
+    let literal = text(node, source);
+    let ignored = if INTEGER_LITERALS.contains(&node.kind()) {
+        java_integer_value(literal)
+            .and_then(|value| {
+                if negative {
+                    value.checked_neg()
+                } else {
+                    Some(value)
+                }
+            })
+            .is_some_and(|value| IGNORED_INTEGERS.contains(&value))
+    } else {
+        numeric_value(literal)
+            .map(|value| if negative { -value } else { value })
+            .is_some_and(|value| {
+                IGNORED_VALUES
+                    .iter()
+                    .any(|&ignored| (value - ignored).abs() < f64::EPSILON)
+            })
+    };
     if ignored || is_in_hash_code(node, source) || is_field_declaration(node) {
         return None;
     }

@@ -42,8 +42,8 @@ fn publishes_problems_while_typing_and_clears_them_on_close() {
     let path = tree.path().join("cart.ts");
     tree.write("cart.ts", "");
     let uri = format!("file://{}", path.to_str().expect("UTF-8").replace(' ', "%20"));
-    let wide = "export function ñandú(a, b, c, d, e) {}\n";
-    let narrow = "export function ñandú(a) {}\n";
+    let wide = "export function ñandú(ab, bc, cd, de, ef) {}\n";
+    let narrow = "export function ñandú(ab) {}\n";
     let messages = [
         json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {} }),
         json!({ "jsonrpc": "2.0", "method": "initialized", "params": {} }),
@@ -66,7 +66,7 @@ fn publishes_problems_while_typing_and_clears_them_on_close() {
     assert_eq!(opened.as_array().map(Vec::len), Some(1));
     assert_eq!(opened[0]["code"], "parameter-count");
     assert_eq!(
-        opened[0]["range"]["end"]["character"], 39,
+        opened[0]["range"]["end"]["character"], 44,
         "el fin de línea se cuenta en UTF-16"
     );
     assert_eq!(

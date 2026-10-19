@@ -1,6 +1,6 @@
 use super::{
     CaseShape, CognitiveShape, CountedLines, GuardShape, LineSpan, LogicalShape, MagicNumberStyle,
-    NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, SpanBounds, TestFiles,
+    NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, ShortNameStyle, SpanBounds, TestFiles,
 };
 
 pub static GO: Profile = Profile {
@@ -76,6 +76,7 @@ pub static GO: Profile = Profile {
     },
     nesting: NestingStyle::ControlFlow,
     magic_numbers: MagicNumberStyle::Mnd,
+    short_names: ShortNameStyle::Varnamelen,
     comments: &["comment"],
     literals: &["raw_string_literal", "interpreted_string_literal"],
     function_length_skips_iife: false,

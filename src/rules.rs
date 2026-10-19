@@ -27,10 +27,11 @@ pub enum RuleId {
     TypeEscape,
     NestingDepth,
     MagicNumber,
+    ShortName,
 }
 
 impl RuleId {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::FileLength,
         Self::FunctionLength,
         Self::CyclomaticComplexity,
@@ -42,6 +43,7 @@ impl RuleId {
         Self::TypeEscape,
         Self::NestingDepth,
         Self::MagicNumber,
+        Self::ShortName,
     ];
 
     pub const fn index(self) -> usize {
@@ -57,6 +59,7 @@ impl RuleId {
             Self::TypeEscape => 8,
             Self::NestingDepth => 9,
             Self::MagicNumber => 10,
+            Self::ShortName => 11,
         }
     }
 
@@ -73,6 +76,7 @@ impl RuleId {
             Self::TypeEscape => "type-escape",
             Self::NestingDepth => "nesting-depth",
             Self::MagicNumber => "magic-number",
+            Self::ShortName => "short-name",
         }
     }
 
@@ -89,6 +93,7 @@ impl RuleId {
             Self::TypeEscape => "El cambio escapa del sistema de tipos",
             Self::NestingDepth => "Demasiados bloques anidados",
             Self::MagicNumber => "Un número sin nombre en medio de la lógica",
+            Self::ShortName => "Un nombre demasiado corto o ambiguo para lo que abarca",
         }
     }
 }
@@ -161,6 +166,7 @@ pub fn evaluate(file: &FileIdentity, analysis: &FileAnalysis, limits: Limits) ->
         })
         .chain(nesting_diagnostics(file, analysis, limits))
         .chain(magic_number_diagnostics(file, analysis))
+        .chain(short_name_diagnostics(file, analysis))
         .collect()
 }
 
@@ -212,6 +218,30 @@ fn magic_number_diagnostics<'analysis>(
             value: MAGIC_NUMBER_COUNT,
             limit: NO_MAGIC_NUMBERS,
             fingerprint: format!("magic-number:{}:{}#{occurrence}", file.relative, found.text),
+            relative_path: file.relative.clone(),
+            absolute_path: file.absolute.clone(),
+        }
+    })
+}
+
+fn short_name_diagnostics<'analysis>(
+    file: &'analysis FileIdentity,
+    analysis: &'analysis FileAnalysis,
+) -> impl Iterator<Item = Diagnostic> + 'analysis {
+    let mut occurrences: HashMap<&str, usize> = HashMap::new();
+    analysis.short_names.iter().map(move |found| {
+        let occurrence = occurrences.entry(found.name.as_str()).or_default();
+        *occurrence = occurrence.saturating_add(1);
+        Diagnostic {
+            path: file.display.clone(),
+            line: found.line,
+            column: found.column,
+            end_line: found.line,
+            rule: RuleId::ShortName,
+            message: format!("`{}` es un nombre demasiado corto o ambiguo", found.name),
+            value: found.name.chars().count(),
+            limit: NO_MAGIC_NUMBERS,
+            fingerprint: format!("short-name:{}:{}#{occurrence}", file.relative, found.name),
             relative_path: file.relative.clone(),
             absolute_path: file.absolute.clone(),
         }
@@ -290,7 +320,8 @@ fn message(finding: &Finding<'_>, name: &str) -> String {
         | RuleId::TestRemoved
         | RuleId::TypeEscape
         | RuleId::NestingDepth
-        | RuleId::MagicNumber => finding.rule.description().to_owned(),
+        | RuleId::MagicNumber
+        | RuleId::ShortName => finding.rule.description().to_owned(),
     }
 }
 

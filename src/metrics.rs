@@ -2,6 +2,7 @@ mod cognitive;
 mod cognitive_pmd;
 mod cyclomatic;
 pub mod magic;
+pub mod names;
 pub mod nesting;
 mod parameters;
 mod recursion;

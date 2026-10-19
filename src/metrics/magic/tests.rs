@@ -1,6 +1,6 @@
 use tree_sitter::Parser;
 
-use super::number::numeric_value;
+use super::number::{java_integer_value, numeric_value};
 use crate::analysis::analyze;
 use crate::language::Language;
 use crate::limits::Limits;
@@ -36,6 +36,13 @@ fn reads_numbers_in_every_notation() {
     assert_eq!(numeric_value("2.0f"), Some(2.0));
     assert_eq!(numeric_value("1e3"), Some(1000.0));
     assert_eq!(numeric_value("0x1p3"), None);
+    assert_eq!(
+        java_integer_value("0xffffffff"),
+        Some(-1),
+        "un int de Java desborda como en Checkstyle"
+    );
+    assert_eq!(java_integer_value("0xFFFF_FFFF_FFFF_FFFFL"), Some(-1));
+    assert_eq!(java_integer_value("017"), Some(15));
 }
 
 #[test]

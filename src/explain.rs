@@ -58,6 +58,11 @@ pub const fn explain(rule: RuleId) -> Explanation {
             why: "Un 86400 suelto obliga a adivinar qué representa y, cuando cambia, a buscar cada copia.",
             example: "if (edad >= 18) se vuelve const MAYORIA_DE_EDAD = 18; if (edad >= MAYORIA_DE_EDAD).",
         },
+        RuleId::ShortName => Explanation {
+            fix: "usá un nombre que diga qué guarda la variable",
+            why: "Con una letra hay que leer todo el bloque para saber qué es, y l, O e I se confunden con 1 y 0.",
+            example: "for (const p of pedidos) se vuelve for (const pedido of pedidos).",
+        },
         RuleId::TypeEscape => Explanation {
             fix: "tipá el valor; con datos externos, unknown y validación",
             why: "any y as unknown as apagan el compilador justo donde más falta hace.",

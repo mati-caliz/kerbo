@@ -33,6 +33,7 @@ pub struct Profile {
     pub cognitive: CognitiveShape,
     pub nesting: NestingStyle,
     pub magic_numbers: MagicNumberStyle,
+    pub short_names: ShortNameStyle,
     pub comments: Kinds,
     pub literals: Kinds,
     pub function_length_skips_iife: bool,
@@ -115,7 +116,7 @@ pub struct CognitiveShape {
 pub struct PmdShape {
     pub structural: Kinds,
     pub nesting_only: Kinds,
-    pub block: &'static str,
+    pub blocks: Kinds,
     pub negation: (&'static str, &'static str),
     pub invocation: &'static str,
     pub this: &'static str,
@@ -125,6 +126,14 @@ pub struct PmdShape {
 pub struct ShortCircuit {
     pub container: &'static str,
     pub conditional: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShortNameStyle {
+    Eslint,
+    Checkstyle,
+    Varnamelen,
+    Ruff,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

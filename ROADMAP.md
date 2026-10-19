@@ -110,8 +110,10 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   de Checkstyle).
 - Números mágicos (hecho en los cuatro lenguajes, con paridad contra `no-magic-numbers` con las
   opciones del estándar, `MagicNumber` de Checkstyle, mnd y `PLR2004` de ruff).
-- Nombres cortos, bloques duplicados y comentarios que narran lo obvio, cada una con paridad
-  contra la herramienta que ya la tiene en cada lenguaje.
+- Nombres cortos (hecho en los cuatro lenguajes, con paridad contra `id-length` de ESLint,
+  `LocalVariableName` de Checkstyle, varnamelen y los nombres ambiguos de ruff).
+- Bloques duplicados y comentarios que narran lo obvio, cada una con paridad contra la
+  herramienta que ya la tiene en cada lenguaje.
 - **Rust** como quinto lenguaje (contra clippy), así kerbo se analiza a sí mismo.
 
 ### 6. Distribución
