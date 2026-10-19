@@ -10,6 +10,8 @@ use crate::metrics::FunctionMetrics;
 
 const FIRST_LINE: usize = 1;
 const FIRST_COLUMN: usize = 1;
+const MAGIC_NUMBER_COUNT: usize = 1;
+const NO_MAGIC_NUMBERS: usize = 0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -24,10 +26,11 @@ pub enum RuleId {
     TestRemoved,
     TypeEscape,
     NestingDepth,
+    MagicNumber,
 }
 
 impl RuleId {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::FileLength,
         Self::FunctionLength,
         Self::CyclomaticComplexity,
@@ -38,6 +41,7 @@ impl RuleId {
         Self::TestRemoved,
         Self::TypeEscape,
         Self::NestingDepth,
+        Self::MagicNumber,
     ];
 
     pub const fn index(self) -> usize {
@@ -52,6 +56,7 @@ impl RuleId {
             Self::TestRemoved => 7,
             Self::TypeEscape => 8,
             Self::NestingDepth => 9,
+            Self::MagicNumber => 10,
         }
     }
 
@@ -67,6 +72,7 @@ impl RuleId {
             Self::TestRemoved => "test-removed",
             Self::TypeEscape => "type-escape",
             Self::NestingDepth => "nesting-depth",
+            Self::MagicNumber => "magic-number",
         }
     }
 
@@ -82,6 +88,7 @@ impl RuleId {
             Self::TestRemoved => "El cambio borra tests",
             Self::TypeEscape => "El cambio escapa del sistema de tipos",
             Self::NestingDepth => "Demasiados bloques anidados",
+            Self::MagicNumber => "Un número sin nombre en medio de la lógica",
         }
     }
 }
@@ -153,6 +160,7 @@ pub fn evaluate(file: &FileIdentity, analysis: &FileAnalysis, limits: Limits) ->
             diagnostic(file, &finding, analysis.file_lines, *occurrence)
         })
         .chain(nesting_diagnostics(file, analysis, limits))
+        .chain(magic_number_diagnostics(file, analysis))
         .collect()
 }
 
@@ -183,6 +191,30 @@ fn nesting_diagnostics<'analysis>(
             relative_path: file.relative.clone(),
             absolute_path: file.absolute.clone(),
         })
+    })
+}
+
+fn magic_number_diagnostics<'analysis>(
+    file: &'analysis FileIdentity,
+    analysis: &'analysis FileAnalysis,
+) -> impl Iterator<Item = Diagnostic> + 'analysis {
+    let mut occurrences: HashMap<&str, usize> = HashMap::new();
+    analysis.magic_numbers.iter().map(move |found| {
+        let occurrence = occurrences.entry(found.text.as_str()).or_default();
+        *occurrence = occurrence.saturating_add(1);
+        Diagnostic {
+            path: file.display.clone(),
+            line: found.line,
+            column: found.column,
+            end_line: found.line,
+            rule: RuleId::MagicNumber,
+            message: format!("El número `{}` no tiene nombre", found.text),
+            value: MAGIC_NUMBER_COUNT,
+            limit: NO_MAGIC_NUMBERS,
+            fingerprint: format!("magic-number:{}:{}#{occurrence}", file.relative, found.text),
+            relative_path: file.relative.clone(),
+            absolute_path: file.absolute.clone(),
+        }
     })
 }
 
@@ -257,7 +289,8 @@ fn message(finding: &Finding<'_>, name: &str) -> String {
         | RuleId::TestDisabled
         | RuleId::TestRemoved
         | RuleId::TypeEscape
-        | RuleId::NestingDepth => finding.rule.description().to_owned(),
+        | RuleId::NestingDepth
+        | RuleId::MagicNumber => finding.rule.description().to_owned(),
     }
 }
 

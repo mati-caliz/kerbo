@@ -177,12 +177,14 @@ pestaña de cambios del pull request) y falla el job si hay problemas.
 | `cognitive-complexity` | 15 | — | 15 | 15 |
 | `parameter-count` | 4 | 6 (sin `self` ni `cls`) | 5 (sin `@Override`) | 4 |
 | `nesting-depth` | 4 bloques | — | — | 4 bloques de control |
+| `magic-number` | fuera de constantes de módulo, enums, tipos y defaults; -1, 0, 1 y 2 valen | sólo en comparaciones; 0 y 1 valen | fuera de campos, constantes y `hashCode`; -1, 0, 1 y 2 valen | en argumentos, asignaciones, casos, condiciones, operaciones y retornos; 0 y 1 valen |
 
 Cada lenguaje cuenta como su herramienta de referencia: ESLint y sonarjs, ruff, Checkstyle y PMD,
-cyclop, gocognit, funlen y revive. Esas diferencias de criterio no están documentadas en ningún
+cyclop, gocognit, funlen, revive y mnd. Esas diferencias de criterio no están documentadas en ningún
 lado; cada una salió de comparar contra repos reales y quedó fijada en un test de
-`src/metrics/tests.rs` (el anidamiento, en `src/metrics/nesting/tests.rs`). En los tests de TypeScript no se mide el largo de función, y en los de
-Python no se cuentan los parámetros.
+`src/metrics/tests.rs` (el anidamiento y los números mágicos, en los `tests.rs` de su módulo). En
+los tests no se buscan números mágicos, en los de TypeScript no se mide el largo de función y en
+los de Python no se cuentan los parámetros. El preset `minimal` no busca números mágicos.
 
 Esos son los umbrales del preset `strict`. Más reglas y la capa para agentes de IA están en la
 [hoja de ruta](ROADMAP.md).

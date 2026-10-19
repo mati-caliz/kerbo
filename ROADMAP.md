@@ -107,8 +107,11 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 
 - Anidamiento (hecho para TypeScript y Go, con paridad contra `max-depth` de ESLint y
   `max-control-nesting` de revive; Java mide `if`, `for` y `try` por separado y va con las reglas
-  de Checkstyle), números mágicos, nombres cortos, bloques duplicados y comentarios que narran lo
-  obvio, cada una con paridad contra la herramienta que ya la tiene en cada lenguaje.
+  de Checkstyle).
+- Números mágicos (hecho en los cuatro lenguajes, con paridad contra `no-magic-numbers` con las
+  opciones del estándar, `MagicNumber` de Checkstyle, mnd y `PLR2004` de ruff).
+- Nombres cortos, bloques duplicados y comentarios que narran lo obvio, cada una con paridad
+  contra la herramienta que ya la tiene en cada lenguaje.
 - **Rust** como quinto lenguaje (contra clippy), así kerbo se analiza a sí mismo.
 
 ### 6. Distribución

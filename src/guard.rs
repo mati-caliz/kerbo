@@ -200,7 +200,8 @@ fn marker_message(rule: RuleId, text: &str) -> String {
         | RuleId::CognitiveComplexity
         | RuleId::ParameterCount
         | RuleId::TestRemoved
-        | RuleId::NestingDepth => {
+        | RuleId::NestingDepth
+        | RuleId::MagicNumber => {
             format!("Se agregó `{text}`: arreglá la causa, o dejá la excepción en kerbo.toml con su motivo")
         }
     }

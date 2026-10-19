@@ -1,6 +1,6 @@
 use super::{
-    CaseShape, CognitiveShape, CountedLines, GuardShape, LineSpan, LogicalShape, NO_PARTIAL_UNITS,
-    NestingStyle, ParameterShape, Profile, RecursionShape, SpanBounds, TestFiles,
+    CaseShape, CognitiveShape, CountedLines, GuardShape, LineSpan, LogicalShape, MagicNumberStyle,
+    NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, SpanBounds, TestFiles,
 };
 
 pub static GO: Profile = Profile {
@@ -72,13 +72,10 @@ pub static GO: Profile = Profile {
         leaking_branch_parent: None,
         pmd: None,
         skipped_units: &[],
-        recursion: Some(RecursionShape {
-            unit: "function_declaration",
-            call: "call_expression",
-            callee: "identifier",
-        }),
+        counts_recursion: true,
     },
     nesting: NestingStyle::ControlFlow,
+    magic_numbers: MagicNumberStyle::Mnd,
     comments: &["comment"],
     literals: &["raw_string_literal", "interpreted_string_literal"],
     function_length_skips_iife: false,

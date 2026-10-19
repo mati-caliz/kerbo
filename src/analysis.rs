@@ -3,15 +3,19 @@ use std::fmt;
 use tree_sitter::Parser;
 
 use crate::language::Language;
+use crate::limits::Limits;
 use crate::lines::LineMap;
+use crate::metrics::magic::{MagicNumber, find_magic_numbers};
 use crate::metrics::nesting::{NestingFinding, find_deep_nesting};
 use crate::metrics::{FunctionMetrics, measure_functions};
+use crate::rules::RuleId;
 
 #[derive(Debug)]
 pub struct FileAnalysis {
     pub file_lines: usize,
     pub functions: Vec<FunctionMetrics>,
     pub nesting: Vec<NestingFinding>,
+    pub magic_numbers: Vec<MagicNumber>,
 }
 
 #[derive(Debug)]
@@ -27,7 +31,7 @@ pub fn analyze(
     parser: &mut Parser,
     language: Language,
     source: &[u8],
-    nesting_limit: Option<usize>,
+    limits: Limits,
 ) -> Result<FileAnalysis, ParseFailed> {
     let tree = parser.parse(source, None).ok_or(ParseFailed)?;
     let root = tree.root_node();
@@ -38,6 +42,11 @@ pub fn analyze(
     Ok(FileAnalysis {
         file_lines,
         functions: measure_functions(root, source, profile, &line_map),
-        nesting: find_deep_nesting(root, profile.nesting, nesting_limit),
+        nesting: find_deep_nesting(root, profile.nesting, limits.get(RuleId::NestingDepth)),
+        magic_numbers: if limits.get(RuleId::MagicNumber).is_some() {
+            find_magic_numbers(root, source, profile.magic_numbers)
+        } else {
+            Vec::new()
+        },
     })
 }

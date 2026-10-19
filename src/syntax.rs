@@ -64,6 +64,25 @@ pub fn function_name(node: Node<'_>, source: &[u8]) -> String {
         .map_or_else(|| ANONYMOUS_FUNCTION.to_owned(), str::to_owned)
 }
 
+pub fn descendants(root: Node<'_>) -> Vec<Node<'_>> {
+    let mut found = Vec::new();
+    let mut pending = vec![root];
+    while let Some(node) = pending.pop() {
+        found.push(node);
+        pending.extend(
+            (0..node.child_count())
+                .rev()
+                .filter_map(|index| node.child(index)),
+        );
+    }
+    found
+}
+
+pub fn named_children(node: Node<'_>) -> Vec<Node<'_>> {
+    let mut cursor = node.walk();
+    node.named_children(&mut cursor).collect()
+}
+
 pub const fn one_based(position: usize) -> usize {
     position.saturating_add(1)
 }

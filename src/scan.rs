@@ -11,7 +11,7 @@ use crate::analysis::analyze;
 use crate::config::Config;
 use crate::language::{Language, Stack};
 use crate::limits::LimitOverride;
-use crate::rules::{Diagnostic, FileIdentity, RuleId, evaluate};
+use crate::rules::{Diagnostic, FileIdentity, evaluate};
 
 const PATH_SEPARATOR: &str = "/";
 
@@ -113,13 +113,7 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
     let mut parser = Parser::new();
     parser.set_language(&file.language.grammar()).ok()?;
     let limits = config.limits_for(relative, file.language, file.is_test);
-    let analysis = analyze(
-        &mut parser,
-        file.language,
-        source,
-        limits.get(RuleId::NestingDepth),
-    )
-    .ok()?;
+    let analysis = analyze(&mut parser, file.language, source, limits).ok()?;
     Some(evaluate(&file.identity, &analysis, limits))
 }
 
@@ -147,8 +141,17 @@ fn collect_files(roots: &[PathBuf], project_root: &Path) -> (Vec<SourceFile>, Ve
 
 fn source_file(walk_root: &Path, path: &Path, project_root: &Path) -> Option<SourceFile> {
     let language = Language::from_path(path)?;
-    let is_test = language.is_test_path(path.strip_prefix(walk_root).unwrap_or(path));
     let absolute = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let test_path = absolute
+        .strip_prefix(project_root)
+        .ok()
+        .or_else(|| {
+            path.strip_prefix(walk_root)
+                .ok()
+                .filter(|relative| !relative.as_os_str().is_empty())
+        })
+        .unwrap_or(path);
+    let is_test = language.is_test_path(test_path);
     let relative = absolute
         .strip_prefix(project_root)
         .map_or_else(|_| portable(path), portable);
@@ -193,8 +196,8 @@ fn check_file(
         .fold(configured, |limits, &limit_override| {
             limits.with_override(limit_override)
         });
-    let analysis = analyze(parser, file.language, &source, limits.get(RuleId::NestingDepth))
-        .map_err(|error| failure(error.to_string()))?;
+    let analysis =
+        analyze(parser, file.language, &source, limits).map_err(|error| failure(error.to_string()))?;
     Ok(evaluate(&file.identity, &analysis, limits))
 }
 

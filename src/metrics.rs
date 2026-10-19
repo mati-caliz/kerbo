@@ -1,8 +1,12 @@
 mod cognitive;
 mod cognitive_pmd;
 mod cyclomatic;
+pub mod magic;
 pub mod nesting;
 mod parameters;
+mod recursion;
+
+use std::collections::HashSet;
 
 use tree_sitter::Node;
 
@@ -29,6 +33,7 @@ struct Context<'context> {
     source: &'context [u8],
     profile: &'context Profile,
     line_map: &'context LineMap,
+    recursive: HashSet<usize>,
 }
 
 pub fn measure_functions(
@@ -41,6 +46,11 @@ pub fn measure_functions(
         source,
         profile,
         line_map,
+        recursive: if profile.cognitive.counts_recursion {
+            recursion::recursive_units(root, source)
+        } else {
+            HashSet::new()
+        },
     };
     let mut functions = Vec::new();
     let mut pending = vec![root];
@@ -58,6 +68,7 @@ fn measure_unit(node: Node<'_>, context: &Context<'_>) -> Option<FunctionMetrics
         source,
         profile,
         line_map,
+        ..
     } = *context;
     let kind = node.kind();
     if profile.units.contains(&kind) {
@@ -68,7 +79,8 @@ fn measure_unit(node: Node<'_>, context: &Context<'_>) -> Option<FunctionMetrics
                 function_lines(node, profile, line_map)
             },
             cyclomatic: Some(cyclomatic::cyclomatic(node, profile, source)),
-            cognitive: cognitive_of(node, profile, source),
+            cognitive: cognitive_of(node, profile, source)
+                .map(|score| score.saturating_add(usize::from(context.recursive.contains(&node.id())))),
             parameters: parameters::parameter_count(node, profile, source),
             ..unmeasured(node, source)
         });

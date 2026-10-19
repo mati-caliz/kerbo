@@ -79,9 +79,15 @@ impl Preset {
             Self::Minimal => (MINIMAL, NESTING_MINIMAL),
         };
         let base = Limits::with_metrics(metrics).with_rule(RuleId::NestingDepth, nesting);
+        let base = if self == Self::Minimal {
+            base.with_rule(RuleId::MagicNumber, None)
+        } else {
+            base
+        };
         if !is_test {
             return base;
         }
+        let base = base.with_rule(RuleId::MagicNumber, None);
         match language {
             Language::TypeScript | Language::Tsx | Language::JavaScript => {
                 base.with_rule(RuleId::FunctionLength, None)

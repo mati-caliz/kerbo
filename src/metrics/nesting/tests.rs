@@ -2,18 +2,25 @@ use tree_sitter::Parser;
 
 use crate::analysis::analyze;
 use crate::language::Language;
+use crate::limits::Limits;
+use crate::rules::RuleId;
 
 fn nesting_of(language: Language, source: &str, limit: usize) -> Vec<(usize, usize)> {
     let mut parser = Parser::new();
     parser
         .set_language(&language.grammar())
         .expect("la gramática carga");
-    analyze(&mut parser, language, source.as_bytes(), Some(limit))
-        .expect("el archivo se parsea")
-        .nesting
-        .into_iter()
-        .map(|found| (found.line, found.depth))
-        .collect()
+    analyze(
+        &mut parser,
+        language,
+        source.as_bytes(),
+        Limits::default().with_rule(RuleId::NestingDepth, Some(limit)),
+    )
+    .expect("el archivo se parsea")
+    .nesting
+    .into_iter()
+    .map(|found| (found.line, found.depth))
+    .collect()
 }
 
 #[test]

@@ -53,6 +53,11 @@ pub const fn explain(rule: RuleId) -> Explanation {
             why: "Cada nivel de anidamiento es una condición más que el lector tiene que sostener para entender una línea.",
             example: "for (...) { if (ok) { ... } } se vuelve for (...) { if (!ok) continue; ... }",
         },
+        RuleId::MagicNumber => Explanation {
+            fix: "dale nombre: una constante que diga qué es el número",
+            why: "Un 86400 suelto obliga a adivinar qué representa y, cuando cambia, a buscar cada copia.",
+            example: "if (edad >= 18) se vuelve const MAYORIA_DE_EDAD = 18; if (edad >= MAYORIA_DE_EDAD).",
+        },
         RuleId::TypeEscape => Explanation {
             fix: "tipá el valor; con datos externos, unknown y validación",
             why: "any y as unknown as apagan el compilador justo donde más falta hace.",

@@ -60,7 +60,17 @@ fn tests_relax_only_what_the_standard_relaxes() {
     );
     assert_eq!(
         Preset::Strict.limits(Language::Java, true),
-        Preset::Strict.limits(Language::Java, false)
+        Preset::Strict
+            .limits(Language::Java, false)
+            .with_rule(RuleId::MagicNumber, None),
+        "en los tests de Java sólo se apagan los números mágicos, como en el estándar"
+    );
+    assert_eq!(typescript.get(RuleId::MagicNumber), None);
+    assert_eq!(
+        Preset::Minimal
+            .limits(Language::Go, false)
+            .get(RuleId::MagicNumber),
+        None
     );
 }
 

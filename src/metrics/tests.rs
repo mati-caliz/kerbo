@@ -3,13 +3,14 @@ use tree_sitter::Parser;
 use super::FunctionMetrics;
 use crate::analysis::{FileAnalysis, analyze};
 use crate::language::Language;
+use crate::limits::Limits;
 
 fn analyze_source(language: Language, source: &str) -> FileAnalysis {
     let mut parser = Parser::new();
     parser
         .set_language(&language.grammar())
         .expect("la gramática carga");
-    analyze(&mut parser, language, source.as_bytes(), None).expect("el archivo se parsea")
+    analyze(&mut parser, language, source.as_bytes(), Limits::default()).expect("el archivo se parsea")
 }
 
 fn function_named<'analysis>(analysis: &'analysis FileAnalysis, name: &str) -> &'analysis FunctionMetrics {
@@ -350,18 +351,37 @@ fn empty_file_has_no_lines() {
 fn counts_go_recursion_and_unnamed_parameters_like_gocognit_and_revive() {
     let analysis = analyze_source(
         Language::Go,
-        "package a\n\nfunc walk(n int) int {\n\tif n > 0 {\n\t\treturn walk(n - 1)\n\t}\n\treturn 0\n}\n\nfunc ignore(*T, string) {}\n\nfunc (r R) walk(n int) int {\n\treturn walk(n)\n}\n",
+        "package a\n\nfunc walk(n int) int {\n\tif n > 0 {\n\t\treturn walk(n - 1) + walk(n - 2)\n\t}\n\treturn 0\n}\n\nfunc ignore(*T, string) {}\n\nfunc (r R) walk(n int) int {\n\treturn walk(n)\n}\n\nfunc (p *P) scan() { p.scan() }\n\nfunc ping() { pong() }\n\nfunc pong() { ping() }\n",
     );
     let walk = analysis.functions.first().expect("hay funciones");
-    assert_eq!(walk.cognitive, Some(2), "gocognit suma la llamada recursiva");
+    assert_eq!(
+        walk.cognitive,
+        Some(2),
+        "gocognit 1.3 suma uno por estar en un ciclo, no por llamada"
+    );
+    assert_eq!(
+        function_named(&analysis, "scan").cognitive,
+        Some(1),
+        "la recursión por el receptor cuenta"
+    );
+    assert_eq!(
+        function_named(&analysis, "pong").cognitive,
+        Some(1),
+        "la recursión mutua también"
+    );
     assert_eq!(
         function_named(&analysis, "ignore").parameters,
         Some(0),
         "revive cuenta nombres"
     );
+    let method = analysis
+        .functions
+        .iter()
+        .find(|function| function.name == "walk" && function.line > 3)
+        .expect("está el método");
     assert_eq!(
-        analysis.functions.last().and_then(|method| method.cognitive),
+        method.cognitive,
         Some(0),
-        "un método no es recursión para gocognit"
+        "llamar a la función homónima no es recursión del método"
     );
 }

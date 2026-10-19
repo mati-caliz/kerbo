@@ -76,3 +76,22 @@ fn follows_the_project_configuration() {
         .collect();
     assert_eq!(reported, ["src/new.ts"]);
 }
+
+#[test]
+fn recognizes_tests_passed_as_single_files() {
+    let tree = TempTree::new("scan-single-test");
+    let magic = "package a\n\nfunc f() int { return 5 }\n";
+    tree.write("a_test.go", magic);
+    tree.write("a.go", magic);
+    let outcome = scan_tree(
+        tree.path(),
+        &[tree.path().join("a_test.go"), tree.path().join("a.go")],
+        &[],
+    );
+    let reported: Vec<&str> = outcome
+        .diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.relative_path.as_str())
+        .collect();
+    assert_eq!(reported, ["a.go"], "los números mágicos de un test no cuentan");
+}

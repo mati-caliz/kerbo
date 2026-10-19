@@ -1,6 +1,6 @@
 use super::{
-    CaseShape, CognitiveShape, CountedLines, GuardShape, LineSpan, LogicalShape, NestingStyle,
-    ParameterShape, PartialUnits, PmdShape, Profile, SpanBounds, TestFiles,
+    CaseShape, CognitiveShape, CountedLines, GuardShape, LineSpan, LogicalShape, MagicNumberStyle,
+    NestingStyle, ParameterShape, PartialUnits, PmdShape, Profile, SpanBounds, TestFiles,
 };
 
 pub static JAVA: Profile = Profile {
@@ -113,9 +113,10 @@ pub static JAVA: Profile = Profile {
             this: "this",
         }),
         skipped_units: &["compact_constructor_declaration"],
-        recursion: None,
+        counts_recursion: false,
     },
     nesting: NestingStyle::Unmeasured,
+    magic_numbers: MagicNumberStyle::Checkstyle,
     comments: &["line_comment", "block_comment"],
     literals: &["string_literal"],
     function_length_skips_iife: false,
