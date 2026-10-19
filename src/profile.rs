@@ -8,22 +8,40 @@ pub use go::GO;
 pub use java::JAVA;
 pub use python::PYTHON;
 
+pub const NO_PARTIAL_UNITS: PartialUnits = PartialUnits {
+    complexity_only: &[],
+    signature_only: &[],
+};
+
 pub type Kinds = &'static [&'static str];
 
 #[derive(Debug)]
 pub struct Profile {
     pub units: Kinds,
     pub inline_functions: Kinds,
+    pub partial_units: PartialUnits,
+    pub leading_attachments: Kinds,
     pub parameters: ParameterShape,
     pub test_files: TestFiles,
     pub decisions: Kinds,
+    pub decision_fields: &'static [(&'static str, &'static str)],
+    pub decision_parents: &'static [(&'static str, &'static str)],
+    pub nested_units_add_to_cyclomatic: bool,
     pub cases: CaseShape,
     pub logical: LogicalShape,
     pub cognitive: CognitiveShape,
     pub comments: Kinds,
+    pub literals: Kinds,
+    pub function_length_skips_iife: bool,
     pub parenthesized: Kinds,
     pub function_lines: LineSpan,
     pub file_lines: LineSpan,
+}
+
+#[derive(Debug)]
+pub struct PartialUnits {
+    pub complexity_only: &'static [(&'static str, Option<&'static str>)],
+    pub signature_only: Kinds,
 }
 
 #[derive(Debug)]
@@ -33,7 +51,9 @@ pub struct ParameterShape {
     pub single_field: Option<&'static str>,
     pub counted: Kinds,
     pub excluded_inner: Kinds,
-    pub excluded_names: Kinds,
+    pub static_decorator: Option<&'static str>,
+    pub method_container: Option<&'static str>,
+    pub excludes_dummy_names: bool,
     pub exempting_annotation: Option<&'static str>,
     pub names_per_declaration: bool,
 }
@@ -48,11 +68,13 @@ pub struct TestFiles {
 pub struct CaseShape {
     pub kinds: Kinds,
     pub default_marker: Option<&'static str>,
+    pub wildcard_pattern: Option<&'static str>,
 }
 
 #[derive(Debug)]
 pub struct LogicalShape {
     pub kinds: Kinds,
+    pub sequence_operators: Kinds,
     pub cognitive_operators: Kinds,
     pub cyclomatic_operators: Kinds,
 }
@@ -64,6 +86,26 @@ pub struct CognitiveShape {
     pub nesting: Kinds,
     pub flat: Kinds,
     pub labeled_jumps: Kinds,
+    pub short_circuit: Option<ShortCircuit>,
+    pub leaking_branch_parent: Option<&'static str>,
+    pub pmd: Option<PmdShape>,
+    pub skipped_units: Kinds,
+}
+
+#[derive(Debug)]
+pub struct PmdShape {
+    pub structural: Kinds,
+    pub nesting_only: Kinds,
+    pub block: &'static str,
+    pub negation: (&'static str, &'static str),
+    pub invocation: &'static str,
+    pub this: &'static str,
+}
+
+#[derive(Debug)]
+pub struct ShortCircuit {
+    pub container: &'static str,
+    pub conditional: &'static str,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +119,7 @@ pub enum SpanBounds {
 pub enum CountedLines {
     All,
     Code,
+    Tokens,
 }
 
 #[derive(Debug, Clone, Copy)]

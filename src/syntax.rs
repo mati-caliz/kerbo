@@ -5,6 +5,7 @@ use crate::profile::{Kinds, Profile};
 const ANONYMOUS_FUNCTION: &str = "(anónima)";
 const NAME_FIELD: &str = "name";
 const NAMING_PARENTS: &[&str] = &[
+    "type_alias_declaration",
     "variable_declarator",
     "pair",
     "public_field_definition",

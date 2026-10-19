@@ -1,4 +1,7 @@
-use super::{CaseShape, CognitiveShape, LineSpan, LogicalShape, ParameterShape, Profile, TestFiles};
+use super::{
+    CaseShape, CognitiveShape, LineSpan, LogicalShape, ParameterShape, PartialUnits, Profile, ShortCircuit,
+    TestFiles,
+};
 
 const FUNCTIONS: &[&str] = &[
     "function_declaration",
@@ -12,8 +15,26 @@ const FUNCTIONS: &[&str] = &[
 pub static ECMASCRIPT: Profile = Profile {
     units: FUNCTIONS,
     inline_functions: &[],
+    partial_units: PartialUnits {
+        complexity_only: &[
+            ("class_static_block", None),
+            ("public_field_definition", Some("value")),
+            ("field_definition", Some("value")),
+        ],
+        signature_only: &["function_type", "function_signature"],
+    },
+    leading_attachments: &["decorator"],
     parameters: ParameterShape {
-        checked_units: FUNCTIONS,
+        checked_units: &[
+            "function_declaration",
+            "function_expression",
+            "generator_function_declaration",
+            "generator_function",
+            "arrow_function",
+            "method_definition",
+            "function_type",
+            "function_signature",
+        ],
         list_field: "parameters",
         single_field: Some("parameter"),
         counted: &[
@@ -26,7 +47,9 @@ pub static ECMASCRIPT: Profile = Profile {
             "array_pattern",
         ],
         excluded_inner: &[],
-        excluded_names: &[],
+        static_decorator: None,
+        method_container: None,
+        excludes_dummy_names: false,
         exempting_annotation: None,
         names_per_declaration: false,
     },
@@ -42,15 +65,23 @@ pub static ECMASCRIPT: Profile = Profile {
         "while_statement",
         "do_statement",
         "catch_clause",
+        "optional_chain",
+        "assignment_pattern",
+        "object_assignment_pattern",
     ],
+    decision_fields: &[("required_parameter", "value")],
+    decision_parents: &[("?.", "call_expression")],
+    nested_units_add_to_cyclomatic: false,
     cases: CaseShape {
         kinds: &["switch_case"],
         default_marker: None,
+        wildcard_pattern: None,
     },
     logical: LogicalShape {
-        kinds: &["binary_expression"],
-        cognitive_operators: &["&&", "||"],
-        cyclomatic_operators: &["&&", "||", "??"],
+        kinds: &["binary_expression", "augmented_assignment_expression"],
+        sequence_operators: &["&&", "||", "??"],
+        cognitive_operators: &["&&"],
+        cyclomatic_operators: &["&&", "||", "??", "&&=", "||=", "??="],
     },
     cognitive: CognitiveShape {
         if_kind: "if_statement",
@@ -66,8 +97,17 @@ pub static ECMASCRIPT: Profile = Profile {
         ],
         flat: &[],
         labeled_jumps: &["break_statement", "continue_statement"],
+        short_circuit: Some(ShortCircuit {
+            container: "jsx_expression",
+            conditional: "ternary_expression",
+        }),
+        leaking_branch_parent: Some("ternary_expression"),
+        pmd: None,
+        skipped_units: &[],
     },
     comments: &["comment", "html_comment"],
+    literals: &["string", "template_string"],
+    function_length_skips_iife: true,
     parenthesized: &["parenthesized_expression"],
     function_lines: LineSpan::CODE_LINES,
     file_lines: LineSpan::CODE_LINES,

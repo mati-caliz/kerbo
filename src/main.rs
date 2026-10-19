@@ -19,6 +19,7 @@ use clap::{Args, Parser, Subcommand};
 
 use crate::language::Stack;
 use crate::report::{Format, render};
+use crate::rules::LimitOverride;
 use crate::scan::{ScanOutcome, scan};
 
 const EXIT_CLEAN: u8 = 0;
@@ -50,6 +51,12 @@ struct CheckArgs {
         help = "Analizar sólo estas pilas (se puede repetir)"
     )]
     languages: Vec<Stack>,
+    #[arg(
+        long = "max",
+        value_name = "REGLA=VALOR",
+        help = "Cambia el máximo de una regla en todos los lenguajes, también en los tests (se puede repetir)"
+    )]
+    overrides: Vec<LimitOverride>,
 }
 
 fn main() -> ExitCode {
@@ -63,7 +70,7 @@ fn main() -> ExitCode {
 
 fn run(arguments: &CheckArgs, report: &mut impl Write, log: &mut impl Write) -> u8 {
     let started = Instant::now();
-    let outcome = scan(&arguments.paths, &arguments.languages);
+    let outcome = scan(&arguments.paths, &arguments.languages, &arguments.overrides);
     let written = render(&outcome.diagnostics, arguments.format, report)
         .and_then(|()| report.flush())
         .and_then(|()| write_summary(&outcome, started, log));
@@ -111,6 +118,7 @@ mod tests {
             paths: vec![path],
             format,
             languages: Vec::new(),
+            overrides: Vec::new(),
         }
     }
 
@@ -123,6 +131,10 @@ mod tests {
         assert_eq!(arguments.paths, [PathBuf::from(".")]);
         assert_eq!(arguments.format, Format::Text);
         assert_eq!(arguments.languages, []);
+        let tuned = Cli::try_parse_from(["kerbo", "check", "--max", "parameter-count=0"]).expect("es válido");
+        let Command::Check(tuned) = tuned.command;
+        assert_eq!(tuned.overrides.len(), 1);
+        assert!(Cli::try_parse_from(["kerbo", "check", "--max", "nope=1"]).is_err());
     }
 
     #[test]

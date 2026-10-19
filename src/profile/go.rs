@@ -1,18 +1,22 @@
 use super::{
-    CaseShape, CognitiveShape, CountedLines, LineSpan, LogicalShape, ParameterShape, Profile, SpanBounds,
-    TestFiles,
+    CaseShape, CognitiveShape, CountedLines, LineSpan, LogicalShape, NO_PARTIAL_UNITS, ParameterShape,
+    Profile, SpanBounds, TestFiles,
 };
 
 pub static GO: Profile = Profile {
     units: &["function_declaration", "method_declaration"],
     inline_functions: &["func_literal"],
+    partial_units: NO_PARTIAL_UNITS,
+    leading_attachments: &[],
     parameters: ParameterShape {
         checked_units: &["function_declaration", "method_declaration"],
         list_field: "parameters",
         single_field: None,
         counted: &["parameter_declaration", "variadic_parameter_declaration"],
         excluded_inner: &[],
-        excluded_names: &[],
+        static_decorator: None,
+        method_container: None,
+        excludes_dummy_names: false,
         exempting_annotation: None,
         names_per_declaration: true,
     },
@@ -21,12 +25,17 @@ pub static GO: Profile = Profile {
         directories: &[],
     },
     decisions: &["if_statement", "for_statement"],
+    decision_fields: &[],
+    decision_parents: &[],
+    nested_units_add_to_cyclomatic: false,
     cases: CaseShape {
         kinds: &["expression_case", "type_case", "communication_case"],
         default_marker: None,
+        wildcard_pattern: None,
     },
     logical: LogicalShape {
         kinds: &["binary_expression"],
+        sequence_operators: &["&&", "||"],
         cognitive_operators: &["&&", "||"],
         cyclomatic_operators: &["&&", "||"],
     },
@@ -41,8 +50,14 @@ pub static GO: Profile = Profile {
         ],
         flat: &["goto_statement"],
         labeled_jumps: &["break_statement", "continue_statement"],
+        short_circuit: None,
+        leaking_branch_parent: None,
+        pmd: None,
+        skipped_units: &[],
     },
     comments: &["comment"],
+    literals: &["raw_string_literal", "interpreted_string_literal"],
+    function_length_skips_iife: false,
     parenthesized: &["parenthesized_expression"],
     function_lines: LineSpan {
         bounds: SpanBounds::Interior,

@@ -9,7 +9,7 @@ use tree_sitter::Parser;
 
 use crate::analysis::analyze;
 use crate::language::{Language, Stack};
-use crate::rules::{Diagnostic, Limits, evaluate};
+use crate::rules::{Diagnostic, LimitOverride, Limits, evaluate};
 
 #[derive(Debug)]
 pub struct ScanFailure {
@@ -44,12 +44,14 @@ impl ParserPool {
     }
 }
 
-pub fn scan(roots: &[PathBuf], stacks: &[Stack]) -> ScanOutcome {
+pub fn scan(roots: &[PathBuf], stacks: &[Stack], overrides: &[LimitOverride]) -> ScanOutcome {
     let (mut files, mut failures) = collect_files(roots);
     files.retain(|file| stacks.is_empty() || stacks.contains(&file.language.stack()));
     let results: Vec<Result<Vec<Diagnostic>, ScanFailure>> = files
         .par_iter()
-        .map_init(ParserPool::default, check_file)
+        .map_init(ParserPool::default, |pool, file| {
+            check_file(pool, file, overrides)
+        })
         .collect();
     let mut outcome = ScanOutcome {
         files: files.len(),
@@ -110,7 +112,11 @@ fn source_file(root: &Path, path: PathBuf) -> Option<SourceFile> {
     })
 }
 
-fn check_file(pool: &mut ParserPool, file: &SourceFile) -> Result<Vec<Diagnostic>, ScanFailure> {
+fn check_file(
+    pool: &mut ParserPool,
+    file: &SourceFile,
+    overrides: &[LimitOverride],
+) -> Result<Vec<Diagnostic>, ScanFailure> {
     let display_path = file.path.display().to_string();
     let failure = |reason: String| ScanFailure {
         path: display_path.clone(),
@@ -119,11 +125,11 @@ fn check_file(pool: &mut ParserPool, file: &SourceFile) -> Result<Vec<Diagnostic
     let source = fs::read(&file.path).map_err(|error| failure(error.to_string()))?;
     let parser = pool.parser(file.language).map_err(failure)?;
     let analysis = analyze(parser, file.language, &source).map_err(|error| failure(error.to_string()))?;
-    Ok(evaluate(
-        &display_path,
-        &analysis,
+    let limits = overrides.iter().fold(
         Limits::strict_for(file.language, file.is_test),
-    ))
+        |limits, &limit_override| limits.with_override(limit_override),
+    );
+    Ok(evaluate(&display_path, &analysis, limits))
 }
 
 #[cfg(test)]
@@ -139,7 +145,7 @@ mod tests {
         tree.write("b.py", "def f(a, b, c, d, e, f, g):\n    pass\n");
         tree.write("a/x.ts", "function f(a, b, c, d, e) {}\n");
         tree.write("notes.md", "# no es código\n");
-        let outcome = scan(&[tree.path().to_path_buf()], &[]);
+        let outcome = scan(&[tree.path().to_path_buf()], &[], &[]);
         assert_eq!(outcome.files, 2);
         assert!(outcome.failures.is_empty());
         let found: Vec<(bool, RuleId)> = outcome
@@ -158,11 +164,11 @@ mod tests {
         let tree = TempTree::new("scan-roots");
         tree.write("one/A.java", "class A { void f() {} }\n");
         tree.write("two.go", "package two\n");
-        let outcome = scan(&[tree.path().join("one"), tree.path().join("two.go")], &[]);
+        let outcome = scan(&[tree.path().join("one"), tree.path().join("two.go")], &[], &[]);
         assert_eq!(outcome.files, 2);
         assert!(outcome.diagnostics.is_empty());
-        assert!(scan(&[], &[]).diagnostics.is_empty());
-        let only_go = scan(&[tree.path().to_path_buf()], &[Stack::Go]);
+        assert!(scan(&[], &[], &[]).diagnostics.is_empty());
+        let only_go = scan(&[tree.path().to_path_buf()], &[Stack::Go], &[]);
         assert_eq!(only_go.files, 1);
     }
 }

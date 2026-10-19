@@ -1,8 +1,12 @@
-use super::{CaseShape, CognitiveShape, LineSpan, LogicalShape, ParameterShape, Profile, TestFiles};
+use super::{
+    CaseShape, CognitiveShape, LineSpan, LogicalShape, NO_PARTIAL_UNITS, ParameterShape, Profile, TestFiles,
+};
 
 pub static PYTHON: Profile = Profile {
     units: &["function_definition"],
     inline_functions: &["lambda"],
+    partial_units: NO_PARTIAL_UNITS,
+    leading_attachments: &[],
     parameters: ParameterShape {
         checked_units: &["function_definition"],
         list_field: "parameters",
@@ -14,8 +18,10 @@ pub static PYTHON: Profile = Profile {
             "typed_default_parameter",
         ],
         excluded_inner: &["list_splat_pattern", "dictionary_splat_pattern"],
-        excluded_names: &["self", "cls"],
-        exempting_annotation: None,
+        static_decorator: Some("staticmethod"),
+        method_container: Some("class_definition"),
+        excludes_dummy_names: true,
+        exempting_annotation: Some("overload"),
         names_per_declaration: false,
     },
     test_files: TestFiles {
@@ -29,12 +35,17 @@ pub static PYTHON: Profile = Profile {
         "while_statement",
         "except_clause",
     ],
+    decision_fields: &[],
+    decision_parents: &[("else_clause", "try_statement")],
+    nested_units_add_to_cyclomatic: true,
     cases: CaseShape {
         kinds: &["case_clause"],
         default_marker: None,
+        wildcard_pattern: Some("_"),
     },
     logical: LogicalShape {
         kinds: &["boolean_operator"],
+        sequence_operators: &["and", "or"],
         cognitive_operators: &["and", "or"],
         cyclomatic_operators: &[],
     },
@@ -50,8 +61,14 @@ pub static PYTHON: Profile = Profile {
         ],
         flat: &["elif_clause", "else_clause"],
         labeled_jumps: &[],
+        short_circuit: None,
+        leaking_branch_parent: None,
+        pmd: None,
+        skipped_units: &[],
     },
     comments: &["comment"],
+    literals: &["string"],
+    function_length_skips_iife: false,
     parenthesized: &["parenthesized_expression"],
     function_lines: LineSpan::ALL_LINES,
     file_lines: LineSpan::ALL_LINES,

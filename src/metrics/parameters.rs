@@ -5,6 +5,10 @@ use crate::profile::{ParameterShape, Profile};
 const NAME_FIELD: &str = "name";
 const IDENTIFIER_KIND: &str = "identifier";
 const MODIFIERS_KIND: &str = "modifiers";
+const DECORATED_KIND: &str = "decorated_definition";
+const DECORATOR_KIND: &str = "decorator";
+const BLOCK_KIND: &str = "block";
+const DUMMY_PREFIX: char = '_';
 
 pub(super) fn parameter_count(unit: Node<'_>, profile: &Profile, source: &[u8]) -> Option<usize> {
     let shape = &profile.parameters;
@@ -21,10 +25,16 @@ pub(super) fn parameter_count(unit: Node<'_>, profile: &Profile, source: &[u8]) 
     let Some(list) = unit.child_by_field_name(shape.list_field) else {
         return Some(0);
     };
+    let has_receiver = is_method(unit, shape) && !has_static_decorator(unit, shape, source);
     let mut cursor = list.walk();
     let declarations = list
         .named_children(&mut cursor)
-        .filter(|&declaration| is_counted(declaration, shape, source));
+        .filter(|declaration| shape.counted.contains(&declaration.kind()))
+        .enumerate()
+        .filter(|&(position, declaration)| {
+            !(has_receiver && position == 0) && is_counted(declaration, shape, source)
+        })
+        .map(|(_, declaration)| declaration);
     let count = if shape.names_per_declaration {
         declarations
             .map(|declaration| declared_names(declaration).max(1))
@@ -36,9 +46,6 @@ pub(super) fn parameter_count(unit: Node<'_>, profile: &Profile, source: &[u8]) 
 }
 
 fn is_counted(declaration: Node<'_>, shape: &ParameterShape, source: &[u8]) -> bool {
-    if !shape.counted.contains(&declaration.kind()) {
-        return false;
-    }
     let first_inner = declaration.named_child(0);
     if first_inner.is_some_and(|inner| shape.excluded_inner.contains(&inner.kind())) {
         return false;
@@ -51,7 +58,21 @@ fn is_counted(declaration: Node<'_>, shape: &ParameterShape, source: &[u8]) -> b
     !name_node
         .filter(|name| name.kind() == IDENTIFIER_KIND)
         .and_then(|name| name.utf8_text(source).ok())
-        .is_some_and(|name| shape.excluded_names.contains(&name))
+        .is_some_and(|name| shape.excludes_dummy_names && is_dummy_name(name))
+}
+
+fn is_dummy_name(name: &str) -> bool {
+    let without_underscores = name.trim_start_matches(DUMMY_PREFIX);
+    let has_prefix = without_underscores.len() < name.len();
+    has_prefix
+        && (without_underscores.is_empty() || name.ends_with(|last: char| last.is_ascii_alphanumeric()))
+}
+
+fn has_static_decorator(unit: Node<'_>, shape: &ParameterShape, source: &[u8]) -> bool {
+    let decorated = unit.parent().filter(|parent| parent.kind() == DECORATED_KIND);
+    shape
+        .static_decorator
+        .is_some_and(|name| decorated.is_some_and(|decorated| decorates_with(decorated, name, source)))
 }
 
 fn has_exempting_annotation(unit: Node<'_>, shape: &ParameterShape, source: &[u8]) -> bool {
@@ -62,7 +83,35 @@ fn has_exempting_annotation(unit: Node<'_>, shape: &ParameterShape, source: &[u8
     let modifiers = unit
         .children(&mut cursor)
         .find(|child| child.kind() == MODIFIERS_KIND);
+    let decorated = unit.parent().filter(|parent| parent.kind() == DECORATED_KIND);
     modifiers.is_some_and(|modifiers| annotates_with(modifiers, annotation_name, source))
+        || decorated.is_some_and(|decorated| decorates_with(decorated, annotation_name, source))
+}
+
+fn decorates_with(decorated: Node<'_>, annotation_name: &str, source: &[u8]) -> bool {
+    let mut cursor = decorated.walk();
+    let mut decorators = decorated
+        .named_children(&mut cursor)
+        .filter(|child| child.kind() == DECORATOR_KIND);
+    decorators.any(|decorator| {
+        decorator.utf8_text(source).is_ok_and(|text| {
+            text.trim_start_matches('@')
+                .rsplit('.')
+                .next()
+                .is_some_and(|name| name.trim() == annotation_name)
+        })
+    })
+}
+
+fn is_method(unit: Node<'_>, shape: &ParameterShape) -> bool {
+    let Some(container) = shape.method_container else {
+        return false;
+    };
+    let mut parent = unit.parent();
+    while let Some(node) = parent.filter(|node| node.kind() == DECORATED_KIND || node.kind() == BLOCK_KIND) {
+        parent = node.parent();
+    }
+    parent.is_some_and(|node| node.kind() == container)
 }
 
 fn annotates_with(modifiers: Node<'_>, annotation_name: &str, source: &[u8]) -> bool {
@@ -81,4 +130,19 @@ fn declared_names(declaration: Node<'_>) -> usize {
     declaration
         .children_by_field_name(NAME_FIELD, &mut cursor)
         .count()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_dummy_name;
+
+    #[test]
+    fn recognizes_ruff_dummy_names() {
+        assert!(is_dummy_name("_"));
+        assert!(is_dummy_name("__"));
+        assert!(is_dummy_name("_browser"));
+        assert!(is_dummy_name("_api_key2"));
+        assert!(!is_dummy_name("browser"));
+        assert!(!is_dummy_name("__dunder__"));
+    }
 }

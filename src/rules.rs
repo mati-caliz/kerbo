@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use serde::Serialize;
 
 use crate::analysis::FileAnalysis;
@@ -18,6 +20,14 @@ pub enum RuleId {
 }
 
 impl RuleId {
+    pub const ALL: [Self; 5] = [
+        Self::FileLength,
+        Self::FunctionLength,
+        Self::CyclomaticComplexity,
+        Self::CognitiveComplexity,
+        Self::ParameterCount,
+    ];
+
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::FileLength => "file-length",
@@ -26,6 +36,31 @@ impl RuleId {
             Self::CognitiveComplexity => "cognitive-complexity",
             Self::ParameterCount => "parameter-count",
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LimitOverride {
+    pub rule: RuleId,
+    pub value: usize,
+}
+
+impl FromStr for LimitOverride {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        let (rule_name, value) = text
+            .split_once('=')
+            .ok_or_else(|| format!("se esperaba regla=valor y llegó `{text}`"))?;
+        let rule = RuleId::ALL
+            .into_iter()
+            .find(|rule| rule.as_str() == rule_name.trim())
+            .ok_or_else(|| format!("no existe la regla `{}`", rule_name.trim()))?;
+        let value = value
+            .trim()
+            .parse()
+            .map_err(|_| format!("`{}` no es un número entero no negativo", value.trim()))?;
+        Ok(Self { rule, value })
     }
 }
 
@@ -89,6 +124,32 @@ impl Limits {
         }
     }
 
+    pub const fn with_override(self, limit_override: LimitOverride) -> Self {
+        let value = Some(limit_override.value);
+        match limit_override.rule {
+            RuleId::FileLength => Self {
+                file_lines: value,
+                ..self
+            },
+            RuleId::FunctionLength => Self {
+                function_lines: value,
+                ..self
+            },
+            RuleId::CyclomaticComplexity => Self {
+                cyclomatic: value,
+                ..self
+            },
+            RuleId::CognitiveComplexity => Self {
+                cognitive: value,
+                ..self
+            },
+            RuleId::ParameterCount => Self {
+                parameters: value,
+                ..self
+            },
+        }
+    }
+
     pub const fn strict(language: Language) -> Self {
         match language {
             Language::Go => GO_LIMITS,
@@ -112,7 +173,7 @@ pub struct Diagnostic {
 
 struct Measurement {
     rule: RuleId,
-    value: usize,
+    value: Option<usize>,
     limit: Option<usize>,
 }
 
@@ -158,19 +219,20 @@ fn evaluate_function<'function>(
         },
         Measurement {
             rule: RuleId::ParameterCount,
-            value: function.parameters.unwrap_or_default(),
-            limit: limits.parameters.filter(|_| function.parameters.is_some()),
+            value: function.parameters,
+            limit: limits.parameters,
         },
     ];
     measurements.into_iter().filter_map(move |measurement| {
-        let limit = measurement.limit.filter(|&limit| measurement.value > limit)?;
+        let value = measurement.value?;
+        let limit = measurement.limit.filter(|&limit| value > limit)?;
         Some(Diagnostic {
             path: path.to_owned(),
             line: function.line,
             column: function.column,
             rule: measurement.rule,
-            message: function_message(measurement.rule, &function.name, measurement.value, limit),
-            value: measurement.value,
+            message: function_message(measurement.rule, &function.name, value, limit),
+            value,
             limit,
         })
     })
@@ -192,130 +254,4 @@ fn function_message(rule: RuleId, name: &str, value: usize, limit: usize) -> Str
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{Limits, RuleId, evaluate};
-    use crate::analysis::FileAnalysis;
-    use crate::language::Language;
-    use crate::metrics::FunctionMetrics;
-
-    fn oversized_function(parameters: Option<usize>) -> FunctionMetrics {
-        FunctionMetrics {
-            name: "process".to_owned(),
-            line: 3,
-            column: 1,
-            lines: 500,
-            cyclomatic: 50,
-            cognitive: 50,
-            parameters,
-        }
-    }
-
-    #[test]
-    fn reports_every_limit_exceeded_with_its_value() {
-        let analysis = FileAnalysis {
-            file_lines: 900,
-            functions: vec![oversized_function(Some(9))],
-        };
-        let diagnostics = evaluate("a.go", &analysis, Limits::strict(Language::Go));
-        let rules: Vec<RuleId> = diagnostics.iter().map(|diagnostic| diagnostic.rule).collect();
-        assert_eq!(
-            rules,
-            [
-                RuleId::FileLength,
-                RuleId::FunctionLength,
-                RuleId::CyclomaticComplexity,
-                RuleId::CognitiveComplexity,
-                RuleId::ParameterCount,
-            ]
-        );
-        let messages: Vec<&str> = diagnostics
-            .iter()
-            .map(|diagnostic| diagnostic.message.as_str())
-            .collect();
-        assert_eq!(
-            messages,
-            [
-                "El archivo tiene 900 líneas (máximo 400)",
-                "La función `process` tiene 500 líneas (máximo 80)",
-                "La función `process` tiene complejidad ciclomática 50 (máximo 10)",
-                "La función `process` tiene complejidad cognitiva 50 (máximo 15)",
-                "La función `process` recibe 9 parámetros (máximo 4)",
-            ]
-        );
-        assert!(
-            diagnostics
-                .iter()
-                .all(|diagnostic| diagnostic.value > diagnostic.limit)
-        );
-    }
-
-    #[test]
-    fn skips_rules_the_language_does_not_enforce() {
-        let analysis = FileAnalysis {
-            file_lines: 900,
-            functions: vec![oversized_function(None)],
-        };
-        let diagnostics = evaluate("a.py", &analysis, Limits::strict(Language::Python));
-        let rules: Vec<RuleId> = diagnostics.iter().map(|diagnostic| diagnostic.rule).collect();
-        assert_eq!(rules, [RuleId::CyclomaticComplexity]);
-    }
-
-    #[test]
-    fn values_at_the_limit_pass() {
-        let function = FunctionMetrics {
-            name: "edge".to_owned(),
-            line: 1,
-            column: 1,
-            lines: 80,
-            cyclomatic: 8,
-            cognitive: 15,
-            parameters: Some(5),
-        };
-        let analysis = FileAnalysis {
-            file_lines: 500,
-            functions: vec![function],
-        };
-        assert!(evaluate("A.java", &analysis, Limits::strict(Language::Java)).is_empty());
-    }
-
-    #[test]
-    fn tests_relax_only_what_the_standard_relaxes() {
-        let analysis = FileAnalysis {
-            file_lines: 10,
-            functions: vec![oversized_function(Some(9))],
-        };
-        let typescript = evaluate(
-            "a.test.ts",
-            &analysis,
-            Limits::strict_for(Language::TypeScript, true),
-        );
-        assert!(
-            typescript
-                .iter()
-                .all(|diagnostic| diagnostic.rule != RuleId::FunctionLength)
-        );
-        assert_eq!(typescript.len(), 3);
-        let python = evaluate(
-            "tests/a.py",
-            &analysis,
-            Limits::strict_for(Language::Python, true),
-        );
-        assert_eq!(python.len(), 1);
-        let go = evaluate("a_test.go", &analysis, Limits::strict_for(Language::Go, true));
-        assert_eq!(go.len(), 4);
-    }
-
-    #[test]
-    fn rule_ids_are_kebab_case() {
-        assert_eq!(RuleId::FileLength.as_str(), "file-length");
-        assert_eq!(RuleId::FunctionLength.as_str(), "function-length");
-        assert_eq!(RuleId::CyclomaticComplexity.as_str(), "cyclomatic-complexity");
-        assert_eq!(RuleId::CognitiveComplexity.as_str(), "cognitive-complexity");
-        assert_eq!(RuleId::ParameterCount.as_str(), "parameter-count");
-        let analysis = FileAnalysis {
-            file_lines: 1,
-            functions: Vec::new(),
-        };
-        assert!(evaluate("a.ts", &analysis, Limits::strict(Language::Tsx)).is_empty());
-    }
-}
+mod tests;
