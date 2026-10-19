@@ -40,14 +40,28 @@ ciclomática y sonarjs no lo suma a la cognitiva, ruff no cuenta `self` ni `cls`
 un método desde la llave y saltea los `@Override`, funlen cuenta las líneas de adentro de la
 función con blancos y comentarios. Cada una está fijada en un test.
 
-Medido sobre diez repos de producción (unos 12.000 archivos): cero diferencias con las
-herramientas originales, entre 0,06 y 2,3 s por repo y menos de 12 MB de memoria.
+Velocidad, contra las herramientas corriendo **sólo** estas cinco reglas, con los mismos umbrales
+y sobre los mismos archivos (una corrida, 2026-10-19):
+
+| Lenguaje | Herramienta | Tiempo | CPU | Memoria |
+|---|---|---|---|---|
+| Java, 3.143 archivos | Checkstyle + PMD | 21,2 s | 47,9 s | 740 MB |
+| | kerbo | 0,9 s | 2,6 s | 8 MB |
+| TypeScript, 2.667 archivos | ESLint + sonarjs | 15,7 s | 27,2 s | 606 MB |
+| | kerbo | 1,1 s | 3,0 s | 10 MB |
+| Go, 65 archivos | golangci-lint | 0,87 s | 0,90 s | 165 MB |
+| | kerbo | 0,04 s | 0,09 s | 5 MB |
+| Python, 154 archivos | ruff | 0,06 s | 0,04 s | 18 MB |
+| | kerbo | 0,10 s | 0,29 s | 7 MB |
+
+En Python, ruff (también en Rust) sigue ganando en tiempo; kerbo gasta CPU de más arrancando
+hilos en repos chicos, que es lo primero a ajustar.
 
 ## Qué sigue
 
 En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la motivó.
 
-### 1. Paridad en las dos direcciones y velocidad justa (en curso)
+### 1. Paridad en las dos direcciones y velocidad justa
 
 - Arnés que corre kerbo y la herramienta de referencia con los umbrales al mínimo (así cada una
   reporta todas las funciones con su valor) y compara función por función. Prueba que kerbo no

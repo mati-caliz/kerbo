@@ -116,6 +116,15 @@ h2 { font-size: clamp(28px, 3.6vw, 40px); line-height: 1.12; letter-spacing: -.0
 .stat__value small { font-size: .5em; color: var(--text-soft); font-weight: 600; }
 .stat__label { margin-top: 10px; color: var(--text-soft); font-size: 15px; }
 .stat--versus .stat__value { color: var(--text-faint); text-decoration: line-through; text-decoration-color: var(--kerb-red); text-decoration-thickness: 3px; }
+.bench { margin-top: 20px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+.bench table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 560px; }
+.bench th, .bench td { padding: 11px 16px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.bench th { font: 600 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); background: var(--bg-raised); }
+.bench td { color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.bench td[rowspan] { color: var(--text); vertical-align: top; }
+.bench tr.ours td { color: var(--text); font-weight: 600; }
+.bench tr.ours td:first-child { color: var(--kerb-red); }
+.bench tbody tr:last-child td { border-bottom: 0; }
 .footnote { margin-top: 18px; font-size: 14px; color: var(--text-faint); max-width: 80ch; }
 
 .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
@@ -183,7 +192,7 @@ footer a { color: var(--text-soft); }
   <div class="wrap hero">
     <span class="pill">Versión 0.1 disponible · open source, Apache 2.0</span>
     <h1>Una sola vara de calidad para <em>todo</em> tu código.</h1>
-    <p class="lead">kerbo revisa Java, TypeScript, Python y Go con <strong>un binario de 7 MB</strong>: las mismas reglas y un solo reporte, contando igual que Checkstyle, PMD, ESLint, ruff y golangci-lint. Corre en segundos, ocupa megas y está pensado para que los <strong>agentes de IA no puedan zafar</strong> de las reglas.</p>
+    <p class="lead">kerbo revisa Java, TypeScript, Python y Go con <strong>un binario de 7 MB</strong>, hasta 23 veces más rápido y con 90 veces menos memoria: las mismas reglas y un solo reporte, contando exactamente igual que Checkstyle, PMD, ESLint, ruff y golangci-lint. Está pensado para que los <strong>agentes de IA no puedan zafar</strong> de las reglas.</p>
     <div class="install" id="instalar-hero">
       <code>curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh</code>
       <button class="copy" type="button" data-copy="curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh" data-umami-event="install-copy" data-umami-event-placement="hero">Copiar</button>
@@ -211,19 +220,36 @@ footer a { color: var(--text-soft); }
       <p class="section-lead">Un repo con backend en Java, front en TypeScript y un servicio en Python carga hoy con un linter por lenguaje, cada uno con sus plugins, su runtime, su formato de reporte y su manera de contar lo mismo. kerbo es un solo motor nativo que aplica las mismas reglas en todos.</p>
       <div class="stats">
         <div class="stat">
-          <div class="stat__value">2,25 <small>s</small></div>
-          <div class="stat__label">para revisar un monorepo de 5.810 archivos en Java y TypeScript</div>
+          <div class="stat__value">23<small>×</small></div>
+          <div class="stat__label">más rápido que Checkstyle + PMD en un backend Java de 3.143 archivos</div>
         </div>
         <div class="stat">
-          <div class="stat__value">11 <small>MB</small></div>
-          <div class="stat__label">de memoria pico, todo el análisis incluido</div>
+          <div class="stat__value">14<small>×</small></div>
+          <div class="stat__label">más rápido que ESLint + sonarjs en un front TypeScript de 2.667 archivos</div>
         </div>
-        <div class="stat stat--versus">
-          <div class="stat__value">1,9 <small>GB</small></div>
-          <div class="stat__label">pico de ESLint solo, sobre el mismo monorepo</div>
+        <div class="stat">
+          <div class="stat__value">90<small>×</small></div>
+          <div class="stat__label">menos memoria: 8 MB contra 740 MB en el mismo backend Java</div>
         </div>
       </div>
-      <p class="footnote">Medido el 19 de octubre de 2026 con la versión 0.1, que aplica cinco reglas (largo de archivo y de función, complejidad ciclomática y cognitiva y parámetros). ESLint corre todas las suyas: la comparación justa, regla por regla, es el próximo paso y se va a publicar acá.</p>
+      <div class="bench" role="region" aria-label="Comparación de velocidad y memoria" tabindex="0">
+        <table>
+          <thead>
+            <tr><th scope="col">Lenguaje</th><th scope="col">Herramienta</th><th scope="col">Tiempo</th><th scope="col">CPU</th><th scope="col">Memoria</th></tr>
+          </thead>
+          <tbody>
+            <tr><td rowspan="2">Java · 3.143 archivos</td><td>Checkstyle + PMD</td><td>21,2 s</td><td>47,9 s</td><td>740 MB</td></tr>
+            <tr class="ours"><td>kerbo</td><td>0,9 s</td><td>2,6 s</td><td>8 MB</td></tr>
+            <tr><td rowspan="2">TypeScript · 2.667 archivos</td><td>ESLint + sonarjs</td><td>15,7 s</td><td>27,2 s</td><td>606 MB</td></tr>
+            <tr class="ours"><td>kerbo</td><td>1,1 s</td><td>3,0 s</td><td>10 MB</td></tr>
+            <tr><td rowspan="2">Go · 65 archivos</td><td>golangci-lint</td><td>0,87 s</td><td>0,90 s</td><td>165 MB</td></tr>
+            <tr class="ours"><td>kerbo</td><td>0,04 s</td><td>0,09 s</td><td>5 MB</td></tr>
+            <tr><td rowspan="2">Python · 154 archivos</td><td>ruff</td><td>0,06 s</td><td>0,04 s</td><td>18 MB</td></tr>
+            <tr class="ours"><td>kerbo</td><td>0,10 s</td><td>0,29 s</td><td>7 MB</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="footnote">Medido el 19 de octubre de 2026 sobre repos de producción, con la versión 0.1. Comparación justa: cada herramienta corre sólo las cinco reglas que kerbo imita (largo de archivo y de función, complejidad ciclomática y cognitiva y parámetros), con los mismos umbrales y sobre los mismos archivos, y las dos dan exactamente los mismos resultados. En Python, ruff ya está escrito en Rust y sigue siendo más rápido; kerbo gana ahí en memoria y en tener una sola herramienta para todo.</p>
     </div>
   </section>
 
