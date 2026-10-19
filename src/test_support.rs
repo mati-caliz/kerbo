@@ -1,6 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static CREATED: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug)]
 pub struct TempTree {
@@ -9,7 +12,8 @@ pub struct TempTree {
 
 impl TempTree {
     pub fn new(name: &str) -> Self {
-        let root = std::env::temp_dir().join(format!("kerbo-test-{}-{name}", process::id()));
+        let sequence = CREATED.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!("kerbo-test-{}-{sequence}-{name}", process::id()));
         if root.exists() {
             fs::remove_dir_all(&root).expect("se borra el directorio de una corrida anterior");
         }

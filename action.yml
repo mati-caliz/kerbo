@@ -1,0 +1,51 @@
+name: kerbo
+description: Analizador de calidad para Java, TypeScript, Python y Go, con los problemas anotados en el pull request
+branding:
+  icon: check-circle
+  color: red
+
+inputs:
+  args:
+    description: Argumentos para `kerbo check` (carpetas, --language, --diff, --config)
+    default: "."
+  version:
+    description: Versión de kerbo; vacío instala la última
+    default: ""
+  upload-sarif:
+    description: Sube el reporte SARIF para ver los problemas en el pull request (pide security-events write)
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Instalar kerbo
+      shell: bash
+      env:
+        KERBO_VERSION: ${{ inputs.version }}
+        KERBO_INSTALL_DIR: ${{ runner.temp }}/kerbo
+      run: curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh
+
+    - name: Analizar
+      id: check
+      shell: bash
+      env:
+        KERBO: ${{ runner.temp }}/kerbo/kerbo
+        KERBO_ARGS: ${{ inputs.args }}
+      run: |
+        read -r -a arguments <<<"${KERBO_ARGS}"
+        status=0
+        "${KERBO}" check --format sarif "${arguments[@]}" >kerbo.sarif || status=$?
+        echo "status=${status}" >>"${GITHUB_OUTPUT}"
+
+    - name: Subir el reporte
+      if: inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      with:
+        sarif_file: kerbo.sarif
+        category: kerbo
+
+    - name: Resultado
+      shell: bash
+      env:
+        STATUS: ${{ steps.check.outputs.status }}
+      run: exit "${STATUS}"

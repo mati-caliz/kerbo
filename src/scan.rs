@@ -8,8 +8,12 @@ use rayon::prelude::*;
 use tree_sitter::Parser;
 
 use crate::analysis::analyze;
+use crate::config::Config;
 use crate::language::{Language, Stack};
-use crate::rules::{Diagnostic, LimitOverride, Limits, evaluate};
+use crate::limits::LimitOverride;
+use crate::rules::{Diagnostic, FileIdentity, evaluate};
+
+const PATH_SEPARATOR: &str = "/";
 
 #[derive(Debug)]
 pub struct ScanFailure {
@@ -22,6 +26,14 @@ pub struct ScanOutcome {
     pub files: usize,
     pub diagnostics: Vec<Diagnostic>,
     pub failures: Vec<ScanFailure>,
+}
+
+#[derive(Debug)]
+pub struct ScanRequest<'request> {
+    pub roots: &'request [PathBuf],
+    pub stacks: &'request [Stack],
+    pub overrides: &'request [LimitOverride],
+    pub config: &'request Config,
 }
 
 #[derive(Default)]
@@ -44,14 +56,27 @@ impl ParserPool {
     }
 }
 
-pub fn scan(roots: &[PathBuf], stacks: &[Stack], overrides: &[LimitOverride]) -> ScanOutcome {
-    let (mut files, mut failures) = collect_files(roots);
-    files.retain(|file| stacks.is_empty() || stacks.contains(&file.language.stack()));
+#[derive(Debug)]
+struct SourceFile {
+    identity: FileIdentity,
+    language: Language,
+    is_test: bool,
+}
+
+pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
+    let project_root = request
+        .config
+        .root()
+        .canonicalize()
+        .unwrap_or_else(|_| request.config.root().to_path_buf());
+    let (mut files, mut failures) = collect_files(request.roots, &project_root);
+    files.retain(|file| {
+        (request.stacks.is_empty() || request.stacks.contains(&file.language.stack()))
+            && !request.config.is_ignored(Path::new(&file.identity.relative))
+    });
     let results: Vec<Result<Vec<Diagnostic>, ScanFailure>> = files
         .par_iter()
-        .map_init(ParserPool::default, |pool, file| {
-            check_file(pool, file, overrides)
-        })
+        .map_init(ParserPool::default, |pool, file| check_file(pool, file, request))
         .collect();
     let mut outcome = ScanOutcome {
         files: files.len(),
@@ -75,100 +100,79 @@ pub fn scan(roots: &[PathBuf], stacks: &[Stack], overrides: &[LimitOverride]) ->
     outcome
 }
 
-#[derive(Debug)]
-struct SourceFile {
-    path: PathBuf,
-    language: Language,
-    is_test: bool,
-}
-
-fn collect_files(roots: &[PathBuf]) -> (Vec<SourceFile>, Vec<ScanFailure>) {
+fn collect_files(roots: &[PathBuf], project_root: &Path) -> (Vec<SourceFile>, Vec<ScanFailure>) {
     let mut files = Vec::new();
     let mut failures = Vec::new();
     for root in roots {
         for entry in WalkBuilder::new(root).build() {
             match entry {
                 Ok(entry) if entry.file_type().is_some_and(|file_type| file_type.is_file()) => {
-                    files.extend(source_file(root, entry.into_path()));
+                    files.extend(source_file(root, entry.path(), project_root));
                 }
                 Ok(_) => {}
-                Err(error) => failures.push(ScanFailure {
-                    path: root.display().to_string(),
-                    reason: error.to_string(),
-                }),
+                Err(error) => {
+                    failures.push(ScanFailure {
+                        path: root.display().to_string(),
+                        reason: error.to_string(),
+                    });
+                }
             }
         }
     }
     (files, failures)
 }
 
-fn source_file(root: &Path, path: PathBuf) -> Option<SourceFile> {
-    let language = Language::from_path(&path)?;
-    let is_test = language.is_test_path(path.strip_prefix(root).unwrap_or(&path));
+fn source_file(walk_root: &Path, path: &Path, project_root: &Path) -> Option<SourceFile> {
+    let language = Language::from_path(path)?;
+    let is_test = language.is_test_path(path.strip_prefix(walk_root).unwrap_or(path));
+    let absolute = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let relative = absolute
+        .strip_prefix(project_root)
+        .map_or_else(|_| portable(path), portable);
+    let identity = FileIdentity {
+        display: path.display().to_string(),
+        relative,
+        absolute,
+    };
     Some(SourceFile {
-        path,
+        identity,
         language,
         is_test,
     })
 }
 
+fn portable(path: &Path) -> String {
+    let parts: Vec<String> = path
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    parts.join(PATH_SEPARATOR)
+}
+
 fn check_file(
     pool: &mut ParserPool,
     file: &SourceFile,
-    overrides: &[LimitOverride],
+    request: &ScanRequest<'_>,
 ) -> Result<Vec<Diagnostic>, ScanFailure> {
-    let display_path = file.path.display().to_string();
     let failure = |reason: String| ScanFailure {
-        path: display_path.clone(),
+        path: file.identity.display.clone(),
         reason,
     };
-    let source = fs::read(&file.path).map_err(|error| failure(error.to_string()))?;
+    let source = fs::read(&file.identity.absolute).map_err(|error| failure(error.to_string()))?;
     let parser = pool.parser(file.language).map_err(failure)?;
     let analysis = analyze(parser, file.language, &source).map_err(|error| failure(error.to_string()))?;
-    let limits = overrides.iter().fold(
-        Limits::strict_for(file.language, file.is_test),
-        |limits, &limit_override| limits.with_override(limit_override),
-    );
-    Ok(evaluate(&display_path, &analysis, limits))
+    let configured =
+        request
+            .config
+            .limits_for(Path::new(&file.identity.relative), file.language, file.is_test);
+    let limits = request
+        .overrides
+        .iter()
+        .fold(configured, |limits, &limit_override| {
+            limits.with_override(limit_override)
+        });
+    Ok(evaluate(&file.identity, &analysis, limits))
 }
 
 #[cfg(test)]
-mod tests {
-    use super::scan;
-    use crate::language::Stack;
-    use crate::rules::RuleId;
-    use crate::test_support::TempTree;
-
-    #[test]
-    fn analyzes_supported_files_in_parallel_and_sorts_the_problems() {
-        let tree = TempTree::new("scan-mixed");
-        tree.write("b.py", "def f(a, b, c, d, e, f, g):\n    pass\n");
-        tree.write("a/x.ts", "function f(a, b, c, d, e) {}\n");
-        tree.write("notes.md", "# no es código\n");
-        let outcome = scan(&[tree.path().to_path_buf()], &[], &[]);
-        assert_eq!(outcome.files, 2);
-        assert!(outcome.failures.is_empty());
-        let found: Vec<(bool, RuleId)> = outcome
-            .diagnostics
-            .iter()
-            .map(|diagnostic| (diagnostic.path.ends_with("x.ts"), diagnostic.rule))
-            .collect();
-        assert_eq!(
-            found,
-            [(true, RuleId::ParameterCount), (false, RuleId::ParameterCount)]
-        );
-    }
-
-    #[test]
-    fn accepts_several_roots_and_single_files() {
-        let tree = TempTree::new("scan-roots");
-        tree.write("one/A.java", "class A { void f() {} }\n");
-        tree.write("two.go", "package two\n");
-        let outcome = scan(&[tree.path().join("one"), tree.path().join("two.go")], &[], &[]);
-        assert_eq!(outcome.files, 2);
-        assert!(outcome.diagnostics.is_empty());
-        assert!(scan(&[], &[], &[]).diagnostics.is_empty());
-        let only_go = scan(&[tree.path().to_path_buf()], &[Stack::Go], &[]);
-        assert_eq!(only_go.files, 1);
-    }
-}
+mod tests;

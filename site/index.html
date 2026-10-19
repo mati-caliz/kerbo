@@ -131,7 +131,7 @@ h2 { font-size: clamp(28px, 3.6vw, 40px); line-height: 1.12; letter-spacing: -.0
 .card { background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; }
 .card h3 { margin: 0 0 10px; font-size: 19px; letter-spacing: -.01em; }
 .card p { margin: 0; color: var(--text-soft); font-size: 16px; }
-.card code, .list code, .section-lead code { font: 14px var(--mono); color: var(--text); background: var(--bg-code); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
+.card code, .list code, .section-lead code, .step code { font: 14px var(--mono); color: var(--text); background: var(--bg-code); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
 .card__icon { font: 700 14px/1 var(--mono); color: var(--kerb-red); margin-bottom: 16px; }
 
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
@@ -190,7 +190,7 @@ footer a { color: var(--text-soft); }
 
 <main>
   <div class="wrap hero">
-    <span class="pill">Versión 0.1 disponible · open source, Apache 2.0</span>
+    <span class="pill">Versión 0.2 disponible · open source, Apache 2.0</span>
     <h1>Una sola vara de calidad para <em>todo</em> tu código.</h1>
     <p class="lead">kerbo revisa Java, TypeScript, Python y Go con <strong>un binario de 7 MB</strong>, hasta 23 veces más rápido y con 90 veces menos memoria: las mismas reglas y un solo reporte, contando exactamente igual que Checkstyle, PMD, ESLint, ruff y golangci-lint. Está pensado para que los <strong>agentes de IA no puedan zafar</strong> de las reglas.</p>
     <div class="install" id="instalar-hero">
@@ -320,14 +320,14 @@ footer a { color: var(--text-soft); }
       <h2>Dónde está y qué sigue.</h2>
       <div class="steps">
         <div class="step step--now">
-          <div class="step__when">Hoy · 0.1</div>
-          <h3>Las reglas universales</h3>
-          <p>Cinco reglas en Java, TypeScript, Python y Go, con cero diferencias contra las herramientas originales en diez repos de producción.</p>
+          <div class="step__when">Hoy · 0.2</div>
+          <h3>Listo para un repo real</h3>
+          <p>Cinco reglas con paridad exacta en cuatro lenguajes, <code>kerbo.toml</code> con presets y excepciones con motivo, línea de base, <code>--diff</code> contra main, SARIF y una GitHub Action.</p>
         </div>
         <div class="step">
           <div class="step__when">Próximo</div>
-          <h3>Núcleo y Java</h3>
-          <p>Configuración, caché, SARIF, todas las reglas de forma de Checkstyle y PMD, y la capa para agentes.</p>
+          <h3>Capa para agentes de IA</h3>
+          <p>Antitrampa (supresiones nuevas, umbrales bajados, tests borrados), salida para agentes, hook de Claude Code y servidor MCP. Después, Java sintáctico completo.</p>
         </div>
         <div class="step">
           <div class="step__when">Después</div>

@@ -1,13 +1,17 @@
-use super::{LimitOverride, Limits, RuleId, evaluate};
+use std::path::PathBuf;
+
+use super::{FileIdentity, RuleId, evaluate};
 use crate::analysis::FileAnalysis;
 use crate::language::Language;
+use crate::limits::{Limits, Preset};
 use crate::metrics::FunctionMetrics;
 
-fn oversized_function(parameters: Option<usize>) -> FunctionMetrics {
+fn function(name: &str, parameters: Option<usize>) -> FunctionMetrics {
     FunctionMetrics {
-        name: "process".to_owned(),
+        name: name.to_owned(),
         line: 3,
         column: 1,
+        end_line: 503,
         lines: Some(500),
         cyclomatic: Some(50),
         cognitive: Some(50),
@@ -15,24 +19,27 @@ fn oversized_function(parameters: Option<usize>) -> FunctionMetrics {
     }
 }
 
+fn file(relative: &str) -> FileIdentity {
+    FileIdentity {
+        display: format!("./{relative}"),
+        relative: relative.to_owned(),
+        absolute: PathBuf::from(relative),
+    }
+}
+
 #[test]
 fn reports_every_limit_exceeded_with_its_value() {
     let analysis = FileAnalysis {
         file_lines: 900,
-        functions: vec![oversized_function(Some(9))],
+        functions: vec![function("process", Some(9))],
     };
-    let diagnostics = evaluate("a.go", &analysis, Limits::strict(Language::Go));
-    let rules: Vec<RuleId> = diagnostics.iter().map(|diagnostic| diagnostic.rule).collect();
-    assert_eq!(
-        rules,
-        [
-            RuleId::FileLength,
-            RuleId::FunctionLength,
-            RuleId::CyclomaticComplexity,
-            RuleId::CognitiveComplexity,
-            RuleId::ParameterCount,
-        ]
+    let diagnostics = evaluate(
+        &file("a.go"),
+        &analysis,
+        Preset::Strict.limits(Language::Go, false),
     );
+    let rules: Vec<RuleId> = diagnostics.iter().map(|diagnostic| diagnostic.rule).collect();
+    assert_eq!(rules, RuleId::ALL);
     let messages: Vec<&str> = diagnostics
         .iter()
         .map(|diagnostic| diagnostic.message.as_str())
@@ -47,6 +54,11 @@ fn reports_every_limit_exceeded_with_its_value() {
             "La función `process` recibe 9 parámetros (máximo 4)",
         ]
     );
+    let file_length = diagnostics.first().expect("hay diagnósticos");
+    assert_eq!(
+        (file_length.line, file_length.end_line, file_length.path.as_str()),
+        (1, 900, "./a.go")
+    );
     assert!(
         diagnostics
             .iter()
@@ -55,22 +67,52 @@ fn reports_every_limit_exceeded_with_its_value() {
 }
 
 #[test]
-fn skips_rules_the_language_does_not_enforce() {
+fn fingerprints_ignore_lines_and_number_repeated_symbols() {
+    let analysis = FileAnalysis {
+        file_lines: 10,
+        functions: vec![
+            function("handle", None),
+            function("handle", None),
+            function("other", None),
+        ],
+    };
+    let limits = Limits::default().with_rule(RuleId::CyclomaticComplexity, Some(1));
+    let fingerprints: Vec<String> = evaluate(&file("src/a.ts"), &analysis, limits)
+        .into_iter()
+        .map(|diagnostic| diagnostic.fingerprint)
+        .collect();
+    assert_eq!(
+        fingerprints,
+        [
+            "cyclomatic-complexity:src/a.ts:handle#1",
+            "cyclomatic-complexity:src/a.ts:handle#2",
+            "cyclomatic-complexity:src/a.ts:other#1",
+        ]
+    );
+}
+
+#[test]
+fn skips_rules_without_limit_or_measure() {
     let analysis = FileAnalysis {
         file_lines: 900,
-        functions: vec![oversized_function(None)],
+        functions: vec![function("f", None)],
     };
-    let diagnostics = evaluate("a.py", &analysis, Limits::strict(Language::Python));
+    let diagnostics = evaluate(
+        &file("a.py"),
+        &analysis,
+        Preset::Strict.limits(Language::Python, false),
+    );
     let rules: Vec<RuleId> = diagnostics.iter().map(|diagnostic| diagnostic.rule).collect();
     assert_eq!(rules, [RuleId::CyclomaticComplexity]);
 }
 
 #[test]
 fn values_at_the_limit_pass() {
-    let function = FunctionMetrics {
+    let edge = FunctionMetrics {
         name: "edge".to_owned(),
         line: 1,
         column: 1,
+        end_line: 80,
         lines: Some(80),
         cyclomatic: Some(8),
         cognitive: Some(15),
@@ -78,101 +120,23 @@ fn values_at_the_limit_pass() {
     };
     let analysis = FileAnalysis {
         file_lines: 500,
-        functions: vec![function],
+        functions: vec![edge],
     };
-    assert!(evaluate("A.java", &analysis, Limits::strict(Language::Java)).is_empty());
-}
-
-#[test]
-fn tests_relax_only_what_the_standard_relaxes() {
-    let analysis = FileAnalysis {
-        file_lines: 10,
-        functions: vec![oversized_function(Some(9))],
-    };
-    let typescript = evaluate(
-        "a.test.ts",
-        &analysis,
-        Limits::strict_for(Language::TypeScript, true),
-    );
     assert!(
-        typescript
-            .iter()
-            .all(|diagnostic| diagnostic.rule != RuleId::FunctionLength)
-    );
-    assert_eq!(typescript.len(), 3);
-    let python = evaluate(
-        "tests/a.py",
-        &analysis,
-        Limits::strict_for(Language::Python, true),
-    );
-    assert_eq!(python.len(), 1);
-    let go = evaluate("a_test.go", &analysis, Limits::strict_for(Language::Go, true));
-    assert_eq!(go.len(), 4);
-}
-
-#[test]
-fn overrides_parse_and_replace_a_single_limit() {
-    let parsed: LimitOverride = "cyclomatic-complexity=0".parse().expect("es válido");
-    assert_eq!(
-        parsed,
-        LimitOverride {
-            rule: RuleId::CyclomaticComplexity,
-            value: 0
-        }
-    );
-    assert!("cyclomatic-complexity".parse::<LimitOverride>().is_err());
-    assert!("unknown=3".parse::<LimitOverride>().is_err());
-    assert!("parameter-count=-1".parse::<LimitOverride>().is_err());
-    let analysis = FileAnalysis {
-        file_lines: 10,
-        functions: vec![oversized_function(Some(2))],
-    };
-    let limits = Limits::strict(Language::Python)
-        .with_override(LimitOverride {
-            rule: RuleId::ParameterCount,
-            value: 1,
-        })
-        .with_override(LimitOverride {
-            rule: RuleId::FileLength,
-            value: 5,
-        })
-        .with_override(LimitOverride {
-            rule: RuleId::FunctionLength,
-            value: 5,
-        })
-        .with_override(LimitOverride {
-            rule: RuleId::CognitiveComplexity,
-            value: 5,
-        })
-        .with_override(LimitOverride {
-            rule: RuleId::CyclomaticComplexity,
-            value: 100,
-        });
-    let rules: Vec<RuleId> = evaluate("a.py", &analysis, limits)
-        .iter()
-        .map(|diagnostic| diagnostic.rule)
-        .collect();
-    assert_eq!(
-        rules,
-        [
-            RuleId::FileLength,
-            RuleId::FunctionLength,
-            RuleId::CognitiveComplexity,
-            RuleId::ParameterCount
-        ]
+        evaluate(
+            &file("A.java"),
+            &analysis,
+            Preset::Strict.limits(Language::Java, false)
+        )
+        .is_empty()
     );
 }
 
 #[test]
-fn rule_ids_are_kebab_case() {
-    assert_eq!(RuleId::FileLength.as_str(), "file-length");
-    assert_eq!(RuleId::FunctionLength.as_str(), "function-length");
-    assert_eq!(RuleId::CyclomaticComplexity.as_str(), "cyclomatic-complexity");
-    assert_eq!(RuleId::CognitiveComplexity.as_str(), "cognitive-complexity");
-    assert_eq!(RuleId::ParameterCount.as_str(), "parameter-count");
-    let analysis = FileAnalysis {
-        file_lines: 1,
-        functions: Vec::new(),
-    };
-    assert!(evaluate("a.ts", &analysis, Limits::strict(Language::Tsx)).is_empty());
+fn rule_ids_round_trip_and_describe_themselves() {
+    for rule in RuleId::ALL {
+        assert_eq!(rule.as_str().parse::<RuleId>(), Ok(rule));
+        assert_ne!(rule.description(), "");
+    }
+    assert!("nope".parse::<RuleId>().is_err());
 }

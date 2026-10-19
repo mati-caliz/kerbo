@@ -72,7 +72,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   los mismos archivos, y publicar la comparación. Comparar contra el gate entero sería trampa.
 - `--max regla=valor` para cambiar un umbral desde la línea de comandos (ya está).
 
-### 2. Lo mínimo para adoptarlo en un repo real
+### 2. Lo mínimo para adoptarlo en un repo real (hecho, 0.2)
 
 - **`kerbo.toml`**: presets (`strict`, `recommended`, `minimal`), umbrales por lenguaje y
   excepciones por archivo, siempre con un `reason` obligatorio que aparece en el reporte como

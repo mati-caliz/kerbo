@@ -1,7 +1,7 @@
 use std::path::{Component, Path};
 
 use clap::ValueEnum;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::profile::{self, Profile};
 
@@ -16,7 +16,8 @@ pub enum Language {
     JavaScript,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Stack {
     Typescript,
     Python,

@@ -1,0 +1,89 @@
+use super::{LimitOverride, Limits, Preset};
+use crate::language::Language;
+use crate::rules::RuleId;
+
+#[test]
+fn strict_is_the_standard_of_each_language() {
+    let java = Preset::Strict.limits(Language::Java, false);
+    assert_eq!(java.get(RuleId::CyclomaticComplexity), Some(8));
+    assert_eq!(java.get(RuleId::FileLength), Some(500));
+    let python = Preset::Strict.limits(Language::Python, false);
+    assert_eq!(python.get(RuleId::FunctionLength), None);
+    assert_eq!(python.get(RuleId::ParameterCount), Some(6));
+    assert_eq!(
+        Preset::Strict
+            .limits(Language::Go, false)
+            .get(RuleId::ParameterCount),
+        Some(4)
+    );
+    assert_eq!(
+        Preset::Strict
+            .limits(Language::Tsx, false)
+            .get(RuleId::FunctionLength),
+        Some(120)
+    );
+}
+
+#[test]
+fn looser_presets_are_uniform_across_languages() {
+    for language in [
+        Language::Go,
+        Language::Java,
+        Language::Python,
+        Language::JavaScript,
+    ] {
+        assert_eq!(
+            Preset::Recommended
+                .limits(language, false)
+                .get(RuleId::CognitiveComplexity),
+            Some(20)
+        );
+        assert_eq!(
+            Preset::Minimal
+                .limits(language, false)
+                .get(RuleId::CyclomaticComplexity),
+            Some(25)
+        );
+    }
+}
+
+#[test]
+fn tests_relax_only_what_the_standard_relaxes() {
+    let typescript = Preset::Strict.limits(Language::TypeScript, true);
+    assert_eq!(typescript.get(RuleId::FunctionLength), None);
+    assert_eq!(typescript.get(RuleId::ParameterCount), Some(4));
+    assert_eq!(
+        Preset::Recommended
+            .limits(Language::Python, true)
+            .get(RuleId::ParameterCount),
+        None
+    );
+    assert_eq!(
+        Preset::Strict.limits(Language::Java, true),
+        Preset::Strict.limits(Language::Java, false)
+    );
+}
+
+#[test]
+fn overrides_parse_and_replace_a_single_limit() {
+    let parsed: LimitOverride = "cyclomatic-complexity=0".parse().expect("es válido");
+    assert_eq!(
+        parsed,
+        LimitOverride {
+            rule: RuleId::CyclomaticComplexity,
+            value: 0
+        }
+    );
+    assert!("cyclomatic-complexity".parse::<LimitOverride>().is_err());
+    assert!("unknown=3".parse::<LimitOverride>().is_err());
+    assert!("parameter-count=-1".parse::<LimitOverride>().is_err());
+    let limits = Limits::default()
+        .with_override(parsed)
+        .with_rule(RuleId::FileLength, Some(3));
+    assert_eq!(limits.get(RuleId::CyclomaticComplexity), Some(0));
+    assert_eq!(limits.get(RuleId::FileLength), Some(3));
+    assert_eq!(
+        limits.with_rule(RuleId::FileLength, None).get(RuleId::FileLength),
+        None
+    );
+}
