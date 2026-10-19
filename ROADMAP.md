@@ -92,47 +92,52 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 - **Modo instantáneo** sobre los archivos recién tocados (meta: menos de 100 ms), un hook listo
   para Claude Code y un **servidor MCP**.
 
-### 4. Más reglas universales y Rust
+### 4. Editor (LSP) e inspecciones de IntelliJ como mapa
+
+- `kerbo lsp`: los problemas de kerbo subrayados mientras se escribe, en IntelliJ (de fábrica en
+  Ultimate, con LSP4IJ en Community), VS Code, Neovim y Zed, y los arreglos seguros como acción
+  rápida.
+- Correr Qodana Community (las inspecciones de IntelliJ en CI) sobre repos reales y contar qué
+  inspecciones aparecen más: esa lista ordena las reglas de las etapas de Java y de flujo de
+  datos, y Qodana pasa a ser otra referencia del arnés de paridad.
+
+### 5. Más reglas universales y Rust
 
 - Anidamiento, números mágicos, nombres cortos, bloques duplicados y comentarios que narran lo
   obvio, cada una con paridad contra la herramienta que ya la tiene en cada lenguaje.
 - **Rust** como quinto lenguaje (contra clippy), así kerbo se analiza a sí mismo.
 
-### 5. Distribución
+### 6. Distribución
 
 - Binarios para macOS (x86 y ARM), Windows y Linux ARM, armados sólo al publicar una versión.
 - `cargo install kerbo` desde crates.io, y Homebrew.
 - Mensajes, README y sitio en inglés además de español.
 
-### 6. Caché y rendimiento
+### 7. Caché y rendimiento
 
 - Caché por contenido de archivo, comprimida y con tope de tamaño: sólo se analiza lo que
   cambió. Es lo que hace posible el modo instantáneo en repos grandes.
 - Una sola pasada por función para todas las métricas, en lugar de una por métrica.
 
-### 7. Java sintáctico
+### 8. Java sintáctico
 
 - Las reglas de forma de Checkstyle y PMD, con paridad medida. Es el hueco más grande: no hay un
   linter rápido de Java.
 
-### 8. Flujo de datos sin compilar
+### 9. Flujo de datos sin compilar
 
 - Lo de SpotBugs sobre el código fuente: nulos, recursos sin cerrar, excepciones tragadas.
 - Contaminación de entradas hacia SQL, comandos, rutas y HTML, en todos los lenguajes.
 
-### 9. Go, Python y TypeScript completos
+### 10. Go, Python y TypeScript completos
 
 - Cada lenguaje contra su herramienta (golangci-lint, ruff, ESLint), regla por regla.
 
-### 10. Tests inteligentes, dependencias y secretos
+### 11. Tests inteligentes, dependencias y secretos
 
 - Correr sólo los tests que afecta el cambio y reusar resultados, con el runner de cada lenguaje.
 - Vulnerabilidades de dependencias con OSV y secretos versionados.
 
-### 11. Formateo propio
+### 12. Formateo propio
 
 - Lenguaje por lenguaje, y sólo cuando la salida sea idéntica a la de la herramienta actual.
-
-### 12. Editor
-
-- Servidor LSP con los problemas al escribir y los arreglos seguros.
