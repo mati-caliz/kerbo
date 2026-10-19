@@ -1,0 +1,17 @@
+# Techos del estándar para Rust. Lo copia quality/sync.sh como clippy.toml de cada crate y no se
+# edita en el repo. Los niveles de los lints no viven acá sino en scripts/verify-rust.sh, que los
+# pasa por línea de comandos para que el Cargo.toml del repo no pueda aflojarlos.
+too-many-lines-threshold = 80
+too-many-arguments-threshold = 4
+cognitive-complexity-threshold = 15
+excessive-nesting-threshold = 4
+max-fn-params-bools = 1
+max-struct-bools = 2
+type-complexity-threshold = 250
+avoid-breaking-exported-api = false
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true
+allow-dbg-in-tests = false
+allow-print-in-tests = false

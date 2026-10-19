@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kerbo — una sola vara de calidad para todo tu código</title>
+<meta name="description" content="kerbo reemplaza a Checkstyle, PMD, ESLint, ruff y golangci-lint con un solo binario: las mismas reglas para Java, TypeScript, Python y Go, en segundos y con megas, y guardarraíles para el código que escriben los agentes de IA.">
+<link rel="canonical" href="https://kerbo.matiascaliz.com.ar/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0f12">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_AR">
+<meta property="og:url" content="https://kerbo.matiascaliz.com.ar/">
+<meta property="og:title" content="kerbo — una sola vara de calidad para todo tu código">
+<meta property="og:description" content="Un binario en lugar de cinco linters: Java, TypeScript, Python y Go con las mismas reglas, en segundos y con megas. Con guardarraíles para agentes de IA.">
+<meta property="og:image" content="https://kerbo.matiascaliz.com.ar/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<script defer src="/estadisticas/script.js" data-website-id="a6dac83f-4d19-4f69-985c-f1ce5419135e" data-host-url="/estadisticas" data-domains="kerbo.matiascaliz.com.ar" data-do-not-track="true" data-performance="true"></script>
+<style>
+:root {
+  --bg: #0d0f12;
+  --bg-raised: #15181d;
+  --bg-code: #0a0b0e;
+  --line: #262a31;
+  --text: #ecedef;
+  --text-soft: #a3a8b3;
+  --text-faint: #6f7480;
+  --kerb-red: #ff4d4f;
+  --kerb-white: #f4f4f5;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius: 14px;
+  --page: 1080px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.6 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+.wrap { max-width: var(--page); margin: 0 auto; padding: 0 20px; }
+.kerb {
+  height: 10px;
+  background: repeating-linear-gradient(-70deg, var(--kerb-red) 0 28px, var(--kerb-white) 28px 56px);
+}
+.kerb--thin { height: 6px; opacity: .9; }
+
+header.nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.nav__inner { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 20px/1 var(--mono); letter-spacing: -.02em; text-decoration: none; }
+.brand img { width: 28px; height: 28px; }
+.nav__links { display: flex; align-items: center; gap: 22px; font-size: 15px; }
+.nav__links a { text-decoration: none; color: var(--text-soft); }
+.nav__links a:hover { color: var(--text); }
+.nav__links .btn { color: var(--bg); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 16px;
+  text-decoration: none; border: 1px solid transparent; transition: transform .12s ease, background .12s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn--solid { background: var(--kerb-white); color: var(--bg); }
+.btn--red { background: var(--kerb-red); color: #fff; }
+.btn--ghost { border-color: var(--line); color: var(--text); }
+.btn--ghost:hover { border-color: var(--text-faint); }
+.btn--small { padding: 8px 14px; font-size: 14px; }
+
+.hero { padding-top: 84px; padding-bottom: 56px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid var(--line);
+  border-radius: 999px; font: 13px/1 var(--mono); color: var(--text-soft);
+}
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.tag { display: inline-block; margin-left: 8px; padding: 3px 8px; border-radius: 6px; font: 600 11px/1.2 var(--mono); letter-spacing: .06em; text-transform: uppercase; vertical-align: middle; color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); }
+.install { display: flex; align-items: center; gap: 12px; margin: 0 0 28px; padding: 14px 16px 14px 20px; max-width: 720px; background: var(--bg-code); border: 1px solid var(--line); border-radius: 12px; font: 15px/1.4 var(--mono); }
+.install code { flex: 1; overflow-x: auto; white-space: nowrap; color: var(--text); }
+.install code::before { content: "$ "; color: var(--kerb-red); }
+.copy { flex: none; cursor: pointer; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-raised); color: var(--text-soft); font: 600 13px/1 var(--sans); }
+.copy:hover { color: var(--text); border-color: var(--text-faint); }
+.cta .install { margin-left: auto; margin-right: auto; text-align: left; }
+h1 { font-size: clamp(38px, 6.4vw, 68px); line-height: 1.04; letter-spacing: -.035em; margin: 22px 0 20px; max-width: 14ch; }
+h1 em { font-style: normal; color: var(--kerb-red); }
+.lead { font-size: clamp(18px, 2.2vw, 21px); color: var(--text-soft); max-width: 62ch; margin: 0 0 32px; }
+.lead strong { color: var(--text); font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+.terminal {
+  margin-top: 56px; background: var(--bg-code); border: 1px solid var(--line); border-radius: var(--radius);
+  overflow: hidden; box-shadow: 0 30px 80px -40px rgba(255, 77, 79, .25);
+}
+.terminal__bar { display: flex; gap: 7px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.terminal__bar span { width: 11px; height: 11px; border-radius: 50%; background: var(--line); }
+.terminal pre { margin: 0; padding: 20px 22px; overflow-x: auto; font: 14px/1.75 var(--mono); color: var(--text-soft); }
+.t-prompt { color: var(--kerb-red); }
+.t-cmd { color: var(--text); }
+.t-path { color: var(--text); }
+.t-rule { color: var(--warn); }
+.t-ok { color: var(--ok); }
+
+section { padding: 72px 0; border-top: 1px solid var(--line); }
+.eyebrow { font: 600 13px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--kerb-red); margin: 0 0 14px; }
+h2 { font-size: clamp(28px, 3.6vw, 40px); line-height: 1.12; letter-spacing: -.025em; margin: 0 0 16px; max-width: 24ch; }
+.section-lead { color: var(--text-soft); max-width: 64ch; margin: 0 0 40px; }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.stat { background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; }
+.stat__value { font: 700 clamp(30px, 4vw, 42px)/1 var(--mono); letter-spacing: -.03em; }
+.stat__value small { font-size: .5em; color: var(--text-soft); font-weight: 600; }
+.stat__label { margin-top: 10px; color: var(--text-soft); font-size: 15px; }
+.stat--versus .stat__value { color: var(--text-faint); text-decoration: line-through; text-decoration-color: var(--kerb-red); text-decoration-thickness: 3px; }
+.footnote { margin-top: 18px; font-size: 14px; color: var(--text-faint); max-width: 80ch; }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.card { background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; }
+.card h3 { margin: 0 0 10px; font-size: 19px; letter-spacing: -.01em; }
+.card p { margin: 0; color: var(--text-soft); font-size: 16px; }
+.card code, .list code, .section-lead code { font: 14px var(--mono); color: var(--text); background: var(--bg-code); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
+.card__icon { font: 700 14px/1 var(--mono); color: var(--kerb-red); margin-bottom: 16px; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.list li { position: relative; padding-left: 28px; color: var(--text-soft); }
+.list li::before { content: ""; position: absolute; left: 0; top: .55em; width: 14px; height: 6px; background: repeating-linear-gradient(90deg, var(--kerb-red) 0 7px, var(--kerb-white) 7px 14px); border-radius: 1px; }
+.list strong { color: var(--text); }
+
+.replaces { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.replaces span { font: 14px var(--mono); padding: 8px 12px; border: 1px dashed var(--line); border-radius: 8px; color: var(--text-soft); }
+.replaces .arrow { border: 0; color: var(--text-faint); padding-left: 0; padding-right: 0; }
+.replaces .into { border-style: solid; border-color: var(--kerb-red); color: var(--text); }
+
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; counter-reset: step; }
+.step { border-left: 2px solid var(--line); padding: 4px 0 4px 20px; }
+.step--now { border-color: var(--kerb-red); }
+.step h3 { margin: 0 0 6px; font-size: 17px; }
+.step p { margin: 0; color: var(--text-soft); font-size: 15px; }
+.step__when { font: 600 12px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--text-faint); margin-bottom: 10px; }
+.step--now .step__when { color: var(--kerb-red); }
+
+.cta { background: var(--bg-raised); border: 1px solid var(--line); border-radius: 20px; padding: clamp(28px, 5vw, 56px); text-align: center; }
+.cta h2 { margin-left: auto; margin-right: auto; }
+.cta .section-lead { margin-left: auto; margin-right: auto; }
+.cta .actions { justify-content: center; }
+.cta .note { margin-top: 20px; font-size: 14px; color: var(--text-faint); }
+
+footer { padding: 36px 0 48px; color: var(--text-faint); font-size: 14px; }
+.footer__inner { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
+footer a { color: var(--text-soft); }
+
+@media (max-width: 860px) {
+  .stats, .cards, .steps, .split { grid-template-columns: 1fr; }
+  .split { gap: 28px; }
+  .nav__links a:not(.btn) { display: none; }
+  .hero { padding-top: 56px; }
+  section { padding: 56px 0; }
+}
+@media (prefers-reduced-motion: reduce) { .btn { transition: none; } .btn:hover { transform: none; } }
+</style>
+</head>
+<body>
+<div class="kerb kerb--thin" aria-hidden="true"></div>
+<header class="nav">
+  <div class="wrap nav__inner">
+    <a class="brand" href="/" aria-label="kerbo, inicio"><img src="/favicon.svg" alt="" width="28" height="28">kerbo</a>
+    <nav class="nav__links" aria-label="Secciones">
+      <a href="#por-que">Por qué</a>
+      <a href="#agentes">Agentes de IA</a>
+      <a href="#java">Java</a>
+      <a href="https://github.com/mati-caliz/kerbo" data-umami-event="github" data-umami-event-placement="nav">GitHub</a>
+      <a class="btn btn--solid btn--small" href="#instalar" data-umami-event="install-open" data-umami-event-placement="nav">Instalar</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <span class="pill">Versión 0.1 disponible · open source, Apache 2.0</span>
+    <h1>Una sola vara de calidad para <em>todo</em> tu código.</h1>
+    <p class="lead">kerbo revisa Java, TypeScript, Python y Go con <strong>un binario de 7 MB</strong>: las mismas reglas y un solo reporte, contando igual que Checkstyle, PMD, ESLint, ruff y golangci-lint. Corre en segundos, ocupa megas y está pensado para que los <strong>agentes de IA no puedan zafar</strong> de las reglas.</p>
+    <div class="install" id="instalar-hero">
+      <code>curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh</code>
+      <button class="copy" type="button" data-copy="curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh" data-umami-event="install-copy" data-umami-event-placement="hero">Copiar</button>
+    </div>
+    <div class="actions">
+      <a class="btn btn--red" href="#instalar" data-umami-event="install-open" data-umami-event-placement="hero">Probalo en tu repo</a>
+      <a class="btn btn--ghost" href="https://github.com/mati-caliz/kerbo" data-umami-event="github" data-umami-event-placement="hero">Ver en GitHub</a>
+    </div>
+
+    <div class="terminal" role="img" aria-label="Salida de kerbo check en una terminal">
+      <div class="terminal__bar" aria-hidden="true"><span></span><span></span><span></span></div>
+<pre><span class="t-prompt">$</span> <span class="t-cmd">kerbo check api web edge broker</span>
+<span class="t-path">api/src/main/java/billing/InvoiceService.java:88:5</span>: <span class="t-rule">cyclomatic-complexity</span> La función `settle` tiene complejidad ciclomática 11 (máximo 8)
+<span class="t-path">web/src/features/orders/use-cart.ts:42:1</span>: <span class="t-rule">cognitive-complexity</span> La función `applyPromotions` tiene complejidad cognitiva 19 (máximo 15)
+<span class="t-path">edge/src/ingest/rtsp_source.py:43:5</span>: <span class="t-rule">parameter-count</span> La función `__init__` recibe 8 parámetros (máximo 6)
+<span class="t-path">broker/internal/session/store.go:12:1</span>: <span class="t-rule">file-length</span> El archivo tiene 512 líneas (máximo 400)
+<span class="t-ok">kerbo: 5810 archivos, 4 problemas, 2250 ms</span></pre>
+    </div>
+  </div>
+
+  <section id="por-que">
+    <div class="wrap">
+      <p class="eyebrow">Por qué</p>
+      <h2>Cinco herramientas, cinco configuraciones y un servidor en swap.</h2>
+      <p class="section-lead">Un repo con backend en Java, front en TypeScript y un servicio en Python carga hoy con un linter por lenguaje, cada uno con sus plugins, su runtime, su formato de reporte y su manera de contar lo mismo. kerbo es un solo motor nativo que aplica las mismas reglas en todos.</p>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat__value">2,25 <small>s</small></div>
+          <div class="stat__label">para revisar un monorepo de 5.810 archivos en Java y TypeScript</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value">11 <small>MB</small></div>
+          <div class="stat__label">de memoria pico, todo el análisis incluido</div>
+        </div>
+        <div class="stat stat--versus">
+          <div class="stat__value">1,9 <small>GB</small></div>
+          <div class="stat__label">pico de ESLint solo, sobre el mismo monorepo</div>
+        </div>
+      </div>
+      <p class="footnote">Medido el 19 de octubre de 2026 con la versión 0.1, que aplica cinco reglas (largo de archivo y de función, complejidad ciclomática y cognitiva y parámetros). ESLint corre todas las suyas: la comparación justa, regla por regla, es el próximo paso y se va a publicar acá.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow">Qué hace</p>
+      <h2>Reglas escritas una vez, aplicadas igual en todos los lenguajes.</h2>
+      <div class="cards">
+        <article class="card">
+          <div class="card__icon">01 · un binario</div>
+          <h3>Sin runtimes ni plugins</h3>
+          <p>Nada de <code>node_modules</code> con ESLint por repo, venvs de herramientas ni plugins de Gradle y Maven. Un ejecutable en Rust, el mismo para todos tus repos.</p>
+        </article>
+        <article class="card">
+          <div class="card__icon">02 · misma vara</div>
+          <h3>Reglas universales</h3>
+          <p>Largo de archivo y de función, complejidad ciclomática y cognitiva y parámetros: una definición y un umbral en los cuatro lenguajes. En camino: anidamiento, números mágicos y duplicación.</p>
+        </article>
+        <article class="card">
+          <div class="card__icon">03 · paridad</div>
+          <h3>Da lo mismo que lo que reemplaza</h3>
+          <p>Cada regla se valida contra la herramienta original sobre repos reales. Si no marca exactamente lo mismo, no sale: la 0.1 da cero diferencias en diez repos de producción.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="agentes">
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">Para agentes de IA</p>
+        <h2>Guardarraíles para el código que escriben Claude Code, Cursor y Copilot. <span class="tag">En camino</span></h2>
+        <p class="section-lead">Los linters de hoy le hablan a una persona. Un agente que escribe y corrige en ciclos cortos necesita otra cosa: saber exactamente qué arreglar, y que nadie le deje "arreglarlo" escondiéndolo.</p>
+      </div>
+      <ul class="list">
+        <li><strong>Antitrampa.</strong> Avisa cuando un cambio zafa en vez de arreglar: un <code>eslint-disable</code>, <code>noqa</code> o <code>@SuppressWarnings</code> nuevo, un umbral bajado, un test borrado o salteado, un <code>any</code>.</li>
+        <li><strong>Salida para agentes.</strong> JSON compacto, priorizado y con el arreglo como parche, sin relleno que gaste tokens.</li>
+        <li><strong>Identificadores estables.</strong> En la vuelta siguiente el agente sabe qué arregló, qué sigue y qué es nuevo.</li>
+        <li><strong>Errores típicos del código generado.</strong> Imports que no existen, funciones que duplican otra del repo, tests sin aserciones.</li>
+        <li><strong>Servidor MCP y modo instantáneo</strong> sobre los archivos recién tocados, para engancharlo después de cada edición.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="java">
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">El ruff de Java</p>
+        <h2>Checkstyle, PMD y SpotBugs, sin JVM y sin compilar.</h2>
+        <p class="section-lead">Python tiene ruff y JavaScript tiene Oxlint y Biome. Java sigue con tres herramientas que arrancan una JVM cada una, y SpotBugs obliga a compilar antes de analizar.</p>
+      </div>
+      <div>
+        <ul class="list">
+          <li><strong>Hoy:</strong> complejidad, largo y parámetros contados exactamente como Checkstyle y PMD, sin arrancar ninguna JVM.</li>
+          <li><strong>En camino:</strong> todas las reglas de forma de Checkstyle y PMD, y el análisis de flujo de SpotBugs sobre el código fuente (nulos, recursos sin cerrar, excepciones tragadas) sin pasar por el bytecode.</li>
+          <li><strong>Segundos en vez de minutos</strong> en el gate, y sin pelearse por la memoria con el build.</li>
+        </ul>
+        <div class="replaces" aria-label="Herramientas que reemplaza">
+          <span>Checkstyle</span><span>PMD</span><span>SpotBugs</span><span>ESLint</span><span>ruff</span><span>golangci-lint</span><span class="arrow">→</span><span class="into">kerbo</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow">Hoja de ruta</p>
+      <h2>Dónde está y qué sigue.</h2>
+      <div class="steps">
+        <div class="step step--now">
+          <div class="step__when">Hoy · 0.1</div>
+          <h3>Las reglas universales</h3>
+          <p>Cinco reglas en Java, TypeScript, Python y Go, con cero diferencias contra las herramientas originales en diez repos de producción.</p>
+        </div>
+        <div class="step">
+          <div class="step__when">Próximo</div>
+          <h3>Núcleo y Java</h3>
+          <p>Configuración, caché, SARIF, todas las reglas de forma de Checkstyle y PMD, y la capa para agentes.</p>
+        </div>
+        <div class="step">
+          <div class="step__when">Después</div>
+          <h3>Flujo de datos y más</h3>
+          <p>Lo de SpotBugs sin compilar, formateo propio, tests que corren sólo si los afecta el cambio, dependencias y secretos.</p>
+        </div>
+      </div>
+      <p class="footnote">Open source con licencia Apache 2.0, gratis también para uso comercial. La <a href="https://github.com/mati-caliz/kerbo/blob/main/ROADMAP.md">hoja de ruta completa</a> está en el repo.</p>
+    </div>
+  </section>
+
+  <section id="instalar">
+    <div class="wrap">
+      <div class="cta">
+        <p class="eyebrow">Instalar</p>
+        <h2>Probalo en tu repo en un minuto.</h2>
+        <p class="section-lead">En Linux, un comando: baja el binario estático, verifica el sha256 y lo deja en <code>~/.local/bin</code>. En macOS y Windows, con Rust: <code>cargo install --git https://github.com/mati-caliz/kerbo --locked</code>.</p>
+        <div class="install">
+          <code>curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh</code>
+          <button class="copy" type="button" data-copy="curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh" data-umami-event="install-copy" data-umami-event-placement="install">Copiar</button>
+        </div>
+        <div class="install">
+          <code>kerbo check</code>
+          <button class="copy" type="button" data-copy="kerbo check" data-umami-event="install-copy" data-umami-event-placement="usage">Copiar</button>
+        </div>
+        <div class="actions">
+          <a class="btn btn--red" href="https://github.com/mati-caliz/kerbo" data-umami-event="github" data-umami-event-placement="install">Ver en GitHub</a>
+          <a class="btn btn--ghost" href="mailto:lantix.argentina@gmail.com?subject=kerbo" data-umami-event="contact" data-umami-event-channel="mail" data-umami-event-placement="install">Escribinos</a>
+        </div>
+        <p class="note">¿Lo querés probar con tu equipo, usás Java o trabajan con agentes de IA? Escribinos y lo corremos juntos sobre tu repo.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="kerb" aria-hidden="true"></div>
+<footer>
+  <div class="wrap footer__inner">
+    <span>kerbo · un proyecto de <a href="https://matiascaliz.com.ar/">Matías Caliz</a></span>
+    <span><a href="https://www.linkedin.com/in/matias-caliz/" rel="noopener">LinkedIn</a> · <a href="mailto:lantix.argentina@gmail.com" data-umami-event="contact" data-umami-event-channel="mail" data-umami-event-placement="footer">lantix.argentina@gmail.com</a></span>
+  </div>
+</footer>
+<script>
+for (const button of document.querySelectorAll("[data-copy]")) {
+  button.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(button.dataset.copy);
+      button.textContent = "Copiado";
+    } catch {
+      button.textContent = "Copialo a mano";
+    }
+    setTimeout(() => { button.textContent = "Copiar"; }, 1600);
+  });
+}
+</script>
+</body>
+</html>

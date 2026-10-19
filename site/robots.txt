@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kerbo.matiascaliz.com.ar/sitemap.xml

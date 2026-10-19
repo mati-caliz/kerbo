@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <pattern id="kerb" width="56" height="20" patternUnits="userSpaceOnUse" patternTransform="skewX(-20)">
+      <rect width="28" height="20" fill="#ff4d4f"/><rect x="28" width="28" height="20" fill="#f4f4f5"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="#0d0f12"/>
+  <rect y="610" width="1200" height="20" fill="url(#kerb)"/>
+  <text x="80" y="150" font-family="DejaVu Sans Mono, monospace" font-size="56" font-weight="700" fill="#f4f4f5">kerbo</text>
+  <text x="80" y="270" font-family="DejaVu Sans, sans-serif" font-size="64" font-weight="700" fill="#ecedef">Una sola vara de calidad</text>
+  <text x="80" y="350" font-family="DejaVu Sans, sans-serif" font-size="64" font-weight="700" fill="#ecedef">para <tspan fill="#ff4d4f">todo</tspan> tu código.</text>
+  <text x="80" y="440" font-family="DejaVu Sans, sans-serif" font-size="30" fill="#a3a8b3">Java · TypeScript · Python · Go — un binario, segundos y megas.</text>
+  <text x="80" y="530" font-family="DejaVu Sans Mono, monospace" font-size="26" fill="#4ade80">$ kerbo check  →  5810 archivos, 2250 ms, 11 MB</text>
+</svg>

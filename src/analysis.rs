@@ -1,0 +1,35 @@
+use std::fmt;
+
+use tree_sitter::Parser;
+
+use crate::language::Language;
+use crate::lines::LineMap;
+use crate::metrics::{FunctionMetrics, measure_functions};
+
+#[derive(Debug)]
+pub struct FileAnalysis {
+    pub file_lines: usize,
+    pub functions: Vec<FunctionMetrics>,
+}
+
+#[derive(Debug)]
+pub struct ParseFailed;
+
+impl fmt::Display for ParseFailed {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("tree-sitter no devolvió un árbol")
+    }
+}
+
+pub fn analyze(parser: &mut Parser, language: Language, source: &[u8]) -> Result<FileAnalysis, ParseFailed> {
+    let tree = parser.parse(source, None).ok_or(ParseFailed)?;
+    let root = tree.root_node();
+    let profile = language.profile();
+    let line_map = LineMap::new(root, source, profile);
+    let file_lines = line_map.count(0, line_map.total_rows().saturating_sub(1), profile.file_lines);
+    let file_lines = if line_map.total_rows() == 0 { 0 } else { file_lines };
+    Ok(FileAnalysis {
+        file_lines,
+        functions: measure_functions(root, source, profile, &line_map),
+    })
+}
