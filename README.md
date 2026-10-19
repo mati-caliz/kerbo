@@ -88,6 +88,10 @@ una excepción es legítima, va en `kerbo.toml` con su `reason`, a la vista de t
 
   En un repo git sólo mira lo que cambió respecto de `HEAD`, antitrampa incluida, y respeta la línea
   de base: el agente no se pone a arreglar código que no tocó. Si kerbo falla, el hook no bloquea.
+- **Servidor MCP** (`kerbo mcp`, por stdio) con dos herramientas, `kerbo_check` (carpetas, `diff`
+  y lenguajes; devuelve la salida para agentes) y `kerbo_explain`. En Claude Code:
+  `claude mcp add kerbo -- kerbo mcp`; en Cursor y otros clientes, un servidor stdio con el
+  comando `kerbo` y el argumento `mcp`.
 
 ### `kerbo.toml`
 

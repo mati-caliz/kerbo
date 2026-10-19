@@ -195,3 +195,65 @@ fn hook_gives_feedback_only_on_problems() {
         "un error del hook no bloquea al agente"
     );
 }
+
+#[test]
+fn mcp_server_lists_and_runs_its_tools() {
+    let tree = TempTree::new("app-mcp");
+    tree.write("many.go", LONG_SIGNATURE);
+    let requests = [
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26"}}"#,
+        r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#,
+        r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"kerbo_check","arguments":{}}}"#,
+        r#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"kerbo_explain","arguments":{"rule":"parameter-count"}}}"#,
+        r#"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"kerbo_explain","arguments":{"rule":"nope"}}}"#,
+        r#"{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"kerbo_check","arguments":{"diff":"HEAD"}}}"#,
+        r#"{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"nope"}}"#,
+        r#"{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"kerbo_check","arguments":{"extra":1}}}"#,
+        r#"{"jsonrpc":"2.0","id":9,"method":"ping"}"#,
+        r#"{"jsonrpc":"2.0","id":10,"method":"resources/list"}"#,
+        "no es json",
+        "",
+    ];
+    let outcome = execute_with_input(&["kerbo", "mcp"], tree.path(), &requests.join("\n"));
+    assert_eq!(outcome.status, EXIT_CLEAN);
+    let responses: Vec<serde_json::Value> = outcome
+        .report
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("cada respuesta es JSON"))
+        .collect();
+    assert_eq!(responses.len(), 11, "la notificación no lleva respuesta");
+    let by_id = |id: u64| {
+        responses
+            .iter()
+            .find(|response| response["id"] == id)
+            .expect("hay respuesta")
+    };
+    assert_eq!(by_id(1)["result"]["protocolVersion"], "2025-03-26");
+    assert_eq!(by_id(2)["result"]["tools"].as_array().map(Vec::len), Some(2));
+    let check_text = by_id(3)["result"]["content"][0]["text"]
+        .as_str()
+        .expect("texto")
+        .to_owned();
+    assert!(check_text.contains("parameter-count") && check_text.contains("\"problems\":1"));
+    assert!(
+        by_id(4)["result"]["content"][0]["text"]
+            .as_str()
+            .is_some_and(|text| text.contains("Por qué"))
+    );
+    assert_eq!(by_id(5)["result"]["isError"], true);
+    assert_eq!(
+        by_id(6)["result"]["isError"],
+        true,
+        "sin git, el diff falla como herramienta"
+    );
+    assert_eq!(by_id(7)["error"]["code"], -32_602);
+    assert_eq!(by_id(8)["error"]["code"], -32_602);
+    assert_eq!(by_id(9)["result"], serde_json::json!({}));
+    assert_eq!(by_id(10)["error"]["code"], -32_601);
+    assert!(
+        responses
+            .iter()
+            .any(|response| response["error"]["code"] == -32_700)
+    );
+}

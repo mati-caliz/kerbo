@@ -81,7 +81,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   main` marca sólo lo nuevo, así se adopta sin arreglar todo antes.
 - **SARIF** y una **GitHub Action** que anota los problemas en el pull request.
 
-### 3. Capa para agentes de IA (hecho en 0.3, salvo el servidor MCP)
+### 3. Capa para agentes de IA (hecho: 0.3 y el servidor MCP en 0.4)
 
 - **Antitrampa**: avisar cuando un cambio agrega una supresión (`eslint-disable`, `noqa`,
   `nolint`, `@SuppressWarnings`, `#[allow]`), baja un umbral en una configuración, o borra,

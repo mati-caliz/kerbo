@@ -31,6 +31,8 @@ pub enum Command {
         about = "Hook para agentes: revisa el archivo recién editado (lee el evento de Claude Code por stdin)"
     )]
     Hook(HookArgs),
+    #[command(about = "Servidor MCP por stdio: herramientas kerbo_check y kerbo_explain para agentes")]
+    Mcp,
 }
 
 #[derive(Debug, Args)]

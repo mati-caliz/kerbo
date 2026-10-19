@@ -39,6 +39,7 @@ pub fn run(command: &Command, directory: &Path, terminal: &mut Terminal<'_>) -> 
             hook::run(arguments, directory, terminal),
             hook::NON_BLOCKING_ERROR,
         ),
+        Command::Mcp => (mcp::serve(directory, terminal), EXIT_FAILURE),
     };
     result.unwrap_or_else(|error| {
         let _written = writeln!(terminal.log, "kerbo: {error}");
@@ -46,13 +47,26 @@ pub fn run(command: &Command, directory: &Path, terminal: &mut Terminal<'_>) -> 
     })
 }
 
-fn check(arguments: &CheckArgs, directory: &Path, terminal: &mut Terminal<'_>) -> Result<u8, String> {
-    let started = Instant::now();
+pub struct Findings {
+    pub files: usize,
+    pub diagnostics: Vec<Diagnostic>,
+    pub known: usize,
+    pub deviations: usize,
+    pub failures: Vec<ScanFailure>,
+}
+
+pub struct FindingsRequest<'request> {
+    pub scan: &'request ScanArgs,
+    pub diff: Option<&'request str>,
+    pub use_baseline: bool,
+}
+
+pub fn findings(request: &FindingsRequest<'_>, directory: &Path) -> Result<Findings, String> {
     let config =
-        Config::load(arguments.scan.config.as_deref(), directory).map_err(|error| error.to_string())?;
-    let outcome = scan_with(&arguments.scan, &config);
+        Config::load(request.scan.config.as_deref(), directory).map_err(|error| error.to_string())?;
+    let outcome = scan_with(request.scan, &config);
     let mut diagnostics = outcome.diagnostics;
-    if let Some(reference) = &arguments.diff {
+    if let Some(reference) = request.diff {
         let changes = ChangedLines::since(reference, directory)?;
         diagnostics.retain(|diagnostic| changes.touches(diagnostic));
         let project_root = config
@@ -63,31 +77,48 @@ fn check(arguments: &CheckArgs, directory: &Path, terminal: &mut Terminal<'_>) -
             changes: &changes,
             config: &config,
             project_root: &project_root,
-            stacks: &arguments.scan.languages,
+            stacks: &request.scan.languages,
         }));
     }
     let mut known = 0;
-    if !arguments.no_baseline
+    if request.use_baseline
         && let Some(baseline) = Baseline::load(&config.root().join(BASELINE_FILE))?
     {
         let filtered = baseline.filter(diagnostics);
         known = filtered.known;
         diagnostics = filtered.diagnostics;
     }
-    render(&diagnostics, arguments.format, terminal.report)
+    Ok(Findings {
+        files: outcome.files,
+        diagnostics,
+        known,
+        deviations: config.deviations(),
+        failures: outcome.failures,
+    })
+}
+
+fn check(arguments: &CheckArgs, directory: &Path, terminal: &mut Terminal<'_>) -> Result<u8, String> {
+    let started = Instant::now();
+    let request = FindingsRequest {
+        scan: &arguments.scan,
+        diff: arguments.diff.as_deref(),
+        use_baseline: !arguments.no_baseline,
+    };
+    let found = findings(&request, directory)?;
+    render(&found.diagnostics, arguments.format, terminal.report)
         .and_then(|()| terminal.report.flush())
         .map_err(|error| write_error(&error))?;
     let summary = Summary {
-        files: outcome.files,
-        problems: diagnostics.len(),
-        known,
-        deviations: config.deviations(),
+        files: found.files,
+        problems: found.diagnostics.len(),
+        known: found.known,
+        deviations: found.deviations,
         started,
     };
-    write_failures(&outcome.failures, terminal.log)
+    write_failures(&found.failures, terminal.log)
         .and_then(|()| write_summary(&summary, terminal.log))
         .map_err(|error| write_error(&error))?;
-    Ok(exit_status(&outcome.failures, &diagnostics))
+    Ok(exit_status(&found.failures, &found.diagnostics))
 }
 
 fn baseline(arguments: &ScanArgs, directory: &Path, terminal: &mut Terminal<'_>) -> Result<u8, String> {
@@ -174,6 +205,7 @@ const fn exit_status(failures: &[ScanFailure], diagnostics: &[Diagnostic]) -> u8
 }
 
 mod hook;
+mod mcp;
 
 #[cfg(test)]
 mod tests;
