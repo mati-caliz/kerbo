@@ -99,7 +99,9 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   rápida.
 - Correr Qodana Community (las inspecciones de IntelliJ en CI) sobre repos reales y contar qué
   inspecciones aparecen más: esa lista ordena las reglas de las etapas de Java y de flujo de
-  datos, y Qodana pasa a ser otra referencia del arnés de paridad.
+  datos, y Qodana pasa a ser otra referencia del arnés de paridad. Pendiente: el primer intento se
+  trabó más de 10 minutos importando el proyecto Maven con el server cargado; va de nuevo con el
+  server tranquilo.
 
 ### 5. Más reglas universales y Rust
 
