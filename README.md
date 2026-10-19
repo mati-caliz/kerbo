@@ -93,6 +93,27 @@ una excepción es legítima, va en `kerbo.toml` con su `reason`, a la vista de t
   `claude mcp add kerbo -- kerbo mcp`; en Cursor y otros clientes, un servidor stdio con el
   comando `kerbo` y el argumento `mcp`.
 
+### En el editor
+
+`kerbo lsp` es un servidor LSP: el editor le pasa el archivo mientras escribís y kerbo marca los
+problemas al instante, sin esperar a que guardes, con el `kerbo.toml` y la línea de base del repo.
+
+- **IntelliJ IDEA, PyCharm, GoLand, WebStorm** (Community o Ultimate): instalá el plugin
+  [LSP4IJ](https://plugins.jetbrains.com/plugin/23257-lsp4ij), y en *Settings → Languages &
+  Frameworks → Language Servers* agregá uno nuevo con el comando `kerbo lsp` y, en *Mappings →
+  File name patterns*, `*.java`, `*.ts`, `*.tsx`, `*.js`, `*.py` y `*.go`.
+- **Neovim**:
+
+  ```lua
+  vim.api.nvim_create_autocmd("FileType", {
+    pattern = { "java", "typescript", "typescriptreact", "javascript", "python", "go" },
+    callback = function() vim.lsp.start({ name = "kerbo", cmd = { "kerbo", "lsp" } }) end,
+  })
+  ```
+
+- **Cualquier editor con LSP genérico** (Zed, Helix, Sublime con LSP): comando `kerbo lsp`, por
+  stdio.
+
 ### `kerbo.toml`
 
 Opcional, en la raíz del repo (kerbo lo busca hacia arriba desde la carpeta actual). Sin él vale

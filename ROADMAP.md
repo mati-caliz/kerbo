@@ -92,7 +92,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 - **Modo instantáneo** sobre los archivos recién tocados (meta: menos de 100 ms), un hook listo
   para Claude Code y un **servidor MCP**.
 
-### 4. Editor (LSP) e inspecciones de IntelliJ como mapa
+### 4. Editor (LSP) e inspecciones de IntelliJ como mapa (el LSP, hecho en 0.5)
 
 - `kerbo lsp`: los problemas de kerbo subrayados mientras se escribe, en IntelliJ (de fábrica en
   Ultimate, con LSP4IJ en Community), VS Code, Neovim y Zed, y los arreglos seguros como acción

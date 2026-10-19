@@ -40,6 +40,7 @@ pub fn run(command: &Command, directory: &Path, terminal: &mut Terminal<'_>) -> 
             hook::NON_BLOCKING_ERROR,
         ),
         Command::Mcp => (mcp::serve(directory, terminal), EXIT_FAILURE),
+        Command::Lsp => (lsp::serve(terminal), EXIT_FAILURE),
     };
     result.unwrap_or_else(|error| {
         let _written = writeln!(terminal.log, "kerbo: {error}");
@@ -205,6 +206,7 @@ const fn exit_status(failures: &[ScanFailure], diagnostics: &[Diagnostic]) -> u8
 }
 
 mod hook;
+mod lsp;
 mod mcp;
 
 #[cfg(test)]

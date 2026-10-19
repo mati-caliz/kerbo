@@ -33,6 +33,10 @@ pub enum Command {
     Hook(HookArgs),
     #[command(about = "Servidor MCP por stdio: herramientas kerbo_check y kerbo_explain para agentes")]
     Mcp,
+    #[command(
+        about = "Servidor LSP por stdio: los problemas en el editor mientras escribís (IntelliJ, VS Code, Neovim)"
+    )]
+    Lsp,
 }
 
 #[derive(Debug, Args)]

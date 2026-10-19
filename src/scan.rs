@@ -100,6 +100,23 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
     outcome
 }
 
+pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Diagnostic>> {
+    let project_root = config
+        .root()
+        .canonicalize()
+        .unwrap_or_else(|_| config.root().to_path_buf());
+    let file = source_file(&project_root, path, &project_root)?;
+    let relative = Path::new(&file.identity.relative);
+    if config.is_ignored(relative) {
+        return Some(Vec::new());
+    }
+    let mut parser = Parser::new();
+    parser.set_language(&file.language.grammar()).ok()?;
+    let analysis = analyze(&mut parser, file.language, source).ok()?;
+    let limits = config.limits_for(relative, file.language, file.is_test);
+    Some(evaluate(&file.identity, &analysis, limits))
+}
+
 fn collect_files(roots: &[PathBuf], project_root: &Path) -> (Vec<SourceFile>, Vec<ScanFailure>) {
     let mut files = Vec::new();
     let mut failures = Vec::new();
