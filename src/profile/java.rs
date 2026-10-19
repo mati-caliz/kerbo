@@ -1,6 +1,6 @@
 use super::{
-    CaseShape, CognitiveShape, CountedLines, LineSpan, LogicalShape, ParameterShape, PartialUnits, PmdShape,
-    Profile, SpanBounds, TestFiles,
+    CaseShape, CognitiveShape, CountedLines, GuardShape, LineSpan, LogicalShape, ParameterShape,
+    PartialUnits, PmdShape, Profile, SpanBounds, TestFiles,
 };
 
 pub static JAVA: Profile = Profile {
@@ -30,6 +30,32 @@ pub static JAVA: Profile = Profile {
     test_files: TestFiles {
         name_markers: &[],
         directories: &["test"],
+    },
+    guard: GuardShape {
+        suppression_comments: &[
+            "NOPMD",
+            "CHECKSTYLE:OFF",
+            "CHECKSTYLE.OFF",
+            "@formatter:off",
+            "spotless:off",
+            "NOSONAR",
+        ],
+        annotation_kinds: &["marker_annotation", "annotation"],
+        suppression_annotations: &["SuppressWarnings", "SuppressFBWarnings", "Generated"],
+        test_annotations: &[
+            "Test",
+            "ParameterizedTest",
+            "RepeatedTest",
+            "TestFactory",
+            "TestTemplate",
+        ],
+        disabled_annotations: &["Disabled", "Ignore"],
+        call_kind: "method_invocation",
+        test_calls: &[],
+        disabled_calls: &[],
+        test_function: None,
+        escape_types: &[],
+        double_cast: None,
     },
     decisions: &[
         "if_statement",

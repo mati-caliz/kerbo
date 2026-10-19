@@ -15,12 +15,18 @@ struct Outcome {
 }
 
 fn execute(arguments: &[&str], directory: &Path) -> Outcome {
+    execute_with_input(arguments, directory, "")
+}
+
+fn execute_with_input(arguments: &[&str], directory: &Path, input: &str) -> Outcome {
     let cli = Cli::try_parse_from(arguments).expect("los argumentos son válidos");
     let (mut report, mut log) = (Vec::new(), Vec::new());
+    let mut input = input.as_bytes();
     let status = run(
         &cli.command,
         directory,
         &mut Terminal {
+            input: &mut input,
             report: &mut report,
             log: &mut log,
         },
@@ -145,4 +151,47 @@ fn fails_on_missing_paths_and_outside_git_with_diff() {
     let no_git = execute(&["kerbo", "check", "--diff", "main", path_of(&tree)], tree.path());
     assert_eq!(no_git.status, EXIT_FAILURE);
     assert!(no_git.log.contains("git"));
+}
+
+#[test]
+fn explains_a_rule() {
+    let tree = TempTree::new("app-explain");
+    let outcome = execute(&["kerbo", "explain", "cognitive-complexity"], tree.path());
+    assert_eq!(outcome.status, EXIT_CLEAN);
+    assert!(outcome.report.contains("Por qué:") && outcome.report.contains("retornos tempranos"));
+    assert!(Cli::try_parse_from(["kerbo", "explain", "nope"]).is_err());
+}
+
+#[test]
+fn hook_gives_feedback_only_on_problems() {
+    let tree = TempTree::new("app-hook");
+    tree.write("many.go", LONG_SIGNATURE);
+    tree.write("few.go", "package sample\n\nfunc Few(a int) {}\n");
+    tree.write("notes.md", "# nada\n");
+    let event = |file: &str| {
+        format!(
+            "{{\"cwd\": \"{}\", \"tool_input\": {{\"file_path\": \"{file}\"}}}}",
+            path_of(&tree)
+        )
+    };
+    let flagged = execute_with_input(&["kerbo", "hook"], tree.path(), &event("many.go"));
+    assert_eq!(flagged.status, 2, "Claude Code le muestra el stderr al agente");
+    assert!(flagged.log.contains("parameter-count") && flagged.log.contains("kerbo explain"));
+    assert_eq!(
+        execute_with_input(&["kerbo", "hook"], tree.path(), &event("few.go")).status,
+        EXIT_CLEAN
+    );
+    assert_eq!(
+        execute_with_input(&["kerbo", "hook"], tree.path(), &event("notes.md")).status,
+        EXIT_CLEAN
+    );
+    assert_eq!(
+        execute_with_input(&["kerbo", "hook"], tree.path(), "{}").status,
+        EXIT_CLEAN
+    );
+    let broken = execute_with_input(&["kerbo", "hook"], tree.path(), "no es json");
+    assert_eq!(
+        broken.status, EXIT_FINDINGS,
+        "un error del hook no bloquea al agente"
+    );
 }

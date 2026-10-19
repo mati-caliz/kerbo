@@ -190,7 +190,7 @@ footer a { color: var(--text-soft); }
 
 <main>
   <div class="wrap hero">
-    <span class="pill">Versión 0.2 disponible · open source, Apache 2.0</span>
+    <span class="pill">Versión 0.3 disponible · open source, Apache 2.0</span>
     <h1>Una sola vara de calidad para <em>todo</em> tu código.</h1>
     <p class="lead">kerbo revisa Java, TypeScript, Python y Go con <strong>un binario de 7 MB</strong>, hasta 23 veces más rápido y con 90 veces menos memoria: las mismas reglas y un solo reporte, contando exactamente igual que Checkstyle, PMD, ESLint, ruff y golangci-lint. Está pensado para que los <strong>agentes de IA no puedan zafar</strong> de las reglas.</p>
     <div class="install" id="instalar-hero">
@@ -281,15 +281,15 @@ footer a { color: var(--text-soft); }
     <div class="wrap split">
       <div>
         <p class="eyebrow">Para agentes de IA</p>
-        <h2>Guardarraíles para el código que escriben Claude Code, Cursor y Copilot. <span class="tag">En camino</span></h2>
+        <h2>Guardarraíles para el código que escriben Claude Code, Cursor y Copilot.</h2>
         <p class="section-lead">Los linters de hoy le hablan a una persona. Un agente que escribe y corrige en ciclos cortos necesita otra cosa: saber exactamente qué arreglar, y que nadie le deje "arreglarlo" escondiéndolo.</p>
       </div>
       <ul class="list">
         <li><strong>Antitrampa.</strong> Avisa cuando un cambio zafa en vez de arreglar: un <code>eslint-disable</code>, <code>noqa</code> o <code>@SuppressWarnings</code> nuevo, un umbral bajado, un test borrado o salteado, un <code>any</code>.</li>
         <li><strong>Salida para agentes.</strong> JSON compacto, priorizado y con el arreglo como parche, sin relleno que gaste tokens.</li>
-        <li><strong>Identificadores estables.</strong> En la vuelta siguiente el agente sabe qué arregló, qué sigue y qué es nuevo.</li>
-        <li><strong>Errores típicos del código generado.</strong> Imports que no existen, funciones que duplican otra del repo, tests sin aserciones.</li>
-        <li><strong>Servidor MCP y modo instantáneo</strong> sobre los archivos recién tocados, para engancharlo después de cada edición.</li>
+        <li><strong>Hook de Claude Code.</strong> Revisa cada archivo que el agente edita, en milisegundos, y le devuelve lo que encontró para que lo arregle en la misma vuelta.</li>
+        <li><strong>Identificadores estables y <code>kerbo explain</code>.</strong> En la vuelta siguiente el agente sabe qué arregló, qué sigue y cómo se arregla cada regla.</li>
+        <li><strong>En camino:</strong> servidor MCP, imports que no existen y funciones que duplican otra del repo.</li>
       </ul>
     </div>
   </section>
@@ -320,14 +320,14 @@ footer a { color: var(--text-soft); }
       <h2>Dónde está y qué sigue.</h2>
       <div class="steps">
         <div class="step step--now">
-          <div class="step__when">Hoy · 0.2</div>
-          <h3>Listo para un repo real</h3>
-          <p>Cinco reglas con paridad exacta en cuatro lenguajes, <code>kerbo.toml</code> con presets y excepciones con motivo, línea de base, <code>--diff</code> contra main, SARIF y una GitHub Action.</p>
+          <div class="step__when">Hoy · 0.3</div>
+          <h3>Listo para un repo real, y para agentes</h3>
+          <p>Paridad exacta en cuatro lenguajes, <code>kerbo.toml</code>, línea de base, <code>--diff</code>, SARIF y GitHub Action, más antitrampa, salida para agentes y hook de Claude Code.</p>
         </div>
         <div class="step">
           <div class="step__when">Próximo</div>
-          <h3>Capa para agentes de IA</h3>
-          <p>Antitrampa (supresiones nuevas, umbrales bajados, tests borrados), salida para agentes, hook de Claude Code y servidor MCP. Después, Java sintáctico completo.</p>
+          <h3>MCP y más reglas</h3>
+          <p>Servidor MCP, anidamiento, números mágicos y duplicación, Rust, y binarios para macOS y Windows. Después, Java sintáctico completo.</p>
         </div>
         <div class="step">
           <div class="step__when">Después</div>

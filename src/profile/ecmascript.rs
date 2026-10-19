@@ -1,6 +1,6 @@
 use super::{
-    CaseShape, CognitiveShape, LineSpan, LogicalShape, ParameterShape, PartialUnits, Profile, ShortCircuit,
-    TestFiles,
+    CaseShape, CognitiveShape, GuardShape, LineSpan, LogicalShape, ParameterShape, PartialUnits, Profile,
+    ShortCircuit, TestFiles,
 };
 
 const FUNCTIONS: &[&str] = &[
@@ -56,6 +56,52 @@ pub static ECMASCRIPT: Profile = Profile {
     test_files: TestFiles {
         name_markers: &[".test.", ".spec."],
         directories: &["test", "tests", "__tests__", "e2e"],
+    },
+    guard: GuardShape {
+        suppression_comments: &[
+            "eslint-disable",
+            "@ts-ignore",
+            "@ts-expect-error",
+            "@ts-nocheck",
+            "istanbul ignore",
+            "c8 ignore",
+            "v8 ignore",
+            "biome-ignore",
+            "oxlint-disable",
+            "NOSONAR",
+        ],
+        annotation_kinds: &[],
+        suppression_annotations: &[],
+        test_annotations: &[],
+        disabled_annotations: &[],
+        call_kind: "call_expression",
+        test_calls: &[
+            "it",
+            "test",
+            "it.skip",
+            "test.skip",
+            "it.only",
+            "test.only",
+            "xit",
+            "xtest",
+            "fit",
+        ],
+        disabled_calls: &[
+            "it.skip",
+            "test.skip",
+            "describe.skip",
+            "xit",
+            "xtest",
+            "xdescribe",
+            "it.only",
+            "test.only",
+            "describe.only",
+            "fit",
+            "fdescribe",
+        ],
+        test_function: None,
+        escape_types: &[("predefined_type", "any")],
+        double_cast: Some(("as_expression", "unknown")),
     },
     decisions: &[
         "if_statement",

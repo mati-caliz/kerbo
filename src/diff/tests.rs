@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::{ChangedLines, Changes, new_side_range, parse_unified_diff};
+use super::{ChangedLines, Changes, LineRange, new_side_range, parse_unified_diff};
 use crate::rules::{Diagnostic, RuleId};
 use crate::test_support::TempTree;
 
@@ -36,29 +36,51 @@ fn diagnostic(absolute: &Path, line: usize, end_line: usize) -> Diagnostic {
     }
 }
 
+const fn range(first: usize, last: usize, added: bool) -> LineRange {
+    LineRange { first, last, added }
+}
+
 #[test]
 fn reads_the_new_side_of_each_hunk() {
-    assert_eq!(new_side_range("-10,0 +11,3 @@ function f() {"), Some((11, 13)));
-    assert_eq!(new_side_range("-40 +44 @@"), Some((44, 44)));
+    assert_eq!(
+        new_side_range("-10,0 +11,3 @@ function f() {"),
+        Some(range(11, 13, true))
+    );
+    assert_eq!(new_side_range("-40 +44 @@"), Some(range(44, 44, true)));
     assert_eq!(
         new_side_range("-5,2 +4,0 @@"),
-        Some((4, 4)),
+        Some(range(4, 4, false)),
         "un borrado marca la línea donde estaba"
     );
-    assert_eq!(new_side_range("-1,3 +0,0 @@"), Some((1, 1)));
+    assert_eq!(new_side_range("-1,3 +0,0 @@"), Some(range(1, 1, false)));
     assert_eq!(new_side_range("sin rangos"), None);
-    let files = parse_unified_diff(DIFF, Path::new("/repo"));
+    let parsed = parse_unified_diff(DIFF, Path::new("/repo"));
+    let changes = parsed
+        .files
+        .get(&PathBuf::from("/repo/src/a.ts"))
+        .expect("a.ts cambió");
     assert_eq!(
-        files.get(&PathBuf::from("/repo/src/a.ts")),
-        Some(&Changes::Ranges(vec![(11, 13), (44, 44)]))
+        changes,
+        &Changes::Ranges(vec![range(11, 13, true), range(44, 44, true)])
     );
-    assert_eq!(files.len(), 1, "los archivos borrados no cuentan");
+    assert!(changes.adds_line(12) && !changes.adds_line(20) && Changes::Whole.adds_line(7));
+    assert!(
+        !Changes::Ranges(vec![range(4, 4, false)]).adds_line(4),
+        "un borrado no agrega líneas"
+    );
+    assert_eq!(
+        parsed.files.len(),
+        1,
+        "los archivos borrados no cuentan como cambiados"
+    );
+    assert_eq!(parsed.deleted, [PathBuf::from("/repo/gone.ts")]);
 }
 
 #[test]
 fn keeps_only_problems_that_touch_changed_lines() {
     let changes = ChangedLines {
-        files: parse_unified_diff(DIFF, Path::new("/repo")),
+        files: parse_unified_diff(DIFF, Path::new("/repo")).files,
+        ..ChangedLines::default()
     };
     let file = Path::new("/repo/src/a.ts");
     assert!(changes.touches(&diagnostic(file, 5, 12)));
@@ -79,7 +101,7 @@ fn git(directory: &Path, arguments: &[&str]) {
 }
 
 #[test]
-fn asks_git_for_changes_and_untracked_files() {
+fn asks_git_for_changes_untracked_files_and_previous_versions() {
     let tree = TempTree::new("diff-git");
     git(tree.path(), &["init", "-q"]);
     tree.write("a.ts", "line 1\nline 2\nline 3\n");
@@ -92,6 +114,14 @@ fn asks_git_for_changes_and_untracked_files() {
     assert!(changes.touches(&diagnostic(&root.join("a.ts"), 2, 2)));
     assert!(!changes.touches(&diagnostic(&root.join("a.ts"), 3, 3)));
     assert!(changes.touches(&diagnostic(&root.join("new.ts"), 1, 1)));
+    assert_eq!(
+        changes.previous_version(&root.join("a.ts")).as_deref(),
+        Some("line 1\nline 2\nline 3\n")
+    );
+    assert!(changes.previous_version(&root.join("new.ts")).is_none());
+    assert!(changes.previous_version(Path::new("/elsewhere.ts")).is_none());
+    assert_eq!(changes.files().count(), 2);
+    assert_eq!(changes.deleted().len(), 0);
     assert!(ChangedLines::since("no-such-ref", tree.path()).is_err());
     assert!(ChangedLines::since("HEAD", &root.join("missing")).is_err());
 }

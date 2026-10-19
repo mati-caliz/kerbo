@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::Path;
 use std::time::Instant;
 
@@ -6,8 +6,10 @@ use crate::baseline::{BASELINE_FILE, Baseline};
 use crate::cli::{CheckArgs, Command, ScanArgs};
 use crate::config::Config;
 use crate::diff::ChangedLines;
+use crate::explain::explain;
+use crate::guard::{GuardRequest, inspect};
 use crate::report::render;
-use crate::rules::Diagnostic;
+use crate::rules::{Diagnostic, RuleId};
 use crate::scan::{ScanFailure, ScanOutcome, ScanRequest, scan};
 
 pub const EXIT_CLEAN: u8 = 0;
@@ -15,6 +17,7 @@ pub const EXIT_FINDINGS: u8 = 1;
 pub const EXIT_FAILURE: u8 = 2;
 
 pub struct Terminal<'output> {
+    pub input: &'output mut dyn Read,
     pub report: &'output mut dyn Write,
     pub log: &'output mut dyn Write,
 }
@@ -28,13 +31,18 @@ struct Summary {
 }
 
 pub fn run(command: &Command, directory: &Path, terminal: &mut Terminal<'_>) -> u8 {
-    let result = match command {
-        Command::Check(arguments) => check(arguments, directory, terminal),
-        Command::Baseline(arguments) => baseline(arguments, directory, terminal),
+    let (result, failure_status) = match command {
+        Command::Check(arguments) => (check(arguments, directory, terminal), EXIT_FAILURE),
+        Command::Baseline(arguments) => (baseline(arguments, directory, terminal), EXIT_FAILURE),
+        Command::Explain { rule } => (explain_rule(*rule, terminal), EXIT_FAILURE),
+        Command::Hook(arguments) => (
+            hook::run(arguments, directory, terminal),
+            hook::NON_BLOCKING_ERROR,
+        ),
     };
     result.unwrap_or_else(|error| {
         let _written = writeln!(terminal.log, "kerbo: {error}");
-        EXIT_FAILURE
+        failure_status
     })
 }
 
@@ -47,6 +55,16 @@ fn check(arguments: &CheckArgs, directory: &Path, terminal: &mut Terminal<'_>) -
     if let Some(reference) = &arguments.diff {
         let changes = ChangedLines::since(reference, directory)?;
         diagnostics.retain(|diagnostic| changes.touches(diagnostic));
+        let project_root = config
+            .root()
+            .canonicalize()
+            .unwrap_or_else(|_| config.root().to_path_buf());
+        diagnostics.extend(inspect(&GuardRequest {
+            changes: &changes,
+            config: &config,
+            project_root: &project_root,
+            stacks: &arguments.scan.languages,
+        }));
     }
     let mut known = 0;
     if !arguments.no_baseline
@@ -94,6 +112,21 @@ fn baseline(arguments: &ScanArgs, directory: &Path, terminal: &mut Terminal<'_>)
     })
 }
 
+fn explain_rule(rule: RuleId, terminal: &mut Terminal<'_>) -> Result<u8, String> {
+    let explanation = explain(rule);
+    writeln!(
+        terminal.report,
+        "{}: {}\n\nPor qué: {}\nCómo se arregla: {}\nEjemplo: {}",
+        rule.as_str(),
+        rule.description(),
+        explanation.why,
+        explanation.fix,
+        explanation.example
+    )
+    .map_err(|error| write_error(&error))?;
+    Ok(EXIT_CLEAN)
+}
+
 fn scan_with(arguments: &ScanArgs, config: &Config) -> ScanOutcome {
     scan(&ScanRequest {
         roots: &arguments.paths,
@@ -139,6 +172,8 @@ const fn exit_status(failures: &[ScanFailure], diagnostics: &[Diagnostic]) -> u8
         EXIT_FINDINGS
     }
 }
+
+mod hook;
 
 #[cfg(test)]
 mod tests;

@@ -37,8 +37,9 @@ kerbo check                       # el directorio actual
 kerbo check api web               # varias carpetas o archivos
 kerbo check --language java api   # sólo una pila: typescript, python, java o go
 kerbo check --diff main           # sólo lo que tocan las líneas cambiadas desde main
-kerbo check --format sarif        # también json; sarif lo leen GitHub y los editores
+kerbo check --format sarif        # también json, agent; sarif lo leen GitHub y los editores
 kerbo baseline                    # acepta lo que ya hay: desde ahora sólo se reporta lo nuevo
+kerbo explain cognitive-complexity  # por qué existe una regla y cómo se arregla
 ```
 
 Respeta `.gitignore` y saltea los archivos ocultos. Sale con `0` si no hay problemas, `1` si los
@@ -51,6 +52,42 @@ hay y `2` si algo no se pudo leer o la configuración es inválida.
 línea de base pasa de complejidad 14 a 16, vuelve a aparecer. Cada problema se identifica por
 regla, archivo y función, no por número de línea, así que mover código no lo hace "nuevo".
 `--no-baseline` muestra todo.
+
+### Antitrampa
+
+Con `--diff`, kerbo también mira **cómo** se resolvió un problema. Marca lo que un cambio agrega
+para zafar en vez de arreglar, sólo en las líneas nuevas:
+
+| Regla | Qué detecta |
+|---|---|
+| `suppression-added` | `eslint-disable`, `@ts-ignore`, `noqa`, `type: ignore`, `nolint`, `#nosec`, `@SuppressWarnings`, `NOPMD`, `CHECKSTYLE:OFF`, `istanbul ignore`, `NOSONAR`… |
+| `test-disabled` | `it.skip`, `it.only`, `xit`, `describe.only`, `@Disabled`, `@Ignore`, `@pytest.mark.skip`, `t.Skip()`… |
+| `test-removed` | tests borrados, comparando contra la referencia; si los tests sólo se movieron de archivo, no avisa |
+| `type-escape` | `any` y `as unknown as` en TypeScript |
+
+Todo se detecta sobre el árbol de sintaxis: un `eslint-disable` dentro de un string no cuenta. Si
+una excepción es legítima, va en `kerbo.toml` con su `reason`, a la vista de todos.
+
+### Para agentes de IA
+
+- `kerbo check --format agent`: JSON compacto con tope, las trampas primero y después lo que más
+  se pasa del límite, cada problema con un identificador estable y una pista de arreglo.
+- `kerbo explain <regla>`: por qué existe, cómo se arregla y un ejemplo, corto para el contexto.
+- **Hook de Claude Code**: revisa cada archivo que el agente edita, en milisegundos, y si encuentra
+  algo se lo devuelve para que lo corrija en la misma vuelta. En `.claude/settings.json`:
+
+  ```json
+  {
+    "hooks": {
+      "PostToolUse": [
+        { "matcher": "Edit|MultiEdit|Write", "hooks": [{ "type": "command", "command": "kerbo hook" }] }
+      ]
+    }
+  }
+  ```
+
+  En un repo git sólo mira lo que cambió respecto de `HEAD`, antitrampa incluida, y respeta la línea
+  de base: el agente no se pone a arreglar código que no tocó. Si kerbo falla, el hook no bloquea.
 
 ### `kerbo.toml`
 

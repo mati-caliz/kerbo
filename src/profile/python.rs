@@ -1,5 +1,6 @@
 use super::{
-    CaseShape, CognitiveShape, LineSpan, LogicalShape, NO_PARTIAL_UNITS, ParameterShape, Profile, TestFiles,
+    CaseShape, CognitiveShape, GuardShape, LineSpan, LogicalShape, NO_PARTIAL_UNITS, ParameterShape, Profile,
+    TestFiles,
 };
 
 pub static PYTHON: Profile = Profile {
@@ -27,6 +28,32 @@ pub static PYTHON: Profile = Profile {
     test_files: TestFiles {
         name_markers: &[],
         directories: &["tests"],
+    },
+    guard: GuardShape {
+        suppression_comments: &[
+            "noqa",
+            "type: ignore",
+            "pragma: no cover",
+            "pylint: disable",
+            "NOSONAR",
+        ],
+        annotation_kinds: &["decorator"],
+        suppression_annotations: &[],
+        test_annotations: &[],
+        disabled_annotations: &[
+            "pytest.mark.skip",
+            "pytest.mark.skipif",
+            "pytest.mark.xfail",
+            "unittest.skip",
+            "unittest.skipIf",
+            "unittest.skipUnless",
+        ],
+        call_kind: "call",
+        test_calls: &[],
+        disabled_calls: &["pytest.skip", "pytest.xfail"],
+        test_function: Some(("function_definition", "test")),
+        escape_types: &[],
+        double_cast: None,
     },
     decisions: &[
         "if_statement",

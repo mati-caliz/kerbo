@@ -4,6 +4,8 @@ mod baseline;
 mod cli;
 mod config;
 mod diff;
+mod explain;
+mod guard;
 mod language;
 mod limits;
 mod lines;
@@ -31,6 +33,7 @@ fn main() -> ExitCode {
         return ExitCode::from(EXIT_FAILURE);
     };
     let mut terminal = Terminal {
+        input: &mut io::stdin().lock(),
         report: &mut io::stdout().lock(),
         log: &mut io::stderr().lock(),
     };

@@ -4,6 +4,7 @@ use clap::ValueEnum;
 
 use crate::rules::Diagnostic;
 
+mod agent;
 mod sarif;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -11,6 +12,7 @@ pub enum Format {
     Text,
     Json,
     Sarif,
+    Agent,
 }
 
 pub fn render<W: Write + ?Sized>(
@@ -38,6 +40,10 @@ pub fn render<W: Write + ?Sized>(
         }
         Format::Sarif => {
             serde_json::to_writer(&mut *writer, &sarif::document(diagnostics))?;
+            writeln!(writer)?;
+        }
+        Format::Agent => {
+            serde_json::to_writer(&mut *writer, &agent::document(diagnostics))?;
             writeln!(writer)?;
         }
     }
@@ -109,5 +115,29 @@ mod tests {
             result["partialFingerprints"]["kerbo/v1"],
             "parameter-count:src/a.go:f#1"
         );
+    }
+
+    #[test]
+    fn renders_a_short_prioritized_list_for_agents() {
+        let mut diagnostics = sample();
+        let mut cheating = sample().remove(0);
+        cheating.rule = RuleId::SuppressionAdded;
+        cheating.value = 1;
+        cheating.limit = 0;
+        diagnostics.push(cheating);
+        let mut output = Vec::new();
+        render(&diagnostics, Format::Agent, &mut output).expect("se escribe en memoria");
+        let parsed: serde_json::Value = serde_json::from_slice(&output).expect("es JSON válido");
+        assert_eq!(parsed["problems"], 2);
+        assert_eq!(parsed["more"], 0);
+        assert_eq!(
+            parsed["items"][0]["rule"], "suppression-added",
+            "las trampas van primero"
+        );
+        assert_eq!(
+            parsed["items"][1]["fix"],
+            "agrupá los parámetros que viajan juntos en un objeto"
+        );
+        assert_eq!(parsed["items"][1]["file"], "src/a.go");
     }
 }

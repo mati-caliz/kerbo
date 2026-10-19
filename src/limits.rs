@@ -8,11 +8,7 @@ use crate::rules::RuleId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Limits {
-    file_lines: Option<usize>,
-    function_lines: Option<usize>,
-    cyclomatic: Option<usize>,
-    cognitive: Option<usize>,
-    parameters: Option<usize>,
+    values: [Option<usize>; RuleId::ALL.len()],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,73 +26,55 @@ pub enum Preset {
     Minimal,
 }
 
-const GO_STRICT: Limits = Limits::new([Some(400), Some(80), Some(10), Some(15), Some(4)]);
-const PYTHON_STRICT: Limits = Limits::new([None, None, Some(10), None, Some(6)]);
-const JAVA_STRICT: Limits = Limits::new([Some(500), Some(80), Some(8), Some(15), Some(5)]);
-const ECMASCRIPT_STRICT: Limits = Limits::new([Some(400), Some(120), Some(10), Some(15), Some(4)]);
-const RECOMMENDED: Limits = Limits::new([Some(750), Some(150), Some(15), Some(20), Some(6)]);
-const MINIMAL: Limits = Limits::new([Some(1500), Some(300), Some(25), Some(30), Some(8)]);
+const ALWAYS_REPORTED: Option<usize> = Some(0);
+const GO_STRICT: [Option<usize>; 5] = [Some(400), Some(80), Some(10), Some(15), Some(4)];
+const PYTHON_STRICT: [Option<usize>; 5] = [None, None, Some(10), None, Some(6)];
+const JAVA_STRICT: [Option<usize>; 5] = [Some(500), Some(80), Some(8), Some(15), Some(5)];
+const ECMASCRIPT_STRICT: [Option<usize>; 5] = [Some(400), Some(120), Some(10), Some(15), Some(4)];
+const RECOMMENDED: [Option<usize>; 5] = [Some(750), Some(150), Some(15), Some(20), Some(6)];
+const MINIMAL: [Option<usize>; 5] = [Some(1500), Some(300), Some(25), Some(30), Some(8)];
 
 impl Limits {
-    const fn new(
-        [file_lines, function_lines, cyclomatic, cognitive, parameters]: [Option<usize>; 5],
-    ) -> Self {
-        Self {
-            file_lines,
-            function_lines,
-            cyclomatic,
-            cognitive,
-            parameters,
+    fn with_metrics([file, function, cyclomatic, cognitive, parameters]: [Option<usize>; 5]) -> Self {
+        let mut limits = Self {
+            values: [ALWAYS_REPORTED; RuleId::ALL.len()],
+        };
+        let metrics = [
+            (RuleId::FileLength, file),
+            (RuleId::FunctionLength, function),
+            (RuleId::CyclomaticComplexity, cyclomatic),
+            (RuleId::CognitiveComplexity, cognitive),
+            (RuleId::ParameterCount, parameters),
+        ];
+        for (rule, max) in metrics {
+            limits = limits.with_rule(rule, max);
         }
+        limits
     }
 
-    pub const fn get(self, rule: RuleId) -> Option<usize> {
-        match rule {
-            RuleId::FileLength => self.file_lines,
-            RuleId::FunctionLength => self.function_lines,
-            RuleId::CyclomaticComplexity => self.cyclomatic,
-            RuleId::CognitiveComplexity => self.cognitive,
-            RuleId::ParameterCount => self.parameters,
-        }
+    pub fn get(self, rule: RuleId) -> Option<usize> {
+        self.values.get(rule.index()).copied().flatten()
     }
 
-    pub const fn with_rule(self, rule: RuleId, max: Option<usize>) -> Self {
-        match rule {
-            RuleId::FileLength => Self {
-                file_lines: max,
-                ..self
-            },
-            RuleId::FunctionLength => Self {
-                function_lines: max,
-                ..self
-            },
-            RuleId::CyclomaticComplexity => Self {
-                cyclomatic: max,
-                ..self
-            },
-            RuleId::CognitiveComplexity => Self {
-                cognitive: max,
-                ..self
-            },
-            RuleId::ParameterCount => Self {
-                parameters: max,
-                ..self
-            },
+    pub fn with_rule(mut self, rule: RuleId, max: Option<usize>) -> Self {
+        if let Some(slot) = self.values.get_mut(rule.index()) {
+            *slot = max;
         }
+        self
     }
 
-    pub const fn with_override(self, limit_override: LimitOverride) -> Self {
+    pub fn with_override(self, limit_override: LimitOverride) -> Self {
         self.with_rule(limit_override.rule, Some(limit_override.value))
     }
 }
 
 impl Preset {
-    pub const fn limits(self, language: Language, is_test: bool) -> Limits {
-        let base = match self {
+    pub fn limits(self, language: Language, is_test: bool) -> Limits {
+        let base = Limits::with_metrics(match self {
             Self::Strict => strict(language),
             Self::Recommended => RECOMMENDED,
             Self::Minimal => MINIMAL,
-        };
+        });
         if !is_test {
             return base;
         }
@@ -110,7 +88,7 @@ impl Preset {
     }
 }
 
-const fn strict(language: Language) -> Limits {
+const fn strict(language: Language) -> [Option<usize>; 5] {
     match language {
         Language::Go => GO_STRICT,
         Language::Python => PYTHON_STRICT,

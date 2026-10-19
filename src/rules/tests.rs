@@ -39,7 +39,16 @@ fn reports_every_limit_exceeded_with_its_value() {
         Preset::Strict.limits(Language::Go, false),
     );
     let rules: Vec<RuleId> = diagnostics.iter().map(|diagnostic| diagnostic.rule).collect();
-    assert_eq!(rules, RuleId::ALL);
+    assert_eq!(
+        rules,
+        [
+            RuleId::FileLength,
+            RuleId::FunctionLength,
+            RuleId::CyclomaticComplexity,
+            RuleId::CognitiveComplexity,
+            RuleId::ParameterCount,
+        ]
+    );
     let messages: Vec<&str> = diagnostics
         .iter()
         .map(|diagnostic| diagnostic.message.as_str())

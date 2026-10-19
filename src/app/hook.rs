@@ -1,0 +1,113 @@
+use std::io::Write;
+use std::path::{Path, PathBuf};
+
+use serde::Deserialize;
+
+use super::{EXIT_CLEAN, Terminal, write_error};
+use crate::baseline::{BASELINE_FILE, Baseline};
+use crate::cli::HookArgs;
+use crate::config::Config;
+use crate::diff::ChangedLines;
+use crate::explain::explain;
+use crate::guard::{GuardRequest, inspect};
+use crate::language::Language;
+use crate::rules::Diagnostic;
+use crate::scan::{ScanRequest, scan};
+
+pub const NON_BLOCKING_ERROR: u8 = 1;
+const FEEDBACK_FOR_AGENT: u8 = 2;
+const COMPARED_REVISION: &str = "HEAD";
+
+#[derive(Debug, Deserialize)]
+struct HookEvent {
+    cwd: Option<PathBuf>,
+    tool_input: Option<ToolInput>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ToolInput {
+    file_path: Option<PathBuf>,
+}
+
+pub fn run(arguments: &HookArgs, directory: &Path, terminal: &mut Terminal<'_>) -> Result<u8, String> {
+    let mut text = String::new();
+    terminal
+        .input
+        .read_to_string(&mut text)
+        .map_err(|error| format!("no se pudo leer el evento: {error}"))?;
+    let event: HookEvent =
+        serde_json::from_str(&text).map_err(|error| format!("el evento no es JSON válido: {error}"))?;
+    let base = event.cwd.unwrap_or_else(|| directory.to_path_buf());
+    let Some(file) = event
+        .tool_input
+        .and_then(|input| input.file_path)
+        .map(|file| base.join(file))
+    else {
+        return Ok(EXIT_CLEAN);
+    };
+    if Language::from_path(&file).is_none() || !file.is_file() {
+        return Ok(EXIT_CLEAN);
+    }
+    let diagnostics = review(&file, arguments)?;
+    if diagnostics.is_empty() {
+        return Ok(EXIT_CLEAN);
+    }
+    write_feedback(&diagnostics, terminal.log).map_err(|error| write_error(&error))?;
+    Ok(FEEDBACK_FOR_AGENT)
+}
+
+fn review(file: &Path, arguments: &HookArgs) -> Result<Vec<Diagnostic>, String> {
+    let start = file.parent().unwrap_or(file);
+    let config = Config::load(arguments.config.as_deref(), start).map_err(|error| error.to_string())?;
+    let roots = [file.to_path_buf()];
+    let outcome = scan(&ScanRequest {
+        roots: &roots,
+        stacks: &[],
+        overrides: &[],
+        config: &config,
+    });
+    let mut diagnostics = outcome.diagnostics;
+    let absolute = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());
+    if let Ok(changes) = ChangedLines::since(COMPARED_REVISION, start) {
+        diagnostics.retain(|diagnostic| changes.touches(diagnostic));
+        let project_root = config
+            .root()
+            .canonicalize()
+            .unwrap_or_else(|_| config.root().to_path_buf());
+        let request = GuardRequest {
+            changes: &changes,
+            config: &config,
+            project_root: &project_root,
+            stacks: &[],
+        };
+        diagnostics.extend(
+            inspect(&request)
+                .into_iter()
+                .filter(|diagnostic| diagnostic.absolute_path == absolute),
+        );
+    }
+    match Baseline::load(&config.root().join(BASELINE_FILE))? {
+        Some(baseline) => Ok(baseline.filter(diagnostics).diagnostics),
+        None => Ok(diagnostics),
+    }
+}
+
+fn write_feedback(diagnostics: &[Diagnostic], log: &mut dyn Write) -> std::io::Result<()> {
+    writeln!(
+        log,
+        "kerbo: {} problemas en lo que acabás de editar:",
+        diagnostics.len()
+    )?;
+    for diagnostic in diagnostics {
+        writeln!(
+            log,
+            "- {}:{} {} — {} ({})",
+            diagnostic.relative_path,
+            diagnostic.line,
+            diagnostic.rule.as_str(),
+            diagnostic.message,
+            explain(diagnostic.rule).fix
+        )?;
+    }
+    writeln!(log, "Más detalle: kerbo explain <regla>")
+}

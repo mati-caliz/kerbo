@@ -23,6 +23,7 @@ pub struct Profile {
     pub leading_attachments: Kinds,
     pub parameters: ParameterShape,
     pub test_files: TestFiles,
+    pub guard: GuardShape,
     pub decisions: Kinds,
     pub decision_fields: &'static [(&'static str, &'static str)],
     pub decision_parents: &'static [(&'static str, &'static str)],
@@ -56,6 +57,21 @@ pub struct ParameterShape {
     pub excludes_dummy_names: bool,
     pub exempting_annotation: Option<&'static str>,
     pub names_per_declaration: bool,
+}
+
+#[derive(Debug)]
+pub struct GuardShape {
+    pub suppression_comments: Kinds,
+    pub annotation_kinds: Kinds,
+    pub suppression_annotations: Kinds,
+    pub test_annotations: Kinds,
+    pub disabled_annotations: Kinds,
+    pub call_kind: &'static str,
+    pub test_calls: Kinds,
+    pub disabled_calls: Kinds,
+    pub test_function: Option<(&'static str, &'static str)>,
+    pub escape_types: &'static [(&'static str, &'static str)],
+    pub double_cast: Option<(&'static str, &'static str)>,
 }
 
 #[derive(Debug)]

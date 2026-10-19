@@ -5,6 +5,7 @@ use clap::{Args, Parser, Subcommand};
 use crate::language::Stack;
 use crate::limits::LimitOverride;
 use crate::report::Format;
+use crate::rules::RuleId;
 
 #[derive(Debug, Parser)]
 #[command(name = "kerbo", version, about = "Analizador de calidad multi-lenguaje")]
@@ -21,6 +22,25 @@ pub enum Command {
         about = "Guarda los problemas actuales como línea de base: después sólo se reportan los nuevos"
     )]
     Baseline(ScanArgs),
+    #[command(about = "Explica una regla: por qué existe y cómo se arregla")]
+    Explain {
+        #[arg(help = "La regla, por ejemplo cognitive-complexity")]
+        rule: RuleId,
+    },
+    #[command(
+        about = "Hook para agentes: revisa el archivo recién editado (lee el evento de Claude Code por stdin)"
+    )]
+    Hook(HookArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct HookArgs {
+    #[arg(
+        long,
+        value_name = "ARCHIVO",
+        help = "Usa esta configuración en vez de buscar kerbo.toml"
+    )]
+    pub config: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]

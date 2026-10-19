@@ -19,16 +19,38 @@ pub enum RuleId {
     CyclomaticComplexity,
     CognitiveComplexity,
     ParameterCount,
+    SuppressionAdded,
+    TestDisabled,
+    TestRemoved,
+    TypeEscape,
 }
 
 impl RuleId {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 9] = [
         Self::FileLength,
         Self::FunctionLength,
         Self::CyclomaticComplexity,
         Self::CognitiveComplexity,
         Self::ParameterCount,
+        Self::SuppressionAdded,
+        Self::TestDisabled,
+        Self::TestRemoved,
+        Self::TypeEscape,
     ];
+
+    pub const fn index(self) -> usize {
+        match self {
+            Self::FileLength => 0,
+            Self::FunctionLength => 1,
+            Self::CyclomaticComplexity => 2,
+            Self::CognitiveComplexity => 3,
+            Self::ParameterCount => 4,
+            Self::SuppressionAdded => 5,
+            Self::TestDisabled => 6,
+            Self::TestRemoved => 7,
+            Self::TypeEscape => 8,
+        }
+    }
 
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -37,6 +59,10 @@ impl RuleId {
             Self::CyclomaticComplexity => "cyclomatic-complexity",
             Self::CognitiveComplexity => "cognitive-complexity",
             Self::ParameterCount => "parameter-count",
+            Self::SuppressionAdded => "suppression-added",
+            Self::TestDisabled => "test-disabled",
+            Self::TestRemoved => "test-removed",
+            Self::TypeEscape => "type-escape",
         }
     }
 
@@ -47,6 +73,10 @@ impl RuleId {
             Self::CyclomaticComplexity => "La función tiene demasiados caminos posibles",
             Self::CognitiveComplexity => "La función es difícil de leer: demasiadas ramas anidadas",
             Self::ParameterCount => "La función recibe demasiados parámetros",
+            Self::SuppressionAdded => "El cambio silencia una herramienta en vez de arreglar la causa",
+            Self::TestDisabled => "El cambio saltea o enfoca un test, y deja otros sin correr",
+            Self::TestRemoved => "El cambio borra tests",
+            Self::TypeEscape => "El cambio escapa del sistema de tipos",
         }
     }
 }
@@ -187,6 +217,9 @@ fn message(finding: &Finding<'_>, name: &str) -> String {
             format!("La función `{name}` tiene complejidad cognitiva {value} (máximo {limit})")
         }
         RuleId::ParameterCount => format!("La función `{name}` recibe {value} parámetros (máximo {limit})"),
+        RuleId::SuppressionAdded | RuleId::TestDisabled | RuleId::TestRemoved | RuleId::TypeEscape => {
+            finding.rule.description().to_owned()
+        }
     }
 }
 

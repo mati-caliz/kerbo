@@ -1,6 +1,6 @@
 use super::{
-    CaseShape, CognitiveShape, CountedLines, LineSpan, LogicalShape, NO_PARTIAL_UNITS, ParameterShape,
-    Profile, SpanBounds, TestFiles,
+    CaseShape, CognitiveShape, CountedLines, GuardShape, LineSpan, LogicalShape, NO_PARTIAL_UNITS,
+    ParameterShape, Profile, SpanBounds, TestFiles,
 };
 
 pub static GO: Profile = Profile {
@@ -23,6 +23,19 @@ pub static GO: Profile = Profile {
     test_files: TestFiles {
         name_markers: &["_test.go"],
         directories: &[],
+    },
+    guard: GuardShape {
+        suppression_comments: &["nolint", "lint:ignore", "#nosec", "NOSONAR"],
+        annotation_kinds: &[],
+        suppression_annotations: &[],
+        test_annotations: &[],
+        disabled_annotations: &[],
+        call_kind: "call_expression",
+        test_calls: &[],
+        disabled_calls: &["t.Skip", "t.SkipNow", "t.Skipf", "b.Skip"],
+        test_function: Some(("function_declaration", "Test")),
+        escape_types: &[],
+        double_cast: None,
     },
     decisions: &["if_statement", "for_statement"],
     decision_fields: &[],
