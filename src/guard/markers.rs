@@ -9,6 +9,12 @@ const ARGUMENTS_START: char = '(';
 const PATH_SEPARATOR: char = '.';
 const SHOWN_TEXT_LIMIT: usize = 60;
 const CAST_TYPE_POSITION: u32 = 1;
+const BODY_FIELD: &str = "body";
+const CALLBACK_KINDS: &[&str] = &["arrow_function", "function_expression", "function"];
+const BLOCK_KINDS: &[&str] = &["block", "statement_block", "statement_list"];
+const PLACEHOLDER_STATEMENTS: &[&str] = &["pass_statement"];
+const EXPRESSION_STATEMENT: &str = "expression_statement";
+const PLACEHOLDER_EXPRESSIONS: &[&str] = &["string", "ellipsis"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MarkerKind {
@@ -16,12 +22,14 @@ pub enum MarkerKind {
     DisabledTest,
     TypeEscape,
     TestDefinition,
+    EmptyTest,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Marker {
     pub kind: MarkerKind,
     pub line: usize,
+    pub end_line: usize,
     pub text: String,
 }
 
@@ -44,6 +52,7 @@ fn classify(node: Node<'_>, source: &[u8], profile: &Profile) -> Vec<Marker> {
     let marker = |marker_kind, shown: &str| Marker {
         kind: marker_kind,
         line: one_based(node.start_position().row),
+        end_line: one_based(node.end_position().row),
         text: shorten(shown),
     };
     if profile.comments.contains(&kind) {
@@ -54,22 +63,48 @@ fn classify(node: Node<'_>, source: &[u8], profile: &Profile) -> Vec<Marker> {
             .map_or_else(Vec::new, |&needle| vec![marker(MarkerKind::Suppression, needle)]);
     }
     if guard.annotation_kinds.contains(&kind) {
-        return annotation_markers(node, source, guard)
+        let found = annotation_markers(node, source, guard);
+        let method = node.parent().and_then(|modifiers| modifiers.parent());
+        let emptied = found.contains(&MarkerKind::TestDefinition)
+            && method
+                .and_then(|method| method.child_by_field_name(BODY_FIELD))
+                .is_some_and(|body| is_empty_body(body, profile));
+        let method_name = method
+            .map(|method| function_name(method, source))
+            .unwrap_or_default();
+        return found
             .into_iter()
             .map(|marker_kind| marker(marker_kind, &annotation_name(node, source)))
+            .chain(emptied.then(|| Marker {
+                end_line: method.map_or(0, |method| one_based(method.end_position().row)),
+                ..marker(MarkerKind::EmptyTest, &method_name)
+            }))
             .collect();
     }
     if kind == guard.call_kind {
-        return call_markers(node, source, guard)
-            .into_iter()
-            .map(|(marker_kind, callee)| marker(marker_kind, callee))
+        let found = call_markers(node, source, guard);
+        let emptied = found
+            .iter()
+            .any(|(marker_kind, _)| *marker_kind == MarkerKind::TestDefinition)
+            && callback_body(node).is_some_and(|body| is_empty_body(body, profile));
+        let shown = found.first().map(|(_, callee)| *callee).unwrap_or_default();
+        return found
+            .iter()
+            .map(|&(marker_kind, callee)| marker(marker_kind, callee))
+            .chain(emptied.then(|| marker(MarkerKind::EmptyTest, shown)))
             .collect();
     }
     if guard
         .test_function
         .is_some_and(|(function_kind, prefix)| kind == function_kind && defines_test(node, source, prefix))
     {
-        return vec![marker(MarkerKind::TestDefinition, &function_name(node, source))];
+        let name = function_name(node, source);
+        let emptied = node
+            .child_by_field_name(BODY_FIELD)
+            .is_some_and(|body| is_empty_body(body, profile));
+        return std::iter::once(marker(MarkerKind::TestDefinition, &name))
+            .chain(emptied.then(|| marker(MarkerKind::EmptyTest, &name)))
+            .collect();
     }
     if is_type_escape(node, source, guard) {
         return vec![marker(MarkerKind::TypeEscape, node_text())];
@@ -158,6 +193,32 @@ fn is_type_escape(node: Node<'_>, source: &[u8], guard: &GuardShape) -> bool {
                         .and_then(|cast| cast.utf8_text(source).ok())
                         == Some(middle_type)
             })
+    })
+}
+
+fn callback_body(call: Node<'_>) -> Option<Node<'_>> {
+    let arguments = call.child_by_field_name("arguments")?;
+    let mut cursor = arguments.walk();
+    let callback = arguments
+        .named_children(&mut cursor)
+        .filter(|argument| CALLBACK_KINDS.contains(&argument.kind()))
+        .last()?;
+    callback.child_by_field_name(BODY_FIELD)
+}
+
+fn is_empty_body(body: Node<'_>, profile: &Profile) -> bool {
+    if !BLOCK_KINDS.contains(&body.kind()) {
+        return false;
+    }
+    let mut cursor = body.walk();
+    body.named_children(&mut cursor).all(|statement| {
+        profile.comments.contains(&statement.kind())
+            || PLACEHOLDER_STATEMENTS.contains(&statement.kind())
+            || (BLOCK_KINDS.contains(&statement.kind()) && is_empty_body(statement, profile))
+            || (statement.kind() == EXPRESSION_STATEMENT
+                && statement
+                    .named_child(0)
+                    .is_some_and(|expression| PLACEHOLDER_EXPRESSIONS.contains(&expression.kind())))
     })
 }
 

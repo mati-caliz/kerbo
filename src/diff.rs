@@ -90,6 +90,15 @@ impl ChangedLines {
 }
 
 impl Changes {
+    pub fn touches_span(&self, first: usize, last: usize) -> bool {
+        match self {
+            Self::Whole => true,
+            Self::Ranges(ranges) => ranges
+                .iter()
+                .any(|range| range.first <= last && first <= range.last),
+        }
+    }
+
     pub fn adds_line(&self, line: usize) -> bool {
         match self {
             Self::Whole => true,

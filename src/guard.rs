@@ -1,4 +1,5 @@
 mod markers;
+mod settings;
 
 use std::collections::HashMap;
 use std::fs;
@@ -47,6 +48,11 @@ pub fn inspect(request: &GuardRequest<'_>) -> Vec<Diagnostic> {
         }
     }
     diagnostics.extend(removed_tests(&counts));
+    diagnostics.extend(settings::loosened_settings(
+        request.changes,
+        request.config,
+        request.project_root,
+    ));
     diagnostics
         .sort_by(|left, right| (&left.relative_path, left.line).cmp(&(&right.relative_path, right.line)));
     diagnostics
@@ -79,7 +85,13 @@ fn inspect_changed<'file>(
     let mut occurrences: HashMap<(RuleId, String), usize> = HashMap::new();
     let diagnostics: Vec<Diagnostic> = markers
         .iter()
-        .filter(|marker| changes.adds_line(marker.line))
+        .filter(|marker| {
+            if marker.kind == MarkerKind::EmptyTest {
+                changes.touches_span(marker.line, marker.end_line)
+            } else {
+                changes.adds_line(marker.line)
+            }
+        })
         .filter_map(|marker| {
             let rule = rule_for(marker.kind)?;
             enabled(&file, rule, request).then(|| {
@@ -164,7 +176,7 @@ fn markers_of(source: &str, language: Language) -> Vec<Marker> {
 const fn rule_for(kind: MarkerKind) -> Option<RuleId> {
     match kind {
         MarkerKind::Suppression => Some(RuleId::SuppressionAdded),
-        MarkerKind::DisabledTest => Some(RuleId::TestDisabled),
+        MarkerKind::DisabledTest | MarkerKind::EmptyTest => Some(RuleId::TestDisabled),
         MarkerKind::TypeEscape => Some(RuleId::TypeEscape),
         MarkerKind::TestDefinition => None,
     }
@@ -182,12 +194,16 @@ fn enabled(file: &Inspected<'_>, rule: RuleId, request: &GuardRequest<'_>) -> bo
 fn marker_diagnostic(file: &Inspected<'_>, rule: RuleId, marker: &Marker, occurrence: usize) -> Diagnostic {
     let fingerprint = format!("{}:{}:{}#{occurrence}", rule.as_str(), file.relative, marker.text);
     Diagnostic {
-        message: marker_message(rule, &marker.text),
+        message: marker_message(rule, marker),
         ..base_diagnostic(file, rule, marker.line, fingerprint)
     }
 }
 
-fn marker_message(rule: RuleId, text: &str) -> String {
+fn marker_message(rule: RuleId, marker: &Marker) -> String {
+    let text = &marker.text;
+    if marker.kind == MarkerKind::EmptyTest {
+        return format!("El test `{text}` quedó vacío: pasa sin probar nada");
+    }
     match rule {
         RuleId::TestDisabled => {
             format!("`{text}` deja tests sin correr: arreglá el test en vez de saltearlo")

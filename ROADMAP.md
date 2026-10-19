@@ -61,7 +61,7 @@ hilos en repos chicos, que es lo primero a ajustar.
 
 En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la motivó.
 
-### 1. Paridad en las dos direcciones y velocidad justa
+### 1. Paridad en las dos direcciones y velocidad justa (hecho)
 
 - Arnés que corre kerbo y la herramienta de referencia con los umbrales al mínimo (así cada una
   reporta todas las funciones con su valor) y compara función por función. Prueba que kerbo no
@@ -84,8 +84,8 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 ### 3. Capa para agentes de IA (hecho: 0.3 y el servidor MCP en 0.4)
 
 - **Antitrampa**: avisar cuando un cambio agrega una supresión (`eslint-disable`, `noqa`,
-  `nolint`, `@SuppressWarnings`, `#[allow]`), baja un umbral en una configuración, o borra,
-  saltea o vacía un test.
+  `nolint`, `@SuppressWarnings`; `#[allow]` llega con Rust), afloja un umbral en una
+  configuración, o borra, saltea o vacía un test.
 - `--format agent`: JSON compacto, priorizado y con tope, e identificadores estables por
   problema (regla + símbolo + contexto, no número de línea).
 - `kerbo explain <regla>`: por qué existe, ejemplo malo y bueno, cómo se arregla.
@@ -95,8 +95,9 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 ### 4. Editor (LSP) e inspecciones de IntelliJ como mapa (el LSP, hecho en 0.5)
 
 - `kerbo lsp`: los problemas de kerbo subrayados mientras se escribe, en IntelliJ (de fábrica en
-  Ultimate, con LSP4IJ en Community), VS Code, Neovim y Zed, y los arreglos seguros como acción
-  rápida.
+  Ultimate, con LSP4IJ en Community), VS Code, Neovim y Zed. Los arreglos como acción rápida
+  pasan a la etapa 8: ninguna regla de hoy tiene un arreglo mecánico (todas piden un nombre o
+  partir una función).
 - Correr Qodana Community (las inspecciones de IntelliJ en CI) sobre repos reales y contar qué
   inspecciones aparecen más: esa lista ordena las reglas de las etapas de Java y de flujo de
   datos, y Qodana pasa a ser otra referencia del arnés de paridad. Pendiente: el primer intento se
@@ -132,6 +133,8 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 
 - Las reglas de forma de Checkstyle y PMD, con paridad medida. Es el hueco más grande: no hay un
   linter rápido de Java.
+- Las que tienen un arreglo mecánico (imports sin usar, `final` que falta, modificadores
+  redundantes) lo traen como acción rápida del LSP y como parche en `--format agent`.
 
 ### 9. Flujo de datos sin compilar
 

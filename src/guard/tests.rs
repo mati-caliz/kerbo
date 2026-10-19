@@ -27,7 +27,7 @@ fn kinds_in(language: Language, source: &str) -> Vec<(MarkerKind, String)> {
 fn finds_suppressions_disabled_tests_and_escapes_in_typescript() {
     let found = kinds_in(
         Language::TypeScript,
-        "// eslint-disable-next-line no-console\nconst x = \"eslint-disable\" as unknown as number;\nlet y: any;\nit.skip(\"a\", () => {});\ntest(\"b\", () => {});\n",
+        "// eslint-disable-next-line no-console\nconst x = \"eslint-disable\" as unknown as number;\nlet y: any;\nit.skip(\"a\", () => run());\ntest(\"b\", () => run());\n",
     );
     assert_eq!(
         found,
@@ -50,7 +50,7 @@ fn finds_suppressions_disabled_tests_and_escapes_in_typescript() {
 fn finds_markers_in_python_java_and_go() {
     let python = kinds_in(
         Language::Python,
-        "import os  # noqa: F401\n\n@pytest.mark.skip(reason=\"x\")\ndef test_a():\n    pass\n\ndef helper():\n    pytest.skip()\n",
+        "import os  # noqa: F401\n\n@pytest.mark.skip(reason=\"x\")\ndef test_a():\n    run()\n\ndef helper():\n    pytest.skip()\n",
     );
     assert_eq!(
         python.iter().map(|(kind, _)| *kind).collect::<Vec<_>>(),
@@ -122,20 +122,20 @@ fn reports_only_what_the_change_adds() {
     );
     tree.write(
         "src/a.test.ts",
-        "test(\"one\", () => {});\ntest(\"two\", () => {});\n",
+        "test(\"one\", () => run());\ntest(\"two\", () => run());\n",
     );
-    tree.write("src/gone.test.ts", "test(\"lost\", () => {});\n");
-    tree.write("src/moved.test.ts", "test(\"keeps\", () => {});\n");
+    tree.write("src/gone.test.ts", "test(\"lost\", () => run());\n");
+    tree.write("src/moved.test.ts", "test(\"keeps\", () => run());\n");
     git(tree.path(), &["add", "."]);
     git(tree.path(), &["commit", "-q", "-m", "base"]);
     tree.write(
         "src/a.ts",
         "// eslint-disable-next-line old\nexport const a = 1;\n// @ts-ignore\nexport const b: any = 2;\n",
     );
-    tree.write("src/a.test.ts", "it.only(\"one\", () => {});\n");
+    tree.write("src/a.test.ts", "it.only(\"one\", () => run());\n");
     std::fs::remove_file(tree.path().join("src/gone.test.ts")).expect("se borra");
     std::fs::remove_file(tree.path().join("src/moved.test.ts")).expect("se mueve");
-    tree.write("src/destination.test.ts", "test(\"keeps\", () => {});\n");
+    tree.write("src/destination.test.ts", "test(\"keeps\", () => run());\n");
     let root = tree.path().canonicalize().expect("existe");
     let changes = ChangedLines::since("HEAD", &root).expect("git responde");
     let config = Config::load(None, &root).expect("sin archivo");
@@ -183,11 +183,14 @@ fn reports_only_what_the_change_adds() {
 fn moving_tests_between_files_is_not_removing_them() {
     let tree = TempTree::new("guard-move");
     git(tree.path(), &["init", "-q"]);
-    tree.write("old.test.ts", "test(\"a\", () => {});\ntest(\"b\", () => {});\n");
+    tree.write(
+        "old.test.ts",
+        "test(\"a\", () => run());\ntest(\"b\", () => run());\n",
+    );
     git(tree.path(), &["add", "."]);
     git(tree.path(), &["commit", "-q", "-m", "base"]);
-    tree.write("old.test.ts", "test(\"a\", () => {});\n");
-    tree.write("new.test.ts", "test(\"b\", () => {});\n");
+    tree.write("old.test.ts", "test(\"a\", () => run());\n");
+    tree.write("new.test.ts", "test(\"b\", () => run());\n");
     let root = tree.path().canonicalize().expect("existe");
     let changes = ChangedLines::since("HEAD", &root).expect("git responde");
     let config = Config::load(None, &root).expect("sin archivo");
@@ -198,4 +201,64 @@ fn moving_tests_between_files_is_not_removing_them() {
         stacks: &[],
     };
     assert!(inspect(&request).is_empty());
+}
+
+#[test]
+fn finds_tests_left_without_a_body() {
+    let typescript = kinds_in(
+        Language::TypeScript,
+        "it(\"vacío\", () => {});\nit(\"con algo\", () => { expect(1).toBe(1); });\nit(\"expresión\", () => expect(1).toBe(1));\n",
+    );
+    let empty: Vec<&str> = typescript
+        .iter()
+        .filter(|(kind, _)| *kind == MarkerKind::EmptyTest)
+        .map(|(_, text)| text.as_str())
+        .collect();
+    assert_eq!(empty, ["it"]);
+    let java = kinds_in(
+        Language::Java,
+        "class ATest {\n  @Test\n  void empty() {\n    // después\n  }\n  @Test\n  void full() { assertTrue(true); }\n}\n",
+    );
+    assert!(java.contains(&(MarkerKind::EmptyTest, "empty".to_owned())));
+    assert!(!java.contains(&(MarkerKind::EmptyTest, "full".to_owned())));
+    let python = kinds_in(Language::Python, "def test_a():\n    \"\"\"doc\"\"\"\n    ...\n");
+    assert!(python.contains(&(MarkerKind::EmptyTest, "test_a".to_owned())));
+    let go = kinds_in(Language::Go, "package a\n\nfunc TestA(t *testing.T) {\n}\n");
+    assert!(go.contains(&(MarkerKind::EmptyTest, "TestA".to_owned())));
+}
+
+#[test]
+fn reports_emptied_tests_and_loosened_thresholds_in_the_change() {
+    let tree = TempTree::new("guard-loosened");
+    git(tree.path(), &["init", "-q"]);
+    tree.write(".golangci.yml", "cyclop:\n  max-complexity: 10\n");
+    tree.write(
+        "a_test.go",
+        "package a\n\nfunc TestA(t *testing.T) {\n\tcheck(t)\n}\n",
+    );
+    git(tree.path(), &["add", "."]);
+    git(tree.path(), &["commit", "-q", "-m", "base"]);
+    tree.write(".golangci.yml", "cyclop:\n  max-complexity: 15\n");
+    tree.write("a_test.go", "package a\n\nfunc TestA(t *testing.T) {\n}\n");
+    let root = tree.path().canonicalize().expect("existe");
+    let changes = ChangedLines::since("HEAD", &root).expect("git responde");
+    let config = Config::load(None, &root).expect("sin archivo");
+    let request = GuardRequest {
+        changes: &changes,
+        config: &config,
+        project_root: &root,
+        stacks: &[],
+    };
+    let found: Vec<(String, RuleId, usize)> = inspect(&request)
+        .into_iter()
+        .map(|diagnostic| (diagnostic.relative_path, diagnostic.rule, diagnostic.line))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            (".golangci.yml".to_owned(), RuleId::SuppressionAdded, 2),
+            ("a_test.go".to_owned(), RuleId::TestDisabled, 3)
+        ],
+        "vaciar un test sin tocar su firma también cuenta"
+    );
 }
