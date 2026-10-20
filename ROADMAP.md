@@ -209,6 +209,12 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   del release y el workflow le pone los sha256 de cada versión). Pendiente: crear el tap
   `mati-caliz/homebrew-tap` y cargar los secretos `HOMEBREW_TAP_TOKEN` y `CARGO_REGISTRY_TOKEN`;
   sin ellos el workflow deja la fórmula como artefacto y no publica en crates.io.
+- Pendientes de la distribución:
+  - Publicar el primer tag: hasta entonces `cargo install kerbo` y `brew install
+    mati-caliz/tap/kerbo`, que ya figuran en el README y en el instalador, no funcionan, y el
+    workflow de release no corrió nunca en GitHub Actions.
+  - El sitio todavía dice que en macOS y Windows se instala con `cargo install --git`.
+  - Binario para Windows ARM e instalador en PowerShell para quien no tiene el bash de Git.
 - Mensajes, README y sitio en inglés además de español.
 
 ### 7. Caché y rendimiento
@@ -243,6 +249,18 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   ocupa 7,2 MB para Guava y 8,1 MB para VS Code. Llenarla no se distingue del ruido. Lo que queda
   en caliente es recorrer el árbol, leer y hashear cada archivo y comparar los duplicados; la
   memoria de Guava es la de los tokens de CPD, que se recombinan enteros en cada corrida.
+- Pendientes de la caché:
+  - Dos procesos que escriben el mismo archivo de la caché a la vez: gana el último y se pierden
+    las entradas del otro. Releer y combinar antes de renombrar, o que lo resuelva el demonio.
+  - El tope de 256 MB es fijo: hacerlo configurable en `kerbo.toml` o por variable de entorno.
+  - El hook y el editor todavía no la usan; la necesitan cuando llegue el expansor de macros.
+  - La memoria en caliente de Guava (202 MB) es casi toda tokens de CPD recombinados enteros:
+    guardar la huella de cada archivo y recombinar sólo los grupos que tocan lo que cambió.
+- Perfilar la corrida en frío de VS Code: 34 s con 126 a 145 s de CPU para 15.395 archivos es
+  mucho más que lo medido en el resto; alguna regla o algún archivo pesa de más.
+- El gate no corre tal cual en un checkout de Windows con `core.autocrlf=true`: los `.rs` salen
+  con CRLF y `cargo fmt --check` falla, y Git Bash convierte las rutas de `docker run` si no se
+  pone `MSYS_NO_PATHCONV=1`. Un `.gitattributes` con `eol=lf` resuelve lo primero.
 - Una sola pasada por función para todas las métricas, en lugar de una por métrica.
 - Un demonio por máquina, con los árboles y la caché en memoria, compartido por el hook, el
   servidor MCP, el LSP y `kerbo check`: varias sesiones de agentes en el mismo repo no repiten el
