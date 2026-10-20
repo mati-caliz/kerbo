@@ -189,3 +189,21 @@ impl<'de> Deserialize<'de> for RuleId {
         deserializer.deserialize_str(RuleVisitor)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{FAMILY_RULES, with_families};
+    use crate::rules::RuleId;
+
+    #[test]
+    fn every_rule_has_its_own_index_in_order() {
+        let built: [RuleId; RuleId::CODE_RULES.len() + FAMILY_RULES] = with_families(RuleId::CODE_RULES);
+        assert_eq!(built, RuleId::ALL);
+        for (position, rule) in built.into_iter().enumerate() {
+            assert_eq!(rule.index(), position, "{rule:?}");
+            assert_eq!(rule.as_str().parse::<RuleId>().ok(), Some(rule));
+        }
+        let error = serde_json::from_str::<RuleId>("7").expect_err("no es una regla");
+        assert!(error.to_string().contains("una regla de kerbo"));
+    }
+}
