@@ -50,8 +50,10 @@ kerbo fix --dry-run --rule unused-import src  # only show the patch, for one rul
 kerbo explain cognitive-complexity  # why a rule exists and how to fix it
 ```
 
-It honors `.gitignore` and skips hidden files. It exits with `0` when there are no problems, `1`
-when there are and `2` when something could not be read or the configuration is invalid.
+It honors `.gitignore` and skips hidden files and folders, except `.github/` and `.devcontainer/`,
+which usually hold the repo's own Dockerfiles, compose files and scripts. It exits with `0` when
+there are no problems, `1` when there are and `2` when something could not be read or the
+configuration is invalid.
 
 `kerbo check`, `kerbo baseline` and the MCP server store what they measure of each file in a
 content cache, so the next run only analyzes what changed (and what is compared across files, like

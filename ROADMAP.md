@@ -643,9 +643,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     `algorithm: :concurrently`), con strong_migrations como referencia de Rails.
   - Las reglas de hadolint que faltan (sobre todo DL3046, DL3033 y DL4005) y las de ShellCheck
     sobre el shell de cada `RUN`, que es la etapa 10.
-  - Los Dockerfile y compose en carpetas ocultas (`.devcontainer/`, `.github/`) no entran cuando
-    se analiza una carpeta, porque el recorrido saltea lo oculto para todos los lenguajes; sí
-    cuando se los nombra.
+  - Los Dockerfile y compose en carpetas ocultas (hecho: el recorrido entra a `.github/` y
+    `.devcontainer/`, para todos los lenguajes, y sigue salteando el resto de lo oculto, como
+    `.git/`, `.venv/` o `.next/`, y los archivos ocultos). La lista es corta a propósito: sumar
+    una carpeta es sumarla en `src/scan/walk.rs`. Los workflows de GitHub Actions no tienen
+    reglas todavía, así que en `.github/workflows/` no hay nada que leer.
   - `squawk-ignore` y `# hadolint ignore=` (hecho, 2026-10-20): se respetan como en la
     herramienta original y la antitrampa los marca como supresión nueva, igual que
     `# shellcheck disable=`. Un solo registro, `SYNTAXES` en `src/suppressions.rs` (comentario,

@@ -41,6 +41,32 @@ fn analyzes_supported_files_in_parallel_and_sorts_the_problems() {
 }
 
 #[test]
+fn walks_the_listed_hidden_folders_and_skips_the_rest() {
+    let tree = TempTree::new("scan-hidden");
+    tree.write(".devcontainer/Dockerfile", "FROM ubuntu:24.04\n");
+    tree.write(
+        ".github/docker/compose.yaml",
+        "services:\n  web:\n    image: nginx:1.27\n",
+    );
+    tree.write(
+        ".github/scripts/release.py",
+        "def f(a, b, c, d, e, f, g):\n    pass\n",
+    );
+    tree.write(".venv/lib/site.py", "def f(a, b, c, d, e, f, g):\n    pass\n");
+    tree.write(".github/.hidden.py", "def f(a, b, c, d, e, f, g):\n    pass\n");
+    tree.write(".hidden.py", "def f(a, b, c, d, e, f, g):\n    pass\n");
+    let outcome = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
+    assert_eq!(outcome.files, 3);
+    assert!(
+        outcome
+            .diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.relative_path.starts_with(".github/")
+                || diagnostic.relative_path.starts_with(".devcontainer/"))
+    );
+}
+
+#[test]
 fn accepts_several_roots_and_single_files() {
     let tree = TempTree::new("scan-roots");
     tree.write("one/A.java", "class A { void f() {} }\n");

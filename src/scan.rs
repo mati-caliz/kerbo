@@ -3,7 +3,6 @@ use std::collections::hash_map::Entry;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ignore::WalkBuilder;
 use rayon::prelude::*;
 use tree_sitter::Parser;
 
@@ -17,6 +16,8 @@ use crate::limits::{LimitOverride, Limits};
 use crate::macro_rules::MacroIndex;
 use crate::rules::{Diagnostic, FileIdentity, RuleId, evaluate};
 use crate::suppressions::{Suppressed, split};
+
+mod walk;
 
 const PATH_SEPARATOR: &str = "/";
 
@@ -182,7 +183,7 @@ fn collect_files(roots: &[PathBuf], project_root: &Path) -> (Vec<SourceFile>, Ve
     let mut files = Vec::new();
     let mut failures = Vec::new();
     for root in roots {
-        for entry in WalkBuilder::new(root).build() {
+        for entry in walk::walk(root) {
             match entry {
                 Ok(entry) if entry.file_type().is_some_and(|file_type| file_type.is_file()) => {
                     files.extend(source_file(root, entry.path(), project_root));

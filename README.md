@@ -50,8 +50,9 @@ kerbo fix --dry-run --rule unused-import src  # sólo muestra el parche, de una 
 kerbo explain cognitive-complexity  # por qué existe una regla y cómo se arregla
 ```
 
-Respeta `.gitignore` y saltea los archivos ocultos. Sale con `0` si no hay problemas, `1` si los
-hay y `2` si algo no se pudo leer o la configuración es inválida.
+Respeta `.gitignore` y saltea los archivos y carpetas ocultos, salvo `.github/` y `.devcontainer/`,
+que suelen tener Dockerfile, compose y scripts propios del repo. Sale con `0` si no hay
+problemas, `1` si los hay y `2` si algo no se pudo leer o la configuración es inválida.
 
 `kerbo check`, `kerbo baseline` y el servidor MCP guardan lo que miden de cada archivo en una
 caché por contenido, así la corrida siguiente sólo analiza lo que cambió (y lo que se compara entre
