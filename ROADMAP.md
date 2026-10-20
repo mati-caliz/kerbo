@@ -139,8 +139,11 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
       pierde problemas): va con el arnés de punta a punta de abajo.
     - Ninguna fila trae el símbolo (la función o la clase) ni el mensaje: el agente se ubica por
       línea. Ver con el arnés si agregar el símbolo ahorra lecturas de archivo.
-    - El hook ahora corta en 30 problemas, como `--format agent`; antes los mostraba todos.
-      Decidir con el arnés si en un archivo recién editado conviene mostrarlos todos.
+    - El hook corta en 30 problemas, como `--format agent` (antes los mostraba todos), y queda
+      así: corre después de cada edición, así que el agente ve los siguientes apenas arregla los
+      primeros, las trampas van siempre adelante y `more` dice cuántos quedan. Mostrar todos sólo
+      engorda el contexto cuando un archivo grande arranca con cientos. El arnés de punta a punta
+      lo confirma o lo revierte.
     - Medir con el tokenizador de los Claude actuales (por la API de conteo de tokens) cuando el
       arnés la use de todos modos.
 - **Cuánto gasta un agente de punta a punta** (pendiente). La velocidad de kerbo ya está medida;
