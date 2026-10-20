@@ -139,6 +139,22 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   winnow, unos 31.000 avisos) lo que difiere es lo que no se ve sin compilar: macros propias o de
   otros crates que esconden un `if`, código escrito adentro de una macro, un `#[cfg]` adentro de
   una función y closures que devuelven `Result` sin decirlo.
+- Paridad total en Rust (pendiente). Lo que falta se puede cerrar sin compilar:
+  - **Expansor de `macro_rules!`**: leer las definiciones de todo el crate antes de analizar y
+    expandir cada invocación como rustc (los fragmentos `expr`, `ident`, `ty`, `tt` y las
+    repeticiones), para contar lo que la macro esconde y medir el código que se escribe adentro
+    de ella (`quickcheck! { fn .. }`). Es la mayor parte de lo que difiere. Pide que el análisis
+    deje de ser sólo archivo por archivo: el modo instantáneo, el hook y el editor tienen que
+    conocer las macros del crate, con una caché para no releerlas en cada cambio.
+  - **Macros de otros crates**: las `macro_rules!` de las dependencias, leídas de su código en la
+    caché de cargo (`~/.cargo/registry/src`) con el mismo expansor. Las macros procedurales
+    (`derive`, `#[tokio::main]`, `automod::dir!`) quedan afuera: hay que compilarlas.
+  - **`#[cfg]` evaluado**: decidir qué código compila con una plataforma y unas features
+    configurables en `kerbo.toml` (por defecto, la máquina donde corre y todas las features), con
+    los `cfg` que emite el `build.rs`, para sacar lo que clippy no ve, también adentro de una
+    función.
+  - Lo que no se puede sin tipos: el `Result` que devuelve un closure sin anotarlo y los módulos
+    que declara una macro procedural. Ahí la referencia sigue siendo clippy.
 
 ### 6. Distribución
 
