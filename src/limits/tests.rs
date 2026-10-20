@@ -62,8 +62,16 @@ fn tests_relax_only_what_the_standard_relaxes() {
         Preset::Strict.limits(Language::Java, true),
         Preset::Strict
             .limits(Language::Java, false)
-            .with_rule(RuleId::MagicNumber, None),
-        "en los tests de Java sólo se apagan los números mágicos, como en el estándar"
+            .with_rule(RuleId::MagicNumber, None)
+            .with_rule(RuleId::DuplicateCode, None),
+        "en los tests de Java sólo se apagan los números mágicos y CPD (includeTests=false), como en el estándar"
+    );
+    assert_eq!(
+        Preset::Strict
+            .limits(Language::Java, false)
+            .get(RuleId::DuplicateCode),
+        Some(99),
+        "CPD del estándar marca desde 100 tokens"
     );
     assert_eq!(typescript.get(RuleId::MagicNumber), None);
     assert_eq!(

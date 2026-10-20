@@ -63,6 +63,11 @@ pub const fn explain(rule: RuleId) -> Explanation {
             why: "Con una letra hay que leer todo el bloque para saber qué es, y l, O e I se confunden con 1 y 0.",
             example: "for (const p of pedidos) se vuelve for (const pedido of pedidos).",
         },
+        RuleId::DuplicateCode => Explanation {
+            fix: "extraé lo repetido a una función o un tipo compartido y llamalo desde los dos lugares",
+            why: "Un bloque copiado se arregla en un lugar y queda roto en el otro: cada copia es un cambio que hay que acordarse de repetir.",
+            example: "Dos servicios que validan igual un pedido pasan a usar el mismo validarPedido(pedido).",
+        },
         RuleId::TypeEscape => Explanation {
             fix: "tipá el valor; con datos externos, unknown y validación",
             why: "any y as unknown as apagan el compilador justo donde más falta hace.",

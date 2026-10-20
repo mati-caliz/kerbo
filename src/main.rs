@@ -4,6 +4,7 @@ mod baseline;
 mod cli;
 mod config;
 mod diff;
+mod duplicates;
 mod explain;
 mod guard;
 mod language;

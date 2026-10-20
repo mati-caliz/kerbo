@@ -7,11 +7,12 @@ use ignore::WalkBuilder;
 use rayon::prelude::*;
 use tree_sitter::Parser;
 
-use crate::analysis::analyze;
+use crate::analysis::{FileAnalysis, analyze};
 use crate::config::Config;
+use crate::duplicates::{PooledFile, find_duplicates};
 use crate::language::{Language, Stack};
-use crate::limits::LimitOverride;
-use crate::rules::{Diagnostic, FileIdentity, evaluate};
+use crate::limits::{LimitOverride, Limits};
+use crate::rules::{Diagnostic, FileIdentity, RuleId, evaluate};
 
 const PATH_SEPARATOR: &str = "/";
 
@@ -74,7 +75,7 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
         (request.stacks.is_empty() || request.stacks.contains(&file.language.stack()))
             && !request.config.is_ignored(Path::new(&file.identity.relative))
     });
-    let results: Vec<Result<Vec<Diagnostic>, ScanFailure>> = files
+    let results: Vec<Result<Checked, ScanFailure>> = files
         .par_iter()
         .map_init(ParserPool::default, |pool, file| check_file(pool, file, request))
         .collect();
@@ -82,12 +83,17 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
         files: files.len(),
         ..ScanOutcome::default()
     };
+    let mut pooled = Vec::new();
     for result in results {
         match result {
-            Ok(diagnostics) => outcome.diagnostics.extend(diagnostics),
+            Ok(checked) => {
+                outcome.diagnostics.extend(checked.diagnostics);
+                pooled.extend(checked.pooled);
+            }
             Err(failure) => failures.push(failure),
         }
     }
+    outcome.diagnostics.extend(duplicate_diagnostics(pooled));
     outcome.diagnostics.sort_by(|left, right| {
         (&left.path, left.line, left.column, left.rule).cmp(&(
             &right.path,
@@ -113,8 +119,39 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
     let mut parser = Parser::new();
     parser.set_language(&file.language.grammar()).ok()?;
     let limits = config.limits_for(relative, file.language, file.is_test);
-    let analysis = analyze(&mut parser, file.language, source, limits).ok()?;
-    Some(evaluate(&file.identity, &analysis, limits))
+    let mut analysis = analyze(&mut parser, file.language, source, limits).ok()?;
+    let pooled = pooled_file(&file.identity, &mut analysis, limits);
+    let mut diagnostics = evaluate(&file.identity, &analysis, limits);
+    diagnostics.extend(find_duplicates(pooled.into_iter().collect()));
+    Some(diagnostics)
+}
+
+#[derive(Debug)]
+struct Checked {
+    diagnostics: Vec<Diagnostic>,
+    pooled: Option<(Stack, PooledFile)>,
+}
+
+fn pooled_file(identity: &FileIdentity, analysis: &mut FileAnalysis, limits: Limits) -> Option<PooledFile> {
+    Some(PooledFile {
+        identity: identity.clone(),
+        limit: limits.get(RuleId::DuplicateCode)?,
+        tokens: analysis.cpd_tokens.take()?,
+    })
+}
+
+fn duplicate_diagnostics(pooled: Vec<(Stack, PooledFile)>) -> Vec<Diagnostic> {
+    let mut by_stack: Vec<(Stack, Vec<PooledFile>)> = Vec::new();
+    for (stack, file) in pooled {
+        match by_stack.iter_mut().find(|(known, _)| *known == stack) {
+            Some((_, files)) => files.push(file),
+            None => by_stack.push((stack, vec![file])),
+        }
+    }
+    by_stack
+        .into_iter()
+        .flat_map(|(_, files)| find_duplicates(files))
+        .collect()
 }
 
 fn collect_files(roots: &[PathBuf], project_root: &Path) -> (Vec<SourceFile>, Vec<ScanFailure>) {
@@ -179,7 +216,7 @@ fn check_file(
     pool: &mut ParserPool,
     file: &SourceFile,
     request: &ScanRequest<'_>,
-) -> Result<Vec<Diagnostic>, ScanFailure> {
+) -> Result<Checked, ScanFailure> {
     let failure = |reason: String| ScanFailure {
         path: file.identity.display.clone(),
         reason,
@@ -196,9 +233,13 @@ fn check_file(
         .fold(configured, |limits, &limit_override| {
             limits.with_override(limit_override)
         });
-    let analysis =
+    let mut analysis =
         analyze(parser, file.language, &source, limits).map_err(|error| failure(error.to_string()))?;
-    Ok(evaluate(&file.identity, &analysis, limits))
+    let pooled = pooled_file(&file.identity, &mut analysis, limits);
+    Ok(Checked {
+        diagnostics: evaluate(&file.identity, &analysis, limits),
+        pooled: pooled.map(|pooled| (file.language.stack(), pooled)),
+    })
 }
 
 #[cfg(test)]

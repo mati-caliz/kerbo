@@ -218,7 +218,8 @@ fn marker_message(rule: RuleId, marker: &Marker) -> String {
         | RuleId::TestRemoved
         | RuleId::NestingDepth
         | RuleId::MagicNumber
-        | RuleId::ShortName => {
+        | RuleId::ShortName
+        | RuleId::DuplicateCode => {
             format!("Se agregó `{text}`: arreglá la causa, o dejá la excepción en kerbo.toml con su motivo")
         }
     }

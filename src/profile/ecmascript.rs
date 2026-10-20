@@ -1,6 +1,6 @@
 use super::{
-    CaseShape, CognitiveShape, GuardShape, LineSpan, LogicalShape, MagicNumberStyle, NestingStyle,
-    ParameterShape, PartialUnits, Profile, ShortCircuit, ShortNameStyle, TestFiles,
+    CaseShape, CognitiveShape, DuplicateStyle, GuardShape, LineSpan, LogicalShape, MagicNumberStyle,
+    NestingStyle, ParameterShape, PartialUnits, Profile, ShortCircuit, ShortNameStyle, TestFiles,
 };
 
 const FUNCTIONS: &[&str] = &[
@@ -155,6 +155,7 @@ pub static ECMASCRIPT: Profile = Profile {
     nesting: NestingStyle::Blocks,
     magic_numbers: MagicNumberStyle::Eslint,
     short_names: ShortNameStyle::Eslint,
+    duplicates: DuplicateStyle::Unmeasured,
     comments: &["comment", "html_comment"],
     literals: &["string", "template_string"],
     function_length_skips_iife: true,

@@ -34,6 +34,7 @@ pub struct Profile {
     pub nesting: NestingStyle,
     pub magic_numbers: MagicNumberStyle,
     pub short_names: ShortNameStyle,
+    pub duplicates: DuplicateStyle,
     pub comments: Kinds,
     pub literals: Kinds,
     pub function_length_skips_iife: bool,
@@ -134,6 +135,13 @@ pub enum ShortNameStyle {
     Checkstyle,
     Varnamelen,
     Ruff,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DuplicateStyle {
+    Unmeasured,
+    CpdJava,
+    CpdPython,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

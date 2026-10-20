@@ -114,8 +114,13 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   opciones del estándar, `MagicNumber` de Checkstyle, mnd y `PLR2004` de ruff).
 - Nombres cortos (hecho en los cuatro lenguajes, con paridad contra `id-length` de ESLint,
   `LocalVariableName` de Checkstyle, varnamelen y los nombres ambiguos de ruff).
-- Bloques duplicados y comentarios que narran lo obvio, cada una con paridad contra la
-  herramienta que ya la tiene en cada lenguaje.
+- Bloques duplicados (hecho para Java y Python, con paridad contra CPD de PMD 7.28: el mismo
+  algoritmo de coincidencias, el orden en que CPD recorre los grupos y los mismos tokens, también
+  sobre Guava y la biblioteca estándar de Python; faltan Go contra `dupl` y TypeScript contra
+  `no-identical-functions` de sonarjs). El modo instantáneo y el editor sólo comparan los archivos
+  que miran; el repo entero, `kerbo check`.
+- Comentarios que narran lo obvio, con paridad contra la herramienta que ya la tiene en cada
+  lenguaje.
 - **Rust** como quinto lenguaje (contra clippy), así kerbo se analiza a sí mismo.
 
 ### 6. Distribución

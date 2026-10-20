@@ -28,10 +28,11 @@ pub enum RuleId {
     NestingDepth,
     MagicNumber,
     ShortName,
+    DuplicateCode,
 }
 
 impl RuleId {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::FileLength,
         Self::FunctionLength,
         Self::CyclomaticComplexity,
@@ -44,6 +45,7 @@ impl RuleId {
         Self::NestingDepth,
         Self::MagicNumber,
         Self::ShortName,
+        Self::DuplicateCode,
     ];
 
     pub const fn index(self) -> usize {
@@ -60,6 +62,7 @@ impl RuleId {
             Self::NestingDepth => 9,
             Self::MagicNumber => 10,
             Self::ShortName => 11,
+            Self::DuplicateCode => 12,
         }
     }
 
@@ -77,6 +80,7 @@ impl RuleId {
             Self::NestingDepth => "nesting-depth",
             Self::MagicNumber => "magic-number",
             Self::ShortName => "short-name",
+            Self::DuplicateCode => "duplicate-code",
         }
     }
 
@@ -94,6 +98,7 @@ impl RuleId {
             Self::NestingDepth => "Demasiados bloques anidados",
             Self::MagicNumber => "Un número sin nombre en medio de la lógica",
             Self::ShortName => "Un nombre demasiado corto o ambiguo para lo que abarca",
+            Self::DuplicateCode => "Un bloque de código copiado y pegado en otro lugar",
         }
     }
 }
@@ -321,7 +326,8 @@ fn message(finding: &Finding<'_>, name: &str) -> String {
         | RuleId::TypeEscape
         | RuleId::NestingDepth
         | RuleId::MagicNumber
-        | RuleId::ShortName => finding.rule.description().to_owned(),
+        | RuleId::ShortName
+        | RuleId::DuplicateCode => finding.rule.description().to_owned(),
     }
 }
 
