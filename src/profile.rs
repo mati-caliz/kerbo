@@ -142,6 +142,7 @@ pub enum ShortNameStyle {
 pub enum CommentedCodeStyle {
     Unmeasured,
     Eradicate,
+    Gocritic,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

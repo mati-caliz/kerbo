@@ -29,11 +29,11 @@ pub fn clone_groups(files: Vec<Vec<SyntaxNode>>, threshold: usize) -> Vec<CloneG
     }
     tree.push(TERMINATOR);
     let mut by_hash: BTreeMap<u64, Vec<Vec<usize>>> = BTreeMap::new();
-    for repeat in tree.repeats_over(threshold) {
-        if let Some(units) = syntax_units(&data, &repeat, threshold) {
+    tree.for_each_repeat(threshold, |repeat| {
+        if let Some(units) = syntax_units(&data, repeat, threshold) {
             by_hash.entry(units.hash).or_default().extend(units.fragments);
         }
-    }
+    });
     by_hash
         .into_iter()
         .filter_map(|(hash, fragments)| clone_group(&data, hash, fragments))

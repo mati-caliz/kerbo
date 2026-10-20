@@ -79,7 +79,7 @@ pub static GO: Profile = Profile {
     magic_numbers: MagicNumberStyle::Mnd,
     short_names: ShortNameStyle::Varnamelen,
     duplicates: DuplicateStyle::Dupl,
-    commented_code: CommentedCodeStyle::Unmeasured,
+    commented_code: CommentedCodeStyle::Gocritic,
     comments: &["comment"],
     literals: &["raw_string_literal", "interpreted_string_literal"],
     function_length_skips_iife: false,

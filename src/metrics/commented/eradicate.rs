@@ -1,10 +1,10 @@
 use std::sync::LazyLock;
 
 use regex::{Regex, RegexSet};
-use tree_sitter::{Node, Parser};
+use tree_sitter::Node;
 
 use super::python_tokens::has_consecutive_names;
-use super::{CommentedCode, at};
+use super::{CommentedCode, SnippetLanguage, at, parse_snippet};
 use crate::syntax::{descendants, named_children};
 
 const COMMENT: &str = "comment";
@@ -181,9 +181,7 @@ fn parses_as_python(line: &str) -> bool {
 }
 
 fn parse(text: &str) -> Option<tree_sitter::Tree> {
-    let mut parser = Parser::new();
-    parser.set_language(&tree_sitter_python::LANGUAGE.into()).ok()?;
-    parser.parse(text, None)
+    parse_snippet(SnippetLanguage::Python, text)
 }
 
 fn parses_cleanly(text: &str) -> Option<bool> {

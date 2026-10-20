@@ -63,3 +63,52 @@ fn other_languages_are_not_measured_yet() {
         Vec::new()
     );
 }
+
+fn go_commented_lines(source: &str) -> Vec<usize> {
+    let mut parser = Parser::new();
+    parser
+        .set_language(&Language::Go.grammar())
+        .expect("la gramática carga");
+    let tree = parser.parse(source, None).expect("el archivo se parsea");
+    find_commented_code(tree.root_node(), source.as_bytes(), CommentedCodeStyle::Gocritic)
+        .into_iter()
+        .map(|found| found.line)
+        .collect()
+}
+
+#[test]
+fn go_flags_comment_groups_inside_functions_that_compile_like_gocritic() {
+    let source = "package p
+
+// total := sumar(pedidos) // fuera de una función
+func run() {
+	// total := sumar(pedidos)
+	x := 1 // fmt.Println(x)
+	// la cuenta se hace por pedido, no por cliente
+	// pedidos.Total
+
+	// for _, pedido := range pedidos {
+	//     total += pedido.Monto
+	// }
+
+	/* go func() { listo <- true }() */
+	// TODO: total := sumar(pedidos)
+	// ver https://example.com/api(v2)
+	//go:generate stringer -type=Pedido
+	_ = x
+}
+";
+    assert_eq!(go_commented_lines(source), vec![5, 6, 10, 14]);
+}
+
+#[test]
+fn go_example_output_comments_are_not_code() {
+    let source = "package p
+
+func ExampleRun() {
+	run()
+	// Output: fmt.Println(1)
+}
+";
+    assert_eq!(go_commented_lines(source), Vec::<usize>::new());
+}

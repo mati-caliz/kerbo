@@ -122,7 +122,9 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   sobre Next.js, React DOM, ESLint y zod). El modo instantáneo y el editor sólo comparan los archivos
   que miran; el repo entero, `kerbo check`.
 - Código comentado (hecho para Python, con paridad contra ERA001 de ruff, que es la regla del
-  estándar; sigue Go contra `commentedOutCode` de gocritic). En TypeScript el estándar no lo
+  estándar, también sobre la biblioteca estándar entera; y para Go, con paridad contra
+  `commentedOutCode` de gocritic: los mismos grupos de comentarios que arma go/parser y la misma
+  prueba de que compilan como sentencia, también sobre 2.500 archivos de la biblioteca estándar). En TypeScript el estándar no lo
   revisa (`no-commented-code` de sonarjs no está en `recommended`) y en Java ninguna herramienta
   del estándar lo hace: ahí no hay contra qué medir.
 - Comentarios que narran lo obvio: ninguna herramienta lo detecta, así que no hay paridad posible.

@@ -1,23 +1,34 @@
-use std::collections::BTreeMap;
-
 const INFINITY: i64 = 2_147_483_647;
 const NO_LEFT_CONTEXT: i32 = 0;
 const INT32_SPAN: i64 = 4_294_967_296;
 const INT32_HALF: i64 = 2_147_483_648;
 const ROOT: usize = 0;
 const AUXILIARY: usize = 1;
+const NONE: usize = usize::MAX;
 
 #[derive(Debug, Clone, Copy)]
 struct Transition {
     start: i64,
     end: i64,
     state: usize,
+    next: usize,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Copy)]
 struct State {
-    transitions: Vec<usize>,
+    first: usize,
+    last: usize,
     link: usize,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            first: NONE,
+            last: NONE,
+            link: ROOT,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -75,19 +86,20 @@ impl SuffixTree {
             start: 0,
             end: 0,
             state: ROOT,
+            next: NONE,
+        })
+    }
+
+    fn transitions_of(&self, state: usize) -> impl Iterator<Item = usize> + '_ {
+        let first = self.states.get(state).map_or(NONE, |found| found.first);
+        std::iter::successors(Some(first).filter(|&index| index != NONE), |&index| {
+            Some(self.transition(index).next).filter(|&next| next != NONE)
         })
     }
 
     fn find_transition(&self, state: usize, value: i32) -> Option<usize> {
-        self.states
-            .get(state)?
-            .transitions
-            .iter()
-            .copied()
-            .find(|&index| {
-                let transition = self.transition(index);
-                self.value(transition.start) == value
-            })
+        self.transitions_of(state)
+            .find(|&index| self.value(self.transition(index).start) == value)
     }
 
     fn new_state(&mut self) -> usize {
@@ -98,8 +110,15 @@ impl SuffixTree {
     fn add_transition(&mut self, from: usize, transition: Transition) {
         self.transitions.push(transition);
         let index = self.transitions.len().saturating_sub(1);
-        if let Some(state) = self.states.get_mut(from) {
-            state.transitions.push(index);
+        let Some(state) = self.states.get_mut(from) else {
+            return;
+        };
+        let previous_last = state.last;
+        state.last = index;
+        if previous_last == NONE {
+            state.first = index;
+        } else if let Some(previous) = self.transitions.get_mut(previous_last) {
+            previous.next = index;
         }
     }
 
@@ -130,6 +149,7 @@ impl SuffixTree {
                     start: end,
                     end: INFINITY,
                     state: leaf,
+                    next: NONE,
                 },
             );
             if previous != ROOT {
@@ -167,6 +187,7 @@ impl SuffixTree {
                     start: split_point,
                     end: transition.end,
                     state: transition.state,
+                    next: NONE,
                 },
             );
             if let Some(shortened) = self.transitions.get_mut(index) {
@@ -205,54 +226,49 @@ impl SuffixTree {
         }
     }
 
-    pub fn repeats_over(&self, threshold: usize) -> Vec<Repeat> {
+    // Las posiciones de un nodo son las hojas de su subárbol: en un recorrido en profundidad quedan
+    // contiguas, así que cada nodo guarda sólo dónde empiezan las suyas en vez de copiar listas
+    // hacia arriba (con datos repetitivos, como las tablas generadas, eso era cuadrático).
+    pub fn for_each_repeat(&self, threshold: usize, mut visit: impl FnMut(&Repeat)) {
         let threshold = i64::try_from(threshold).unwrap_or(i64::MAX);
-        let mut found = Vec::new();
-        let root = Frame::new(
-            Transition {
-                start: 0,
-                end: 0,
-                state: ROOT,
-            },
-            0,
-        );
-        let mut stack = vec![root];
+        let mut leaves: Vec<(i32, usize)> = Vec::new();
+        let mut stack = vec![Frame::new(0, 0, self.first_transition(ROOT))];
         while let Some(frame) = stack.last_mut() {
-            let next = self
-                .states
-                .get(frame.transition.state)
-                .and_then(|state| state.transitions.get(frame.next_child))
-                .copied();
-            if let Some(index) = next {
-                frame.next_child = frame.next_child.saturating_add(1);
-                let child = self.transition(index);
+            if frame.next_child != NONE {
+                let child = self.transition(frame.next_child);
+                frame.next_child = child.next;
                 let length = frame.length.saturating_add(go_length(child));
-                stack.push(Frame::new(child, length));
+                stack.extend(self.descend(child, length, &mut leaves));
                 continue;
             }
-            let Some(mut finished) = stack.pop() else {
+            let Some(finished) = stack.pop() else {
                 break;
             };
-            if self
-                .states
-                .get(finished.transition.state)
-                .is_none_or(|state| state.transitions.is_empty())
+            if finished.length >= threshold
+                && let Some(found) = repeat(
+                    leaves.get(finished.first_leaf..).unwrap_or_default(),
+                    finished.length,
+                )
             {
-                finished.contexts = self.leaf_context(finished.transition, finished.length);
-            } else if finished.length >= threshold && finished.contexts.len() > 1 {
-                found.push(Repeat {
-                    positions: finished.contexts.values().flatten().copied().collect(),
-                    length: usize::try_from(finished.length).unwrap_or_default(),
-                });
-            }
-            if let Some(parent) = stack.last_mut().filter(|_| finished.length >= threshold) {
-                parent.absorb(finished.contexts);
+                visit(&found);
             }
         }
-        found
     }
 
-    fn leaf_context(&self, transition: Transition, length: i64) -> BTreeMap<i32, Vec<usize>> {
+    fn descend(&self, child: Transition, length: i64, leaves: &mut Vec<(i32, usize)>) -> Option<Frame> {
+        let first_grandchild = self.first_transition(child.state);
+        if first_grandchild == NONE {
+            leaves.extend(self.leaf_context(child, length));
+            return None;
+        }
+        Some(Frame::new(length, leaves.len(), first_grandchild))
+    }
+
+    fn first_transition(&self, state: usize) -> usize {
+        self.states.get(state).map_or(NONE, |found| found.first)
+    }
+
+    fn leaf_context(&self, transition: Transition, length: i64) -> Option<(i32, usize)> {
         let start =
             wrap_int32(wrap_int32(transition.end.saturating_add(1)).saturating_sub(wrap_int32(length)));
         let context = if start > 0 {
@@ -260,31 +276,36 @@ impl SuffixTree {
         } else {
             NO_LEFT_CONTEXT
         };
-        BTreeMap::from([(context, usize::try_from(start).into_iter().collect())])
+        usize::try_from(start).ok().map(|position| (context, position))
     }
+}
+
+fn repeat(leaves: &[(i32, usize)], length: i64) -> Option<Repeat> {
+    let first_context = leaves.first()?.0;
+    if leaves.iter().all(|&(context, _)| context == first_context) {
+        return None;
+    }
+    let mut ordered = leaves.to_vec();
+    ordered.sort_by_key(|&(context, _)| context);
+    Some(Repeat {
+        positions: ordered.into_iter().map(|(_, position)| position).collect(),
+        length: usize::try_from(length).unwrap_or_default(),
+    })
 }
 
 #[derive(Debug)]
 struct Frame {
-    transition: Transition,
     length: i64,
+    first_leaf: usize,
     next_child: usize,
-    contexts: BTreeMap<i32, Vec<usize>>,
 }
 
 impl Frame {
-    const fn new(transition: Transition, length: i64) -> Self {
+    const fn new(length: i64, first_leaf: usize, next_child: usize) -> Self {
         Self {
-            transition,
             length,
-            next_child: 0,
-            contexts: BTreeMap::new(),
-        }
-    }
-
-    fn absorb(&mut self, contexts: BTreeMap<i32, Vec<usize>>) {
-        for (context, positions) in contexts {
-            self.contexts.entry(context).or_default().extend(positions);
+            first_leaf,
+            next_child,
         }
     }
 }
