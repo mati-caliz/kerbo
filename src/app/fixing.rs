@@ -96,11 +96,7 @@ impl FixOutcome {
             FixNotice::Previewed { count, files }
         };
         notices.push(lang.notice(&Notice::Fix(summary)));
-        notices.extend(
-            self.failures
-                .iter()
-                .map(|failure| lang.problem(&failure.problem)),
-        );
+        notices.extend(self.failures.iter().map(|failure| lang.problem(&failure.problem)));
         notices
     }
 }

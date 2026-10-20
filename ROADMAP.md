@@ -383,6 +383,9 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   archivos de texto con LF, y el README dice que desde Git Bash se corre con
   `MSYS_NO_PATHCONV=1`, porque el script se copia de afuera y no se edita). Un checkout hecho
   antes del `.gitattributes` conserva los CRLF hasta `git rm --cached -r . && git reset --hard`.
+  Pendiente: con `MSYS_NO_PATHCONV=1`, `pwd` devuelve `/c/Users/...` y Docker Desktop a veces
+  monta `/src` vacío según la carpeta; con `pwd -W` anda siempre. Como `verify-rust.sh` viene del
+  estándar (`quality/sync.sh`), el arreglo va allá y no en este repo.
 - Una sola pasada por función para todas las métricas, en lugar de una por métrica.
 - Un demonio por máquina, con los árboles y la caché en memoria, compartido por el hook, el
   servidor MCP, el LSP y `kerbo check`: varias sesiones de agentes en el mismo repo no repiten el

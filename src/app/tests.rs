@@ -350,9 +350,9 @@ fn mcp_server_fixes_or_previews_the_mechanical_fixes() {
     assert!(
         text(0).starts_with("--- a/Cart.java\n+++ b/Cart.java\n@@ -1 +0,0 @@\n-import java.util.List;\n")
     );
-    assert!(text(0).ends_with("1 arreglos en 1 archivos; no se escribió nada"));
+    assert!(text(0).ends_with("1 arreglo en 1 archivo; no se escribió nada"));
     assert_eq!(responses[1]["result"]["isError"], true);
-    assert!(text(2).ends_with("1 arreglos aplicados en 1 archivos"));
+    assert!(text(2).ends_with("1 arreglo aplicado en 1 archivo"));
     let fixed = std::fs::read_to_string(tree.path().join("Cart.java")).expect("se lee");
     assert_eq!(fixed, "final class Cart {}\n");
 }
@@ -374,7 +374,7 @@ fn respects_the_ignore_comments_and_shows_why_in_the_log() {
         outcome.log
     );
     assert!(
-        outcome.log.contains(" · 1 ignorados en el código"),
+        outcome.log.contains(" · 1 ignorado en el código"),
         "{}",
         outcome.log
     );

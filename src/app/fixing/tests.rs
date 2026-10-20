@@ -42,7 +42,7 @@ fn a_dry_run_shows_the_whole_patch_and_leaves_the_file_alone() {
     );
     assert_eq!(
         outcome.notices(Lang::Spanish),
-        ["3 arreglos en 1 archivos; no se escribió nada"]
+        ["3 arreglos en 1 archivo; no se escribió nada"]
     );
 }
 
@@ -96,7 +96,7 @@ fn the_command_prints_the_patch_on_a_dry_run() {
     );
     assert_eq!(status, EXIT_CLEAN);
     assert!(String::from_utf8_lossy(&report).contains("+    void greet(final String name) {"));
-    assert!(String::from_utf8_lossy(&log).contains("1 arreglos en 1 archivos"));
+    assert!(String::from_utf8_lossy(&log).contains("1 arreglo en 1 archivo"));
     assert_eq!(read(&tree, "Greeter.java"), GREETER);
 }
 

@@ -257,7 +257,7 @@ pub enum FixNotice {
     Left { count: usize },
 }
 
-const SINGLE: usize = 1;
+pub(super) const SINGLE: usize = 1;
 
 pub fn counted(count: usize, singular: &str, plural: &str) -> String {
     let noun = if count == SINGLE { singular } else { plural };
