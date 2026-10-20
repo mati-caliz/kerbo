@@ -1,12 +1,21 @@
 mod collector;
 mod cpd;
+mod dupl;
+mod go_kinds;
+mod go_statements;
+mod go_syntax;
+mod go_types;
 mod java;
 mod python;
 mod python_letters;
+mod suffix_tree;
 
 use std::collections::HashMap;
+use std::path::Path;
 
 use tree_sitter::Node;
+
+pub use go_syntax::SyntaxNode;
 
 use crate::profile::DuplicateStyle;
 use crate::rules::{Diagnostic, FileIdentity, RuleId};
@@ -15,6 +24,8 @@ const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0100_0000_01b3;
 const SUPPRESSION_OFF: &str = "CPD-OFF";
 const SUPPRESSION_ON: &str = "CPD-ON";
+const TOKEN_UNIT: &str = "tokens";
+const SYNTAX_UNIT: &str = "nodos";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CpdToken {
@@ -24,10 +35,25 @@ pub struct CpdToken {
 }
 
 #[derive(Debug)]
+pub enum DuplicateUnits {
+    Tokens(Vec<CpdToken>),
+    Syntax(Vec<SyntaxNode>),
+}
+
+#[derive(Debug)]
 pub struct PooledFile {
     pub identity: FileIdentity,
     pub limit: usize,
-    pub tokens: Vec<CpdToken>,
+    pub units: DuplicateUnits,
+}
+
+impl PooledFile {
+    pub fn package_scope(&self) -> Option<&Path> {
+        match self.units {
+            DuplicateUnits::Syntax(_) => self.identity.absolute.parent(),
+            DuplicateUnits::Tokens(_) => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,64 +63,118 @@ enum Suppression {
     On,
 }
 
-pub fn cpd_tokens(root: Node<'_>, source: &[u8], style: DuplicateStyle) -> Option<Vec<CpdToken>> {
+#[derive(Debug, Clone, Copy)]
+struct Placement {
+    file: usize,
+    line: usize,
+    end_line: usize,
+}
+
+#[derive(Debug)]
+struct CloneGroup {
+    size: usize,
+    content: u64,
+    copies: Vec<Placement>,
+}
+
+pub fn duplicate_units(root: Node<'_>, source: &[u8], style: DuplicateStyle) -> Option<DuplicateUnits> {
     match style {
-        DuplicateStyle::CpdJava => Some(java::tokens(root, source)),
-        DuplicateStyle::CpdPython => python::tokens(source),
+        DuplicateStyle::CpdJava => Some(DuplicateUnits::Tokens(java::tokens(root, source))),
+        DuplicateStyle::CpdPython => python::tokens(source).map(DuplicateUnits::Tokens),
+        DuplicateStyle::Dupl => go_syntax::nodes(root, source).map(DuplicateUnits::Syntax),
         DuplicateStyle::Unmeasured => None,
     }
 }
 
 pub fn find_duplicates(mut files: Vec<PooledFile>) -> Vec<Diagnostic> {
     files.sort_by(|left, right| left.identity.absolute.cmp(&right.identity.absolute));
-    let Some(tile) = files.iter().map(|file| file.limit.saturating_add(1)).min() else {
+    let Some(threshold) = files.iter().map(|file| file.limit.saturating_add(1)).min() else {
         return Vec::new();
     };
-    let pool = cpd::Pool::new(&mut files);
+    let mut token_files = Vec::new();
+    let mut syntax_files = Vec::new();
+    let identities: Vec<(FileIdentity, usize)> = files
+        .into_iter()
+        .map(|file| {
+            match file.units {
+                DuplicateUnits::Tokens(tokens) => token_files.push(tokens),
+                DuplicateUnits::Syntax(nodes) => syntax_files.push(nodes),
+            }
+            (file.identity, file.limit)
+        })
+        .collect();
+    let (groups, unit) = if syntax_files.is_empty() {
+        (cpd_groups(token_files, threshold), TOKEN_UNIT)
+    } else {
+        (dupl::clone_groups(syntax_files, threshold), SYNTAX_UNIT)
+    };
+    report(&identities, &groups, unit)
+}
+
+fn cpd_groups(files: Vec<Vec<CpdToken>>, tile: usize) -> Vec<CloneGroup> {
+    let pool = cpd::Pool::new(files);
+    pool.matches(tile)
+        .into_iter()
+        .map(|found| CloneGroup {
+            size: found.tokens,
+            content: pool.content_hash(found.marks.first().copied(), found.tokens),
+            copies: found
+                .marks
+                .iter()
+                .filter_map(|&mark| pool.span(mark, found.tokens))
+                .map(|span| Placement {
+                    file: span.file,
+                    line: span.line,
+                    end_line: span.end_line,
+                })
+                .collect(),
+        })
+        .collect()
+}
+
+fn report(identities: &[(FileIdentity, usize)], groups: &[CloneGroup], unit: &str) -> Vec<Diagnostic> {
     let mut occurrences: HashMap<(usize, u64), usize> = HashMap::new();
     let mut diagnostics = Vec::new();
-    for found in pool.matches(tile) {
-        let marks: Vec<cpd::MarkSpan> = found
-            .marks
-            .iter()
-            .filter_map(|&mark| pool.span(mark, found.tokens))
-            .collect();
-        let content = pool.content_hash(found.marks.first().copied(), found.tokens);
-        for (position, mark) in marks.iter().enumerate() {
-            let Some(file) = files.get(mark.file).filter(|file| found.tokens > file.limit) else {
+    for group in groups {
+        for (position, copy) in group.copies.iter().enumerate() {
+            let Some((identity, limit)) = identities
+                .get(copy.file)
+                .filter(|&&(_, limit)| group.size > limit)
+            else {
                 continue;
             };
-            let occurrence = occurrences.entry((mark.file, content)).or_default();
+            let occurrence = occurrences.entry((copy.file, group.content)).or_default();
             *occurrence = occurrence.saturating_add(1);
-            let others = marks
+            let others = group
+                .copies
                 .iter()
                 .enumerate()
                 .filter(|&(other, _)| other != position)
                 .filter_map(|(_, other)| {
-                    files
+                    identities
                         .get(other.file)
-                        .map(|other_file| format!("{}:{}", other_file.identity.display, other.line))
+                        .map(|(other_identity, _)| format!("{}:{}", other_identity.display, other.line))
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
             diagnostics.push(Diagnostic {
-                path: file.identity.display.clone(),
-                line: mark.line,
+                path: identity.display.clone(),
+                line: copy.line,
                 column: 1,
-                end_line: mark.end_line,
+                end_line: copy.end_line,
                 rule: RuleId::DuplicateCode,
                 message: format!(
-                    "Este bloque de {} tokens está repetido en {others} (máximo {})",
-                    found.tokens, file.limit
+                    "Este bloque de {} {unit} está repetido en {others} (máximo {limit})",
+                    group.size
                 ),
-                value: found.tokens,
-                limit: file.limit,
+                value: group.size,
+                limit: *limit,
                 fingerprint: format!(
-                    "duplicate-code:{}:{content:016x}#{occurrence}",
-                    file.identity.relative
+                    "duplicate-code:{}:{:016x}#{occurrence}",
+                    identity.relative, group.content
                 ),
-                relative_path: file.identity.relative.clone(),
-                absolute_path: file.identity.absolute.clone(),
+                relative_path: identity.relative.clone(),
+                absolute_path: identity.absolute.clone(),
             });
         }
     }

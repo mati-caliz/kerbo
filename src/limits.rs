@@ -36,6 +36,8 @@ const NESTING_RECOMMENDED: Option<usize> = Some(5);
 const NESTING_MINIMAL: Option<usize> = Some(6);
 const DUPLICATE_TOKENS_STRICT: Option<usize> = Some(99);
 const DUPLICATE_TOKENS_RECOMMENDED: Option<usize> = Some(149);
+const DUPLICATE_NODES_STRICT: Option<usize> = Some(149);
+const DUPLICATE_NODES_RECOMMENDED: Option<usize> = Some(224);
 const RECOMMENDED: [Option<usize>; 5] = [Some(750), Some(150), Some(15), Some(20), Some(6)];
 const MINIMAL: [Option<usize>; 5] = [Some(1500), Some(300), Some(25), Some(30), Some(8)];
 
@@ -76,8 +78,20 @@ impl Limits {
 impl Preset {
     pub fn limits(self, language: Language, is_test: bool) -> Limits {
         let (metrics, nesting, duplicates) = match self {
-            Self::Strict => (strict(language), NESTING_STRICT, DUPLICATE_TOKENS_STRICT),
-            Self::Recommended => (RECOMMENDED, NESTING_RECOMMENDED, DUPLICATE_TOKENS_RECOMMENDED),
+            Self::Strict => (
+                strict(language),
+                NESTING_STRICT,
+                duplicates(language, DUPLICATE_TOKENS_STRICT, DUPLICATE_NODES_STRICT),
+            ),
+            Self::Recommended => (
+                RECOMMENDED,
+                NESTING_RECOMMENDED,
+                duplicates(
+                    language,
+                    DUPLICATE_TOKENS_RECOMMENDED,
+                    DUPLICATE_NODES_RECOMMENDED,
+                ),
+            ),
             Self::Minimal => (MINIMAL, NESTING_MINIMAL, None),
         };
         let base = Limits::with_metrics(metrics)
@@ -100,6 +114,15 @@ impl Preset {
             }
             Language::Python => base.with_rule(RuleId::ParameterCount, None),
             Language::Go | Language::Java => base,
+        }
+    }
+}
+
+const fn duplicates(language: Language, tokens: Option<usize>, nodes: Option<usize>) -> Option<usize> {
+    match language {
+        Language::Go => nodes,
+        Language::Python | Language::Java | Language::TypeScript | Language::Tsx | Language::JavaScript => {
+            tokens
         }
     }
 }

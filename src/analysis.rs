@@ -2,7 +2,7 @@ use std::fmt;
 
 use tree_sitter::Parser;
 
-use crate::duplicates::{CpdToken, cpd_tokens};
+use crate::duplicates::{DuplicateUnits, duplicate_units};
 use crate::language::Language;
 use crate::limits::Limits;
 use crate::lines::LineMap;
@@ -19,7 +19,7 @@ pub struct FileAnalysis {
     pub nesting: Vec<NestingFinding>,
     pub magic_numbers: Vec<MagicNumber>,
     pub short_names: Vec<ShortName>,
-    pub cpd_tokens: Option<Vec<CpdToken>>,
+    pub duplicate_units: Option<DuplicateUnits>,
 }
 
 #[derive(Debug)]
@@ -57,8 +57,8 @@ pub fn analyze(
         } else {
             Vec::new()
         },
-        cpd_tokens: limits
+        duplicate_units: limits
             .get(RuleId::DuplicateCode)
-            .and_then(|_| cpd_tokens(root, source, profile.duplicates)),
+            .and_then(|_| duplicate_units(root, source, profile.duplicates)),
     })
 }

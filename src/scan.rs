@@ -136,19 +136,22 @@ fn pooled_file(identity: &FileIdentity, analysis: &mut FileAnalysis, limits: Lim
     Some(PooledFile {
         identity: identity.clone(),
         limit: limits.get(RuleId::DuplicateCode)?,
-        tokens: analysis.cpd_tokens.take()?,
+        units: analysis.duplicate_units.take()?,
     })
 }
 
+type PoolScope = (Stack, Option<PathBuf>);
+
 fn duplicate_diagnostics(pooled: Vec<(Stack, PooledFile)>) -> Vec<Diagnostic> {
-    let mut by_stack: Vec<(Stack, Vec<PooledFile>)> = Vec::new();
+    let mut by_scope: Vec<(PoolScope, Vec<PooledFile>)> = Vec::new();
     for (stack, file) in pooled {
-        match by_stack.iter_mut().find(|(known, _)| *known == stack) {
+        let scope = (stack, file.package_scope().map(Path::to_path_buf));
+        match by_scope.iter_mut().find(|(known, _)| *known == scope) {
             Some((_, files)) => files.push(file),
-            None => by_stack.push((stack, vec![file])),
+            None => by_scope.push((scope, vec![file])),
         }
     }
-    by_stack
+    by_scope
         .into_iter()
         .flat_map(|(_, files)| find_duplicates(files))
         .collect()

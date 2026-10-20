@@ -142,6 +142,7 @@ pub enum DuplicateStyle {
     Unmeasured,
     CpdJava,
     CpdPython,
+    Dupl,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

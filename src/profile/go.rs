@@ -78,7 +78,7 @@ pub static GO: Profile = Profile {
     nesting: NestingStyle::ControlFlow,
     magic_numbers: MagicNumberStyle::Mnd,
     short_names: ShortNameStyle::Varnamelen,
-    duplicates: DuplicateStyle::Unmeasured,
+    duplicates: DuplicateStyle::Dupl,
     comments: &["comment"],
     literals: &["raw_string_literal", "interpreted_string_literal"],
     function_length_skips_iife: false,

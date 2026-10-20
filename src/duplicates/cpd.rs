@@ -1,9 +1,8 @@
 use std::cmp::Reverse;
 use std::collections::HashMap;
-use std::mem;
 
 use super::collector::{Match, MatchCollector};
-use super::{FNV_OFFSET, PooledFile, fnv};
+use super::{CpdToken, FNV_OFFSET, fnv};
 
 const END_OF_FILE: u32 = 0;
 const HASH_BASE: i32 = 37;
@@ -33,12 +32,12 @@ pub struct Pool {
 }
 
 impl Pool {
-    pub fn new(files: &mut [PooledFile]) -> Self {
+    pub fn new(files: Vec<Vec<CpdToken>>) -> Self {
         let mut identifiers: HashMap<u64, u32> = HashMap::new();
         let mut code = Vec::new();
         let mut positions = Vec::new();
-        for (file, pooled) in files.iter_mut().enumerate() {
-            for token in mem::take(&mut pooled.tokens) {
+        for (file, tokens) in files.into_iter().enumerate() {
+            for token in tokens {
                 let next = u32::try_from(identifiers.len()).map_or(u32::MAX, |count| count.saturating_add(1));
                 code.push(*identifiers.entry(token.image).or_insert(next));
                 positions.push(Some(Position {
