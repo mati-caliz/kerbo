@@ -118,6 +118,8 @@ pub const fn explanation(rule: RuleId) -> Explanation {
         RuleId::ShortName => SHORT_NAME,
         RuleId::DuplicateCode => DUPLICATE_CODE,
         RuleId::CommentedCode => COMMENTED_CODE,
+        RuleId::CommittedSecret => super::security::COMMITTED_SECRET,
+        RuleId::VulnerableDependency => super::security::VULNERABLE_DEPENDENCY,
         RuleId::TypeEscape => TYPE_ESCAPE,
         RuleId::UnusedImport => UNUSED_IMPORT,
         RuleId::RedundantImport => REDUNDANT_IMPORT,

@@ -7,6 +7,7 @@ use clap::{Args, CommandFactory, FromArgMatches, Parser, Subcommand};
 use crate::i18n::{Lang, Problem, Text};
 use crate::language::Stack;
 use crate::limits::LimitOverride;
+use crate::osv::{Ecosystem, OsvMode};
 use crate::report::Format;
 use crate::rules::RuleId;
 
@@ -28,6 +29,10 @@ const OVERRIDES_ARGUMENT: &str = "overrides";
 const FORMAT_ARGUMENT: &str = "format";
 const DIFF_ARGUMENT: &str = "diff";
 const NO_BASELINE_ARGUMENT: &str = "no_baseline";
+const OSV_ARGUMENT: &str = "osv";
+const OSV_DOWNLOAD_COMMAND: &str = "osv-download";
+const ECOSYSTEMS_ARGUMENT: &str = "ecosystems";
+const ONLINE_MODE: &str = "online";
 
 #[derive(Debug, Parser)]
 #[command(name = "kerbo", version)]
@@ -49,6 +54,11 @@ pub enum Command {
     Fix(FixArgs),
     Hook(HookArgs),
     Mcp,
+    #[command(name = OSV_DOWNLOAD_COMMAND)]
+    OsvDownload {
+        #[arg(value_enum)]
+        ecosystems: Vec<Ecosystem>,
+    },
     Lsp,
 }
 
@@ -59,7 +69,7 @@ impl Command {
             Self::Baseline(arguments) => arguments.config.as_deref(),
             Self::Hook(arguments) => arguments.config.as_deref(),
             Self::Fix(arguments) => arguments.config.as_deref(),
-            Self::Explain { .. } | Self::Mcp | Self::Lsp => None,
+            Self::Explain { .. } | Self::Mcp | Self::Lsp | Self::OsvDownload { .. } => None,
         }
     }
 }
@@ -108,6 +118,8 @@ pub struct CheckArgs {
     pub diff: Option<String>,
     #[arg(long)]
     pub no_baseline: bool,
+    #[arg(long, value_enum, num_args = 0..=1, require_equals = true, default_missing_value = ONLINE_MODE)]
+    pub osv: Option<OsvMode>,
 }
 
 pub fn try_parse<Argument>(
@@ -135,6 +147,14 @@ pub fn command(lang: Lang) -> clap::Command {
                 })
                 .mut_arg(NO_BASELINE_ARGUMENT, |arg| {
                     arg.help(lang.text(Text::HelpNoBaseline))
+                })
+                .mut_arg(OSV_ARGUMENT, |arg| arg.help(lang.text(Text::HelpOsv)))
+        })
+        .mut_subcommand(OSV_DOWNLOAD_COMMAND, |download| {
+            download
+                .about(lang.text(Text::AboutOsvDownload))
+                .mut_arg(ECOSYSTEMS_ARGUMENT, |arg| {
+                    arg.help(lang.text(Text::HelpEcosystems))
                 })
         })
         .mut_subcommand(BASELINE_COMMAND, |baseline| {

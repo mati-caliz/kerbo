@@ -1,10 +1,15 @@
 use std::path::{Path, PathBuf};
 
 use super::{ScanOutcome, ScanRequest, scan};
+use crate::cache::AnalysisCache;
 use crate::config::Config;
+use crate::i18n::Lang;
 use crate::language::Stack;
+use crate::report::{Format, render};
 use crate::rules::RuleId;
 use crate::test_support::TempTree;
+
+const CACHE_BYTES: usize = 16 * 1024 * 1024;
 
 fn scan_tree(root: &Path, roots: &[PathBuf], stacks: &[Stack]) -> ScanOutcome {
     let config = Config::load(None, root).expect("la configuración es válida");
@@ -121,4 +126,118 @@ fn recognizes_tests_passed_as_single_files() {
         .map(|diagnostic| diagnostic.relative_path.as_str())
         .collect();
     assert_eq!(reported, ["a.go"], "los números mágicos de un test no cuentan");
+}
+
+fn fake_key() -> String {
+    ["AKIA", "QYLPMN5HHHFPZAM2"].concat()
+}
+
+#[test]
+fn finds_committed_secrets_in_every_file_also_hidden_ones() {
+    let tree = TempTree::new("scan-secrets");
+    let key = fake_key();
+    tree.write(".env", &format!("AWS_ACCESS_KEY_ID={key}\n"));
+    tree.write("src/config.py", &format!("KEY = \"{key}\"\n"));
+    tree.write(
+        ".idea/scripts/deploy.py",
+        "def deploy(a, b, c, d, e, f, g):\n    pass\n",
+    );
+    tree.write("image.png", &key);
+    let outcome = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
+    let found: Vec<(&str, RuleId)> = outcome
+        .diagnostics
+        .iter()
+        .map(|diagnostic| (diagnostic.relative_path.as_str(), diagnostic.rule))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            (".env", RuleId::CommittedSecret),
+            ("src/config.py", RuleId::CommittedSecret)
+        ]
+    );
+    assert!(
+        outcome
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.fingerprint.contains(&key))
+    );
+    for format in [
+        Format::Text,
+        Format::Json,
+        Format::Sarif,
+        Format::Agent,
+        Format::AgentJson,
+    ] {
+        let mut rendered = Vec::new();
+        render(&outcome.diagnostics, format, Lang::Spanish, &mut rendered).expect("se escribe el reporte");
+        assert!(!String::from_utf8_lossy(&rendered).contains(&key), "{format:?}");
+    }
+    let only_go = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[Stack::Go]);
+    assert!(only_go.diagnostics.is_empty());
+}
+
+#[test]
+fn cached_secrets_come_back_masked_and_identical() {
+    let tree = TempTree::new("scan-secrets-cache");
+    let key = fake_key();
+    tree.write("deploy/.env", &format!("AWS_ACCESS_KEY_ID={key}\n"));
+    tree.write("src/keys.py", &format!("KEY = \"{key}\"\n"));
+    let config = Config::load(None, tree.path()).expect("la configuración es válida");
+    let cache = AnalysisCache::open(tree.path().join("cache"), CACHE_BYTES);
+    let run = || {
+        let outcome = scan(&ScanRequest {
+            roots: &[tree.path().to_path_buf()],
+            stacks: &[],
+            overrides: &[],
+            config: &config,
+            cache: Some(&cache),
+        });
+        outcome
+            .diagnostics
+            .into_iter()
+            .map(|diagnostic| (diagnostic.fingerprint, diagnostic.line, diagnostic.message))
+            .collect::<Vec<_>>()
+    };
+    let fresh = run();
+    assert_eq!(fresh.len(), 2);
+    assert_eq!(run(), fresh);
+    let reopened = AnalysisCache::open(tree.path().join("cache"), CACHE_BYTES);
+    let profile = crate::secrets::path_profile("x.env").expect("no está excluido");
+    let stored =
+        reopened.secrets(reopened.secrets_key(&profile, format!("AWS_ACCESS_KEY_ID={key}\n").as_bytes()));
+    let stored = stored.expect("quedó guardado en la caché");
+    assert_eq!(stored.len(), 1);
+    assert_eq!(stored[0].preview, "AKIA");
+}
+
+#[test]
+fn secrets_can_be_excused_per_path_with_a_reason() {
+    let tree = TempTree::new("scan-secrets-excused");
+    let key = fake_key();
+    tree.write("fixtures/keys.txt", &format!("aws = {key}\n"));
+    tree.write("fixtures/keys.py", &format!("AWS = \"{key}\"\n"));
+    tree.write(
+        "kerbo.toml",
+        "[[exceptions]]\npaths = [\"fixtures/**\"]\nrule = \"committed-secret\"\nreason = \"claves falsas de prueba\"\n",
+    );
+    let outcome = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
+    assert!(
+        outcome
+            .diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.rule != RuleId::CommittedSecret),
+        "{:?}",
+        outcome.diagnostics
+    );
+}
+
+#[test]
+fn checks_secrets_in_the_text_the_editor_sends() {
+    let tree = TempTree::new("scan-secrets-text");
+    let config = Config::load(None, tree.path()).expect("la configuración es válida");
+    let text = format!("AWS_ACCESS_KEY_ID={}\n", fake_key());
+    let found = super::check_text(&tree.path().join(".env"), text.as_bytes(), &config).expect("se revisa");
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].rule, RuleId::CommittedSecret);
 }

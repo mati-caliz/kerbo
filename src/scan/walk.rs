@@ -1,10 +1,10 @@
-use std::path::Path;
+use std::path::{Component, Path};
 
 use ignore::{DirEntry, Walk, WalkBuilder};
 
-const VISITED_HIDDEN_DIRECTORIES: [&str; 2] = [".github", ".devcontainer"];
+const ANALYZED_HIDDEN_DIRECTORIES: [&str; 2] = [".github", ".devcontainer"];
+const GIT_DIRECTORY: &str = ".git";
 const HIDDEN_PREFIX: char = '.';
-const WALK_ROOT_DEPTH: usize = 0;
 
 pub fn walk(root: &Path) -> Walk {
     WalkBuilder::new(root)
@@ -14,13 +14,26 @@ pub fn walk(root: &Path) -> Walk {
 }
 
 fn is_visited(entry: &DirEntry) -> bool {
-    if entry.depth() == WALK_ROOT_DEPTH {
+    entry.file_name() != GIT_DIRECTORY
+}
+
+pub fn is_analyzed(walk_root: &Path, path: &Path) -> bool {
+    let Ok(relative) = path.strip_prefix(walk_root) else {
         return true;
+    };
+    let mut components = relative.components().peekable();
+    while let Some(component) = components.next() {
+        let Component::Normal(name) = component else {
+            continue;
+        };
+        let name = name.to_string_lossy();
+        if !name.starts_with(HIDDEN_PREFIX) {
+            continue;
+        }
+        let is_directory = components.peek().is_some();
+        if !(is_directory && ANALYZED_HIDDEN_DIRECTORIES.contains(&name.as_ref())) {
+            return false;
+        }
     }
-    let name = entry.file_name().to_string_lossy();
-    if !name.starts_with(HIDDEN_PREFIX) {
-        return true;
-    }
-    let is_directory = entry.file_type().is_some_and(|file_type| file_type.is_dir());
-    is_directory && VISITED_HIDDEN_DIRECTORIES.contains(&name.as_ref())
+    true
 }

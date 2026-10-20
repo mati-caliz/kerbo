@@ -250,7 +250,9 @@ fn marker_message(rule: RuleId, marker: &Marker) -> Message {
         | RuleId::FinalClass
         | RuleId::Migration(_)
         | RuleId::Dockerfile(_)
-        | RuleId::Compose(_) => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
+        | RuleId::Compose(_)
+        | RuleId::CommittedSecret
+        | RuleId::VulnerableDependency => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
     }
 }
 

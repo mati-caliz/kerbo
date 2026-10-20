@@ -1,11 +1,12 @@
 use super::{
-    BlockUnit, Cheat, FixNotice, FunctionName, Lang, LangPreference, Message, Notice, Problem, Summary, Text,
+    BlockUnit, Cheat, FixNotice, FunctionName, Lang, LangPreference, Message, Notice, OsvProblem, Problem,
+    Summary, Text,
 };
 use crate::rules::RuleId;
 
 const LANGS: [Lang; 2] = [Lang::Spanish, Lang::English];
 
-const TEXTS: [Text; 34] = [
+const TEXTS: [Text; 37] = [
     Text::WhyLabel,
     Text::FixLabel,
     Text::ExampleLabel,
@@ -40,6 +41,9 @@ const TEXTS: [Text; 34] = [
     Text::ValueFile,
     Text::ValueRuleLimit,
     Text::ValueReference,
+    Text::AboutOsvDownload,
+    Text::HelpOsv,
+    Text::HelpEcosystems,
 ];
 
 fn messages() -> Vec<Message> {
@@ -92,6 +96,7 @@ fn messages() -> Vec<Message> {
     ]
     .into_iter()
     .chain(cheats().into_iter().map(Message::Cheat))
+    .chain(security::messages())
     .collect()
 }
 
@@ -169,6 +174,9 @@ fn problems() -> Vec<Problem> {
         Problem::MissingContentLength,
         Problem::IncompleteMessage(detail()),
         Problem::InvalidMessage(detail()),
+        Problem::Osv(OsvProblem::Unavailable(detail())),
+        Problem::Osv(OsvProblem::InvalidResponse(detail())),
+        Problem::Osv(OsvProblem::DatabaseMissing(path())),
     ]
 }
 
@@ -222,6 +230,11 @@ fn notices() -> Vec<Notice> {
             introduced: 1,
         }),
         Notice::Fix(FixNotice::Left { count: 2 }),
+        Notice::OsvDatabaseSaved {
+            ecosystem: "npm".to_owned(),
+            advisories: 2,
+            path: "all.zip".to_owned(),
+        },
     ]
 }
 
@@ -356,3 +369,5 @@ fn the_flag_wins_over_the_configuration_and_the_locale() {
     };
     assert_eq!(flagged.resolve(Some(Lang::Spanish)), Lang::English);
 }
+
+mod security;

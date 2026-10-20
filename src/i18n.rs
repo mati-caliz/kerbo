@@ -8,7 +8,8 @@ mod english;
 mod spanish;
 
 pub use catalog::{
-    BlockUnit, Cheat, Explanation, FixNotice, FunctionName, Message, Notice, Problem, Summary, Text,
+    Advisory, BlockUnit, Cheat, Explanation, FixNotice, FunctionName, Message, Notice, OsvProblem, Problem,
+    SecretLeak, Summary, Text,
 };
 
 use catalog::Catalog;

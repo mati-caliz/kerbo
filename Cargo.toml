@@ -13,8 +13,10 @@ categories = ["development-tools", "command-line-utilities"]
 include = ["/src", "/tests", "/Cargo.toml", "/Cargo.lock", "/README.md", "/LICENSE"]
 
 [dependencies]
+aho-corasick = "1.1.5"
 clap = { version = "4.6.7", features = ["derive"] }
 globset = "0.4.20"
+miniz_oxide = "0.8.9"
 lz4_flex = { version = "0.14.0", default-features = false, features = ["checked-decode", "safe-decode", "safe-encode", "std"] }
 ignore = "0.4.33"
 rayon = "1.12.0"

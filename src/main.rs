@@ -16,10 +16,12 @@ mod lines;
 mod lint;
 mod macro_rules;
 mod metrics;
+mod osv;
 mod profile;
 mod report;
 mod rules;
 mod scan;
+mod secrets;
 mod suppressions;
 mod syntax;
 #[cfg(test)]

@@ -39,6 +39,7 @@ pub enum Preset {
 }
 
 const ALWAYS_REPORTED: Option<u32> = Some(0);
+pub const REPORT_EVERY_OCCURRENCE: Option<usize> = Some(0);
 const FAMILY_LIMIT: usize = 0;
 const ALL_FAMILIES_SILENCED: u64 = u64::MAX;
 const NO_FAMILY_SILENCED: u64 = 0;

@@ -10,6 +10,7 @@ mod explanations;
 mod fixes;
 
 const ANONYMOUS_FUNCTION: &str = "(anónima)";
+mod security;
 
 #[derive(Debug)]
 pub struct Spanish;
@@ -71,6 +72,13 @@ impl Catalog for Spanish {
             Text::ValueFile => "ARCHIVO",
             Text::ValueRuleLimit => "REGLA=VALOR",
             Text::ValueReference => "REFERENCIA",
+            Text::AboutOsvDownload => {
+                "Baja la base de OSV de cada ecosistema para usar `kerbo check --osv=offline` sin red"
+            }
+            Text::HelpOsv => {
+                "Busca vulnerabilidades de las dependencias en OSV: online consulta api.osv.dev, offline usa la base bajada"
+            }
+            Text::HelpEcosystems => "Ecosistemas a bajar; por defecto, todos los que kerbo lee",
         }
     }
 
@@ -99,6 +107,8 @@ impl Catalog for Spanish {
             RuleId::Migration(rule) => deploy::migration(rule).description,
             RuleId::Dockerfile(rule) => dockerfile::dockerfile(rule).description,
             RuleId::Compose(rule) => deploy::compose(rule).description,
+            RuleId::CommittedSecret => security::COMMITTED_SECRET_DESCRIPTION,
+            RuleId::VulnerableDependency => security::VULNERABLE_DEPENDENCY_DESCRIPTION,
         }
     }
 
@@ -165,6 +175,8 @@ impl Catalog for Spanish {
             ),
             Message::Lint { kind, subject } => self.lint(*kind, subject),
             Message::Cheat(cheat) => self.cheat(cheat),
+            Message::CommittedSecret(leak) => security::secret(leak),
+            Message::VulnerableDependency(advisory) => security::advisory(advisory),
             Message::Rule(rule) => self.rule_description(*rule).to_owned(),
             Message::Violation { rule, subject } => with_subject(self.rule_description(*rule), subject),
         }
@@ -259,6 +271,7 @@ impl Catalog for Spanish {
             Problem::MissingContentLength => "falta el encabezado Content-Length".to_owned(),
             Problem::IncompleteMessage(detail) => format!("mensaje incompleto: {detail}"),
             Problem::InvalidMessage(detail) => format!("el mensaje no es JSON válido: {detail}"),
+            Problem::Osv(problem) => security::problem(problem),
         }
     }
 
@@ -280,6 +293,11 @@ impl Catalog for Spanish {
                 let problems = counted(*count, "problema", "problemas");
                 format!("{problems} en lo que acabás de editar:")
             }
+            Notice::OsvDatabaseSaved {
+                ecosystem,
+                advisories,
+                path,
+            } => security::database_saved(ecosystem, *advisories, path),
         }
     }
 }

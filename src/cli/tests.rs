@@ -37,3 +37,29 @@ fn invalid_values_are_explained_in_the_chosen_language() {
     assert_eq!(parsed.lang, Some(Lang::English));
     assert!(matches!(parsed.command, Command::Explain { .. }));
 }
+
+#[test]
+fn the_osv_lookup_is_opt_in_and_offline_on_request() {
+    use crate::osv::{Ecosystem, OsvMode};
+    let modes = |arguments: &[&str]| {
+        let parsed = try_parse(Lang::Spanish, arguments.iter().copied()).expect("es válido");
+        let Command::Check(check) = parsed.command else {
+            panic!("se esperaba check");
+        };
+        (check.osv, check.scan.paths.len())
+    };
+    assert_eq!(modes(&["kerbo", "check"]), (None, 1));
+    assert_eq!(
+        modes(&["kerbo", "check", "--osv", "src"]),
+        (Some(OsvMode::Online), 1)
+    );
+    assert_eq!(
+        modes(&["kerbo", "check", "--osv=offline"]),
+        (Some(OsvMode::Offline), 1)
+    );
+    let download = try_parse(Lang::English, ["kerbo", "osv-download", "npm", "PyPI"]).expect("es válido");
+    assert!(matches!(
+        download.command,
+        Command::OsvDownload { ecosystems } if ecosystems == [Ecosystem::Npm, Ecosystem::PyPi]
+    ));
+}

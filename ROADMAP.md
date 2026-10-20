@@ -568,7 +568,73 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   verificar nada, que es la trampa típica de un agente.
 - `kerbo gate`: el gate entero (análisis, tipos, tests, cobertura) con un planificador propio que
   decide el orden y cuántos pasos en paralelo según la memoria libre.
-- Vulnerabilidades de dependencias con OSV y secretos versionados.
+- Vulnerabilidades de dependencias con OSV y secretos versionados (hecho en main).
+  - **`committed-secret`**: las 222 reglas de la configuración por defecto de gitleaks v8.30.1,
+    copiadas tal cual en `src/secrets/gitleaks.toml` y leídas al arrancar, con sus palabras clave,
+    allowlists (globales y por regla, con `condition`, `regexTarget`, rutas y stopwords),
+    entropía, `secretGroup`, reglas sólo por nombre de archivo, `gitleaks:allow`, la
+    decodificación de base64, hex, URL y escapes Unicode hasta 5 niveles, el descarte de binarios
+    por firma y la precedencia de una regla específica sobre `generic-api-key` en la misma línea.
+    Las regex de Go se traducen al dialecto de Rust (las llaves que Go toma literales) y se
+    compilan cuando la palabra clave aparece. Mira todos los archivos, también los ocultos
+    (`.env`, `.github/`), salvo `.git`, y respeta `.gitignore`. El secreto nunca sale entero: el
+    reporte y la caché sólo guardan los primeros cuatro caracteres y el largo. Entra en la caché
+    por contenido con la huella de qué patrones de ruta matchean, así el resultado no depende de
+    la ruta (la caché pasa al formato 4 al sumar este tipo de entrada). Suma una regla propia, `connection-string-password` (`src/secrets/extra-rules.toml`),
+    para contraseñas en URLs de bases, colas y FTP.
+  - Paridad contra `gitleaks dir` (docker, configuración por defecto forzada con `--config` y sin
+    `.gitleaksignore`), 2026-10-20, en 15 repos: gitleaks (con sus fixtures), trufflehog (miles de
+    secretos falsos en los tests de sus detectores), Yelp/detect-secrets, OWASP juice-shop, flask,
+    express, requests, fastapi, django, cpython, spring-boot, junit4, commons-lang, Guava y parte
+    de VS Code: **2.251 hallazgos idénticos (archivo, línea y regla), 0 faltan y 0 sobran**. La
+    regla propia suma 66, todos en fixtures de tests (65 de trufflehog, uno de spring-boot).
+  - **`vulnerable-dependency`**, sólo con `kerbo check --osv` (la única regla con red): lee
+    `Cargo.lock`, `package-lock.json`/`npm-shrinkwrap.json` (v1 a v3), `pnpm-lock.yaml` (v5 a v9),
+    `yarn.lock` (clásico y berry), `go.mod` con `replace` y `go.sum` (sin repetir lo de `go.mod`),
+    `poetry.lock`, `uv.lock`, `Pipfile.lock`, `requirements*.txt` fijados con `==`, `pom.xml` con
+    los padres locales cuyas coordenadas coinciden, sus propiedades y su `dependencyManagement`, y
+    `gradle.lockfile`. Consulta `api.osv.dev/v1/querybatch` (con paginado) y baja cada aviso;
+    agrupa los que son alias entre sí en un solo problema con la versión que lo arregla. No usa
+    un cliente HTTP propio: ureq con rustls no pasa `deny.toml` (webpki-roots tiene licencia
+    CDLA-Permissive-2.0, y ring arrastra un segundo windows-sys), native-tls rompe el binario
+    estático de musl, así que habla con OSV a través del `curl` del sistema, con 10 s para
+    conectar, 60 s por pedido y los avisos en paralelo en un solo proceso. Las respuestas de
+    `querybatch` quedan en la caché un día; los avisos, hasta que OSV informe otro `modified`.
+    `kerbo osv-download [ecosistemas]` baja los `all.zip` de OSV (crates.io, npm, Go, PyPI y
+    Maven: 280 MB, 31 s y 29 MB de memoria con el índice armado) y `--osv=offline` los lee sin red
+    con un lector de zip propio (zip64 incluido) y miniz_oxide, evaluando rangos `SEMVER` y
+    `ECOSYSTEM` y listas de versiones con comparadores de semver, PEP 440 y Maven.
+  - Paridad contra osv-scanner 2.7.0 (docker), 2026-10-20: NodeGoat (package-lock), Vite 4.0
+    (pnpm v5), Vue 2.6 (yarn), ripgrep 13 (Cargo), gin 1.7 (go.mod y go.sum), Poetry 1.1
+    (poetry.lock), pydantic 2.10 (uv.lock) y djangoproject.com (uv.lock): **los 958 avisos que
+    reporta osv-scanner, sin uno de más**; con la base bajada, 957 (el que falta OSV lo resuelve
+    por un rango `GIT`). Los paquetes empaquetados dentro de otro (`inBundle`) no se reportan, como
+    en osv-scanner. En WebGoat 8 (Maven, contra `--no-resolve`) están los 779 y sobran 12, todos
+    reales: versiones que vienen de propiedades del POM raíz que osv-scanner no resuelve sin red.
+  - Pendientes:
+    - Maven sin resolución transitiva: osv-scanner por defecto le pide el árbol a deps.dev; kerbo
+      sólo ve lo declarado en los POM locales (ni BOMs ni padres remotos como
+      `spring-boot-starter-parent`). Gradle sólo con `gradle.lockfile`.
+    - `requirements.txt` no sigue los `-r`/`-c` ni resuelve rangos; `go.mod` no suma la versión de
+      `go`/`toolchain` como `stdlib` (osv-scanner tampoco lo hace hoy). Faltan `bun.lock`,
+      `deno.lock`, `composer.lock`, `Gemfile.lock`, `packages.lock.json` y `pubspec.lock`.
+    - Comparadores de versiones aproximados para el modo offline: PEP 440 sin segmentos locales y
+      Maven sin las listas anidadas de `ComparableVersion`; los rangos `GIT` se ignoran.
+    - Secretos sólo en el árbol actual: falta la historia de git (`gitleaks git`), donde queda lo
+      que se borró después de commitear, y los archivos comprimidos (gitleaks tampoco los abre por
+      defecto). Los archivos de más de 32 MB que no son código se saltean.
+    - Las supresiones en el código valen para los secretos de los archivos de código; en los que
+      no son código (`.env`, YAML, JSON) sólo vale `gitleaks:allow` o una excepción en `kerbo.toml`.
+    - Memoria: los secretos suman las cachés por hilo de las regex que se usan (trufflehog pasa de
+      120 a 250 MB; Guava, de 305 a 360 MB, con el mismo tiempo de CPU). Achicar la caché del DFA
+      perezoso la baja un 30 % a cambio de un 40 % más de CPU; falta una estrategia mejor (regex
+      por grupo de reglas o un prefiltro común).
+    - La caché de OSV es un solo archivo: dos corridas a la vez pisan sus consultas (como la de
+      análisis). Las respuestas viejas no se podan.
+    - `kerbo baseline`, el hook y el servidor MCP todavía no consultan OSV; el hook y el LSP sí
+      buscan secretos en el archivo editado.
+    - Una regla de kerbo o una allowlist propia de secretos en `kerbo.toml`, además de las
+      excepciones por ruta, y un `kerbo explain` por cada tipo de secreto.
 
 ### 12. Migraciones y contenedores (hecho en main)
 

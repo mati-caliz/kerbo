@@ -44,6 +44,8 @@ kerbo check --language java api   # sólo una pila: typescript, python, java o g
 kerbo check --diff main           # sólo lo que tocan las líneas cambiadas desde main
 kerbo check --format sarif        # también json, agent, agent-json; sarif lo leen GitHub y los editores
 kerbo check --no-cache            # analiza todo de cero, sin leer ni escribir la caché
+kerbo check --osv                 # suma las vulnerabilidades de las dependencias (consulta OSV)
+kerbo osv-download                # baja la base de OSV para usar --osv=offline sin red
 kerbo baseline                    # acepta lo que ya hay: desde ahora sólo se reporta lo nuevo
 kerbo fix                         # aplica de una vez todos los arreglos mecánicos
 kerbo fix --dry-run --rule unused-import src  # sólo muestra el parche, de una regla y una carpeta
@@ -51,8 +53,9 @@ kerbo explain cognitive-complexity  # por qué existe una regla y cómo se arreg
 ```
 
 Respeta `.gitignore` y saltea los archivos y carpetas ocultos, salvo `.github/` y `.devcontainer/`,
-que suelen tener Dockerfile, compose y scripts propios del repo. Sale con `0` si no hay
-problemas, `1` si los hay y `2` si algo no se pudo leer o la configuración es inválida.
+que suelen tener Dockerfile, compose y scripts propios del repo; los demás ocultos (`.env`,
+`.npmrc`) sólo se revisan buscando secretos. Sale con `0` si no hay problemas, `1` si los hay y
+`2` si algo no se pudo leer o la configuración es inválida.
 
 `kerbo check`, `kerbo baseline` y el servidor MCP guardan lo que miden de cada archivo en una
 caché por contenido, así la corrida siguiente sólo analiza lo que cambió (y lo que se compara entre
@@ -282,6 +285,28 @@ si no. Los closures se miden aparte, también los que van adentro de una macro. 
 del propio crate se expanden como rustc, leyendo las definiciones de todos sus archivos; las de la
 biblioteca estándar y las de `log` se imitan, y de las de otras dependencias se cuentan sólo los
 argumentos.
+
+### Secretos y dependencias vulnerables
+
+`committed-secret` revisa todos los archivos versionados, no sólo el código, con las 222 reglas de
+la configuración por defecto de gitleaks (claves de AWS, GCP y Azure, tokens de GitHub, GitLab,
+Slack y Stripe, claves privadas, JWT…), sus allowlists, su umbral de entropía y su decodificación
+de base64, hex, URL y escapes Unicode, más una regla propia para contraseñas en cadenas de
+conexión. Marca lo mismo que `gitleaks dir` en los repos donde se midió. El secreto nunca sale
+entero en el reporte ni se guarda en la caché: sólo los primeros cuatro caracteres y el largo. Un
+`gitleaks:allow` en la línea lo deja pasar; los datos de prueba se excluyen en `kerbo.toml` con
+`[[exceptions]]`, `rule = "committed-secret"` y su `reason` (los `.gitleaksignore` no se leen,
+para que nada se afloje en silencio).
+
+`vulnerable-dependency` es la única regla que usa la red, y sólo con `--osv`: lee `Cargo.lock`,
+`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.mod`, `go.sum`, `poetry.lock`, `uv.lock`,
+`Pipfile.lock`, `requirements*.txt` fijados con `==`, `pom.xml` (con los padres locales y sus
+propiedades) y `gradle.lockfile`, y le pregunta a OSV por las versiones exactas. Habla con
+`api.osv.dev` a través de `curl` (el que trae el sistema), con un minuto de tope por pedido, y
+guarda las respuestas en la caché un día; los avisos se guardan hasta que OSV los modifique.
+`kerbo osv-download` baja la base de cada ecosistema (unos 280 MB en total, npm es casi todo) y
+`--osv=offline` la usa sin red. Cada problema dice el aviso, sus alias y la versión que lo arregla.
+Las dos reglas están en los tres presets, también en los tests.
 
 Esos son los umbrales del preset `strict`. Más reglas y la capa para agentes de IA están en la
 [hoja de ruta](ROADMAP.md).

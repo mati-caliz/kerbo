@@ -292,7 +292,9 @@ fn message(finding: &Finding<'_>, name: &str) -> Message {
         | RuleId::FinalClass
         | RuleId::Migration(_)
         | RuleId::Dockerfile(_)
-        | RuleId::Compose(_) => Message::Rule(finding.rule),
+        | RuleId::Compose(_)
+        | RuleId::CommittedSecret
+        | RuleId::VulnerableDependency => Message::Rule(finding.rule),
     }
 }
 

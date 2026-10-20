@@ -44,6 +44,8 @@ kerbo check --language java api   # a single stack: typescript, python, java or 
 kerbo check --diff main           # only what the lines changed since main touch
 kerbo check --format sarif        # also json, agent, agent-json; GitHub and editors read sarif
 kerbo check --no-cache            # analyze everything from scratch, without reading or writing the cache
+kerbo check --osv                 # add the vulnerabilities of the dependencies (asks OSV)
+kerbo osv-download                # download the OSV database to use --osv=offline without network
 kerbo baseline                    # accept what is already there: from now on only new problems
 kerbo fix                         # apply every mechanical fix at once
 kerbo fix --dry-run --rule unused-import src  # only show the patch, for one rule and one folder
@@ -51,9 +53,9 @@ kerbo explain cognitive-complexity  # why a rule exists and how to fix it
 ```
 
 It honors `.gitignore` and skips hidden files and folders, except `.github/` and `.devcontainer/`,
-which usually hold the repo's own Dockerfiles, compose files and scripts. It exits with `0` when
-there are no problems, `1` when there are and `2` when something could not be read or the
-configuration is invalid.
+which usually hold the repo's own Dockerfiles, compose files and scripts; the other hidden ones
+(`.env`, `.npmrc`) are only checked for secrets. It exits with `0` when there are no problems, `1`
+when there are and `2` when something could not be read or the configuration is invalid.
 
 `kerbo check`, `kerbo baseline` and the MCP server store what they measure of each file in a
 content cache, so the next run only analyzes what changed (and what is compared across files, like
@@ -288,6 +290,28 @@ over the already expanded code, so `for`, `while`, every `?` and every `.await`,
 `Result`, half otherwise. Closures are measured separately, including the ones inside a macro.
 kerbo does not expand macros: it mimics the standard library's and `log`'s, and for the rest it
 counts only the arguments; a crate's own macro that hides an `if` is the difference that remains.
+
+### Secrets and vulnerable dependencies
+
+`committed-secret` checks every committed file, not just code, with the 222 rules of gitleaks'
+default configuration (AWS, GCP and Azure keys, GitHub, GitLab, Slack and Stripe tokens, private
+keys, JWTs…), its allowlists, its entropy threshold and its decoding of base64, hex, URL and
+Unicode escapes, plus a rule of its own for passwords in connection strings. It reports the same
+as `gitleaks dir` on the repos where it was measured. The secret is never printed whole nor stored
+in the cache: only its first four characters and its length. A `gitleaks:allow` on the line lets
+it through; test data is excluded in `kerbo.toml` with `[[exceptions]]`,
+`rule = "committed-secret"` and its `reason` (`.gitleaksignore` files are not read, so nothing is
+loosened silently).
+
+`vulnerable-dependency` is the only rule that uses the network, and only with `--osv`: it reads
+`Cargo.lock`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `go.mod`, `go.sum`,
+`poetry.lock`, `uv.lock`, `Pipfile.lock`, `requirements*.txt` pinned with `==`, `pom.xml` (with its
+local parents and their properties) and `gradle.lockfile`, and asks OSV about the exact versions.
+It talks to `api.osv.dev` through the system's `curl`, with a one-minute limit per request, and
+keeps the answers in the cache for a day; advisories are kept until OSV modifies them.
+`kerbo osv-download` downloads each ecosystem's database (about 280 MB in all, almost all of it
+npm) and `--osv=offline` uses it without network. Each problem names the advisory, its aliases and
+the version that fixes it. Both rules are in all three presets, tests included.
 
 Those are the thresholds of the `strict` preset. More rules and the layer for AI agents are in
 the [roadmap](ROADMAP.md) (in Spanish).

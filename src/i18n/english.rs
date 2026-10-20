@@ -8,6 +8,7 @@ mod deploy;
 mod dockerfile;
 mod explanations;
 mod fixes;
+mod security;
 
 const ANONYMOUS_FUNCTION: &str = "(anonymous)";
 
@@ -71,6 +72,13 @@ impl Catalog for English {
             Text::ValueFile => "FILE",
             Text::ValueRuleLimit => "RULE=VALUE",
             Text::ValueReference => "REFERENCE",
+            Text::AboutOsvDownload => {
+                "Downloads the OSV database of each ecosystem to run `kerbo check --osv=offline` without network"
+            }
+            Text::HelpOsv => {
+                "Looks up dependency vulnerabilities in OSV: online queries api.osv.dev, offline uses the downloaded database"
+            }
+            Text::HelpEcosystems => "Ecosystems to download; by default, every one kerbo reads",
         }
     }
 
@@ -101,6 +109,8 @@ impl Catalog for English {
             RuleId::Migration(rule) => deploy::migration(rule).description,
             RuleId::Dockerfile(rule) => dockerfile::dockerfile(rule).description,
             RuleId::Compose(rule) => deploy::compose(rule).description,
+            RuleId::CommittedSecret => security::COMMITTED_SECRET_DESCRIPTION,
+            RuleId::VulnerableDependency => security::VULNERABLE_DEPENDENCY_DESCRIPTION,
         }
     }
 
@@ -165,6 +175,8 @@ impl Catalog for English {
             ),
             Message::Lint { kind, subject } => self.lint(*kind, subject),
             Message::Cheat(cheat) => self.cheat(cheat),
+            Message::CommittedSecret(leak) => security::secret(leak),
+            Message::VulnerableDependency(advisory) => security::advisory(advisory),
             Message::Rule(rule) => self.rule_description(*rule).to_owned(),
             Message::Violation { rule, subject } => with_subject(self.rule_description(*rule), subject),
         }
@@ -261,6 +273,7 @@ impl Catalog for English {
             Problem::MissingContentLength => "the Content-Length header is missing".to_owned(),
             Problem::IncompleteMessage(detail) => format!("incomplete message: {detail}"),
             Problem::InvalidMessage(detail) => format!("the message is not valid JSON: {detail}"),
+            Problem::Osv(problem) => security::problem(problem),
         }
     }
 
@@ -274,6 +287,11 @@ impl Catalog for English {
                 reason,
             } => fixes::suppressed(path, *line, *rule, reason),
             Notice::Fix(notice) => fixes::notice(notice),
+            Notice::OsvDatabaseSaved {
+                ecosystem,
+                advisories,
+                path,
+            } => security::database_saved(ecosystem, *advisories, path),
             Notice::BaselineSaved { count, path } => {
                 format!("{} saved in {path}", counted(*count, "problem", "problems"))
             }

@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::i18n::{Lang, Problem};
 use crate::language::{Language, Stack};
-use crate::limits::{Limits, Preset};
+use crate::limits::{Limits, Preset, REPORT_EVERY_OCCURRENCE};
 use crate::rules::RuleId;
 
 pub const CONFIG_FILE: &str = "kerbo.toml";
@@ -176,12 +176,24 @@ impl Config {
     }
 
     pub fn limits_for(&self, relative: &Path, language: Language, is_test: bool) -> Limits {
-        let stack = language.stack();
+        self.adjusted(
+            self.preset.limits(language, is_test),
+            Some(language.stack()),
+            relative,
+        )
+    }
+
+    pub fn reports(&self, relative: &Path, rule: RuleId) -> bool {
+        let base = Limits::default().with_rule(rule, REPORT_EVERY_OCCURRENCE);
+        self.adjusted(base, None, relative).get(rule).is_some()
+    }
+
+    fn adjusted(&self, base: Limits, stack: Option<Stack>, relative: &Path) -> Limits {
         let adjusted = self
             .adjustments
             .iter()
-            .filter(|adjustment| adjustment.stack.is_none_or(|only| only == stack))
-            .fold(self.preset.limits(language, is_test), |limits, adjustment| {
+            .filter(|adjustment| adjustment.stack.is_none_or(|only| Some(only) == stack))
+            .fold(base, |limits, adjustment| {
                 limits.with_rule(adjustment.rule, adjustment.max)
             });
         self.exceptions

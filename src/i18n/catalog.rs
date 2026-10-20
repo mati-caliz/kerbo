@@ -64,6 +64,9 @@ pub enum Text {
     ValueFile,
     ValueRuleLimit,
     ValueReference,
+    AboutOsvDownload,
+    HelpOsv,
+    HelpEcosystems,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,11 +143,37 @@ pub enum Message {
         subject: String,
     },
     Cheat(Cheat),
+    CommittedSecret(SecretLeak),
+    VulnerableDependency(Box<Advisory>),
     Rule(RuleId),
     Violation {
         rule: RuleId,
         subject: String,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecretLeak {
+    pub kind: String,
+    pub preview: String,
+    pub length: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Advisory {
+    pub package: String,
+    pub version: String,
+    pub id: String,
+    pub aliases: Vec<String>,
+    pub summary: String,
+    pub fixed: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OsvProblem {
+    Unavailable(String),
+    InvalidResponse(String),
+    DatabaseMissing(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -218,6 +247,7 @@ pub enum Problem {
     MissingContentLength,
     IncompleteMessage(String),
     InvalidMessage(String),
+    Osv(OsvProblem),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -247,6 +277,11 @@ pub enum Notice {
         reason: String,
     },
     Fix(FixNotice),
+    OsvDatabaseSaved {
+        ecosystem: String,
+        advisories: usize,
+        path: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

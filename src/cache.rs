@@ -4,6 +4,7 @@ mod codec;
 mod key;
 mod lint_codec;
 mod location;
+mod secret_codec;
 mod shard;
 mod store;
 
@@ -21,15 +22,20 @@ use crate::analysis::FileAnalysis;
 use crate::language::Language;
 use crate::limits::Limits;
 use crate::rules::RuleId;
+use crate::secrets::{PathProfile, SecretFinding};
 
 const FORMAT_DIRECTORY: &str = "analysis-v2";
-const FORMAT_VERSION: u64 = 3;
+const FORMAT_VERSION: u64 = 4;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisSubject<'subject> {
     pub language: Language,
     pub source: &'subject [u8],
     pub context: Option<u64>,
+}
+
+pub fn cache_root() -> Option<PathBuf> {
+    location::default_directory()
 }
 
 #[derive(Debug)]
@@ -75,6 +81,23 @@ impl AnalysisCache {
 
     pub fn remember(&self, key: CacheKey, analysis: &FileAnalysis) {
         self.store.put(key, &analysis_codec::encode(analysis));
+    }
+
+    pub fn secrets_key(&self, profile: &PathProfile, source: &[u8]) -> CacheKey {
+        let mut builder = KeyBuilder::new(self.salt, EntryKind::Secrets);
+        profile.signature().hash(&mut builder);
+        builder.content(source);
+        builder.key()
+    }
+
+    pub fn secrets(&self, key: CacheKey) -> Option<Vec<SecretFinding>> {
+        self.store
+            .get(key)
+            .and_then(|bytes| secret_codec::decode(&bytes).ok())
+    }
+
+    pub fn remember_secrets(&self, key: CacheKey, findings: &[SecretFinding]) {
+        self.store.put(key, &secret_codec::encode(findings));
     }
 
     pub fn persist(&self) {

@@ -68,20 +68,24 @@ fn parser_for(language: Language) -> Result<Parser, String> {
 #[derive(Debug)]
 struct SourceFile {
     identity: FileIdentity,
-    language: Language,
+    language: Option<Language>,
     is_test: bool,
 }
 
-pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
-    let project_root = request
-        .config
+fn project_root(config: &Config) -> PathBuf {
+    config
         .root()
         .canonicalize()
-        .unwrap_or_else(|_| request.config.root().to_path_buf());
-    let (mut files, mut failures) = collect_files(request.roots, &project_root);
+        .unwrap_or_else(|_| config.root().to_path_buf())
+}
+
+pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
+    let (mut files, mut failures) = collect_files(request.roots, &project_root(request.config));
     files.retain(|file| {
-        (request.stacks.is_empty() || request.stacks.contains(&file.language.stack()))
-            && !request.config.is_ignored(Path::new(&file.identity.relative))
+        let wanted = file.language.map_or(request.stacks.is_empty(), |language| {
+            request.stacks.is_empty() || request.stacks.contains(&language.stack())
+        });
+        wanted && !request.config.is_ignored(Path::new(&file.identity.relative))
     });
     let macros = MacroIndex::for_one_scan();
     let results: Vec<Result<Checked, ScanFailure>> = files
@@ -91,7 +95,7 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
         })
         .collect();
     let mut outcome = ScanOutcome {
-        files: files.len(),
+        files: files.iter().filter(|file| file.language.is_some()).count(),
         ..ScanOutcome::default()
     };
     let mut pooled = Vec::new();
@@ -121,28 +125,44 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
     outcome
 }
 
+pub fn identities(roots: &[PathBuf], config: &Config) -> (Vec<FileIdentity>, Vec<ScanFailure>) {
+    let (files, failures) = collect_files(roots, &project_root(config));
+    let identities = files
+        .into_iter()
+        .map(|file| file.identity)
+        .filter(|identity| !config.is_ignored(Path::new(&identity.relative)))
+        .collect();
+    (identities, failures)
+}
+
 pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Diagnostic>> {
-    let project_root = config
-        .root()
-        .canonicalize()
-        .unwrap_or_else(|_| config.root().to_path_buf());
-    let file = source_file(&project_root, path, &project_root)?;
+    let root = project_root(config);
+    let file = source_file(&root, path, &root);
     let relative = Path::new(&file.identity.relative);
     if config.is_ignored(relative) {
         return Some(Vec::new());
     }
-    let mut parser = parser_for(file.language).ok()?;
-    let limits = config.limits_for(relative, file.language, file.is_test);
-    let crate_macros = MacroIndex::shared().crate_of(file.language, &file.identity.absolute);
+    let limits = file
+        .language
+        .map(|language| config.limits_for(relative, language, file.is_test));
+    let mut diagnostics = secret_scan::profile(&file.identity, config, limits)
+        .map(|profile| secret_scan::diagnostics(&file.identity, &profile, source, None))
+        .unwrap_or_default();
+    let (Some(language), Some(limits)) = (file.language, limits) else {
+        return Some(diagnostics);
+    };
+    let mut parser = parser_for(language).ok()?;
+    let crate_macros = MacroIndex::shared().crate_of(language, &file.identity.absolute);
     let unit = SourceUnit {
-        language: file.language,
+        language,
         source,
         path: Some(&file.identity.absolute),
         crate_macros: crate_macros.as_ref(),
     };
     let mut analysis = analyze_unit(&mut parser, unit, limits).ok()?;
     let pooled = pooled_file(&file.identity, &mut analysis, limits);
-    let (mut diagnostics, _suppressed) = split(source, evaluate(&file.identity, &analysis, limits));
+    diagnostics.extend(evaluate(&file.identity, &analysis, limits));
+    let (mut diagnostics, _suppressed) = split(source, diagnostics);
     diagnostics.extend(find_duplicates(pooled.into_iter().collect()));
     Some(diagnostics)
 }
@@ -186,7 +206,7 @@ fn collect_files(roots: &[PathBuf], project_root: &Path) -> (Vec<SourceFile>, Ve
         for entry in walk::walk(root) {
             match entry {
                 Ok(entry) if entry.file_type().is_some_and(|file_type| file_type.is_file()) => {
-                    files.extend(source_file(root, entry.path(), project_root));
+                    files.push(walked_file(root, entry.path(), project_root));
                 }
                 Ok(_) => {}
                 Err(error) => {
@@ -203,8 +223,8 @@ fn collect_files(roots: &[PathBuf], project_root: &Path) -> (Vec<SourceFile>, Ve
     (files, failures)
 }
 
-fn source_file(walk_root: &Path, path: &Path, project_root: &Path) -> Option<SourceFile> {
-    let language = Language::from_path(path)?;
+fn source_file(walk_root: &Path, path: &Path, project_root: &Path) -> SourceFile {
+    let language = Language::from_path(path);
     let absolute = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let test_path = absolute
         .strip_prefix(project_root)
@@ -215,7 +235,7 @@ fn source_file(walk_root: &Path, path: &Path, project_root: &Path) -> Option<Sou
                 .filter(|relative| !relative.as_os_str().is_empty())
         })
         .unwrap_or(path);
-    let is_test = language.is_test_path(test_path);
+    let is_test = language.is_some_and(|language| language.is_test_path(test_path));
     let relative = absolute
         .strip_prefix(project_root)
         .map_or_else(|_| portable(path), portable);
@@ -224,11 +244,22 @@ fn source_file(walk_root: &Path, path: &Path, project_root: &Path) -> Option<Sou
         relative,
         absolute,
     };
-    Some(SourceFile {
+    SourceFile {
         identity,
         language,
         is_test,
-    })
+    }
+}
+
+fn walked_file(walk_root: &Path, path: &Path, project_root: &Path) -> SourceFile {
+    let file = source_file(walk_root, path, project_root);
+    if !walk::is_analyzed(walk_root, path) {
+        return SourceFile {
+            language: None,
+            ..file
+        };
+    }
+    file
 }
 
 fn portable(path: &Path) -> String {
@@ -251,24 +282,32 @@ fn check_file(
             detail,
         },
     };
+    let Some(language) = file.language else {
+        let profile = secret_scan::profile(&file.identity, request.config, None);
+        let diagnostics = secret_scan::plain_file(&file.identity, profile.as_ref(), request.cache);
+        return diagnostics.map_err(failure).map(|diagnostics| Checked {
+            diagnostics,
+            suppressed: Vec::new(),
+            pooled: None,
+        });
+    };
     let source = fs::read(&file.identity.absolute).map_err(|error| failure(error.to_string()))?;
-    let parser = pool.parser(file.language).map_err(failure)?;
-    let configured =
-        request
-            .config
-            .limits_for(Path::new(&file.identity.relative), file.language, file.is_test);
+    let parser = pool.parser(language).map_err(failure)?;
+    let configured = request
+        .config
+        .limits_for(Path::new(&file.identity.relative), language, file.is_test);
     let limits = request
         .overrides
         .iter()
         .fold(configured, |limits, &limit_override| {
             limits.with_override(limit_override)
         });
-    let crate_macros = macros.crate_of(file.language, &file.identity.absolute);
+    let crate_macros = macros.crate_of(language, &file.identity.absolute);
     let context = crate_macros
         .as_ref()
         .map(|crate_macros| crate_macros.analysis_context(&file.identity.absolute));
     let subject = AnalysisSubject {
-        language: file.language,
+        language,
         source: &source,
         context,
     };
@@ -276,7 +315,7 @@ fn check_file(
         .cache
         .map(|cache| (cache, cache.analysis_key(subject, limits)));
     let unit = SourceUnit {
-        language: file.language,
+        language,
         source: &source,
         path: Some(&file.identity.absolute),
         crate_macros: crate_macros.as_ref(),
@@ -290,11 +329,20 @@ fn check_file(
             }
         })?;
     let pooled = pooled_file(&file.identity, &mut analysis, limits);
-    let (diagnostics, suppressed) = split(&source, evaluate(&file.identity, &analysis, limits));
+    let mut diagnostics = evaluate(&file.identity, &analysis, limits);
+    if let Some(profile) = secret_scan::profile(&file.identity, request.config, Some(limits)) {
+        diagnostics.extend(secret_scan::diagnostics(
+            &file.identity,
+            &profile,
+            &source,
+            request.cache,
+        ));
+    }
+    let (diagnostics, suppressed) = split(&source, diagnostics);
     Ok(Checked {
         diagnostics,
         suppressed,
-        pooled: pooled.map(|pooled| (file.language.stack(), pooled)),
+        pooled: pooled.map(|pooled| (language.stack(), pooled)),
     })
 }
 
@@ -311,6 +359,8 @@ fn cached_or_fresh(
     }
     Ok(analysis)
 }
+
+mod secret_scan;
 
 #[cfg(test)]
 mod tests;

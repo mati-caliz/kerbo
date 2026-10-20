@@ -9,6 +9,7 @@ use crate::config::Config;
 use crate::diff::ChangedLines;
 use crate::guard::{GuardRequest, inspect};
 use crate::i18n::{Lang, LangPreference, Notice, Problem, Summary};
+use crate::osv::{AuditRequest, Curl, Ecosystem, OsvMode, audit, download};
 use crate::report::render;
 use crate::rules::{Diagnostic, RuleId};
 use crate::scan::{ScanFailure, ScanOutcome, ScanRequest, scan};
@@ -41,6 +42,7 @@ pub fn run(
             hook::NON_BLOCKING_ERROR,
         ),
         Command::Mcp => (mcp::serve(directory, lang, terminal), EXIT_FAILURE),
+        Command::OsvDownload { ecosystems } => (download_osv(ecosystems, lang, terminal), EXIT_FAILURE),
         Command::Lsp => (lsp::serve(lang, terminal), EXIT_FAILURE),
     };
     result.unwrap_or_else(|problem| {
@@ -68,6 +70,7 @@ pub struct FindingsRequest<'request> {
     pub scan: &'request ScanArgs,
     pub diff: Option<&'request str>,
     pub use_baseline: bool,
+    pub osv: Option<OsvMode>,
 }
 
 pub fn findings(request: &FindingsRequest<'_>, directory: &Path) -> Result<Findings, Problem> {
@@ -75,6 +78,15 @@ pub fn findings(request: &FindingsRequest<'_>, directory: &Path) -> Result<Findi
     let outcome = scan_with(request.scan, &config);
     let mut diagnostics = outcome.diagnostics;
     let mut suppressed = outcome.suppressed;
+    if let Some(mode) = request.osv {
+        diagnostics.extend(audit(&AuditRequest {
+            roots: &request.scan.paths,
+            config: &config,
+            mode,
+            transport: &Curl::default(),
+            directory: None,
+        })?);
+    }
     if let Some(reference) = request.diff {
         let changes = ChangedLines::since(reference, directory)?;
         diagnostics.retain(|diagnostic| changes.touches(diagnostic));
@@ -119,6 +131,7 @@ fn check(
         scan: &arguments.scan,
         diff: arguments.diff.as_deref(),
         use_baseline: !arguments.no_baseline,
+        osv: arguments.osv,
     };
     let found = findings(&request, directory)?;
     render(&found.diagnostics, arguments.format, lang, terminal.report)
@@ -164,6 +177,13 @@ fn baseline(
     } else {
         EXIT_FAILURE
     })
+}
+
+fn download_osv(ecosystems: &[Ecosystem], lang: Lang, terminal: &mut Terminal<'_>) -> Result<u8, Problem> {
+    for notice in download(ecosystems, &Curl::default(), None)? {
+        writeln!(terminal.log, "kerbo: {}", lang.notice(&notice)).map_err(|error| write_error(&error))?;
+    }
+    Ok(EXIT_CLEAN)
 }
 
 fn explain_rule(rule: RuleId, lang: Lang, terminal: &mut Terminal<'_>) -> Result<u8, Problem> {

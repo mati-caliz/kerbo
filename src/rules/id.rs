@@ -25,6 +25,8 @@ pub enum RuleId {
     RedundantModifier,
     FinalParameter,
     FinalClass,
+    CommittedSecret,
+    VulnerableDependency,
     Migration(MigrationRule),
     Dockerfile(DockerfileRule),
     Compose(ComposeRule),
@@ -33,7 +35,7 @@ pub enum RuleId {
 impl RuleId {
     pub const ALL: [Self; Self::CODE_RULES.len() + families::FAMILY_RULES] =
         families::with_families(Self::CODE_RULES);
-    pub const CODE_RULES: [Self; 20] = [
+    pub const CODE_RULES: [Self; 22] = [
         Self::FileLength,
         Self::FunctionLength,
         Self::CyclomaticComplexity,
@@ -54,6 +56,8 @@ impl RuleId {
         Self::RedundantModifier,
         Self::FinalParameter,
         Self::FinalClass,
+        Self::CommittedSecret,
+        Self::VulnerableDependency,
     ];
 
     pub fn index(self) -> usize {
@@ -78,6 +82,8 @@ impl RuleId {
             Self::RedundantModifier => 17,
             Self::FinalParameter => 18,
             Self::FinalClass => 19,
+            Self::CommittedSecret => 20,
+            Self::VulnerableDependency => 21,
             Self::Migration(rule) => families::migration_index(rule, Self::CODE_RULES.len()),
             Self::Dockerfile(rule) => families::dockerfile_index(rule, Self::CODE_RULES.len()),
             Self::Compose(rule) => families::compose_index(rule, Self::CODE_RULES.len()),
@@ -106,6 +112,8 @@ impl RuleId {
             Self::RedundantModifier => "redundant-modifier",
             Self::FinalParameter => "final-parameter",
             Self::FinalClass => "final-class",
+            Self::CommittedSecret => "committed-secret",
+            Self::VulnerableDependency => "vulnerable-dependency",
             Self::Migration(rule) => rule.as_str(),
             Self::Dockerfile(rule) => rule.as_str(),
             Self::Compose(rule) => rule.as_str(),

@@ -24,12 +24,14 @@ impl CacheKey {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryKind {
     FileAnalysis,
+    Secrets,
 }
 
 impl EntryKind {
     const fn tag(self) -> u64 {
         match self {
             Self::FileAnalysis => 1,
+            Self::Secrets => 2,
         }
     }
 }

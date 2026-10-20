@@ -220,6 +220,7 @@ fn run_check(arguments: CheckArguments, directory: &Path, lang: Lang) -> Result<
         scan: &scan,
         diff: arguments.diff.as_deref(),
         use_baseline: true,
+        osv: None,
     };
     let found = findings(&request, directory)?;
     let mut output = Vec::new();
