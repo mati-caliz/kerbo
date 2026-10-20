@@ -162,6 +162,9 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 ### 11. Tests inteligentes, dependencias y secretos
 
 - Correr sólo los tests que afecta el cambio y reusar resultados, con el runner de cada lenguaje.
+- Bajar el costo fijo de cada corrida: runners que quedan vivos entre corridas (JVM, vitest, pytest)
+  con tope de memoria, y servicios de los tests (bases en contenedores) reusados en vez de
+  levantados de cero.
 - Vulnerabilidades de dependencias con OSV y secretos versionados.
 
 ### 12. Formateo propio
