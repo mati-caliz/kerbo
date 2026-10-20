@@ -39,6 +39,7 @@ pub struct Profile {
     pub short_names: ShortNameStyle,
     pub duplicates: DuplicateStyle,
     pub commented_code: CommentedCodeStyle,
+    pub lints: LintStyle,
     pub comments: Kinds,
     pub literals: Kinds,
     pub function_length_skips_iife: bool,
@@ -146,6 +147,12 @@ pub enum ShortNameStyle {
     Checkstyle,
     Varnamelen,
     Ruff,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LintStyle {
+    Unmeasured,
+    Checkstyle,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

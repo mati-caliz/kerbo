@@ -1,7 +1,7 @@
 use super::{
     CaseShape, CognitiveShape, CommentedCodeStyle, CountedLines, DuplicateStyle, GuardShape, LineSpan,
-    LogicalShape, MagicNumberStyle, MetricsStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile,
-    ShortNameStyle, SpanBounds, TestFiles,
+    LintStyle, LogicalShape, MagicNumberStyle, MetricsStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape,
+    Profile, ShortNameStyle, SpanBounds, TestFiles,
 };
 
 pub static GO: Profile = Profile {
@@ -81,6 +81,7 @@ pub static GO: Profile = Profile {
     short_names: ShortNameStyle::Varnamelen,
     duplicates: DuplicateStyle::Dupl,
     commented_code: CommentedCodeStyle::Gocritic,
+    lints: LintStyle::Unmeasured,
     comments: &["comment"],
     literals: &["raw_string_literal", "interpreted_string_literal"],
     function_length_skips_iife: false,

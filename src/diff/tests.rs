@@ -34,6 +34,7 @@ fn diagnostic(absolute: &Path, line: usize, end_line: usize) -> Diagnostic {
         fingerprint: String::new(),
         relative_path: String::new(),
         absolute_path: absolute.to_path_buf(),
+        fix: None,
     }
 }
 

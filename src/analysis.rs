@@ -8,6 +8,7 @@ use crate::duplicates::{DuplicateUnits, duplicate_units};
 use crate::language::Language;
 use crate::limits::Limits;
 use crate::lines::LineMap;
+use crate::lint::{LintFinding, find_lints};
 use crate::macro_rules::{CrateMacros, MacroScope};
 use crate::metrics::commented::{CommentedCode, find_commented_code};
 use crate::metrics::magic::{MagicNumber, find_magic_numbers};
@@ -26,6 +27,7 @@ pub struct FileAnalysis {
     pub short_names: Vec<ShortName>,
     pub duplicate_units: Option<DuplicateUnits>,
     pub commented_code: Vec<CommentedCode>,
+    pub lints: Vec<LintFinding>,
 }
 
 #[derive(Debug)]
@@ -102,6 +104,7 @@ pub fn analyze_unit(
         } else {
             Vec::new()
         },
+        lints: find_lints(root, source, profile.lints, limits),
         duplicate_units: limits
             .get(RuleId::DuplicateCode)
             .and_then(|limit| duplicate_units(root, source, profile.duplicates, limit)),

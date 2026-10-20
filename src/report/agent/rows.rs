@@ -17,6 +17,7 @@ pub(in crate::report) fn write<W: Write + ?Sized>(report: &Report<'_>, writer: &
             write_file(file, writer)?;
         }
     }
+    write_patches(report, writer)?;
     if !report.fixes.is_empty() {
         writeln!(writer, "fix[{}]:", report.fixes.len())?;
         for fix in &report.fixes {
@@ -40,6 +41,31 @@ fn write_file<W: Write + ?Sized>(file: &FileGroup<'_>, writer: &mut W) -> io::Re
             diagnostic.value,
             diagnostic.limit
         )?;
+    }
+    Ok(())
+}
+
+fn write_patches<W: Write + ?Sized>(report: &Report<'_>, writer: &mut W) -> io::Result<()> {
+    let patches: Vec<(&str, &str)> = report
+        .files
+        .iter()
+        .flat_map(|file| &file.rows)
+        .filter_map(|row| {
+            row.diagnostic
+                .fix
+                .as_ref()
+                .map(|fix| (row.id.as_str(), fix.hunk.as_str()))
+        })
+        .collect();
+    if patches.is_empty() {
+        return Ok(());
+    }
+    writeln!(writer, "patch[{}]:", patches.len())?;
+    for (id, hunk) in patches {
+        writeln!(writer, "{INDENT}{id}:")?;
+        for line in hunk.lines() {
+            writeln!(writer, "{INDENT}{INDENT}{line}")?;
+        }
     }
     Ok(())
 }

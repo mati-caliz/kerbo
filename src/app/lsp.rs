@@ -1,3 +1,6 @@
+mod actions;
+
+use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -20,39 +23,57 @@ const HEX_RADIX: u32 = 16;
 const ESCAPE: u8 = b'%';
 const ESCAPED_WIDTH: usize = 3;
 
+type Documents = HashMap<String, String>;
+
 pub fn serve(lang: Lang, terminal: &mut Terminal<'_>) -> Result<u8, Problem> {
     let mut reader = BufReader::new(&mut *terminal.input);
+    let mut documents = Documents::new();
     while let Some(message) = read_message(&mut reader)? {
         let method = message.get("method").and_then(Value::as_str).unwrap_or_default();
         if method == "exit" {
             break;
         }
-        for reply in handle(method, &message, lang) {
+        for reply in handle(method, &message, lang, &mut documents) {
             write_message(terminal.report, &reply).map_err(|error| write_error(&error))?;
         }
     }
     Ok(EXIT_CLEAN)
 }
 
-fn handle(method: &str, message: &Value, lang: Lang) -> Vec<Value> {
+fn handle(method: &str, message: &Value, lang: Lang, documents: &mut Documents) -> Vec<Value> {
     let id = message.get("id").cloned();
     let text_at = |pointer: &str| message.pointer(pointer).and_then(Value::as_str);
     let uri = text_at("/params/textDocument/uri").unwrap_or_default();
     match method {
         "initialize" => respond(id, &initialize_result()),
         "shutdown" => respond(id, &Value::Null),
-        "textDocument/didOpen" => vec![publish(uri, text_at("/params/textDocument/text"), lang)],
+        "textDocument/didOpen" => {
+            let text = document(documents, uri, text_at("/params/textDocument/text"));
+            vec![publish(uri, &text, lang)]
+        }
         "textDocument/didChange" => {
-            let text = message
+            let changed = message
                 .pointer("/params/contentChanges")
                 .and_then(Value::as_array)
                 .and_then(|changes| changes.last())
                 .and_then(|change| change.get("text"))
                 .and_then(Value::as_str);
-            vec![publish(uri, text, lang)]
+            let text = document(documents, uri, changed);
+            vec![publish(uri, &text, lang)]
         }
-        "textDocument/didSave" => vec![publish(uri, text_at("/params/text"), lang)],
-        "textDocument/didClose" => vec![notification(uri, &[])],
+        "textDocument/didSave" => {
+            let text = document(documents, uri, text_at("/params/text"));
+            vec![publish(uri, &text, lang)]
+        }
+        "textDocument/didClose" => {
+            documents.remove(uri);
+            vec![notification(uri, &[])]
+        }
+        "textDocument/codeAction" => {
+            let text = document(documents, uri, None);
+            let range = message.pointer("/params/range");
+            respond(id, &actions::code_actions(uri, &text, range, lang))
+        }
         _ => id.map_or_else(Vec::new, |id| {
             let text = lang.problem(&Problem::UnknownMethod(method.to_owned()));
             let error = json!({ "code": METHOD_NOT_FOUND, "message": text });
@@ -72,18 +93,30 @@ fn initialize_result() -> Value {
         "capabilities": {
             "positionEncoding": "utf-16",
             "textDocumentSync": { "openClose": true, "change": FULL_SYNC, "save": { "includeText": true } },
+            "codeActionProvider": { "codeActionKinds": [actions::QUICK_FIX] },
         },
         "serverInfo": { "name": "kerbo", "version": env!("CARGO_PKG_VERSION") },
     })
 }
 
-fn publish(uri: &str, text: Option<&str>, lang: Lang) -> Value {
+fn document(documents: &mut Documents, uri: &str, text: Option<&str>) -> String {
+    if let Some(text) = text {
+        documents.insert(uri.to_owned(), text.to_owned());
+        return text.to_owned();
+    }
+    documents.get(uri).cloned().unwrap_or_else(|| {
+        path_from_uri(uri)
+            .and_then(|path| fs::read_to_string(path).ok())
+            .unwrap_or_default()
+    })
+}
+
+fn publish(uri: &str, text: &str, lang: Lang) -> Value {
     let Some(path) = path_from_uri(uri) else {
         return notification(uri, &[]);
     };
-    let text = text.map_or_else(|| fs::read_to_string(&path).unwrap_or_default(), str::to_owned);
     let lines: Vec<&str> = text.lines().collect();
-    let diagnostics: Vec<Value> = diagnose(&path, &text)
+    let diagnostics: Vec<Value> = diagnose(&path, text)
         .iter()
         .map(|diagnostic| to_lsp(diagnostic, &lines, lang))
         .collect();

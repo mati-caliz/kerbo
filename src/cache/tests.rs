@@ -22,6 +22,7 @@ const OLD_STAMP: u64 = 10;
 const NEW_STAMP: u64 = 20;
 const JAVA_METHOD: &str =
     "  int sum(int first, int second) {\n    int total = first + second;\n    return total * total;\n  }\n";
+const JAVA_LINTS: &str = "package a;\nimport java.lang.String;\nimport a.Same;\nimport b.C;\nimport b.C;\nimport java.util.*;\nfinal class A {\n  private A() {}\n  final void m(int value) {}\n}\nclass B { private B() {} }\n";
 const GO_SOURCE: &str = "package sample\n\nfunc Many(a, b, c, d, e int) int {\n\tif a > b {\n\t\treturn c\n\t}\n\treturn d + e\n}\n";
 const PYTHON_SOURCE: &str =
     "def build(first, second, third, fourth, fifth, sixth, seventh):\n    # x = 1\n    return first * 42\n";
@@ -140,6 +141,7 @@ fn truncated_or_overlong_bytes_are_corrupt() {
 fn every_kind_of_analysis_decodes_to_the_same_value() {
     let samples = [
         (Language::Java, format!("class A {{\n{JAVA_METHOD}}}\n")),
+        (Language::Java, JAVA_LINTS.to_owned()),
         (Language::Go, GO_SOURCE.to_owned()),
         (Language::Python, PYTHON_SOURCE.to_owned()),
         (Language::TypeScript, TYPESCRIPT_SOURCE.to_owned()),

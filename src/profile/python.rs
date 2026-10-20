@@ -1,7 +1,7 @@
 use super::{
-    CaseShape, CognitiveShape, CommentedCodeStyle, DuplicateStyle, GuardShape, LineSpan, LogicalShape,
-    MagicNumberStyle, MetricsStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, ShortNameStyle,
-    TestFiles,
+    CaseShape, CognitiveShape, CommentedCodeStyle, DuplicateStyle, GuardShape, LineSpan, LintStyle,
+    LogicalShape, MagicNumberStyle, MetricsStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile,
+    ShortNameStyle, TestFiles,
 };
 
 pub static PYTHON: Profile = Profile {
@@ -101,6 +101,7 @@ pub static PYTHON: Profile = Profile {
     short_names: ShortNameStyle::Ruff,
     duplicates: DuplicateStyle::CpdPython,
     commented_code: CommentedCodeStyle::Eradicate,
+    lints: LintStyle::Unmeasured,
     comments: &["comment"],
     literals: &["string"],
     function_length_skips_iife: false,

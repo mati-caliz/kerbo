@@ -9,7 +9,7 @@ use crate::rules::RuleId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Limits {
-    values: [Option<usize>; RuleId::ALL.len()],
+    values: [Option<u32>; RuleId::ALL.len()],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,7 +27,7 @@ pub enum Preset {
     Minimal,
 }
 
-const ALWAYS_REPORTED: Option<usize> = Some(0);
+const ALWAYS_REPORTED: Option<u32> = Some(0);
 const GO_STRICT: [Option<usize>; 5] = [Some(400), Some(80), Some(10), Some(15), Some(4)];
 const PYTHON_STRICT: [Option<usize>; 5] = [None, None, Some(10), None, Some(6)];
 const JAVA_STRICT: [Option<usize>; 5] = [Some(500), Some(80), Some(8), Some(15), Some(5)];
@@ -40,6 +40,15 @@ const RUST_UNMEASURED: &[RuleId] = &[
     RuleId::ShortName,
     RuleId::DuplicateCode,
     RuleId::CommentedCode,
+];
+const RECOMMENDED_OFF: &[RuleId] = &[RuleId::FinalParameter];
+const MINIMAL_OFF: &[RuleId] = &[
+    RuleId::MagicNumber,
+    RuleId::CommentedCode,
+    RuleId::StarImport,
+    RuleId::RedundantModifier,
+    RuleId::FinalParameter,
+    RuleId::FinalClass,
 ];
 const NESTING_STRICT: Option<usize> = Some(4);
 const NESTING_RECOMMENDED: Option<usize> = Some(5);
@@ -93,12 +102,16 @@ impl Limits {
     }
 
     pub fn get(self, rule: RuleId) -> Option<usize> {
-        self.values.get(rule.index()).copied().flatten()
+        self.values
+            .get(rule.index())
+            .copied()
+            .flatten()
+            .and_then(|value| usize::try_from(value).ok())
     }
 
     pub fn with_rule(mut self, rule: RuleId, max: Option<usize>) -> Self {
         if let Some(slot) = self.values.get_mut(rule.index()) {
-            *slot = max;
+            *slot = max.map(|value| u32::try_from(value).unwrap_or(u32::MAX));
         }
         self
     }
@@ -126,12 +139,14 @@ impl Preset {
         let base = Limits::with_metrics(metrics)
             .with_rule(RuleId::NestingDepth, nesting)
             .with_rule(RuleId::DuplicateCode, duplicates);
-        let base = if self == Self::Minimal {
-            base.with_rule(RuleId::MagicNumber, None)
-                .with_rule(RuleId::CommentedCode, None)
-        } else {
-            base
+        let relaxed: &[RuleId] = match self {
+            Self::Strict => &[],
+            Self::Recommended => RECOMMENDED_OFF,
+            Self::Minimal => MINIMAL_OFF,
         };
+        let base = relaxed
+            .iter()
+            .fold(base, |limits, &rule| limits.with_rule(rule, None));
         let base = unmeasured(language)
             .iter()
             .fold(base, |limits, &rule| limits.with_rule(rule, None));

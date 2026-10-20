@@ -72,6 +72,37 @@ const TYPE_ESCAPE: Explanation = Explanation {
     example: "const datos: any = await res.json() se vuelve const datos = esquema.parse(await res.json()).",
 };
 
+const UNUSED_IMPORT: Explanation = Explanation {
+    fix: "borrá el import",
+    why: "Un import sin usar hace creer que el archivo depende de algo que no usa y ensucia cada diff que toca la cabecera.",
+    example: "import java.util.List; sin ningún List en el archivo se borra.",
+};
+const REDUNDANT_IMPORT: Explanation = Explanation {
+    fix: "borrá el import repetido, el de java.lang o el del mismo paquete",
+    why: "Las clases de java.lang y las del mismo paquete se ven sin importarlas, y repetir un import no agrega nada.",
+    example: "import java.lang.String; se borra: String ya está a la vista.",
+};
+const STAR_IMPORT: Explanation = Explanation {
+    fix: "importá cada clase por su nombre",
+    why: "Un import con comodín esconde de dónde sale cada nombre, y una clase nueva en el paquete puede chocar con otra que ya usás.",
+    example: "import java.util.*; se vuelve import java.util.List; import java.util.Map;",
+};
+const REDUNDANT_MODIFIER: Explanation = Explanation {
+    fix: "borrá el modificador",
+    why: "Repetir lo que el lenguaje ya asume (public en una interfaz, final en un método privado) es ruido y hace dudar si significa algo más.",
+    example: "En una interfaz, public abstract void guardar(); se vuelve void guardar();",
+};
+const FINAL_PARAMETER: Explanation = Explanation {
+    fix: "marcá el parámetro como final",
+    why: "Reasignar un parámetro pisa el valor con el que se llamó a la función y confunde al que lee el resto del cuerpo.",
+    example: "void cobrar(Pedido pedido) se vuelve void cobrar(final Pedido pedido).",
+};
+const FINAL_CLASS: Explanation = Explanation {
+    fix: "declará la clase como final",
+    why: "Si sus constructores son privados nadie de afuera puede heredarla: final lo dice en la firma y lo hace cumplir el compilador.",
+    example: "class Fechas { private Fechas() {} } se vuelve final class Fechas { private Fechas() {} }.",
+};
+
 pub const fn explanation(rule: RuleId) -> Explanation {
     match rule {
         RuleId::FileLength => FILE_LENGTH,
@@ -88,5 +119,11 @@ pub const fn explanation(rule: RuleId) -> Explanation {
         RuleId::DuplicateCode => DUPLICATE_CODE,
         RuleId::CommentedCode => COMMENTED_CODE,
         RuleId::TypeEscape => TYPE_ESCAPE,
+        RuleId::UnusedImport => UNUSED_IMPORT,
+        RuleId::RedundantImport => REDUNDANT_IMPORT,
+        RuleId::StarImport => STAR_IMPORT,
+        RuleId::RedundantModifier => REDUNDANT_MODIFIER,
+        RuleId::FinalParameter => FINAL_PARAMETER,
+        RuleId::FinalClass => FINAL_CLASS,
     }
 }

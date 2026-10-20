@@ -172,8 +172,8 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 
 - `kerbo lsp`: los problemas de kerbo subrayados mientras se escribe, en IntelliJ (de fábrica en
   Ultimate, con LSP4IJ en Community), VS Code, Neovim y Zed. Los arreglos como acción rápida
-  pasan a la etapa 8: ninguna regla de hoy tiene un arreglo mecánico (todas piden un nombre o
-  partir una función).
+  llegaron con las reglas de forma de Java de la etapa 8, que son las primeras con un arreglo
+  mecánico.
 - Correr Qodana Community (las inspecciones de IntelliJ en CI) sobre repos reales y contar qué
   inspecciones aparecen más (hecho, 2026-10-20): esa lista ordena las reglas de las etapas 8 y 9.
   Qodana for JVM Community 2026.2.4 con el perfil `Default` del IDE, que es lo que IntelliJ
@@ -376,12 +376,82 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   servidor MCP, el LSP y `kerbo check`: varias sesiones de agentes en el mismo repo no repiten el
   trabajo, y el hook responde sin arrancar un proceso por edición.
 
-### 8. Java sintáctico
+### 8. Java sintáctico (empezada)
 
 - Las reglas de forma de Checkstyle y PMD, con paridad medida. Es el hueco más grande: no hay un
   linter rápido de Java.
 - Las que tienen un arreglo mecánico (imports sin usar, `final` que falta, modificadores
-  redundantes) lo traen como acción rápida del LSP y como parche en `--format agent`.
+  redundantes) lo traen como acción rápida del LSP y como parche en `--format agent` (hecho
+  para las primeras seis, 2026-10-20):
+  - El estándar es `sun_checks.xml` de Checkstyle 14.3, el mismo del que ya salen `MagicNumber`
+    y los largos: es la única configuración de referencia que pide todo esto. `google_checks.xml`
+    sólo trae `AvoidStarImport`, y el quickstart de PMD 7 tiene `UnnecessaryImport`,
+    `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal` pero no pide `final`
+    en los parámetros.
+  - Seis reglas: `unused-import` (`UnusedImports` con `processJavadoc` apagado, como en
+    `sun_checks`), `redundant-import` (`RedundantImport`), `star-import` (`AvoidStarImport`),
+    `redundant-modifier` (`RedundantModifier`), `final-parameter` (`FinalParameters`) y
+    `final-class` (`FinalClass`). Todas menos `star-import` traen el arreglo: borrar el import o el
+    modificador, o insertar `final`. `recommended` apaga `final-parameter` y `minimal` deja sólo
+    los imports sin usar y repetidos.
+  - El arreglo es un tipo propio (`src/fix.rs`) que sirve a cualquier regla: ediciones de rango y
+    el bloque de diff unificado que resulta, calculado durante el análisis y guardado en la caché
+    por contenido junto con lo demás del archivo. El LSP lo ofrece como `quickFix` (y ahora guarda
+    el texto de cada documento abierto para responder `textDocument/codeAction`); `--format agent`
+    lo manda en el campo `patch`.
+  - Paridad: cero diferencias, por archivo, línea, columna y nombre, contra Checkstyle 14.3 con
+    sólo esos seis chequeos y las propiedades de `sun_checks`, sobre Guava (3.277 archivos),
+    spring-boot (8.708), commons-lang (630) y junit4 (473): 74.892 parámetros sin `final`, 2.184
+    imports sin usar, 465 clases que deberían ser finales, 250 modificadores redundantes, 5 imports
+    con comodín y 1 import redundante. Correr `sun_checks.xml` entero da las mismas cuentas. Lo que
+    no se ve a simple vista quedó fijado en `src/lint/fixtures/`, cada archivo con su salida de
+    Checkstyle al lado:
+    - Un tipo calificado con argumentos cuenta como uso del último nombre sólo con un nivel antes
+      (`Map.Entry<K, V>` usa `Entry`; `java.util.List<String>` no usa `List`).
+    - `FinalClass` registra la superclase de una clase anónima con el primer hijo del nodo que
+      envuelve al `new`: en un ternario, un cast, paréntesis, una asignación o una cadena de
+      llamadas toma otra cosa y la clase base se marca igual; con `extends Red<B>.Orange` el nombre
+      se rompe y `Orange` también se marca.
+    - tree-sitter-java 0.23 no entiende una anotación de tipo antes de `...`
+      (`Object @Nullable ... args`): esa lista de parámetros se vuelve a partir a mano, sin contar
+      comentarios.
+    - Las columnas cuentan bytes, como en el resto de las reglas; Checkstyle expande los tabs a 8
+      (junit4 los usa) y cuenta caracteres. Comparando con esa conversión no queda ninguna
+      diferencia.
+  - Velocidad: en commons-lang, con y sin las seis reglas, la corrida entera da entre 5,1 y 7,5 s
+    en las dos variantes; no se distingue del ruido. Guava sigue en 9 s sin caché.
+- Pendientes de las reglas de forma, por frecuencia en `sun_checks.xml` entero sobre los mismos
+  cuatro repos (sin contar las que ya hace kerbo):
+  - `Indentation` (696.473) y `LineLength` (228.941): son de formato y van con la etapa 13; sin
+    medirlas contra el formateador del proyecto marcarían casi todo Guava, que usa
+    google-java-format.
+  - Javadoc: `JavadocVariable` (29.407), `MissingJavadocMethod` (27.721), `JavadocMethod`
+    (19.370), `JavadocType` (1.921), `JavadocPackage` (1.508), `InvalidJavadocPosition` (13).
+    Piden leer el Javadoc como árbol; tree-sitter lo deja como un comentario.
+  - `DesignForExtension` (26.914), `HiddenField` (12.474), `MethodName` (9.239),
+    `FileTabCharacter` (7.717, arreglo mecánico), `WhitespaceAround` (6.533, mecánico),
+    `DeclarationOrder` (4.672), `VisibilityModifier` (3.637), `NoWhitespaceAfter` (2.325,
+    mecánico), `RightCurly` (2.116, mecánico), `ConstantName` (929), `RegexpSingleline` (518, los
+    espacios al final de línea; mecánico), `HideUtilityClassConstructor` (311, mecánico: un
+    constructor privado), `TodoComment` (209), `NewlineAtEndOfFile` (179, mecánico),
+    `InnerAssignment` (177), `OperatorWrap` (145, mecánico), `AvoidNestedBlocks` (136),
+    `MissingSwitchDefault` (104), `NeedBraces` (76, mecánico), `EqualsHashCode` (73) y el resto
+    con menos de 70 (`StaticVariableName`, `NoWhitespaceBefore`, `EmptyForIteratorPad`,
+    `LeftCurly`, `TypeName`, `EmptyBlock`, `MethodParamPad`, `LocalFinalVariableName`,
+    `ModifierOrder`, `IllegalImport`, `MultipleVariableDeclarations`, `MemberName`,
+    `GenericWhitespace`, `InterfaceIsType`, `EmptyStatement`, `UpperEll`, `ParameterName`,
+    `WhitespaceAfter`, `SimplifyBooleanExpression`, `ArrayTypeStyle`).
+  - La misma paridad contra PMD para quien usa el quickstart en vez de Checkstyle:
+    `UnnecessaryImport` resuelve tipos con el classpath y no va a coincidir sin las firmas de la
+    etapa 9; `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal`, sí.
+  - `kerbo fix`: aplicar todos los arreglos que no se pisan de una vez, en el CLI y como acción
+    "arreglar todo" del LSP. Hoy se aplican de a uno.
+  - El LSP ofrece las acciones de las líneas pedidas sin mirar `context.diagnostics`; con un
+    editor que pide el archivo entero llegan todas.
+  - Sumar Qodana al arnés de paridad para las reglas que coinciden con una inspección (imports
+    sin usar y modificadores redundantes).
+  - El arnés de esta paridad (correr Checkstyle con los seis chequeos, kerbo en JSON y comparar
+    con la conversión de tabs) quedó fuera del repo, como los anteriores: falta sumarlo.
 - Primero, por lo que más aparece en Qodana: la API nueva que reemplaza a la vieja
   (`getFirst()`, `List.of`, `Math.clamp`, bloques de texto) y las redundancias (valor por defecto
   repetido en una anotación, escapes Unicode de más).

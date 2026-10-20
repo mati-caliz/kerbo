@@ -1,105 +1,21 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::str::FromStr;
-
-use serde::{Deserialize, Serialize};
 
 use crate::analysis::FileAnalysis;
-use crate::i18n::{Message, Problem};
+use crate::fix::Fix;
+use crate::i18n::Message;
 use crate::limits::Limits;
 use crate::metrics::FunctionMetrics;
+
+mod id;
+mod lints;
+
+pub use id::RuleId;
 
 const FIRST_LINE: usize = 1;
 const FIRST_COLUMN: usize = 1;
 const MAGIC_NUMBER_COUNT: usize = 1;
 const NO_MAGIC_NUMBERS: usize = 0;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum RuleId {
-    FileLength,
-    FunctionLength,
-    CyclomaticComplexity,
-    CognitiveComplexity,
-    ParameterCount,
-    SuppressionAdded,
-    TestDisabled,
-    TestRemoved,
-    TypeEscape,
-    NestingDepth,
-    MagicNumber,
-    ShortName,
-    DuplicateCode,
-    CommentedCode,
-}
-
-impl RuleId {
-    pub const ALL: [Self; 14] = [
-        Self::FileLength,
-        Self::FunctionLength,
-        Self::CyclomaticComplexity,
-        Self::CognitiveComplexity,
-        Self::ParameterCount,
-        Self::SuppressionAdded,
-        Self::TestDisabled,
-        Self::TestRemoved,
-        Self::TypeEscape,
-        Self::NestingDepth,
-        Self::MagicNumber,
-        Self::ShortName,
-        Self::DuplicateCode,
-        Self::CommentedCode,
-    ];
-
-    pub const fn index(self) -> usize {
-        match self {
-            Self::FileLength => 0,
-            Self::FunctionLength => 1,
-            Self::CyclomaticComplexity => 2,
-            Self::CognitiveComplexity => 3,
-            Self::ParameterCount => 4,
-            Self::SuppressionAdded => 5,
-            Self::TestDisabled => 6,
-            Self::TestRemoved => 7,
-            Self::TypeEscape => 8,
-            Self::NestingDepth => 9,
-            Self::MagicNumber => 10,
-            Self::ShortName => 11,
-            Self::DuplicateCode => 12,
-            Self::CommentedCode => 13,
-        }
-    }
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::FileLength => "file-length",
-            Self::FunctionLength => "function-length",
-            Self::CyclomaticComplexity => "cyclomatic-complexity",
-            Self::CognitiveComplexity => "cognitive-complexity",
-            Self::ParameterCount => "parameter-count",
-            Self::SuppressionAdded => "suppression-added",
-            Self::TestDisabled => "test-disabled",
-            Self::TestRemoved => "test-removed",
-            Self::TypeEscape => "type-escape",
-            Self::NestingDepth => "nesting-depth",
-            Self::MagicNumber => "magic-number",
-            Self::ShortName => "short-name",
-            Self::DuplicateCode => "duplicate-code",
-            Self::CommentedCode => "commented-code",
-        }
-    }
-}
-
-impl FromStr for RuleId {
-    type Err = Problem;
-
-    fn from_str(text: &str) -> Result<Self, Self::Err> {
-        Self::ALL
-            .into_iter()
-            .find(|rule| rule.as_str() == text)
-            .ok_or_else(|| Problem::UnknownRule(text.to_owned()))
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct FileIdentity {
@@ -121,6 +37,7 @@ pub struct Diagnostic {
     pub fingerprint: String,
     pub relative_path: String,
     pub absolute_path: PathBuf,
+    pub fix: Option<Fix>,
 }
 
 struct Finding<'function> {
@@ -158,6 +75,7 @@ pub fn evaluate(file: &FileIdentity, analysis: &FileAnalysis, limits: Limits) ->
         .chain(magic_number_diagnostics(file, analysis))
         .chain(short_name_diagnostics(file, analysis))
         .chain(commented_code_diagnostics(file, analysis))
+        .chain(lints::lint_diagnostics(file, analysis))
         .collect()
 }
 
@@ -187,6 +105,7 @@ fn nesting_diagnostics<'analysis>(
             fingerprint: format!("nesting-depth:{}:{}#{occurrence}", file.relative, found.depth),
             relative_path: file.relative.clone(),
             absolute_path: file.absolute.clone(),
+            fix: None,
         })
     })
 }
@@ -213,6 +132,7 @@ fn magic_number_diagnostics<'analysis>(
             fingerprint: format!("magic-number:{}:{}#{occurrence}", file.relative, found.text),
             relative_path: file.relative.clone(),
             absolute_path: file.absolute.clone(),
+            fix: None,
         }
     })
 }
@@ -239,6 +159,7 @@ fn short_name_diagnostics<'analysis>(
             fingerprint: format!("short-name:{}:{}#{occurrence}", file.relative, found.name),
             relative_path: file.relative.clone(),
             absolute_path: file.absolute.clone(),
+            fix: None,
         }
     })
 }
@@ -263,6 +184,7 @@ fn commented_code_diagnostics<'analysis>(
             fingerprint: format!("commented-code:{}:{}#{occurrence}", file.relative, found.text),
             relative_path: file.relative.clone(),
             absolute_path: file.absolute.clone(),
+            fix: None,
         }
     })
 }
@@ -319,6 +241,7 @@ fn diagnostic(
         ),
         relative_path: file.relative.clone(),
         absolute_path: file.absolute.clone(),
+        fix: None,
     }
 }
 
@@ -355,7 +278,13 @@ fn message(finding: &Finding<'_>, name: &str) -> Message {
         | RuleId::MagicNumber
         | RuleId::ShortName
         | RuleId::DuplicateCode
-        | RuleId::CommentedCode => Message::Rule(finding.rule),
+        | RuleId::CommentedCode
+        | RuleId::UnusedImport
+        | RuleId::RedundantImport
+        | RuleId::StarImport
+        | RuleId::RedundantModifier
+        | RuleId::FinalParameter
+        | RuleId::FinalClass => Message::Rule(finding.rule),
     }
 }
 

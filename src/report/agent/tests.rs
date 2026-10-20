@@ -40,6 +40,7 @@ fn diagnostic(path: &str, rule: RuleId, line: usize, measure: Measure) -> Diagno
         fingerprint: format!("{}:{path}:symbol{line}#1", rule.as_str()),
         relative_path: path.to_owned(),
         absolute_path: PathBuf::from("/repo").join(path),
+        fix: None,
     }
 }
 

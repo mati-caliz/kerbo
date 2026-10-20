@@ -221,7 +221,13 @@ fn marker_message(rule: RuleId, marker: &Marker) -> Message {
         | RuleId::MagicNumber
         | RuleId::ShortName
         | RuleId::DuplicateCode
-        | RuleId::CommentedCode => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
+        | RuleId::CommentedCode
+        | RuleId::UnusedImport
+        | RuleId::RedundantImport
+        | RuleId::StarImport
+        | RuleId::RedundantModifier
+        | RuleId::FinalParameter
+        | RuleId::FinalClass => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
     }
 }
 
@@ -238,6 +244,7 @@ fn base_diagnostic(file: &Inspected<'_>, rule: RuleId, line: usize, fingerprint:
         fingerprint,
         relative_path: file.relative.clone(),
         absolute_path: file.path.to_path_buf(),
+        fix: None,
     }
 }
 

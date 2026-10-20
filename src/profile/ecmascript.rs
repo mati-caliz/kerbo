@@ -1,7 +1,7 @@
 use super::{
-    CaseShape, CognitiveShape, CommentedCodeStyle, DuplicateStyle, GuardShape, LineSpan, LogicalShape,
-    MagicNumberStyle, MetricsStyle, NestingStyle, ParameterShape, PartialUnits, Profile, ShortCircuit,
-    ShortNameStyle, TestFiles,
+    CaseShape, CognitiveShape, CommentedCodeStyle, DuplicateStyle, GuardShape, LineSpan, LintStyle,
+    LogicalShape, MagicNumberStyle, MetricsStyle, NestingStyle, ParameterShape, PartialUnits, Profile,
+    ShortCircuit, ShortNameStyle, TestFiles,
 };
 
 const FUNCTIONS: &[&str] = &[
@@ -159,6 +159,7 @@ pub static ECMASCRIPT: Profile = Profile {
     short_names: ShortNameStyle::Eslint,
     duplicates: DuplicateStyle::Sonar,
     commented_code: CommentedCodeStyle::Unmeasured,
+    lints: LintStyle::Unmeasured,
     comments: &["comment", "html_comment"],
     literals: &["string", "template_string"],
     function_length_skips_iife: true,

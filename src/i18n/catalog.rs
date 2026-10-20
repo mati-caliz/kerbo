@@ -1,3 +1,4 @@
+use crate::lint::LintKind;
 use crate::rules::RuleId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +92,10 @@ pub enum Message {
         unit: BlockUnit,
         copies: String,
         limit: usize,
+    },
+    Lint {
+        kind: LintKind,
+        subject: String,
     },
     Cheat(Cheat),
     Rule(RuleId),
@@ -188,6 +193,7 @@ pub trait Catalog: Sync {
     fn explanation(&self, rule: RuleId) -> Explanation;
     fn message(&self, message: &Message) -> String;
     fn cheat(&self, cheat: &Cheat) -> String;
+    fn lint(&self, kind: LintKind, subject: &str) -> String;
     fn problem(&self, problem: &Problem) -> String;
     fn notice(&self, notice: &Notice) -> String;
 }

@@ -1,4 +1,5 @@
 use super::catalog::{BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text};
+use crate::lint::{ImportRedundancy, LintKind};
 use crate::rules::RuleId;
 
 mod explanations;
@@ -69,6 +70,12 @@ impl Catalog for Spanish {
             RuleId::ShortName => "Un nombre demasiado corto o ambiguo para lo que abarca",
             RuleId::DuplicateCode => "Un bloque de código copiado y pegado en otro lugar",
             RuleId::CommentedCode => "Código comentado en vez de borrado",
+            RuleId::UnusedImport => "Un import que no se usa",
+            RuleId::RedundantImport => "Un import que sobra: repetido, de java.lang o del mismo paquete",
+            RuleId::StarImport => "Un import con comodín que trae el paquete entero",
+            RuleId::RedundantModifier => "Un modificador que ya está implícito",
+            RuleId::FinalParameter => "Un parámetro que no es final",
+            RuleId::FinalClass => "Una clase que nadie puede heredar y no es final",
         }
     }
 
@@ -129,8 +136,30 @@ impl Catalog for Spanish {
                 "Este bloque de {size} {} está repetido en {copies} (máximo {limit})",
                 block_unit(*unit)
             ),
+            Message::Lint { kind, subject } => self.lint(*kind, subject),
             Message::Cheat(cheat) => self.cheat(cheat),
             Message::Rule(rule) => self.rule_description(*rule).to_owned(),
+        }
+    }
+
+    fn lint(&self, kind: LintKind, subject: &str) -> String {
+        match kind {
+            LintKind::UnusedImport => format!("El import `{subject}` no se usa"),
+            LintKind::RedundantImport(ImportRedundancy::JavaLang) => {
+                format!("`{subject}` es de java.lang, que se importa solo")
+            }
+            LintKind::RedundantImport(ImportRedundancy::SamePackage) => {
+                format!("`{subject}` es del mismo paquete: no hace falta importarlo")
+            }
+            LintKind::RedundantImport(ImportRedundancy::Duplicate { first_line }) => {
+                format!("`{subject}` ya se importa en la línea {first_line}")
+            }
+            LintKind::StarImport => format!("`{subject}` importa el paquete entero"),
+            LintKind::RedundantModifier => format!("El modificador `{subject}` sobra: ya está implícito"),
+            LintKind::FinalParameter => format!("El parámetro `{subject}` debería ser final"),
+            LintKind::FinalClass => {
+                format!("La clase `{subject}` debería ser final: no se puede heredar desde afuera")
+            }
         }
     }
 

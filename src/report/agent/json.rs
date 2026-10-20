@@ -2,6 +2,8 @@ use serde_json::{Map, Value, json};
 
 use super::{EXPLAIN_HINT, FileGroup, Report};
 
+const PATCH_KEY: &str = "patch";
+
 pub(in crate::report) fn document(report: &Report<'_>) -> Value {
     let fixes: Map<String, Value> = report
         .fixes
@@ -24,14 +26,18 @@ fn file(group: &FileGroup<'_>) -> Value {
         .iter()
         .map(|row| {
             let diagnostic = row.diagnostic;
-            json!({
+            let mut item = json!({
                 "id": row.id,
                 "line": diagnostic.line,
                 "end": diagnostic.end_line,
                 "rule": diagnostic.rule.as_str(),
                 "value": diagnostic.value,
                 "max": diagnostic.limit,
-            })
+            });
+            if let (Some(fix), Some(fields)) = (&diagnostic.fix, item.as_object_mut()) {
+                fields.insert(PATCH_KEY.to_owned(), Value::from(fix.hunk.as_str()));
+            }
+            item
         })
         .collect();
     json!({ "path": group.path, "items": items })

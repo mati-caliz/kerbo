@@ -1,0 +1,10 @@
+6:3 final-class NoCtor
+9:3 final-class OnlyPrivate
+15:11 final-parameter x
+28:3 final-class AssignedAnon
+35:23 final-parameter b
+35:30 final-parameter c
+35:52 final-parameter rest
+37:5 final-class Local
+46:5 redundant-modifier private
+50:17 final-parameter s

@@ -1,4 +1,5 @@
 use super::codec::{Corrupt, Reader, Writer};
+use super::lint_codec::{read_lint, write_lint};
 use crate::analysis::FileAnalysis;
 use crate::duplicates::{CpdToken, DuplicateUnits, RepeatedBlock, RepeatedKind, SyntaxNode};
 use crate::metrics::FunctionMetrics;
@@ -35,6 +36,7 @@ pub fn encode(analysis: &FileAnalysis) -> Vec<u8> {
         writer.text(&found.text);
     });
     write_units(&mut writer, analysis.duplicate_units.as_ref());
+    writer.list(&analysis.lints, write_lint);
     writer.into_bytes()
 }
 
@@ -72,6 +74,7 @@ pub fn decode(bytes: &[u8]) -> Result<FileAnalysis, Corrupt> {
             })
         })?,
         duplicate_units: read_units(&mut reader)?,
+        lints: reader.list(read_lint)?,
     };
     if reader.is_empty() {
         Ok(analysis)

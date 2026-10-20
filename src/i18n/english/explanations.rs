@@ -72,6 +72,37 @@ const TYPE_ESCAPE: Explanation = Explanation {
     example: "const data: any = await res.json() becomes const data = schema.parse(await res.json()).",
 };
 
+const UNUSED_IMPORT: Explanation = Explanation {
+    fix: "delete the import",
+    why: "An unused import suggests the file depends on something it does not use, and it adds noise to every diff of the header.",
+    example: "import java.util.List; with no List anywhere in the file is deleted.",
+};
+const REDUNDANT_IMPORT: Explanation = Explanation {
+    fix: "delete the duplicated import, the one from java.lang or the one from the same package",
+    why: "Classes in java.lang and in the same package are visible without an import, and repeating an import adds nothing.",
+    example: "import java.lang.String; is deleted: String is already in sight.",
+};
+const STAR_IMPORT: Explanation = Explanation {
+    fix: "import each class by name",
+    why: "A wildcard import hides where each name comes from, and a new class in the package can clash with one you already use.",
+    example: "import java.util.*; becomes import java.util.List; import java.util.Map;",
+};
+const REDUNDANT_MODIFIER: Explanation = Explanation {
+    fix: "delete the modifier",
+    why: "Repeating what the language already assumes (public in an interface, final on a private method) is noise and makes the reader wonder if it means more.",
+    example: "In an interface, public abstract void save(); becomes void save();",
+};
+const FINAL_PARAMETER: Explanation = Explanation {
+    fix: "mark the parameter as final",
+    why: "Reassigning a parameter overwrites the value the function was called with and confuses whoever reads the rest of the body.",
+    example: "void charge(Order order) becomes void charge(final Order order).",
+};
+const FINAL_CLASS: Explanation = Explanation {
+    fix: "declare the class final",
+    why: "If its constructors are private nobody outside can extend it: final says so in the signature and lets the compiler enforce it.",
+    example: "class Dates { private Dates() {} } becomes final class Dates { private Dates() {} }.",
+};
+
 pub const fn explanation(rule: RuleId) -> Explanation {
     match rule {
         RuleId::FileLength => FILE_LENGTH,
@@ -88,5 +119,11 @@ pub const fn explanation(rule: RuleId) -> Explanation {
         RuleId::DuplicateCode => DUPLICATE_CODE,
         RuleId::CommentedCode => COMMENTED_CODE,
         RuleId::TypeEscape => TYPE_ESCAPE,
+        RuleId::UnusedImport => UNUSED_IMPORT,
+        RuleId::RedundantImport => REDUNDANT_IMPORT,
+        RuleId::StarImport => STAR_IMPORT,
+        RuleId::RedundantModifier => REDUNDANT_MODIFIER,
+        RuleId::FinalParameter => FINAL_PARAMETER,
+        RuleId::FinalClass => FINAL_CLASS,
     }
 }

@@ -116,6 +116,7 @@ mod tests {
             fingerprint: fingerprint.to_owned(),
             relative_path: "a.go".to_owned(),
             absolute_path: PathBuf::from("a.go"),
+            fix: None,
         }
     }
 

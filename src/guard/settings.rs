@@ -344,6 +344,7 @@ fn diagnostic(path: &Path, relative: &str, loosening: &Loosening, occurrence: us
         fingerprint: format!("suppression-added:{relative}:{}#{occurrence}", new.key),
         relative_path: relative.to_owned(),
         absolute_path: path.to_path_buf(),
+        fix: None,
     }
 }
 

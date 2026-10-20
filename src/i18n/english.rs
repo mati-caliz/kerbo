@@ -1,4 +1,5 @@
 use super::catalog::{BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text};
+use crate::lint::{ImportRedundancy, LintKind};
 use crate::rules::RuleId;
 
 mod explanations;
@@ -71,6 +72,14 @@ impl Catalog for English {
             RuleId::ShortName => "A name too short or ambiguous for its scope",
             RuleId::DuplicateCode => "A block of code copied and pasted somewhere else",
             RuleId::CommentedCode => "Code commented out instead of deleted",
+            RuleId::UnusedImport => "An import that is not used",
+            RuleId::RedundantImport => {
+                "A redundant import: duplicated, from java.lang or from the same package"
+            }
+            RuleId::StarImport => "A wildcard import that brings in the whole package",
+            RuleId::RedundantModifier => "A modifier that is already implied",
+            RuleId::FinalParameter => "A parameter that is not final",
+            RuleId::FinalClass => "A class nobody can extend that is not final",
         }
     }
 
@@ -129,8 +138,32 @@ impl Catalog for English {
                 "This block of {size} {} is repeated in {copies} (maximum {limit})",
                 block_unit(*unit)
             ),
+            Message::Lint { kind, subject } => self.lint(*kind, subject),
             Message::Cheat(cheat) => self.cheat(cheat),
             Message::Rule(rule) => self.rule_description(*rule).to_owned(),
+        }
+    }
+
+    fn lint(&self, kind: LintKind, subject: &str) -> String {
+        match kind {
+            LintKind::UnusedImport => format!("The import `{subject}` is not used"),
+            LintKind::RedundantImport(ImportRedundancy::JavaLang) => {
+                format!("`{subject}` is in java.lang, which is imported implicitly")
+            }
+            LintKind::RedundantImport(ImportRedundancy::SamePackage) => {
+                format!("`{subject}` is in the same package: it needs no import")
+            }
+            LintKind::RedundantImport(ImportRedundancy::Duplicate { first_line }) => {
+                format!("`{subject}` is already imported on line {first_line}")
+            }
+            LintKind::StarImport => format!("`{subject}` imports the whole package"),
+            LintKind::RedundantModifier => {
+                format!("The `{subject}` modifier is redundant: it is already implied")
+            }
+            LintKind::FinalParameter => format!("The parameter `{subject}` should be final"),
+            LintKind::FinalClass => {
+                format!("The class `{subject}` should be final: it cannot be extended from outside")
+            }
         }
     }
 

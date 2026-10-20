@@ -136,6 +136,7 @@ fn repeated_diagnostics(file: &PooledFile) -> Vec<Diagnostic> {
                 ),
                 relative_path: file.identity.relative.clone(),
                 absolute_path: file.identity.absolute.clone(),
+                fix: None,
             }
         })
         .collect()
@@ -235,6 +236,7 @@ fn report(identities: &[(FileIdentity, usize)], groups: &[CloneGroup], unit: Blo
                 ),
                 relative_path: identity.relative.clone(),
                 absolute_path: identity.absolute.clone(),
+                fix: None,
             });
         }
     }

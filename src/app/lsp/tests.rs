@@ -134,3 +134,48 @@ fn speaks_the_chosen_language_to_the_editor() {
         "método desconocido: textDocument/hover"
     );
 }
+
+#[test]
+fn offers_the_mechanical_fix_as_a_quick_fix() {
+    let tree = TempTree::new("lsp-actions");
+    let path = tree.path().join("Cart.java");
+    tree.write("Cart.java", "");
+    let uri = format!("file://{}", path.to_str().expect("UTF-8").replace(' ', "%20"));
+    let text =
+        "import java.util.List;\nfinal class Cart {\n  void añadir(final int ñandú, int count) {}\n}\n";
+    let range = json!({ "start": { "line": 0, "character": 0 }, "end": { "line": 2, "character": 0 } });
+    let messages = [
+        json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {} }),
+        json!({ "jsonrpc": "2.0", "method": "textDocument/didOpen", "params": { "textDocument": { "uri": uri, "text": text } } }),
+        json!({ "jsonrpc": "2.0", "id": 2, "method": "textDocument/codeAction", "params": { "textDocument": { "uri": uri }, "range": range, "context": { "diagnostics": [] } } }),
+        json!({ "jsonrpc": "2.0", "method": "textDocument/didClose", "params": { "textDocument": { "uri": uri } } }),
+        json!({ "jsonrpc": "2.0", "id": 3, "method": "textDocument/codeAction", "params": { "textDocument": { "uri": uri }, "range": range } }),
+    ];
+    let input: String = messages.iter().map(frame).collect();
+    let (_, replies) = serve(&input);
+    assert_eq!(
+        replies[0]["result"]["capabilities"]["codeActionProvider"]["codeActionKinds"],
+        json!(["quickfix"])
+    );
+    let actions = replies[2]["result"].as_array().expect("una lista de acciones");
+    assert_eq!(actions.len(), 2);
+    assert_eq!(actions[0]["kind"], "quickfix");
+    assert_eq!(actions[0]["title"], "kerbo: borrá el import");
+    assert_eq!(actions[0]["diagnostics"][0]["code"], "unused-import");
+    let removal = &actions[0]["edit"]["changes"][uri.as_str()][0];
+    assert_eq!(removal["range"]["start"], json!({ "line": 0, "character": 0 }));
+    assert_eq!(removal["range"]["end"], json!({ "line": 1, "character": 0 }));
+    assert_eq!(removal["newText"], "");
+    let insertion = &actions[1]["edit"]["changes"][uri.as_str()][0];
+    assert_eq!(
+        insertion["range"]["start"],
+        json!({ "line": 2, "character": 31 }),
+        "la columna del arreglo se cuenta en UTF-16"
+    );
+    assert_eq!(insertion["newText"], "final ");
+    assert_eq!(
+        replies[4]["result"],
+        json!([]),
+        "cerrado, se lee del disco y el archivo está vacío"
+    );
+}

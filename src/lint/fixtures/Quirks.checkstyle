@@ -1,0 +1,9 @@
+3:8 unused-import com.example.Deserializer
+5:8 unused-import java.util.List
+11:7 final-parameter expression
+15:7 final-parameter template
+16:7 final-parameter arguments
+20:3 final-class Red
+21:5 final-class Orange
+23:5 final-class Yellow
+26:3 final-class From

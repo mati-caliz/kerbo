@@ -60,8 +60,11 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{Format, render};
+    use crate::fix::Fix;
     use crate::i18n::{Lang, Message};
     use crate::rules::{Diagnostic, RuleId};
+
+    const UNUSED_IMPORT_HUNK: &str = "@@ -3 +2,0 @@\n-import java.util.List;";
 
     fn sample() -> Vec<Diagnostic> {
         vec![Diagnostic {
@@ -80,6 +83,7 @@ mod tests {
             fingerprint: "parameter-count:src/a.go:f#1".to_owned(),
             relative_path: "src/a.go".to_owned(),
             absolute_path: PathBuf::from("/repo/src/a.go"),
+            fix: None,
         }]
     }
 
@@ -153,6 +157,33 @@ mod tests {
             parsed["fix"]["parameter-count"],
             "agrupá los parámetros que viajan juntos en un objeto"
         );
+        assert!(
+            file["items"][1].get("patch").is_none(),
+            "sin arreglo mecánico no hay parche"
+        );
+    }
+
+    #[test]
+    fn hands_agents_the_patch_of_a_mechanical_fix() {
+        let mut diagnostics = sample();
+        diagnostics[0].rule = RuleId::UnusedImport;
+        diagnostics[0].fix = Some(Fix {
+            edits: Vec::new(),
+            hunk: UNUSED_IMPORT_HUNK.to_owned(),
+        });
+        let parsed: serde_json::Value =
+            serde_json::from_str(&rendered_of(&diagnostics, Format::AgentJson)).expect("es JSON válido");
+        assert_eq!(parsed["files"][0]["items"][0]["patch"], UNUSED_IMPORT_HUNK);
+        assert_eq!(parsed["fix"]["unused-import"], "borrá el import");
+        let rows = rendered_of(&diagnostics, Format::Agent);
+        assert!(rows.contains("patch[1]:\n"));
+        assert!(rows.contains("    @@ -3 +2,0 @@\n    -import java.util.List;\n"));
+    }
+
+    fn rendered_of(diagnostics: &[Diagnostic], format: Format) -> String {
+        let mut output = Vec::new();
+        render(diagnostics, format, Lang::Spanish, &mut output).expect("se escribe en memoria");
+        String::from_utf8_lossy(&output).into_owned()
     }
 
     fn rendered(format: Format, lang: Lang) -> String {

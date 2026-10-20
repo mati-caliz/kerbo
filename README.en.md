@@ -94,6 +94,9 @@ an exception is legitimate, it goes in `kerbo.toml` with its `reason`, in plain 
   at the end. It spends 2.1 to 3.7 times fewer tokens than the previous JSON.
   `--format agent-json` gives the same thing as JSON, for code that parses it; the hook and the
   MCP server return `--format agent`.
+  When the fix is mechanical (a redundant import, an extra modifier, a missing `final`), the
+  `patch` section carries, by `id`, the unified diff hunk that solves it (in `agent-json`, the
+  problem's `patch` field).
 - `kerbo explain <rule>`: why it exists, how to fix it and an example, short enough for the
   context window.
 - **Claude Code hook**: reviews every file the agent edits, in milliseconds, and if it finds
@@ -121,6 +124,8 @@ an exception is legitimate, it goes in `kerbo.toml` with its `reason`, in plain 
 
 `kerbo lsp` is an LSP server: the editor passes it the file while you type and kerbo flags the
 problems instantly, without waiting for you to save, with the repo's `kerbo.toml` and baseline.
+The ones with a mechanical fix show up as a quick fix: delete the import, drop the modifier or add
+the `final`.
 
 - **IntelliJ IDEA, PyCharm, GoLand, WebStorm** (Community or Ultimate): install the
   [LSP4IJ](https://plugins.jetbrains.com/plugin/23257-lsp4ij) plugin, and in *Settings →
@@ -206,6 +211,12 @@ pull request's changes tab) and fails the job when there are problems.
 | `magic-number` | outside module constants, enums, types and defaults; -1, 0, 1 and 2 are fine | only in comparisons; 0 and 1 are fine | outside fields, constants and `hashCode`; -1, 0, 1 and 2 are fine | in arguments, assignments, cases, conditions, operations and returns; 0 and 1 are fine | — |
 | `duplicate-code` | identical functions of 3 lines or more and repeated branches of an `if` or a `switch`, within the file | blocks of 100 tokens repeated across files or within one | the same, not counting annotations, `import` or `;` | blocks of 150 syntax tree nodes repeated within a package | — |
 | `commented-code` | — | comments on their own line that compile as Python | — | comment groups inside a function that compile as a Go statement | — |
+| `unused-import` | — | — | imports nobody names (the ones that only show up in Javadoc count as unused) and the ones from `java.lang`; fixed automatically | — | — |
+| `redundant-import` | — | — | duplicated imports, from `java.lang` or from the same package; fixed automatically | — | — |
+| `star-import` | — | — | `import a.b.*`, `static` ones included | — | — |
+| `redundant-modifier` | — | — | what the language already assumes: `public`, `static`, `abstract` or `final` in an interface, `final` on a private method or in a final class, `static` on a nested enum or record, `public` on the constructor of a non-public class; fixed automatically | — | — |
+| `final-parameter` | — | — | parameters of methods and constructors with a body that are not `final`; fixed automatically | — | — |
+| `final-class` | — | — | classes whose constructors are all private (or private ones without a constructor) that are not `final` and are not extended in the file; fixed automatically | — | — |
 
 Each language counts like its reference tool: ESLint and sonarjs, ruff, Checkstyle and PMD,
 cyclop, gocognit, funlen, revive, mnd and varnamelen; duplicate blocks, PMD's CPD, dupl and
@@ -217,6 +228,15 @@ module). Tests are not searched for magic numbers or duplicate blocks, TypeScrip
 get their function length measured and Python tests do not get their parameters counted. The
 `minimal` preset does not look for magic numbers or duplicates, and `recommended` flags blocks
 from 150 tokens (225 nodes in Go and 5-line functions in TypeScript).
+
+The six Java form rules mimic Checkstyle 14 with `sun_checks.xml`, the reference configuration
+Checkstyle ships and the one already used for `MagicNumber` and the lengths: `UnusedImports` (with
+`processJavadoc` off, as in `sun_checks`), `RedundantImport`, `AvoidStarImport`,
+`RedundantModifier`, `FinalParameters` and `FinalClass`. `google_checks.xml` only asks for
+`AvoidStarImport`, and PMD 7's quickstart has the equivalents for imports, modifiers and final
+classes but not `final` parameters. `recommended` does not ask for `final` parameters and `minimal`
+only checks unused and duplicated imports. Columns count bytes, as in every other rule: with tabs,
+Checkstyle expands them to 8 and reports a different number.
 
 In Rust, kerbo measures only what clippy measures (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` and `excessive_nesting`), and the cognitive complexity is clippy's, not
@@ -249,6 +269,11 @@ file's path inside it: changing a macro analyzes again whoever uses it.
 
 The CLI texts (report, `explain`, errors, hook, MCP and LSP) live in a typed catalog in
 `src/i18n/`, one per language; the compiler makes sure every message exists in both.
+
+A mechanical fix (`src/fix.rs`) is a list of range edits (start and end line and column and the
+new text) plus the resulting unified diff hunk, computed during the analysis and stored in the
+cache with the rest. The LSP sends the edits as a quick fix and `--format agent` sends the diff; a
+new rule only has to build the `Fix` (delete a node or insert before one).
 
 ## Development
 

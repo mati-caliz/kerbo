@@ -36,6 +36,7 @@ fn reports_every_limit_exceeded_with_its_value() {
         short_names: Vec::new(),
         duplicate_units: None,
         commented_code: Vec::new(),
+        lints: Vec::new(),
         file_lines: 900,
         functions: vec![function("process", Some(9))],
     };
@@ -89,6 +90,7 @@ fn fingerprints_ignore_lines_and_number_repeated_symbols() {
         short_names: Vec::new(),
         duplicate_units: None,
         commented_code: Vec::new(),
+        lints: Vec::new(),
         file_lines: 10,
         functions: vec![
             function("handle", None),
@@ -119,6 +121,7 @@ fn skips_rules_without_limit_or_measure() {
         short_names: Vec::new(),
         duplicate_units: None,
         commented_code: Vec::new(),
+        lints: Vec::new(),
         file_lines: 900,
         functions: vec![function("f", None)],
     };
@@ -149,6 +152,7 @@ fn values_at_the_limit_pass() {
         short_names: Vec::new(),
         duplicate_units: None,
         commented_code: Vec::new(),
+        lints: Vec::new(),
         file_lines: 500,
         functions: vec![edge],
     };

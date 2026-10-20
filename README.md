@@ -93,6 +93,9 @@ una excepción es legítima, va en `kerbo.toml` con su `reason`, a la vista de t
   arregla cada regla va una sola vez al final. Gasta entre 2,1 y 3,7 veces menos tokens que el
   JSON de antes. `--format agent-json` da lo mismo en JSON, para quien lo lee con código; el hook y
   el servidor MCP devuelven `--format agent`.
+  Si el arreglo es mecánico (un import que sobra, un modificador de más, un `final` que falta),
+  la sección `patch` trae, por `id`, el bloque de diff unificado que lo resuelve (en
+  `agent-json`, el campo `patch` del problema).
 - `kerbo explain <regla>`: por qué existe, cómo se arregla y un ejemplo, corto para el contexto.
 - **Hook de Claude Code**: revisa cada archivo que el agente edita, en milisegundos, y si encuentra
   algo se lo devuelve para que lo corrija en la misma vuelta. En `.claude/settings.json`:
@@ -118,6 +121,8 @@ una excepción es legítima, va en `kerbo.toml` con su `reason`, a la vista de t
 
 `kerbo lsp` es un servidor LSP: el editor le pasa el archivo mientras escribís y kerbo marca los
 problemas al instante, sin esperar a que guardes, con el `kerbo.toml` y la línea de base del repo.
+Los que tienen arreglo mecánico aparecen como acción rápida (*quick fix*): borrar el import,
+sacar el modificador o agregar el `final`.
 
 - **IntelliJ IDEA, PyCharm, GoLand, WebStorm** (Community o Ultimate): instalá el plugin
   [LSP4IJ](https://plugins.jetbrains.com/plugin/23257-lsp4ij), y en *Settings → Languages &
@@ -203,6 +208,12 @@ pestaña de cambios del pull request) y falla el job si hay problemas.
 | `magic-number` | fuera de constantes de módulo, enums, tipos y defaults; -1, 0, 1 y 2 valen | sólo en comparaciones; 0 y 1 valen | fuera de campos, constantes y `hashCode`; -1, 0, 1 y 2 valen | en argumentos, asignaciones, casos, condiciones, operaciones y retornos; 0 y 1 valen | — |
 | `duplicate-code` | funciones iguales de 3 líneas o más y ramas repetidas de un `if` o un `switch`, dentro del archivo | bloques de 100 tokens repetidos entre archivos o dentro de uno | lo mismo, sin contar anotaciones, `import` ni `;` | bloques de 150 nodos del árbol repetidos dentro de un paquete | — |
 | `commented-code` | — | comentarios en su propia línea que compilan como Python | — | grupos de comentarios dentro de una función que compilan como una sentencia de Go | — |
+| `unused-import` | — | — | imports que nadie nombra (los que sólo aparecen en el Javadoc cuentan como sin usar) y los de `java.lang`; se arregla solo | — | — |
+| `redundant-import` | — | — | imports repetidos, de `java.lang` o del mismo paquete; se arregla solo | — | — |
+| `star-import` | — | — | `import a.b.*`, también los `static` | — | — |
+| `redundant-modifier` | — | — | lo que el lenguaje ya asume: `public`, `static`, `abstract` o `final` en una interfaz, `final` en un método privado o de una clase final, `static` en un enum o un record anidado, `public` en el constructor de una clase que no es pública; se arregla solo | — | — |
+| `final-parameter` | — | — | parámetros de métodos y constructores con cuerpo que no son `final`; se arregla solo | — | — |
+| `final-class` | — | — | clases con todos los constructores privados (o privadas y sin constructor) que no son `final` ni se heredan en el archivo; se arregla solo | — | — |
 
 Cada lenguaje cuenta como su herramienta de referencia: ESLint y sonarjs, ruff, Checkstyle y PMD,
 cyclop, gocognit, funlen, revive, mnd y varnamelen; los bloques duplicados, CPD de PMD, dupl y sonarjs (`no-identical-functions` y
@@ -212,6 +223,15 @@ lado; cada una salió de comparar contra repos reales y quedó fijada en un test
 los tests no se buscan números mágicos ni bloques duplicados, en los de TypeScript no se mide el largo de función y en
 los de Python no se cuentan los parámetros. El preset `minimal` no busca números mágicos ni duplicados, y `recommended` marca
 los bloques desde 150 tokens (225 nodos en Go y funciones de 5 líneas en TypeScript).
+
+Las seis reglas de forma de Java imitan a Checkstyle 14 con `sun_checks.xml`, que es la
+configuración de referencia que trae Checkstyle y la que ya se usa para `MagicNumber` y los
+largos: `UnusedImports` (con `processJavadoc` apagado, como en `sun_checks`), `RedundantImport`,
+`AvoidStarImport`, `RedundantModifier`, `FinalParameters` y `FinalClass`. `google_checks.xml` sólo
+pide `AvoidStarImport`, y el quickstart de PMD 7 trae los equivalentes de imports, modificadores y
+clases finales pero no `final` en los parámetros. `recommended` no pide `final` en los parámetros y
+`minimal` sólo revisa imports sin usar y repetidos. Las columnas cuentan bytes, como en el resto de
+las reglas: con tabs, Checkstyle las expande a 8 y da otro número.
 
 En Rust, kerbo mide sólo lo que mide clippy (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` y `excessive_nesting`), y la complejidad cognitiva es la de clippy, no la de
@@ -245,6 +265,12 @@ crate y de la ruta del archivo dentro de él: cambiar una macro vuelve a analiza
 
 Los textos del CLI (reporte, `explain`, errores, hook, MCP y LSP) viven en un catálogo tipado en
 `src/i18n/`, uno por idioma; el compilador asegura que cada mensaje exista en los dos.
+
+Un arreglo mecánico (`src/fix.rs`) es una lista de ediciones de rango (línea y columna de inicio y
+de fin y el texto nuevo) más el bloque de diff unificado que resulta, calculado durante el análisis
+y guardado en la caché con el resto. El LSP manda las ediciones como acción rápida y `--format
+agent` manda el diff; una regla nueva sólo tiene que armar el `Fix` (borrar un nodo o insertar
+antes de uno).
 
 ## Desarrollo
 

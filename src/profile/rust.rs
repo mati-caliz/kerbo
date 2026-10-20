@@ -1,7 +1,7 @@
 use super::{
-    CaseShape, CognitiveShape, CommentedCodeStyle, DuplicateStyle, GuardShape, LineSpan, LogicalShape,
-    MagicNumberStyle, MetricsStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, ShortNameStyle,
-    TestFiles,
+    CaseShape, CognitiveShape, CommentedCodeStyle, DuplicateStyle, GuardShape, LineSpan, LintStyle,
+    LogicalShape, MagicNumberStyle, MetricsStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile,
+    ShortNameStyle, TestFiles,
 };
 
 pub static RUST: Profile = Profile {
@@ -71,6 +71,7 @@ pub static RUST: Profile = Profile {
     short_names: ShortNameStyle::Unmeasured,
     duplicates: DuplicateStyle::Unmeasured,
     commented_code: CommentedCodeStyle::Unmeasured,
+    lints: LintStyle::Unmeasured,
     comments: &["line_comment", "block_comment"],
     literals: &["string_literal", "raw_string_literal"],
     function_length_skips_iife: false,

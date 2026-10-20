@@ -1,6 +1,7 @@
 mod analysis_codec;
 mod codec;
 mod key;
+mod lint_codec;
 mod location;
 mod shard;
 mod store;
@@ -21,8 +22,8 @@ use crate::limits::Limits;
 use crate::rules::RuleId;
 
 pub const DEFAULT_MAX_BYTES: usize = 256 * 1024 * 1024;
-const FORMAT_DIRECTORY: &str = "analysis-v1";
-const FORMAT_VERSION: u64 = 1;
+const FORMAT_DIRECTORY: &str = "analysis-v2";
+const FORMAT_VERSION: u64 = 2;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisSubject<'subject> {
