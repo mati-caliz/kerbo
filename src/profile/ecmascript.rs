@@ -155,7 +155,7 @@ pub static ECMASCRIPT: Profile = Profile {
     nesting: NestingStyle::Blocks,
     magic_numbers: MagicNumberStyle::Eslint,
     short_names: ShortNameStyle::Eslint,
-    duplicates: DuplicateStyle::Unmeasured,
+    duplicates: DuplicateStyle::Sonar,
     comments: &["comment", "html_comment"],
     literals: &["string", "template_string"],
     function_length_skips_iife: true,

@@ -34,10 +34,33 @@ const ECMASCRIPT_STRICT: [Option<usize>; 5] = [Some(400), Some(120), Some(10), S
 const NESTING_STRICT: Option<usize> = Some(4);
 const NESTING_RECOMMENDED: Option<usize> = Some(5);
 const NESTING_MINIMAL: Option<usize> = Some(6);
-const DUPLICATE_TOKENS_STRICT: Option<usize> = Some(99);
-const DUPLICATE_TOKENS_RECOMMENDED: Option<usize> = Some(149);
-const DUPLICATE_NODES_STRICT: Option<usize> = Some(149);
-const DUPLICATE_NODES_RECOMMENDED: Option<usize> = Some(224);
+const DUPLICATES_STRICT: DuplicateLimits = DuplicateLimits {
+    tokens: 99,
+    nodes: 149,
+    lines: 2,
+};
+const DUPLICATES_RECOMMENDED: DuplicateLimits = DuplicateLimits {
+    tokens: 149,
+    nodes: 224,
+    lines: 4,
+};
+
+#[derive(Debug, Clone, Copy)]
+struct DuplicateLimits {
+    tokens: usize,
+    nodes: usize,
+    lines: usize,
+}
+
+impl DuplicateLimits {
+    const fn for_language(self, language: Language) -> usize {
+        match language {
+            Language::Go => self.nodes,
+            Language::Python | Language::Java => self.tokens,
+            Language::TypeScript | Language::Tsx | Language::JavaScript => self.lines,
+        }
+    }
+}
 const RECOMMENDED: [Option<usize>; 5] = [Some(750), Some(150), Some(15), Some(20), Some(6)];
 const MINIMAL: [Option<usize>; 5] = [Some(1500), Some(300), Some(25), Some(30), Some(8)];
 
@@ -81,16 +104,12 @@ impl Preset {
             Self::Strict => (
                 strict(language),
                 NESTING_STRICT,
-                duplicates(language, DUPLICATE_TOKENS_STRICT, DUPLICATE_NODES_STRICT),
+                Some(DUPLICATES_STRICT.for_language(language)),
             ),
             Self::Recommended => (
                 RECOMMENDED,
                 NESTING_RECOMMENDED,
-                duplicates(
-                    language,
-                    DUPLICATE_TOKENS_RECOMMENDED,
-                    DUPLICATE_NODES_RECOMMENDED,
-                ),
+                Some(DUPLICATES_RECOMMENDED.for_language(language)),
             ),
             Self::Minimal => (MINIMAL, NESTING_MINIMAL, None),
         };
@@ -114,15 +133,6 @@ impl Preset {
             }
             Language::Python => base.with_rule(RuleId::ParameterCount, None),
             Language::Go | Language::Java => base,
-        }
-    }
-}
-
-const fn duplicates(language: Language, tokens: Option<usize>, nodes: Option<usize>) -> Option<usize> {
-    match language {
-        Language::Go => nodes,
-        Language::Python | Language::Java | Language::TypeScript | Language::Tsx | Language::JavaScript => {
-            tokens
         }
     }
 }

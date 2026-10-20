@@ -139,10 +139,10 @@ pub enum ShortNameStyle {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DuplicateStyle {
-    Unmeasured,
     CpdJava,
     CpdPython,
     Dupl,
+    Sonar,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

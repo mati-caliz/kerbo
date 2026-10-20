@@ -15,13 +15,14 @@ fn units_of(language: Language, style: DuplicateStyle, source: &str) -> Duplicat
         .set_language(&language.grammar())
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("el archivo se parsea");
-    duplicate_units(tree.root_node(), source.as_bytes(), style).expect("el lenguaje se mide")
+    duplicate_units(tree.root_node(), source.as_bytes(), style, SMALL_TILE_LIMIT)
+        .expect("el lenguaje se mide")
 }
 
 fn tokens_of(language: Language, style: DuplicateStyle, source: &str) -> Vec<super::CpdToken> {
     match units_of(language, style, source) {
         DuplicateUnits::Tokens(tokens) => tokens,
-        DuplicateUnits::Syntax(_) => Vec::new(),
+        DuplicateUnits::Syntax(_) | DuplicateUnits::Repeated(_) => Vec::new(),
     }
 }
 
@@ -171,7 +172,7 @@ fn go_pooled(path: &str, source: &str, limit: usize) -> PooledFile {
 fn go_kinds(source: &str) -> Vec<(i32, usize)> {
     match units_of(Language::Go, DuplicateStyle::Dupl, source) {
         DuplicateUnits::Syntax(nodes) => nodes.into_iter().map(|node| (node.kind, node.owns)).collect(),
-        DuplicateUnits::Tokens(_) => Vec::new(),
+        DuplicateUnits::Tokens(_) | DuplicateUnits::Repeated(_) => Vec::new(),
     }
 }
 
@@ -203,7 +204,15 @@ fn go_files_that_do_not_parse_are_left_out() {
         .expect("la gramática carga");
     let source = "package p\nfunc f( {";
     let tree = parser.parse(source, None).expect("el archivo se parsea");
-    assert!(duplicate_units(tree.root_node(), source.as_bytes(), DuplicateStyle::Dupl).is_none());
+    assert!(
+        duplicate_units(
+            tree.root_node(),
+            source.as_bytes(),
+            DuplicateStyle::Dupl,
+            SMALL_TILE_LIMIT
+        )
+        .is_none()
+    );
 }
 
 #[test]

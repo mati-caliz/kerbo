@@ -8,6 +8,7 @@ mod go_types;
 mod java;
 mod python;
 mod python_letters;
+mod sonar;
 mod suffix_tree;
 
 use std::collections::HashMap;
@@ -16,6 +17,9 @@ use std::path::Path;
 use tree_sitter::Node;
 
 pub use go_syntax::SyntaxNode;
+pub use sonar::RepeatedBlock;
+
+use sonar::RepeatedKind;
 
 use crate::profile::DuplicateStyle;
 use crate::rules::{Diagnostic, FileIdentity, RuleId};
@@ -38,6 +42,7 @@ pub struct CpdToken {
 pub enum DuplicateUnits {
     Tokens(Vec<CpdToken>),
     Syntax(Vec<SyntaxNode>),
+    Repeated(Vec<RepeatedBlock>),
 }
 
 #[derive(Debug)]
@@ -51,7 +56,7 @@ impl PooledFile {
     pub fn package_scope(&self) -> Option<&Path> {
         match self.units {
             DuplicateUnits::Syntax(_) => self.identity.absolute.parent(),
-            DuplicateUnits::Tokens(_) => None,
+            DuplicateUnits::Tokens(_) | DuplicateUnits::Repeated(_) => None,
         }
     }
 }
@@ -77,17 +82,67 @@ struct CloneGroup {
     copies: Vec<Placement>,
 }
 
-pub fn duplicate_units(root: Node<'_>, source: &[u8], style: DuplicateStyle) -> Option<DuplicateUnits> {
+pub fn duplicate_units(
+    root: Node<'_>,
+    source: &[u8],
+    style: DuplicateStyle,
+    limit: usize,
+) -> Option<DuplicateUnits> {
     match style {
+        DuplicateStyle::Sonar => Some(DuplicateUnits::Repeated(sonar::repeated_blocks(
+            root, source, limit,
+        ))),
         DuplicateStyle::CpdJava => Some(DuplicateUnits::Tokens(java::tokens(root, source))),
         DuplicateStyle::CpdPython => python::tokens(source).map(DuplicateUnits::Tokens),
         DuplicateStyle::Dupl => go_syntax::nodes(root, source).map(DuplicateUnits::Syntax),
-        DuplicateStyle::Unmeasured => None,
     }
 }
 
-pub fn find_duplicates(mut files: Vec<PooledFile>) -> Vec<Diagnostic> {
+pub fn find_duplicates(files: Vec<PooledFile>) -> Vec<Diagnostic> {
+    let (repeated, mut files): (Vec<PooledFile>, Vec<PooledFile>) = files
+        .into_iter()
+        .partition(|file| matches!(file.units, DuplicateUnits::Repeated(_)));
+    let mut diagnostics: Vec<Diagnostic> = repeated.iter().flat_map(repeated_diagnostics).collect();
     files.sort_by(|left, right| left.identity.absolute.cmp(&right.identity.absolute));
+    diagnostics.extend(pooled_diagnostics(files));
+    diagnostics
+}
+
+fn repeated_diagnostics(file: &PooledFile) -> Vec<Diagnostic> {
+    let DuplicateUnits::Repeated(blocks) = &file.units else {
+        return Vec::new();
+    };
+    let mut occurrences: HashMap<u64, usize> = HashMap::new();
+    blocks
+        .iter()
+        .map(|block| {
+            let occurrence = occurrences.entry(block.content).or_default();
+            *occurrence = occurrence.saturating_add(1);
+            let what = match block.kind {
+                RepeatedKind::Function => "Esta función repite la",
+                RepeatedKind::Branch => "Esta rama repite la",
+            };
+            Diagnostic {
+                path: file.identity.display.clone(),
+                line: block.line,
+                column: 1,
+                end_line: block.end_line,
+                rule: RuleId::DuplicateCode,
+                message: format!("{what} de la línea {}", block.original_line),
+                value: block.lines,
+                limit: file.limit,
+                fingerprint: format!(
+                    "duplicate-code:{}:{:016x}#{occurrence}",
+                    file.identity.relative, block.content
+                ),
+                relative_path: file.identity.relative.clone(),
+                absolute_path: file.identity.absolute.clone(),
+            }
+        })
+        .collect()
+}
+
+fn pooled_diagnostics(files: Vec<PooledFile>) -> Vec<Diagnostic> {
     let Some(threshold) = files.iter().map(|file| file.limit.saturating_add(1)).min() else {
         return Vec::new();
     };
@@ -99,6 +154,7 @@ pub fn find_duplicates(mut files: Vec<PooledFile>) -> Vec<Diagnostic> {
             match file.units {
                 DuplicateUnits::Tokens(tokens) => token_files.push(tokens),
                 DuplicateUnits::Syntax(nodes) => syntax_files.push(nodes),
+                DuplicateUnits::Repeated(_) => {}
             }
             (file.identity, file.limit)
         })

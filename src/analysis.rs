@@ -59,6 +59,6 @@ pub fn analyze(
         },
         duplicate_units: limits
             .get(RuleId::DuplicateCode)
-            .and_then(|_| duplicate_units(root, source, profile.duplicates)),
+            .and_then(|limit| duplicate_units(root, source, profile.duplicates, limit)),
     })
 }
