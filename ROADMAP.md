@@ -18,8 +18,10 @@ para Java, TypeScript/JavaScript, Python y Go.
 - **Pensado también para agentes de IA.** Salida compacta y priorizada, identificadores estables
   por problema, arreglos como parche y avisos cuando un cambio esquiva una regla en vez de
   arreglarla.
-- **No se reimplementan compiladores ni runners de tests.** Los tipos de TypeScript vienen del
-  compilador; los tests corren con el runner de cada lenguaje, pero sólo los que afecta el cambio.
+- **No se reimplementan compiladores ni motores de tests.** Los tipos de TypeScript vienen del
+  compilador; cada test lo ejecuta el motor de su lenguaje (JUnit Platform, Node, pytest,
+  `go test`), así se comporta igual. Lo que lo rodea (elegir qué correr, compilar, transformar,
+  arrancar y reusar procesos) es de kerbo.
 
 ## Qué hay hoy (0.1)
 
@@ -161,10 +163,19 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 
 ### 11. Tests inteligentes, dependencias y secretos
 
-- Correr sólo los tests que afecta el cambio y reusar resultados, con el runner de cada lenguaje.
-- Bajar el costo fijo de cada corrida: runners que quedan vivos entre corridas (JVM, vitest, pytest)
-  con tope de memoria, y servicios de los tests (bases en contenedores) reusados en vez de
-  levantados de cero.
+- Correr sólo los tests que afecta el cambio y reusar resultados.
+- Primero medir, por lenguaje, cuánto de una corrida con un cambio chico es arranque y cuánto son
+  los tests.
+- Runner propio sobre el motor de cada lenguaje, para bajar ese arranque sin cambiar cómo se
+  comporta un test:
+  - Java: el launcher de JUnit Platform en una JVM que queda viva, sin pasar por Gradle ni Maven,
+    compilando sólo las clases cambiadas; los contextos de Spring quedan en caché entre corridas.
+  - JavaScript/TypeScript: transformación propia con caché por contenido y workers de Node
+    reusados.
+  - Python: un proceso con los imports ya hechos que lanza cada corrida con un fork.
+  - Go: `go test` ya compila y guarda resultados en caché; sólo la selección de tests.
+- Procesos vivos con tope de memoria y servicios de los tests (bases en contenedores) reusados en
+  vez de levantados de cero.
 - Vulnerabilidades de dependencias con OSV y secretos versionados.
 
 ### 12. Formateo propio
