@@ -152,10 +152,10 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 
   | Inspección | Problemas | Repos | Etapa |
   |---|---|---|---|
-  | Declaración sin usar (`unused`) | 3.919 | 3 | 10, con puntos de entrada de frameworks |
+  | Declaración sin usar (`unused`) | 3.919 | 3 | 9 |
   | Getters y setters que podría generar Lombok | 384 | 2 | — |
   | `getFirst()` en vez de `get(0)`, `List.of`, `Math.clamp`, bloques de texto | 362 | 3 | 8 |
-  | Parámetro que siempre recibe lo mismo, retorno que nadie usa o siempre igual | 259 | 3 | 10 |
+  | Parámetro que siempre recibe lo mismo, retorno que nadie usa o siempre igual | 259 | 3 | 9 |
   | Valor por defecto repetido en una anotación, `throws` de más, escapes Unicode de más | 134 | 3 | 8 |
   | Anotaciones de nulabilidad que no coinciden con el método que redefinen | 86 | 3 | 9 |
   | Nulos y flujo de datos (`DataFlowIssue`, `Optional.get()` sin chequear, `ConstantValue`) | 59 | 3 | 9 |
@@ -328,11 +328,46 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   (`getFirst()`, `List.of`, `Math.clamp`, bloques de texto) y las redundancias (valor por defecto
   repetido en una anotación, escapes Unicode de más).
 
-### 9. Flujo de datos sin compilar
+### 9. Inspecciones de IntelliJ propias y flujo de datos sin compilar
 
-- Lo de SpotBugs sobre el código fuente: nulos, recursos sin cerrar, excepciones tragadas, en
-  ese orden (en Qodana los nulos son 145 y los recursos 10).
-- Contaminación de entradas hacia SQL, comandos, rutas y HTML, en todos los lenguajes.
+Lo que Qodana tarda de 6 a 13 minutos y 5 GB en hacer por repo, en segundos y dentro de la meta
+de memoria de siempre, medido sobre los mismos tres servicios y Guava. Casi todo el tiempo de
+Qodana se va en abrir el proyecto como un IDE (importar Maven o Gradle, indexar el JDK y cada
+jar entero) antes de mirar una línea; kerbo no abre nada, sólo lee lo que cada regla necesita.
+Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
+
+- **Resumen por archivo.** En la misma pasada de tree-sitter que ya existe, cada archivo deja lo
+  que declara (clases, métodos con su firma, campos, anotaciones, imports) y lo que referencia
+  (llamadas por nombre y cantidad de argumentos, `new`, accesos a campos). Va a la caché por
+  contenido, así un archivo editado sólo rehace su resumen. Los árboles no se guardan: el
+  resumen son cadenas internadas e índices, unos pocos KB por archivo.
+- **Índice del proyecto.** Una fase global que sólo junta resúmenes: resuelve nombres con los
+  imports, el paquete y las clases anidadas, y arma quién llama a quién. Donde la resolución es
+  ambigua (sobrecargas con el mismo número de argumentos y tipos que no se pueden inferir sin
+  compilar), no reporta: un falso positivo rompe un gate, uno que falta no. Habilita parámetro
+  que siempre recibe lo mismo, retorno que nadie usa, tipo privado expuesto y código muerto.
+  El LSP lo tiene en memoria y lo actualiza por archivo; el modo instantáneo lo lee de la caché.
+- **Frameworks como tablas.** Spring, Jakarta/JPA, Jackson, JUnit y Lombok declarados como datos
+  (anotación → efecto: la clase se instancia, el campo se escribe, el método se llama, existen
+  estos getters), no como código por framework. Es lo que le falta a Qodana Community y lo que
+  hace que hoy el 72 % de lo suyo sea ruido.
+- **Firmas de las dependencias, sin compilar.** El classpath se le pide una vez a Maven o Gradle y
+  se guarda con la huella de los `pom.xml`, `build.gradle` y lockfiles: si no cambian, no se
+  vuelve a preguntar. De cada jar se lee el índice del zip y, sólo de las clases que el código
+  usa, la firma y las anotaciones del `.class` (sin bytecode). Los jars de `~/.m2` y de Gradle no
+  cambian, así que esa caché va por hash del jar y se comparte entre repos. El JDK sale de
+  `ct.sym` para el `release` del proyecto, que da qué API existe en cada versión: lo que a Qodana
+  le faltaba cuando analizó con el JDK equivocado.
+- **Flujo de datos.** Un grafo de control por método armado desde tree-sitter, con la nulabilidad
+  de las anotaciones (también `@NonNullApi` del `package-info`) del proyecto y de las firmas de
+  arriba. Entre métodos, sólo con resúmenes ("puede devolver null", "cierra lo que recibe")
+  guardados en el índice, sin análisis del programa entero. Primero nulos, después recursos sin
+  cerrar y excepciones tragadas (en Qodana los nulos son 145 y los recursos 10).
+- Contaminación de entradas hacia SQL, comandos, rutas y HTML, en todos los lenguajes, sobre el
+  mismo grafo.
+- Paridad contra Qodana con el perfil `Default`, inspección por inspección. Donde Qodana se
+  equivoca por no conocer el framework, la diferencia queda fijada en un test como mejora, no
+  como desvío.
 
 ### 10. Go, Python, TypeScript y shell completos
 
