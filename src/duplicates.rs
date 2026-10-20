@@ -17,9 +17,7 @@ use std::path::Path;
 use tree_sitter::Node;
 
 pub use go_syntax::SyntaxNode;
-pub use sonar::RepeatedBlock;
-
-use sonar::RepeatedKind;
+pub use sonar::{RepeatedBlock, RepeatedKind};
 
 use crate::profile::DuplicateStyle;
 use crate::rules::{Diagnostic, FileIdentity, RuleId};

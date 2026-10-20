@@ -3,6 +3,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use crate::baseline::{BASELINE_FILE, Baseline};
+use crate::cache::AnalysisCache;
 use crate::cli::{CheckArgs, Command, ScanArgs};
 use crate::config::Config;
 use crate::diff::ChangedLines;
@@ -160,11 +161,17 @@ fn explain_rule(rule: RuleId, terminal: &mut Terminal<'_>) -> Result<u8, String>
 }
 
 fn scan_with(arguments: &ScanArgs, config: &Config) -> ScanOutcome {
+    let cache = if arguments.no_cache {
+        None
+    } else {
+        AnalysisCache::open_default()
+    };
     scan(&ScanRequest {
         roots: &arguments.paths,
         stacks: &arguments.languages,
         overrides: &arguments.overrides,
         config,
+        cache: cache.as_ref(),
     })
 }
 

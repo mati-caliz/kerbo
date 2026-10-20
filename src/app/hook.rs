@@ -65,6 +65,7 @@ fn review(file: &Path, arguments: &HookArgs) -> Result<Vec<Diagnostic>, String> 
         stacks: &[],
         overrides: &[],
         config: &config,
+        cache: None,
     });
     let mut diagnostics = outcome.diagnostics;
     let absolute = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());

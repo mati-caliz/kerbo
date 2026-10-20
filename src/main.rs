@@ -1,6 +1,7 @@
 mod analysis;
 mod app;
 mod baseline;
+mod cache;
 mod cli;
 mod config;
 mod diff;

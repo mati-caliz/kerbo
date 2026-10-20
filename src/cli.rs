@@ -71,6 +71,8 @@ pub struct ScanArgs {
         help = "Usa esta configuración en vez de buscar kerbo.toml"
     )]
     pub config: Option<PathBuf>,
+    #[arg(long, help = "Analiza todo de cero, sin leer ni escribir la caché")]
+    pub no_cache: bool,
 }
 
 #[derive(Debug, Args)]

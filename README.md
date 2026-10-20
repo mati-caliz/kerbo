@@ -40,12 +40,20 @@ kerbo check api web               # varias carpetas o archivos
 kerbo check --language java api   # sólo una pila: typescript, python, java o go
 kerbo check --diff main           # sólo lo que tocan las líneas cambiadas desde main
 kerbo check --format sarif        # también json, agent; sarif lo leen GitHub y los editores
+kerbo check --no-cache            # analiza todo de cero, sin leer ni escribir la caché
 kerbo baseline                    # acepta lo que ya hay: desde ahora sólo se reporta lo nuevo
 kerbo explain cognitive-complexity  # por qué existe una regla y cómo se arregla
 ```
 
 Respeta `.gitignore` y saltea los archivos ocultos. Sale con `0` si no hay problemas, `1` si los
 hay y `2` si algo no se pudo leer o la configuración es inválida.
+
+`kerbo check`, `kerbo baseline` y el servidor MCP guardan lo que miden de cada archivo en una
+caché por contenido, así la corrida siguiente sólo analiza lo que cambió (y lo que se compara entre
+archivos, como los bloques duplicados, se recombina con lo guardado). Vive en la carpeta de caché
+del usuario (`~/.cache/kerbo`, `~/Library/Caches/kerbo` o `%LOCALAPPDATA%\kerbo`; otra con
+`KERBO_CACHE_DIR`), se comparte entre proyectos y clones, ocupa como mucho 256 MB y se descarta
+sola cuando cambia el binario o la configuración que afecta a un archivo. Si se rompe, se ignora.
 
 ### Adoptarlo en un repo que ya existe
 
@@ -211,6 +219,16 @@ Las métricas se escriben una sola vez sobre el árbol de [tree-sitter](https://
 Lo propio de cada lenguaje vive en `src/profile/`: qué nodo es una función, una decisión o un
 operador lógico, y cómo cuenta líneas la herramienta que se imita. Los archivos se analizan en
 paralelo y de a uno, sin cargar el programa entero.
+
+La caché (`src/cache/`) guarda por archivo lo que mide el análisis, no los problemas: la clave es el
+contenido, el lenguaje, los umbrales efectivos de ese archivo y la identidad del binario (versión,
+tamaño y fecha), y la ruta queda afuera, así un archivo movido o el mismo archivo en otro clone no
+se vuelve a analizar. Las reglas y los duplicados entre archivos se calculan siempre sobre lo
+guardado. Está partida en 256 archivos por el primer byte de la clave, cada uno con su tope y
+desalojo del menos usado; cada entrada va comprimida con LZ4 y con su suma de control, y se
+escribe a un temporal que se renombra. Lo que en el futuro dependa de más de un archivo (por
+ejemplo, las `macro_rules!` del crate para Rust) suma su huella a la clave y guarda lo suyo como
+otro tipo de entrada en el mismo almacén.
 
 ## Desarrollo
 

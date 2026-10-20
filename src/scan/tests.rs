@@ -13,6 +13,7 @@ fn scan_tree(root: &Path, roots: &[PathBuf], stacks: &[Stack]) -> ScanOutcome {
         stacks,
         overrides: &[],
         config: &config,
+        cache: None,
     })
 }
 

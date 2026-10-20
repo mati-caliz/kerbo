@@ -15,6 +15,7 @@ include = ["/src", "/tests", "/Cargo.toml", "/Cargo.lock", "/README.md", "/LICEN
 [dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
 globset = "0.4.20"
+lz4_flex = { version = "0.14.0", default-features = false, features = ["checked-decode", "safe-decode", "safe-encode", "std"] }
 ignore = "0.4.33"
 rayon = "1.12.0"
 regex = "1.13.1"

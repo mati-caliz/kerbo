@@ -214,7 +214,35 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 ### 7. Caché y rendimiento
 
 - Caché por contenido de archivo, comprimida y con tope de tamaño: sólo se analiza lo que
-  cambió. Es lo que hace posible el modo instantáneo en repos grandes.
+  cambió (hecho). Guarda lo que mide el análisis de cada archivo, también los tokens y nodos que
+  usan los duplicados, y en cada corrida recombina lo guardado con lo nuevo, así los duplicados
+  entre archivos dan lo mismo. La clave es el contenido, el lenguaje, los umbrales efectivos y la
+  identidad del binario; la ruta no, así que se comparte entre clones. 256 archivos con desalojo
+  del menos usado hasta 256 MB, LZ4, suma de control por entrada y escritura atómica; si se rompe,
+  se ignora. `--no-cache` la apaga. La usan `kerbo check`, `kerbo baseline` y el servidor MCP; el
+  hook y el editor miran un solo archivo y no la necesitan todavía (sí cuando el expansor de
+  macros tenga que conocer el crate entero: su huella va a la clave y las definiciones de cada
+  archivo, como otro tipo de entrada en el mismo almacén).
+
+  Con todas las reglas del preset `strict`, en un contenedor con 4 núcleos (una corrida,
+  2026-10-20; la máquina se compartía con otras tareas, así que entre corridas iguales hay hasta
+  un 30 % de diferencia):
+
+  | Repo | Corrida | Tiempo | CPU | Memoria |
+  |---|---|---|---|---|
+  | Guava (Java), 3.277 archivos | sin caché | 9,2 s | 32,1 s | 282 MB |
+  | | en frío (llenando la caché) | 7,5 a 9,3 s | 28,3 a 35,6 s | 275 MB |
+  | | en caliente | 0,37 s | 0,46 s | 202 MB |
+  | | con un archivo editado | 0,44 s | 0,54 s | 204 MB |
+  | VS Code (TypeScript), 15.395 archivos | sin caché | 32,2 a 36,5 s | 126 a 145 s | 339 MB |
+  | | en frío (llenando la caché) | 34,4 a 45,4 s | 134 a 178 s | 420 MB |
+  | | en caliente | 0,45 s | 0,76 s | 111 MB |
+  | | con un archivo editado | 0,46 s | 0,75 s | 112 MB |
+
+  Los reportes en caliente son idénticos a los de sin caché (49.492 y 83.598 problemas). La caché
+  ocupa 7,2 MB para Guava y 8,1 MB para VS Code. Llenarla no se distingue del ruido. Lo que queda
+  en caliente es recorrer el árbol, leer y hashear cada archivo y comparar los duplicados; la
+  memoria de Guava es la de los tokens de CPD, que se recombinan enteros en cada corrida.
 - Una sola pasada por función para todas las métricas, en lugar de una por métrica.
 - Un demonio por máquina, con los árboles y la caché en memoria, compartido por el hook, el
   servidor MCP, el LSP y `kerbo check`: varias sesiones de agentes en el mismo repo no repiten el

@@ -148,6 +148,7 @@ fn run_check(arguments: CheckArguments, directory: &Path) -> Result<String, Stri
         languages: arguments.languages,
         overrides: Vec::new(),
         config: None,
+        no_cache: false,
     };
     let request = FindingsRequest {
         scan: &scan,

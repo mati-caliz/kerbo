@@ -7,7 +7,8 @@ use ignore::WalkBuilder;
 use rayon::prelude::*;
 use tree_sitter::Parser;
 
-use crate::analysis::{FileAnalysis, analyze};
+use crate::analysis::{FileAnalysis, ParseFailed, analyze};
+use crate::cache::{AnalysisCache, CacheKey};
 use crate::config::Config;
 use crate::duplicates::{PooledFile, find_duplicates};
 use crate::language::{Language, Stack};
@@ -35,6 +36,7 @@ pub struct ScanRequest<'request> {
     pub stacks: &'request [Stack],
     pub overrides: &'request [LimitOverride],
     pub config: &'request Config,
+    pub cache: Option<&'request AnalysisCache>,
 }
 
 #[derive(Default)]
@@ -92,6 +94,9 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
             }
             Err(failure) => failures.push(failure),
         }
+    }
+    if let Some(cache) = request.cache {
+        cache.persist();
     }
     outcome.diagnostics.extend(duplicate_diagnostics(pooled));
     outcome.diagnostics.sort_by(|left, right| {
@@ -236,13 +241,30 @@ fn check_file(
         .fold(configured, |limits, &limit_override| {
             limits.with_override(limit_override)
         });
-    let mut analysis =
-        analyze(parser, file.language, &source, limits).map_err(|error| failure(error.to_string()))?;
+    let cached = request
+        .cache
+        .map(|cache| (cache, cache.analysis_key(file.language, limits, &source)));
+    let mut analysis = cached_or_fresh(cached, || analyze(parser, file.language, &source, limits))
+        .map_err(|error| failure(error.to_string()))?;
     let pooled = pooled_file(&file.identity, &mut analysis, limits);
     Ok(Checked {
         diagnostics: evaluate(&file.identity, &analysis, limits),
         pooled: pooled.map(|pooled| (file.language.stack(), pooled)),
     })
+}
+
+fn cached_or_fresh(
+    cached: Option<(&AnalysisCache, CacheKey)>,
+    fresh: impl FnOnce() -> Result<FileAnalysis, ParseFailed>,
+) -> Result<FileAnalysis, ParseFailed> {
+    if let Some(analysis) = cached.and_then(|(cache, key)| cache.analysis(key)) {
+        return Ok(analysis);
+    }
+    let analysis = fresh()?;
+    if let Some((cache, key)) = cached {
+        cache.remember(key, &analysis);
+    }
+    Ok(analysis)
 }
 
 #[cfg(test)]
