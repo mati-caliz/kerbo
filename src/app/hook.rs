@@ -9,8 +9,9 @@ use crate::cli::HookArgs;
 use crate::config::Config;
 use crate::diff::ChangedLines;
 use crate::guard::{GuardRequest, inspect};
-use crate::i18n::{Lang, Notice, Problem, Text};
+use crate::i18n::{Lang, Notice, Problem};
 use crate::language::Language;
+use crate::report::{Format, render};
 use crate::rules::Diagnostic;
 use crate::scan::{ScanRequest, scan};
 
@@ -103,16 +104,5 @@ fn write_feedback(diagnostics: &[Diagnostic], lang: Lang, log: &mut dyn Write) -
         count: diagnostics.len(),
     };
     writeln!(log, "kerbo: {}", lang.notice(&header))?;
-    for diagnostic in diagnostics {
-        writeln!(
-            log,
-            "- {}:{} {} — {} ({})",
-            diagnostic.relative_path,
-            diagnostic.line,
-            diagnostic.rule.as_str(),
-            lang.message(&diagnostic.message),
-            lang.explain(diagnostic.rule).fix
-        )?;
-    }
-    writeln!(log, "{}", lang.text(Text::HookMoreDetail))
+    render(diagnostics, Format::Agent, lang, log)
 }

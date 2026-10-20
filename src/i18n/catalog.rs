@@ -12,7 +12,6 @@ pub enum Text {
     WhyLabel,
     FixLabel,
     ExampleLabel,
-    HookMoreDetail,
     McpInstructions,
     McpCheckDescription,
     McpPathsDescription,

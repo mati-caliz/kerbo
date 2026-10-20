@@ -15,6 +15,7 @@ pub enum Format {
     Json,
     Sarif,
     Agent,
+    AgentJson,
 }
 
 pub fn render<W: Write + ?Sized>(
@@ -45,8 +46,9 @@ pub fn render<W: Write + ?Sized>(
             serde_json::to_writer(&mut *writer, &sarif::document(diagnostics, lang))?;
             writeln!(writer)?;
         }
-        Format::Agent => {
-            serde_json::to_writer(&mut *writer, &agent::document(diagnostics, lang))?;
+        Format::Agent => agent::write(&agent::build(diagnostics, lang), writer)?,
+        Format::AgentJson => {
+            serde_json::to_writer(&mut *writer, &agent::document(&agent::build(diagnostics, lang)))?;
             writeln!(writer)?;
         }
     }
@@ -126,27 +128,31 @@ mod tests {
     }
 
     #[test]
-    fn renders_a_short_prioritized_list_for_agents() {
+    fn renders_agent_json_grouped_by_file_with_one_fix_per_rule() {
         let mut diagnostics = sample();
         let mut cheating = sample().remove(0);
         cheating.rule = RuleId::SuppressionAdded;
         cheating.value = 1;
         cheating.limit = 0;
+        cheating.fingerprint = "suppression-added:src/a.go:nolint#1".to_owned();
         diagnostics.push(cheating);
         let mut output = Vec::new();
-        render(&diagnostics, Format::Agent, Lang::Spanish, &mut output).expect("se escribe en memoria");
+        render(&diagnostics, Format::AgentJson, Lang::Spanish, &mut output).expect("se escribe en memoria");
         let parsed: serde_json::Value = serde_json::from_slice(&output).expect("es JSON válido");
         assert_eq!(parsed["problems"], 2);
         assert_eq!(parsed["more"], 0);
+        let file = &parsed["files"][0];
+        assert_eq!(file["path"], "src/a.go");
+        assert_eq!(parsed["files"].as_array().map(Vec::len), Some(1));
         assert_eq!(
-            parsed["items"][0]["rule"], "suppression-added",
+            file["items"][0]["rule"], "suppression-added",
             "las trampas van primero"
         );
+        assert_eq!(file["items"][1]["max"], 4);
         assert_eq!(
-            parsed["items"][1]["fix"],
+            parsed["fix"]["parameter-count"],
             "agrupá los parámetros que viajan juntos en un objeto"
         );
-        assert_eq!(parsed["items"][1]["file"], "src/a.go");
     }
 
     fn rendered(format: Format, lang: Lang) -> String {
@@ -175,14 +181,15 @@ mod tests {
             "The function takes too many parameters"
         );
         let english: serde_json::Value =
-            serde_json::from_str(&rendered(Format::Agent, Lang::English)).expect("es JSON válido");
+            serde_json::from_str(&rendered(Format::AgentJson, Lang::English)).expect("es JSON válido");
         let spanish: serde_json::Value =
-            serde_json::from_str(&rendered(Format::Agent, Lang::Spanish)).expect("es JSON válido");
+            serde_json::from_str(&rendered(Format::AgentJson, Lang::Spanish)).expect("es JSON válido");
         assert_eq!(
-            english["items"][0]["fix"],
+            english["fix"]["parameter-count"],
             "group the parameters that travel together into an object"
         );
-        assert_eq!(english["items"][0]["id"], spanish["items"][0]["id"]);
+        assert_eq!(english["files"], spanish["files"]);
         assert_eq!(english["explain"], spanish["explain"]);
+        assert!(rendered(Format::Agent, Lang::English).contains("parameter-count: group the parameters"));
     }
 }

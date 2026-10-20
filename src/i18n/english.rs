@@ -14,7 +14,6 @@ impl Catalog for English {
             Text::WhyLabel => "Why",
             Text::FixLabel => "How to fix it",
             Text::ExampleLabel => "Example",
-            Text::HookMoreDetail => "More detail: kerbo explain <rule>",
             Text::McpInstructions => {
                 "Use kerbo_check after editing code: with diff (for example HEAD) it looks only at what changed and catches cheats such as new suppressions or skipped tests. kerbo_explain says how to fix each rule."
             }

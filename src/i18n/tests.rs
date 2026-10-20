@@ -3,11 +3,10 @@ use crate::rules::RuleId;
 
 const LANGS: [Lang; 2] = [Lang::Spanish, Lang::English];
 
-const TEXTS: [Text; 28] = [
+const TEXTS: [Text; 27] = [
     Text::WhyLabel,
     Text::FixLabel,
     Text::ExampleLabel,
-    Text::HookMoreDetail,
     Text::McpInstructions,
     Text::McpCheckDescription,
     Text::McpPathsDescription,

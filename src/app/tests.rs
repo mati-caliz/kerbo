@@ -241,7 +241,7 @@ fn mcp_server_lists_and_runs_its_tools() {
         .as_str()
         .expect("texto")
         .to_owned();
-    assert!(check_text.contains("parameter-count") && check_text.contains("\"problems\":1"));
+    assert!(check_text.contains("parameter-count") && check_text.starts_with("problems: 1\n"));
     assert!(
         by_id(4)["result"]["content"][0]["text"]
             .as_str()
@@ -300,7 +300,7 @@ fn the_hook_and_the_mcp_server_follow_the_language() {
     );
     let hook = execute_with_input(&["kerbo", "hook", "--lang", "en"], tree.path(), &event);
     assert!(hook.log.contains("1 problem in what you just edited:"));
-    assert!(hook.log.contains("More detail: kerbo explain <rule>"));
+    assert!(hook.log.contains("parameter-count: group the parameters"));
     let requests = [
         r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
         r#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"kerbo_explain","arguments":{"rule":"magic-number"}}}"#,

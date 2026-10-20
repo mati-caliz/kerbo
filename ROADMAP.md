@@ -88,32 +88,61 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 - **Antitrampa**: avisar cuando un cambio agrega una supresión (`eslint-disable`, `noqa`,
   `nolint`, `@SuppressWarnings`, `#[allow]`), afloja un umbral en una
   configuración, o borra, saltea o vacía un test.
-- `--format agent`: JSON compacto, priorizado y con tope, e identificadores estables por
+- `--format agent`: salida compacta, priorizada y con tope, e identificadores estables por
   problema (regla + símbolo + contexto, no número de línea).
 - `kerbo explain <regla>`: por qué existe, ejemplo malo y bueno, cómo se arregla.
 - **Modo instantáneo** sobre los archivos recién tocados (meta: menos de 100 ms), un hook listo
   para Claude Code y un **servidor MCP**.
-- **Salida para agentes con menos tokens** (pendiente). Hoy cada problema es un objeto JSON
-  que repite todas las claves, la ruta del archivo y el texto entero de cómo se arregla. Lo que
-  más ahorra no es el formato sino dejar de repetir:
-  - **Cómo se arregla, una vez por regla**: el texto de `kerbo explain` va en una sección aparte
-    indexada por regla, no en cada problema. Con 30 problemas de la misma regla hoy se manda 30
-    veces el mismo párrafo.
-  - **Agrupado por archivo**: la ruta aparece una sola vez y debajo van sus problemas.
-  - **Identificador corto**: el prefijo más corto del identificador estable que no choca con
-    otro dentro del reporte, sin dejar de ser estable entre corridas (un agente lo usa para
-    seguir un problema de un cambio al siguiente).
-  - **Filas en vez de objetos**: las claves se declaran una vez y cada problema es una fila, al
-    estilo de TOON (Token-Oriented Object Notation), que es lo que mejor rinde con listas de
-    objetos iguales. YAML no sirve para esto: saca llaves y comillas pero repite las claves igual
-    (de 10 a 20 % menos que JSON) y la indentación es frágil.
-  - Medir antes de elegir: contar los tokens de JSON, del JSON sin repeticiones y de las filas
-    sobre reportes reales (un repo con pocos problemas y uno con cientos), con el tokenizador de
-    los modelos que más se usan, y quedarse con lo que menos gaste sin que el agente lo lea peor.
-  - El formato ganador pasa a ser `--format agent` y el JSON queda como `--format agent-json`
-    para quien lo parsea con código. El mismo formato en el hook y en el servidor MCP.
-  - Un test fija la salida y otro el tope de tokens de un reporte de ejemplo, así un cambio que
-    la agrande se ve.
+- **Salida para agentes con menos tokens** (hecho). Antes cada problema era un objeto JSON que
+  repetía todas las claves, la ruta del archivo y el texto entero de cómo se arregla. Ahora
+  `--format agent` es texto al estilo de TOON (Token-Oriented Object Notation):
+  - **Cómo se arregla, una vez por regla**, en una sección `fix` al final, sólo de las reglas que
+    aparecen en lo mostrado.
+  - **Agrupado por archivo**: la ruta va una vez y debajo sus filas; los archivos salen en el
+    orden de su problema más urgente y las trampas siguen primero.
+  - **Filas en vez de objetos**: las columnas (`id,line,end,rule,value,max`) se declaran una vez
+    en el encabezado y cada problema es una fila separada por comas.
+  - **Identificador corto**: un hash del identificador estable (FNV-1a de 64 bits con la mezcla
+    final de MurmurHash3, así identificadores casi iguales no comparten prefijo) y de ese hash el
+    prefijo más corto, de 4 caracteres como mínimo, que no choca con otro problema del reporte
+    entero (no sólo de lo mostrado). Un mismo problema da siempre el mismo hash y si hace falta un
+    carácter más el id viejo sigue siendo su prefijo, así un agente lo sigue de un cambio al otro.
+    El JSON de `--format json` sigue trayendo el identificador completo.
+  - `--format agent-json` es lo mismo en JSON sin repeticiones (agrupado por archivo y con `fix`
+    por regla), para quien lo parsea con código. El hook de Claude Code (después de su
+    encabezado) y `kerbo_check` del servidor MCP devuelven `--format agent`.
+  - Medido (2026-10-20) con `scripts/count-tokens.py`: o200k_base (GPT-4o y posteriores) y
+    cl100k_base (GPT-4) de tiktoken, y el tokenizador público de Claude anterior a Claude 3
+    (`Xenova/claude-tokenizer`; el de los Claude actuales no se puede correr local). Reportes del
+    preset `strict` sobre pkg/errors (34 problemas), google/uuid (159), express (113), cobra (216)
+    y fastapi (421), con el tope de 30 que usa kerbo y sin tope. Tokens de o200k (cl100k da casi
+    lo mismo; el de Claude, hasta 17 % más en el JSON y lo mismo en las filas):
+
+    | Repo | Problemas | JSON de antes | JSON sin repeticiones | Filas |
+    |---|---|---|---|---|
+    | pkg/errors | 34 | 1.631 | 1.029 | 701 |
+    | google/uuid | 159 | 1.720 | 1.028 | 710 |
+    | express | 113 | 1.719 | 1.179 | 802 |
+    | cobra | 216 | 1.785 | 1.076 | 714 |
+    | fastapi | 421 | 2.388 | 997 | 678 |
+    | fastapi sin tope | 421 | 31.332 | 12.961 | 8.393 |
+    | cobra sin tope | 216 | 12.846 | 6.614 | 4.203 |
+
+    Las filas gastan entre 2,1 y 3,7 veces menos que el JSON de antes y un tercio menos que el
+    JSON sin repeticiones; cuanto más se repite una regla, más ahorra.
+  - Un test fija la salida entera de un reporte chico y otro pone un tope de 650 tokens a uno de
+    48 problemas en 8 archivos. Como en los tests no hay tokenizador, se cuentan las piezas que
+    separa el pretokenizador de los modelos (palabras, grupos de hasta tres dígitos y cada signo),
+    que sobreestima a o200k; hoy da 619.
+  - Pendientes:
+    - Comprobar que el agente lo lee igual de bien que el JSON (que no confunde columnas ni
+      pierde problemas): va con el arnés de punta a punta de abajo.
+    - Ninguna fila trae el símbolo (la función o la clase) ni el mensaje: el agente se ubica por
+      línea. Ver con el arnés si agregar el símbolo ahorra lecturas de archivo.
+    - El hook ahora corta en 30 problemas, como `--format agent`; antes los mostraba todos.
+      Decidir con el arnés si en un archivo recién editado conviene mostrarlos todos.
+    - Medir con el tokenizador de los Claude actuales (por la API de conteo de tokens) cuando el
+      arnés la use de todos modos.
 - **Cuánto gasta un agente de punta a punta** (pendiente). La velocidad de kerbo ya está medida;
   falta medir lo que paga quien lo usa con un agente: correr el gate, leer la salida, arreglar y
   volver a correr hasta que pase.

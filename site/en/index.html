@@ -136,7 +136,7 @@
       </div>
       <ul class="list">
         <li><strong>Anti-cheat.</strong> Warns when a change dodges a problem instead of fixing it: a new <code>eslint-disable</code>, <code>noqa</code> or <code>@SuppressWarnings</code>, a loosened threshold, a deleted, skipped or emptied test, an <code>any</code>.</li>
-        <li><strong>Output for agents.</strong> Compact, prioritized JSON with how to fix each problem, and no filler that burns tokens.</li>
+        <li><strong>Output for agents.</strong> Short rows grouped by file, prioritized, with how to fix each rule stated once: up to 3.7 times fewer tokens than JSON.</li>
         <li><strong>Claude Code hook.</strong> Reviews every file the agent edits, in milliseconds, and hands back what it found so the agent fixes it in the same turn.</li>
         <li><strong>Stable identifiers and <code>kerbo explain</code>.</strong> On the next turn the agent knows what it fixed, what is left and how to fix each rule.</li>
         <li><strong>MCP server</strong> for Claude Code, Cursor and any client. <strong>Coming up:</strong> imports that do not exist and functions that duplicate another one in the repo.</li>

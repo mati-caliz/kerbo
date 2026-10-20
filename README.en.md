@@ -41,7 +41,7 @@ kerbo check                       # the current directory
 kerbo check api web               # several folders or files
 kerbo check --language java api   # a single stack: typescript, python, java or go
 kerbo check --diff main           # only what the lines changed since main touch
-kerbo check --format sarif        # also json, agent; GitHub and editors read sarif
+kerbo check --format sarif        # also json, agent, agent-json; GitHub and editors read sarif
 kerbo check --no-cache            # analyze everything from scratch, without reading or writing the cache
 kerbo baseline                    # accept what is already there: from now on only new problems
 kerbo explain cognitive-complexity  # why a rule exists and how to fix it
@@ -61,7 +61,7 @@ ignored. `--no-cache` turns it off.
 Messages come out in Spanish or English. `--lang en` (or `es`) wins, then `lang` in
 `kerbo.toml`, then the system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`); without any of them,
 Spanish. The language only changes the text meant for people: rule identifiers, stable `id`s and
-the shape of the JSON, SARIF and `--format agent` output stay the same.
+the shape of the JSON, SARIF, `--format agent` and `agent-json` output stay the same.
 
 ### Adopting it in an existing repo
 
@@ -88,8 +88,12 @@ an exception is legitimate, it goes in `kerbo.toml` with its `reason`, in plain 
 
 ### For AI agents
 
-- `kerbo check --format agent`: compact, capped JSON, cheats first and then what exceeds the
-  limit the most, each problem with a stable identifier and a fix hint.
+- `kerbo check --format agent`: short, capped output, cheats first and then what exceeds the
+  limit the most. It groups by file (the path appears once), each problem is a row whose columns
+  are declared once (TOON style) with a short, stable `id`, and how to fix each rule appears once
+  at the end. It spends 2.1 to 3.7 times fewer tokens than the previous JSON.
+  `--format agent-json` gives the same thing as JSON, for code that parses it; the hook and the
+  MCP server return `--format agent`.
 - `kerbo explain <rule>`: why it exists, how to fix it and an example, short enough for the
   context window.
 - **Claude Code hook**: reviews every file the agent edits, in milliseconds, and if it finds

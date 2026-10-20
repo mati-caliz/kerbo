@@ -41,7 +41,7 @@ kerbo check                       # el directorio actual
 kerbo check api web               # varias carpetas o archivos
 kerbo check --language java api   # sólo una pila: typescript, python, java o go
 kerbo check --diff main           # sólo lo que tocan las líneas cambiadas desde main
-kerbo check --format sarif        # también json, agent; sarif lo leen GitHub y los editores
+kerbo check --format sarif        # también json, agent, agent-json; sarif lo leen GitHub y los editores
 kerbo check --no-cache            # analiza todo de cero, sin leer ni escribir la caché
 kerbo baseline                    # acepta lo que ya hay: desde ahora sólo se reporta lo nuevo
 kerbo explain cognitive-complexity  # por qué existe una regla y cómo se arregla
@@ -60,7 +60,7 @@ sola cuando cambia el binario o la configuración que afecta a un archivo. Si se
 Los mensajes salen en español o en inglés. Manda `--lang en` (o `es`), después `lang` en
 `kerbo.toml` y después el locale del sistema (`LC_ALL`, `LC_MESSAGES`, `LANG`); sin nada de eso,
 español. El idioma sólo cambia el texto para personas: los identificadores de reglas, los `id`
-estables y la forma del JSON, de SARIF y de `--format agent` son los mismos.
+estables y la forma del JSON, de SARIF y de `--format agent` y `agent-json` son los mismos.
 
 ### Adoptarlo en un repo que ya existe
 
@@ -87,8 +87,12 @@ una excepción es legítima, va en `kerbo.toml` con su `reason`, a la vista de t
 
 ### Para agentes de IA
 
-- `kerbo check --format agent`: JSON compacto con tope, las trampas primero y después lo que más
-  se pasa del límite, cada problema con un identificador estable y una pista de arreglo.
+- `kerbo check --format agent`: salida corta con tope, las trampas primero y después lo que más
+  se pasa del límite. Agrupa por archivo (la ruta va una vez), cada problema es una fila con
+  columnas declaradas una sola vez (al estilo de TOON) y un `id` corto y estable, y cómo se
+  arregla cada regla va una sola vez al final. Gasta entre 2,1 y 3,7 veces menos tokens que el
+  JSON de antes. `--format agent-json` da lo mismo en JSON, para quien lo lee con código; el hook y
+  el servidor MCP devuelven `--format agent`.
 - `kerbo explain <regla>`: por qué existe, cómo se arregla y un ejemplo, corto para el contexto.
 - **Hook de Claude Code**: revisa cada archivo que el agente edita, en milisegundos, y si encuentra
   algo se lo devuelve para que lo corrija en la misma vuelta. En `.claude/settings.json`:

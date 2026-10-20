@@ -12,7 +12,6 @@ impl Catalog for Spanish {
             Text::WhyLabel => "Por qué",
             Text::FixLabel => "Cómo se arregla",
             Text::ExampleLabel => "Ejemplo",
-            Text::HookMoreDetail => "Más detalle: kerbo explain <regla>",
             Text::McpInstructions => {
                 "Usá kerbo_check después de editar código: con diff (por ejemplo HEAD) mira sólo lo cambiado y detecta trampas como supresiones nuevas o tests salteados. kerbo_explain dice cómo arreglar cada regla."
             }
