@@ -14,20 +14,22 @@ kerbo: 5810 archivos, 2 problemas, 2250 ms
 
 ## Instalación
 
-Linux (x86_64, binario estático que corre en cualquier distro):
+Linux y macOS, en x86_64 y ARM (en Linux, un binario estático que corre en cualquier distro), y
+Windows x86_64 desde el bash de Git:
 
 ```sh
 curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh
 ```
 
 El instalador baja la última versión de los
-[releases](https://github.com/mati-caliz/kerbo/releases), verifica el sha256 y deja `kerbo` en
-`~/.local/bin` (otra carpeta con `KERBO_INSTALL_DIR`).
+[releases](https://github.com/mati-caliz/kerbo/releases) para la máquina, verifica el sha256 y
+deja `kerbo` en `~/.local/bin` (otra carpeta con `KERBO_INSTALL_DIR`).
 
-macOS, Windows y otras arquitecturas, con Rust instalado:
+Con Homebrew o con Rust instalado:
 
 ```sh
-cargo install --git https://github.com/mati-caliz/kerbo --locked
+brew install mati-caliz/tap/kerbo
+cargo install kerbo --locked
 ```
 
 ## Uso

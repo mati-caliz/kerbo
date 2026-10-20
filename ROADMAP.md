@@ -198,10 +198,17 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   - Lo que no se puede sin tipos: el `Result` que devuelve un closure sin anotarlo y los módulos
     que declara una macro procedural. Ahí la referencia sigue siendo clippy.
 
-### 6. Distribución
+### 6. Distribución (hecho: binarios, crates.io y Homebrew, falta la primera publicación)
 
-- Binarios para macOS (x86 y ARM), Windows y Linux ARM, armados sólo al publicar una versión.
-- `cargo install kerbo` desde crates.io, y Homebrew.
+- Binarios para macOS (x86 y ARM), Windows y Linux ARM, armados sólo al publicar una versión
+  (hecho: el workflow de release corre con un tag `v<versión>` que tiene que coincidir con el
+  Cargo.toml, compila cada target en un runner nativo, sin cross, y sube los archivos con su
+  sha256 al release; el instalador elige el de la máquina, también bajo Rosetta).
+- `cargo install kerbo` desde crates.io, y Homebrew (hecho: el paquete lleva sólo el código, los
+  tests, el README y la licencia, y pasa `cargo publish --dry-run`; la fórmula usa los binarios
+  del release y el workflow le pone los sha256 de cada versión). Pendiente: crear el tap
+  `mati-caliz/homebrew-tap` y cargar los secretos `HOMEBREW_TAP_TOKEN` y `CARGO_REGISTRY_TOKEN`;
+  sin ellos el workflow deja la fórmula como artefacto y no publica en crates.io.
 - Mensajes, README y sitio en inglés además de español.
 
 ### 7. Caché y rendimiento
