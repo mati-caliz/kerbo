@@ -590,9 +590,9 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   tree-sitter ni métricas de código. Las reglas nuevas son tres familias de `RuleId`
   (`Migration`, `Dockerfile`, `Compose`) que se prenden o se apagan; en `Limits` van como bits,
   así el arreglo de umbrales no crece con cada regla. Lo encontrado entra en la caché por
-  contenido como una lista más del análisis de cada archivo (versión de formato 2). Textos en
-  español e inglés en `src/i18n/*/deploy.rs` y `src/i18n/*/dockerfile.rs`, con `kerbo explain`
-  para cada regla.
+  contenido como una lista más del análisis de cada archivo (versión de formato 3, la siguiente
+  a la de las reglas de Java). Textos en español e inglés en `src/i18n/*/deploy.rs` y
+  `src/i18n/*/dockerfile.rs`, con `kerbo explain` para cada regla.
 - Pendientes:
   - **Renombres que el código desplegado todavía usa**: no hay forma confiable sin compilar. Los
     nombres de columnas pasan por los mapeos del ORM (`@map` de Prisma, `name=` de SQLAlchemy,
