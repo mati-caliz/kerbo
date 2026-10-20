@@ -24,6 +24,13 @@ pub const DEFAULT_MAX_BYTES: usize = 256 * 1024 * 1024;
 const FORMAT_DIRECTORY: &str = "analysis-v1";
 const FORMAT_VERSION: u64 = 1;
 
+#[derive(Debug, Clone, Copy)]
+pub struct AnalysisSubject<'subject> {
+    pub language: Language,
+    pub source: &'subject [u8],
+    pub context: Option<u64>,
+}
+
 #[derive(Debug)]
 pub struct AnalysisCache {
     store: Store,
@@ -43,13 +50,12 @@ impl AnalysisCache {
         }
     }
 
-    pub fn analysis_key(
-        &self,
-        language: Language,
-        limits: Limits,
-        source: &[u8],
-        context: Option<u64>,
-    ) -> CacheKey {
+    pub fn analysis_key(&self, subject: AnalysisSubject<'_>, limits: Limits) -> CacheKey {
+        let AnalysisSubject {
+            language,
+            source,
+            context,
+        } = subject;
         let mut builder = KeyBuilder::new(self.salt, EntryKind::FileAnalysis);
         language.hash(&mut builder);
         context.hash(&mut builder);

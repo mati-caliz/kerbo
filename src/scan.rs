@@ -8,7 +8,7 @@ use rayon::prelude::*;
 use tree_sitter::Parser;
 
 use crate::analysis::{FileAnalysis, ParseFailed, SourceUnit, analyze_unit};
-use crate::cache::{AnalysisCache, CacheKey};
+use crate::cache::{AnalysisCache, AnalysisSubject, CacheKey};
 use crate::config::Config;
 use crate::duplicates::{PooledFile, find_duplicates};
 use crate::language::{Language, Stack};
@@ -257,9 +257,14 @@ fn check_file(
     let context = crate_macros
         .as_ref()
         .map(|crate_macros| crate_macros.analysis_context(&file.identity.absolute));
+    let subject = AnalysisSubject {
+        language: file.language,
+        source: &source,
+        context,
+    };
     let cached = request
         .cache
-        .map(|cache| (cache, cache.analysis_key(file.language, limits, &source, context)));
+        .map(|cache| (cache, cache.analysis_key(subject, limits)));
     let unit = SourceUnit {
         language: file.language,
         source: &source,
