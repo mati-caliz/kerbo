@@ -23,6 +23,14 @@ struct RawConfig {
     exceptions: Vec<RawException>,
     #[serde(default)]
     ignore: Vec<RawIgnore>,
+    #[serde(default)]
+    cache: RawCache,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawCache {
+    max_megabytes: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -73,6 +81,7 @@ pub struct Config {
     ignored: GlobSet,
     deviations: usize,
     lang: Option<Lang>,
+    cache_max_megabytes: Option<usize>,
 }
 
 impl Config {
@@ -103,6 +112,7 @@ impl Config {
             ignored: GlobSet::empty(),
             deviations: 0,
             lang: None,
+            cache_max_megabytes: None,
         }
     }
 
@@ -140,12 +150,17 @@ impl Config {
             ignored: glob_set(&ignore_paths, source)?,
             deviations,
             lang: raw.lang,
+            cache_max_megabytes: raw.cache.max_megabytes,
             root,
         })
     }
 
     pub const fn lang(&self) -> Option<Lang> {
         self.lang
+    }
+
+    pub const fn cache_max_megabytes(&self) -> Option<usize> {
+        self.cache_max_megabytes
     }
 
     pub fn root(&self) -> &Path {

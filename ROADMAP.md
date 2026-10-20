@@ -359,9 +359,12 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   en caliente es recorrer el árbol, leer y hashear cada archivo y comparar los duplicados; la
   memoria de Guava es la de los tokens de CPD, que se recombinan enteros en cada corrida.
 - Pendientes de la caché:
-  - Dos procesos que escriben el mismo archivo de la caché a la vez: gana el último y se pierden
-    las entradas del otro. Releer y combinar antes de renombrar, o que lo resuelva el demonio.
-  - El tope de 256 MB es fijo: hacerlo configurable en `kerbo.toml` o por variable de entorno.
+  - Dos procesos que escriben el mismo archivo de la caché a la vez (hecho: antes de escribir un
+    shard se relee el del disco y se combinan las entradas sanas, con la marca de uso más nueva).
+    Queda una ventana chica entre releer y renombrar; cerrarla del todo pide un lock o el demonio.
+  - El tope configurable (hecho: `max_megabytes` en `[cache]` de `kerbo.toml` y
+    `KERBO_CACHE_MAX_MB`, que manda; 256 MB de fábrica). La caché es una por usuario y la comparten
+    los proyectos, así que el tope que vale es el del último que escribe.
   - El hook y el editor todavía no la usan; la necesitan cuando llegue el expansor de macros.
   - La memoria en caliente de Guava (202 MB) es casi toda tokens de CPD recombinados enteros:
     guardar la huella de cada archivo y recombinar sólo los grupos que tocan lo que cambió.

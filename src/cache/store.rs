@@ -76,6 +76,7 @@ impl Store {
                     .as_mut()
                     .filter(|shard| shard.dirty)
                     .map(|shard| {
+                        shard.absorb(self.load(index));
                         shard.evict_to(self.shard_budget);
                         shard.dirty = false;
                         shard.serialize()

@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry as Slot;
 
 use super::codec::{Corrupt, Reader, Writer};
 use super::key::{CacheKey, checksum};
@@ -60,6 +61,21 @@ impl Shard {
         let mut bytes = MAGIC.to_vec();
         bytes.extend(writer.into_bytes());
         bytes
+    }
+
+    pub fn absorb(&mut self, stored: Self) {
+        let intact = stored.entries.into_iter().filter(|(_, entry)| entry.is_intact());
+        for (key, entry) in intact {
+            match self.entries.entry(key) {
+                Slot::Occupied(mut kept) => {
+                    let kept = kept.get_mut();
+                    kept.stamp = kept.stamp.max(entry.stamp);
+                }
+                Slot::Vacant(slot) => {
+                    slot.insert(entry);
+                }
+            }
+        }
     }
 
     pub fn evict_to(&mut self, budget: usize) {

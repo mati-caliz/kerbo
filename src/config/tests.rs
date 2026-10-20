@@ -56,6 +56,16 @@ fn reads_the_language_of_the_messages() {
 }
 
 #[test]
+fn reads_the_cache_size_cap() {
+    assert_eq!(
+        load("[cache]\nmax_megabytes = 64\n").map(|config| config.cache_max_megabytes()),
+        Ok(Some(64))
+    );
+    assert_eq!(load("").map(|config| config.cache_max_megabytes()), Ok(None));
+    assert!(load("[cache]\nmax_mb = 64\n").is_err());
+}
+
+#[test]
 fn applies_preset_adjustments_and_exceptions_in_order() {
     let config = load(CONFIG).expect("la configuración es válida");
     assert_eq!(config.deviations(), 5);

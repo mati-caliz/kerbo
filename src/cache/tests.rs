@@ -3,11 +3,12 @@ use std::path::{Path, PathBuf};
 
 use tree_sitter::Parser;
 
+use super::budget::{self, DEFAULT_MAX_BYTES};
 use super::codec::{Corrupt, Reader, Writer};
 use super::key::CacheKey;
 use super::shard::{Entry, Shard};
 use super::store::Store;
-use super::{AnalysisCache, AnalysisSubject, DEFAULT_MAX_BYTES, analysis_codec, location};
+use super::{AnalysisCache, AnalysisSubject, analysis_codec, location};
 use crate::analysis::{FileAnalysis, analyze};
 use crate::config::Config;
 use crate::language::Language;
@@ -221,6 +222,35 @@ fn stored_entries_survive_a_new_process_and_corruption_is_ignored() {
 }
 
 #[test]
+fn two_processes_writing_the_same_shard_keep_both_entries() {
+    let tree = TempTree::new("cache-concurrent");
+    let first = CacheKey::from_bits(1);
+    let second = CacheKey::from_bits(2);
+    assert_eq!(first.shard(), second.shard());
+    let one_process = Store::new(tree.path().to_path_buf(), DEFAULT_MAX_BYTES);
+    let other_process = Store::new(tree.path().to_path_buf(), DEFAULT_MAX_BYTES);
+    assert_eq!(one_process.get(first), None);
+    assert_eq!(other_process.get(second), None);
+    one_process.put(first, b"del primero");
+    other_process.put(second, b"del segundo");
+    one_process.persist();
+    other_process.persist();
+    let reopened = Store::new(tree.path().to_path_buf(), DEFAULT_MAX_BYTES);
+    assert_eq!(reopened.get(first).as_deref(), Some(b"del primero".as_slice()));
+    assert_eq!(reopened.get(second).as_deref(), Some(b"del segundo".as_slice()));
+}
+
+#[test]
+fn the_size_cap_comes_from_the_variable_then_the_config_then_the_default() {
+    let megabytes = |count: usize| count * 1024 * 1024;
+    assert_eq!(budget::resolve(Some("64".into()), Some(32)), megabytes(64));
+    assert_eq!(budget::resolve(None, Some(32)), megabytes(32));
+    assert_eq!(budget::resolve(Some("mucho".into()), Some(32)), megabytes(32));
+    assert_eq!(budget::resolve(None, None), DEFAULT_MAX_BYTES);
+    assert_eq!(DEFAULT_MAX_BYTES, megabytes(256));
+}
+
+#[test]
 fn eviction_drops_the_least_recently_used_entries_first() {
     let mut shard = Shard::default();
     let old = CacheKey::from_bits(1);
@@ -315,5 +345,5 @@ fn caller_is_too_complex(outcome: &ScanOutcome) -> bool {
 #[test]
 fn the_default_directory_lives_under_the_user_cache() {
     assert!(location::default_directory().is_some());
-    assert!(AnalysisCache::open_default().is_some());
+    assert!(AnalysisCache::open_default(None).is_some());
 }

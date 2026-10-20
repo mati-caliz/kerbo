@@ -1,4 +1,5 @@
 mod analysis_codec;
+mod budget;
 mod codec;
 mod key;
 mod lint_codec;
@@ -21,7 +22,6 @@ use crate::language::Language;
 use crate::limits::Limits;
 use crate::rules::RuleId;
 
-pub const DEFAULT_MAX_BYTES: usize = 256 * 1024 * 1024;
 const FORMAT_DIRECTORY: &str = "analysis-v2";
 const FORMAT_VERSION: u64 = 3;
 
@@ -39,9 +39,9 @@ pub struct AnalysisCache {
 }
 
 impl AnalysisCache {
-    pub fn open_default() -> Option<Self> {
-        location::default_directory()
-            .map(|directory| Self::open(directory.join(FORMAT_DIRECTORY), DEFAULT_MAX_BYTES))
+    pub fn open_default(configured_megabytes: Option<usize>) -> Option<Self> {
+        let max_bytes = budget::max_bytes(configured_megabytes);
+        location::default_directory().map(|directory| Self::open(directory.join(FORMAT_DIRECTORY), max_bytes))
     }
 
     pub fn open(directory: PathBuf, max_bytes: usize) -> Self {

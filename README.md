@@ -57,8 +57,11 @@ hay y `2` si algo no se pudo leer o la configuración es inválida.
 caché por contenido, así la corrida siguiente sólo analiza lo que cambió (y lo que se compara entre
 archivos, como los bloques duplicados, se recombina con lo guardado). Vive en la carpeta de caché
 del usuario (`~/.cache/kerbo`, `~/Library/Caches/kerbo` o `%LOCALAPPDATA%\kerbo`; otra con
-`KERBO_CACHE_DIR`), se comparte entre proyectos y clones, ocupa como mucho 256 MB y se descarta
-sola cuando cambia el binario o la configuración que afecta a un archivo. Si se rompe, se ignora.
+`KERBO_CACHE_DIR`), se comparte entre proyectos y clones, ocupa como mucho 256 MB (otro tope con
+`max_megabytes` en la sección `[cache]` de `kerbo.toml`, o con `KERBO_CACHE_MAX_MB`, que manda
+sobre el archivo) y se descarta sola cuando cambia el binario o la configuración que afecta a un
+archivo. Dos corridas a la vez no se pisan: antes de escribir, cada una relee lo que dejó la otra.
+Si se rompe, se ignora.
 
 Los mensajes salen en español o en inglés. Manda `--lang en` (o `es`), después `lang` en
 `kerbo.toml` y después el locale del sistema (`LC_ALL`, `LC_MESSAGES`, `LANG`); sin nada de eso,
@@ -197,6 +200,9 @@ reason = "se reescribe en el primer trimestre"
 [[ignore]]
 paths = ["generated/**"]
 reason = "lo genera el compilador de protos"
+
+[cache]
+max_megabytes = 512               # opcional: el tope de la caché, 256 de fábrica
 ```
 
 | Preset | Archivo | Función | Ciclomática | Cognitiva | Parámetros |
