@@ -136,18 +136,56 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   - El arnés queda en el repo y corre antes de cada versión, así una regresión en el consumo se
     ve igual que una en la paridad.
 
-### 4. Editor (LSP) e inspecciones de IntelliJ como mapa (el LSP, hecho en 0.5)
+### 4. Editor (LSP) e inspecciones de IntelliJ como mapa (hecho: el LSP en 0.5, el mapa en main)
 
 - `kerbo lsp`: los problemas de kerbo subrayados mientras se escribe, en IntelliJ (de fábrica en
   Ultimate, con LSP4IJ en Community), VS Code, Neovim y Zed. Los arreglos como acción rápida
   pasan a la etapa 8: ninguna regla de hoy tiene un arreglo mecánico (todas piden un nombre o
   partir una función).
 - Correr Qodana Community (las inspecciones de IntelliJ en CI) sobre repos reales y contar qué
-  inspecciones aparecen más: esa lista ordena las reglas de las etapas de Java y de flujo de
-  datos, y Qodana pasa a ser otra referencia del arnés de paridad. Pendiente: en una máquina de
-  8 GB compartida con otros servicios, Qodana sobre un proyecto Maven de 600 archivos no termina
-  ni limitado a `src/main` (más de 30 minutos, cuatro núcleos y la máquina en swap). Necesita una
-  máquina dedicada con 16 GB.
+  inspecciones aparecen más (hecho, 2026-10-20): esa lista ordena las reglas de las etapas 8 y 9.
+  Qodana for JVM Community 2026.2.4 con el perfil `Default` del IDE, que es lo que IntelliJ
+  subraya al escribir (`qodana.starter` y `qodana.recommended`, los perfiles de fábrica de
+  Qodana, dan 11 y 21 problemas en un repo de 640 archivos: muy poco para ordenar nada), sobre
+  tres servicios Spring Boot: dos Maven de 640 y 3.060 archivos y uno Gradle de 618. 5.479
+  problemas en 63 inspecciones:
+
+  | Inspección | Problemas | Repos | Etapa |
+  |---|---|---|---|
+  | Declaración sin usar (`unused`) | 3.919 | 3 | 10, con puntos de entrada de frameworks |
+  | Getters y setters que podría generar Lombok | 384 | 2 | — |
+  | `getFirst()` en vez de `get(0)`, `List.of`, `Math.clamp`, bloques de texto | 362 | 3 | 8 |
+  | Parámetro que siempre recibe lo mismo, retorno que nadie usa o siempre igual | 259 | 3 | 10 |
+  | Valor por defecto repetido en una anotación, `throws` de más, escapes Unicode de más | 134 | 3 | 8 |
+  | Anotaciones de nulabilidad que no coinciden con el método que redefinen | 86 | 3 | 9 |
+  | Nulos y flujo de datos (`DataFlowIssue`, `Optional.get()` sin chequear, `ConstantValue`) | 59 | 3 | 9 |
+  | Tipo privado expuesto en una firma pública | 33 | 3 | 8 |
+  | Recursos sin `try` con recursos | 10 | 2 | 9 |
+
+  Lo que la tabla dice para kerbo:
+  - `unused` es el 72 % y casi todo es ruido: Community no trae el soporte de Spring ni de JPA
+    de Ultimate, así que cada bean sin `new` y cada campo de entidad que llena Hibernate cuenta
+    como sin usar. Una regla de código muerto en Java sin entender `@Component`, `@Bean`,
+    `@Entity` y los controllers sería igual de inútil.
+  - Lo más frecuente que kerbo puede hacer sin tipos es modernizar la API (`getFirst()` y
+    `getLast()` solas son 251) y sacar redundancias, y todo tiene arreglo mecánico: va primero
+    en la etapa 8.
+  - En flujo de datos los nulos le ganan a los recursos 145 a 10, y las excepciones tragadas no
+    aparecen (el perfil `Default` no las revisa): la etapa 9 arranca por nulos.
+
+  Cómo correrlo, porque lo de fábrica da un resultado que parece válido y no lo es:
+  - Sin `projectJDK` en `qodana.yaml`, la imagen sólo tiene el JDK del IDE, analiza con un nivel
+    de lenguaje viejo y reporta miles de errores de sintaxis y de API que no existen.
+  - Un proyecto con archivos de Eclipse (`.project`) además del `pom.xml` no abre sin
+    `--property=project.open.type=Maven`.
+  - No montar el `~/.m2` del usuario: Qodana le escribe un `settings.xml` con su propio
+    repositorio local. La caché va en un volumen en `/data/cache`.
+  - Con 6 núcleos y 12 GB, abrir el proyecto (importar Maven o Gradle) lleva de 3 a 10 minutos
+    en frío y el análisis de 1 a 3,5 minutos; el repo de 3.060 archivos usa 5 GB. En la
+    máquina de 8 GB compartida no terminaba.
+
+  Pendiente: sumarlo al arnés de paridad como referencia cuando haya una regla de Java que
+  coincida con una inspección.
 
 ### 5. Más reglas universales y Rust (hecho: las reglas en 0.6, Rust en main)
 
@@ -286,10 +324,14 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   linter rápido de Java.
 - Las que tienen un arreglo mecánico (imports sin usar, `final` que falta, modificadores
   redundantes) lo traen como acción rápida del LSP y como parche en `--format agent`.
+- Primero, por lo que más aparece en Qodana: la API nueva que reemplaza a la vieja
+  (`getFirst()`, `List.of`, `Math.clamp`, bloques de texto) y las redundancias (valor por defecto
+  repetido en una anotación, escapes Unicode de más).
 
 ### 9. Flujo de datos sin compilar
 
-- Lo de SpotBugs sobre el código fuente: nulos, recursos sin cerrar, excepciones tragadas.
+- Lo de SpotBugs sobre el código fuente: nulos, recursos sin cerrar, excepciones tragadas, en
+  ese orden (en Qodana los nulos son 145 y los recursos 10).
 - Contaminación de entradas hacia SQL, comandos, rutas y HTML, en todos los lenguajes.
 
 ### 10. Go, Python, TypeScript y shell completos
