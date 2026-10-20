@@ -1,7 +1,11 @@
-use super::catalog::{BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text};
+use super::catalog::{
+    BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text, with_subject,
+};
 use crate::lint::{ImportRedundancy, LintKind};
 use crate::rules::RuleId;
 
+mod deploy;
+mod dockerfile;
 mod explanations;
 
 #[derive(Debug)]
@@ -76,6 +80,9 @@ impl Catalog for Spanish {
             RuleId::RedundantModifier => "Un modificador que ya está implícito",
             RuleId::FinalParameter => "Un parámetro que no es final",
             RuleId::FinalClass => "Una clase que nadie puede heredar y no es final",
+            RuleId::Migration(rule) => deploy::migration(rule).description,
+            RuleId::Dockerfile(rule) => dockerfile::dockerfile(rule).description,
+            RuleId::Compose(rule) => deploy::compose(rule).description,
         }
     }
 
@@ -139,6 +146,7 @@ impl Catalog for Spanish {
             Message::Lint { kind, subject } => self.lint(*kind, subject),
             Message::Cheat(cheat) => self.cheat(cheat),
             Message::Rule(rule) => self.rule_description(*rule).to_owned(),
+            Message::Violation { rule, subject } => with_subject(self.rule_description(*rule), subject),
         }
     }
 

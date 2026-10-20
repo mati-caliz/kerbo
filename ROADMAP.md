@@ -528,14 +528,99 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   decide el orden y cuántos pasos en paralelo según la memoria libre.
 - Vulnerabilidades de dependencias con OSV y secretos versionados.
 
-### 12. Migraciones y contenedores
+### 12. Migraciones y contenedores (hecho en main)
 
-- **Migraciones peligrosas** en drizzle, Prisma, Flyway y Alembic: índices sin `CONCURRENTLY`,
-  `NOT NULL` sin default, cambios de tipo en tablas grandes, renombres de algo que el código
-  desplegado todavía usa. Lo que bloquea una tabla en Postgres se marca antes de llegar a
-  producción.
-- **Dockerfile** contra hadolint, y reglas para compose: límite de memoria en cada servicio y
-  healthchecks con `start_period` e intervalos razonables.
+- **Migraciones peligrosas** en drizzle, Prisma, Flyway y Alembic (hecho): las nueve reglas de
+  squawk que cubren lo que bloquea o rompe en Postgres, con sus nombres y su criterio
+  (`require-concurrent-index-creation`, `require-concurrent-index-deletion`,
+  `adding-required-field`, `adding-not-nullable-field`, `changing-column-type`,
+  `renaming-column`, `renaming-table`, `ban-drop-column`, `ban-drop-table`). El SQL pasa por un
+  lexer propio (strings, `$$`, comentarios anidados, identificadores entre comillas) y un parser
+  de sentencias chico: tree-sitter-sequel pide `cc ~1.2`, que choca con el `cc` del resto y con
+  `multiple-versions = "deny"`, y su gramática es SQL genérico. Se toma, como squawk con
+  `--assume-in-transaction`, que cada archivo corre en una transacción, porque así lo corren las
+  cuatro herramientas en Postgres. Alembic se lee sobre el árbol de Python que ya existe: el
+  `upgrade()` de los archivos que importan `alembic`, `op.*` y `batch_op.*` traducidos a la regla
+  del SQL que generan (incluido el índice de un `sa.Column(index=True)`), el SQL de cualquier
+  `.execute(...)` analizado como migración y las ramas de otro dialecto salteadas.
+
+  Paridad contra squawk 2.70.0 real (en Docker, una corrida, 2026-10-20) sobre 1.848 migraciones
+  de lobe-chat (drizzle), documenso, trigger.dev y cal.com (Prisma), conductor (Flyway) y
+  awesome-compose: **1.598 de 1.598 avisos, sin sobrantes**, con las nueve reglas presentes.
+  Quedan afuera 15 archivos donde squawk da error de sintaxis (MySQL o SQLite). Alembic contra
+  squawk sobre el SQL que genera el propio Alembic en modo offline (`upgrade --sql` por revisión,
+  aislada) de airflow, superset, mlflow y redash: de 662 revisiones convierten 261 (el resto
+  importa la aplicación o consulta la base); por archivo y regla coinciden **117 de 118**, con 4
+  de más; contando cada aviso, 182 de 195 y 11 de más. Lo que falta son los `for` que repiten una
+  operación por tabla (kerbo marca la llamada una vez); lo que sobra, caminos que el modo
+  offline no recorre (`is_offline_mode()`, `try`/`except`, una operación que en offline levanta
+  una excepción y corta el resto), donde kerbo marca lo que corre en una migración real.
+  1.848 migraciones y 178 Dockerfiles se analizan en 0,08 s; squawk tarda 0,40 s con las
+  migraciones solas.
+- **Dockerfile** contra hadolint (hecho): 38 reglas DL, las más comunes primero por frecuencia
+  en los repos medidos, con el código como nombre (`dl3008`; `kerbo explain DL3008` también vale).
+  Parser propio de instrucciones (continuaciones, `# escape=`, comentarios dentro de un `RUN`,
+  heredocs, `ONBUILD`, forma JSON) y del shell de cada `RUN`, que separa comandos y banderas como
+  ShellCheck: cada comando cuenta dos veces para DL3059 porque ShellCheck lo ve como
+  `T_Redirecting` y como `T_SimpleCommand`, `[ ... ]` no es un comando y los pipes adentro de
+  `$( )` cuentan para DL4006. `recommended` apaga las de nivel `info` y `minimal` deja sólo las de
+  nivel `error`, como hadolint las clasifica.
+
+  Paridad contra hadolint 2.15.1 real (en Docker, con `--disable-ignore-pragma`, una corrida,
+  2026-10-20) sobre 178 Dockerfiles de awesome-compose, docker-stacks, airflow, superset, mlflow,
+  nextcloud/docker, mastodon, sentry self-hosted, grafana y redash: **439 de 439 avisos de las
+  reglas cubiertas, sin sobrantes**. Quedan afuera 23 archivos donde hadolint no parsea (DL1000:
+  casi todos un heredoc seguido de otra instrucción). hadolint tarda 2,1 s (7,4 s de CPU, con
+  ShellCheck) en esos 178 archivos y kerbo 0,025 s.
+
+  Cubiertas: DL3000, DL3002 a DL3004, DL3006 a DL3009, DL3012 a DL3016, DL3018 a DL3025, DL3027,
+  DL3029, DL3032, DL3042, DL3045, DL3047, DL3059, DL3061, DL3062, DL3064, DL3066, DL3067, DL4000,
+  DL4001, DL4003, DL4004 y DL4006.
+- **docker compose** (hecho, criterio propio porque no hay herramienta de referencia), sobre la
+  gramática tree-sitter-yaml 0.7.2 (MIT, pasa cargo-deny) con anclas y `<<:` resueltos:
+  `compose-memory-limit` (cada servicio con `image` o `build` necesita
+  `deploy.resources.limits.memory` o `mem_limit`; los que usan `extends` y los fragmentos de un
+  override, sin `image` ni `build`, se saltean), `compose-healthcheck-start-period` (un
+  healthcheck activo sin `start_period`) y `compose-healthcheck-interval` (`interval` entre 5 s y
+  5 min, `timeout` menor que el intervalo; sin `interval` vale el de Docker, 30 s). Sobre los 132
+  archivos compose de los mismos repos marca 333 avisos en 73 archivos.
+- Integración: tres lenguajes nuevos al final de `Language` (`Sql`, `Dockerfile`, `Compose`) y
+  dos pilas para `--language` y `kerbo.toml` (`sql`, `docker`); `Language::grammar()` y
+  `Language::profile()` pasan a devolver `Option` porque SQL y Dockerfile no tienen gramática de
+  tree-sitter ni métricas de código. Las reglas nuevas son tres familias de `RuleId`
+  (`Migration`, `Dockerfile`, `Compose`) que se prenden o se apagan; en `Limits` van como bits,
+  así el arreglo de umbrales no crece con cada regla. Lo encontrado entra en la caché por
+  contenido como una lista más del análisis de cada archivo (versión de formato 2). Textos en
+  español e inglés en `src/i18n/*/deploy.rs` y `src/i18n/*/dockerfile.rs`, con `kerbo explain`
+  para cada regla.
+- Pendientes:
+  - **Renombres que el código desplegado todavía usa**: no hay forma confiable sin compilar. Los
+    nombres de columnas pasan por los mapeos del ORM (`@map` de Prisma, `name=` de SQLAlchemy,
+    los nombres de drizzle), cambian de caso y coinciden con palabras comunes (`name`, `status`),
+    así que buscar el nombre viejo en el código da falsos positivos y negativos. Mientras tanto,
+    como squawk, todo renombre se marca. Lo confiable sería leer el esquema del ORM (Prisma,
+    drizzle, modelos de SQLAlchemy) y cruzarlo con la migración.
+  - El resto de squawk: `adding-foreign-key-constraint`, `constraint-missing-not-valid`,
+    `ban-drop-not-null`, `ban-drop-constraint`, `adding-field-with-default` con default volátil,
+    `adding-serial-primary-key-field`, `disallowed-unique-constraint`,
+    `ban-concurrent-index-creation-in-transaction`, `require-timeout-settings`,
+    `transaction-nesting`, `renaming-object` y las de preferencia (`prefer-bigint-over-int`,
+    `prefer-text-field`, `prefer-timestamptz`, `prefer-identity`, `prefer-robust-stmts`).
+  - Alembic: expandir los `for` sobre listas literales para contar una vez por tabla, seguir las
+    funciones auxiliares que llaman a `op` desde fuera de `upgrade()`, y medir paridad sobre las
+    401 revisiones que el modo offline no convierte (habría que levantar cada aplicación).
+  - Migraciones de Django y Rails (`AddIndex` sin `AddIndexConcurrently`, `add_index` sin
+    `algorithm: :concurrently`), con strong_migrations como referencia de Rails.
+  - Las reglas de hadolint que faltan (sobre todo DL3046, DL3033 y DL4005) y las de ShellCheck
+    sobre el shell de cada `RUN`, que es la etapa 10.
+  - Los Dockerfile y compose en carpetas ocultas (`.devcontainer/`, `.github/`) no entran cuando
+    se analiza una carpeta, porque el recorrido saltea lo oculto para todos los lenguajes; sí
+    cuando se los nombra.
+  - `squawk-ignore` y `# hadolint ignore=` no se respetan (las excepciones van en `kerbo.toml`
+    con su motivo); que el antitrampa los marque como supresión nueva, como `noqa` o
+    `eslint-disable`.
+  - compose: el límite de CPU, `restart`, imágenes sin versión fija (como DL3006/DL3007) y los
+    servicios que dependen de otro sin `condition: service_healthy`.
 
 ### 13. Formateo propio
 

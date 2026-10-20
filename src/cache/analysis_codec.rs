@@ -1,6 +1,7 @@
 use super::codec::{Corrupt, Reader, Writer};
 use super::lint_codec::{read_lint, write_lint};
 use crate::analysis::FileAnalysis;
+use crate::deploy::Violation;
 use crate::duplicates::{CpdToken, DuplicateUnits, RepeatedBlock, RepeatedKind, SyntaxNode};
 use crate::metrics::FunctionMetrics;
 use crate::metrics::commented::CommentedCode;
@@ -37,6 +38,11 @@ pub fn encode(analysis: &FileAnalysis) -> Vec<u8> {
     });
     write_units(&mut writer, analysis.duplicate_units.as_ref());
     writer.list(&analysis.lints, write_lint);
+    writer.list(&analysis.violations, |writer, found| {
+        writer.text(found.rule.as_str());
+        write_position(writer, found.line, found.column);
+        writer.text(&found.subject);
+    });
     writer.into_bytes()
 }
 
@@ -75,6 +81,14 @@ pub fn decode(bytes: &[u8]) -> Result<FileAnalysis, Corrupt> {
         })?,
         duplicate_units: read_units(&mut reader)?,
         lints: reader.list(read_lint)?,
+        violations: reader.list(|reader| {
+            Ok(Violation {
+                rule: reader.text()?.parse().map_err(|_| Corrupt)?,
+                line: reader.size()?,
+                column: reader.size()?,
+                subject: reader.text()?,
+            })
+        })?,
     };
     if reader.is_empty() {
         Ok(analysis)

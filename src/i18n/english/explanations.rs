@@ -125,5 +125,8 @@ pub const fn explanation(rule: RuleId) -> Explanation {
         RuleId::RedundantModifier => REDUNDANT_MODIFIER,
         RuleId::FinalParameter => FINAL_PARAMETER,
         RuleId::FinalClass => FINAL_CLASS,
+        RuleId::Migration(rule) => super::deploy::migration(rule).explanation,
+        RuleId::Dockerfile(rule) => super::dockerfile::dockerfile(rule).explanation,
+        RuleId::Compose(rule) => super::deploy::compose(rule).explanation,
     }
 }

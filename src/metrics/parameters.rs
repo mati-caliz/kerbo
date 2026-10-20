@@ -140,7 +140,7 @@ mod tests {
         let source = "class A:\n    if flag:\n        def kill(self, signal):\n            pass\n\ndef outer(self):\n    def inner(self):\n        pass\n";
         let mut parser = Parser::new();
         parser
-            .set_language(&Language::Python.grammar())
+            .set_language(&Language::Python.grammar().expect("tiene gramática"))
             .expect("la gramática carga");
         let counts: Vec<(String, Option<usize>)> = analyze(
             &mut parser,

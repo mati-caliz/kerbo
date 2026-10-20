@@ -9,7 +9,7 @@ use crate::rules::RuleId;
 pub(super) fn analyze_rust(source: &str, limits: Limits) -> FileAnalysis {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Rust.grammar())
+        .set_language(&Language::Rust.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     analyze(&mut parser, Language::Rust, source.as_bytes(), limits).expect("el archivo se parsea")
 }

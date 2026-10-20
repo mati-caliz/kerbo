@@ -1,11 +1,9 @@
 use std::str::FromStr;
 
-use serde::{Deserialize, Serialize};
-
+use super::families::{self, ComposeRule, DockerfileRule, MigrationRule};
 use crate::i18n::Problem;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RuleId {
     FileLength,
     FunctionLength,
@@ -27,10 +25,15 @@ pub enum RuleId {
     RedundantModifier,
     FinalParameter,
     FinalClass,
+    Migration(MigrationRule),
+    Dockerfile(DockerfileRule),
+    Compose(ComposeRule),
 }
 
 impl RuleId {
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; Self::CODE_RULES.len() + families::FAMILY_RULES] =
+        families::with_families(Self::CODE_RULES);
+    pub const CODE_RULES: [Self; 20] = [
         Self::FileLength,
         Self::FunctionLength,
         Self::CyclomaticComplexity,
@@ -53,7 +56,7 @@ impl RuleId {
         Self::FinalClass,
     ];
 
-    pub const fn index(self) -> usize {
+    pub fn index(self) -> usize {
         match self {
             Self::FileLength => 0,
             Self::FunctionLength => 1,
@@ -75,6 +78,9 @@ impl RuleId {
             Self::RedundantModifier => 17,
             Self::FinalParameter => 18,
             Self::FinalClass => 19,
+            Self::Migration(rule) => families::migration_index(rule, Self::CODE_RULES.len()),
+            Self::Dockerfile(rule) => families::dockerfile_index(rule, Self::CODE_RULES.len()),
+            Self::Compose(rule) => families::compose_index(rule, Self::CODE_RULES.len()),
         }
     }
 
@@ -100,6 +106,9 @@ impl RuleId {
             Self::RedundantModifier => "redundant-modifier",
             Self::FinalParameter => "final-parameter",
             Self::FinalClass => "final-class",
+            Self::Migration(rule) => rule.as_str(),
+            Self::Dockerfile(rule) => rule.as_str(),
+            Self::Compose(rule) => rule.as_str(),
         }
     }
 }
@@ -110,7 +119,7 @@ impl FromStr for RuleId {
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         Self::ALL
             .into_iter()
-            .find(|rule| rule.as_str() == text)
+            .find(|rule| rule.as_str().eq_ignore_ascii_case(text))
             .ok_or_else(|| Problem::UnknownRule(text.to_owned()))
     }
 }

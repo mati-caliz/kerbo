@@ -7,7 +7,7 @@ use crate::limits::Limits;
 fn python_complexities(source: &str) -> Vec<(String, Option<usize>, Option<usize>)> {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Python.grammar())
+        .set_language(&Language::Python.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     analyze(
         &mut parser,

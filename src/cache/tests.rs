@@ -37,7 +37,7 @@ const TYPESCRIPT_SOURCE: &str = "function pick(flag: boolean, value: number) {\n
 fn analysis_of(language: Language, source: &str, limits: Limits) -> FileAnalysis {
     let mut parser = Parser::new();
     parser
-        .set_language(&language.grammar())
+        .set_language(&language.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     analyze(&mut parser, language, source.as_bytes(), limits).expect("el archivo se parsea")
 }

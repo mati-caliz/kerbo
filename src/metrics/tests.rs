@@ -8,7 +8,7 @@ use crate::limits::Limits;
 fn analyze_source(language: Language, source: &str) -> FileAnalysis {
     let mut parser = Parser::new();
     parser
-        .set_language(&language.grammar())
+        .set_language(&language.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     analyze(&mut parser, language, source.as_bytes(), Limits::default()).expect("el archivo se parsea")
 }

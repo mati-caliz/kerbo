@@ -8,7 +8,7 @@ const SONAR_MIN_LINES_LIMIT: usize = 2;
 fn repeated(source: &str) -> Vec<(RepeatedKind, usize, usize)> {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::TypeScript.grammar())
+        .set_language(&Language::TypeScript.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("el archivo se parsea");
     let mut found: Vec<(RepeatedKind, usize, usize)> =

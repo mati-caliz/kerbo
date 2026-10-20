@@ -2,14 +2,17 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::analysis::FileAnalysis;
+use crate::deploy::violation_diagnostics;
 use crate::fix::Fix;
 use crate::i18n::Message;
 use crate::limits::Limits;
 use crate::metrics::FunctionMetrics;
 
+mod families;
 mod id;
 mod lints;
 
+pub use families::{ComposeRule, DockerfileRule, MigrationRule};
 pub use id::RuleId;
 
 const FIRST_LINE: usize = 1;
@@ -76,6 +79,7 @@ pub fn evaluate(file: &FileIdentity, analysis: &FileAnalysis, limits: Limits) ->
         .chain(short_name_diagnostics(file, analysis))
         .chain(commented_code_diagnostics(file, analysis))
         .chain(lints::lint_diagnostics(file, analysis))
+        .chain(violation_diagnostics(file, &analysis.violations, limits))
         .collect()
 }
 
@@ -284,7 +288,10 @@ fn message(finding: &Finding<'_>, name: &str) -> Message {
         | RuleId::StarImport
         | RuleId::RedundantModifier
         | RuleId::FinalParameter
-        | RuleId::FinalClass => Message::Rule(finding.rule),
+        | RuleId::FinalClass
+        | RuleId::Migration(_)
+        | RuleId::Dockerfile(_)
+        | RuleId::Compose(_) => Message::Rule(finding.rule),
     }
 }
 

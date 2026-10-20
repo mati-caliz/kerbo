@@ -1,0 +1,191 @@
+use std::fmt;
+
+use serde::de::{self, Unexpected, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use super::id::RuleId;
+
+const EXPECTED_RULE: &str = "una regla de kerbo";
+
+macro_rules! rule_family {
+    ($family:ident { $($variant:ident => $name:literal),+ $(,)? }) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub enum $family {
+            $($variant),+
+        }
+
+        impl $family {
+            pub const ALL: [Self; [$($name),+].len()] = [$(Self::$variant),+];
+
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $name),+
+                }
+            }
+
+            pub fn position(self) -> usize {
+                Self::ALL.iter().position(|rule| *rule == self).unwrap_or_default()
+            }
+        }
+    };
+}
+
+rule_family!(MigrationRule {
+    RequireConcurrentIndexCreation => "require-concurrent-index-creation",
+    RequireConcurrentIndexDeletion => "require-concurrent-index-deletion",
+    AddingRequiredField => "adding-required-field",
+    AddingNotNullableField => "adding-not-nullable-field",
+    ChangingColumnType => "changing-column-type",
+    RenamingColumn => "renaming-column",
+    RenamingTable => "renaming-table",
+    BanDropColumn => "ban-drop-column",
+    BanDropTable => "ban-drop-table",
+});
+
+rule_family!(DockerfileRule {
+    Dl3000 => "dl3000",
+    Dl3002 => "dl3002",
+    Dl3003 => "dl3003",
+    Dl3004 => "dl3004",
+    Dl3006 => "dl3006",
+    Dl3007 => "dl3007",
+    Dl3008 => "dl3008",
+    Dl3009 => "dl3009",
+    Dl3012 => "dl3012",
+    Dl3013 => "dl3013",
+    Dl3014 => "dl3014",
+    Dl3015 => "dl3015",
+    Dl3016 => "dl3016",
+    Dl3018 => "dl3018",
+    Dl3019 => "dl3019",
+    Dl3020 => "dl3020",
+    Dl3021 => "dl3021",
+    Dl3022 => "dl3022",
+    Dl3023 => "dl3023",
+    Dl3024 => "dl3024",
+    Dl3025 => "dl3025",
+    Dl3027 => "dl3027",
+    Dl3029 => "dl3029",
+    Dl3032 => "dl3032",
+    Dl3042 => "dl3042",
+    Dl3045 => "dl3045",
+    Dl3047 => "dl3047",
+    Dl3059 => "dl3059",
+    Dl3061 => "dl3061",
+    Dl3062 => "dl3062",
+    Dl3064 => "dl3064",
+    Dl3066 => "dl3066",
+    Dl3067 => "dl3067",
+    Dl4000 => "dl4000",
+    Dl4001 => "dl4001",
+    Dl4003 => "dl4003",
+    Dl4004 => "dl4004",
+    Dl4006 => "dl4006",
+});
+
+rule_family!(ComposeRule {
+    MemoryLimit => "compose-memory-limit",
+    HealthcheckStartPeriod => "compose-healthcheck-start-period",
+    HealthcheckInterval => "compose-healthcheck-interval",
+});
+
+pub const FAMILY_RULES: usize = MigrationRule::ALL.len() + DockerfileRule::ALL.len() + ComposeRule::ALL.len();
+
+pub const fn with_families<const CODE: usize, const TOTAL: usize>(code: [RuleId; CODE]) -> [RuleId; TOTAL] {
+    let mut all = [RuleId::FileLength; TOTAL];
+    let free = copy_rules(&mut all, &code);
+    let free = wrap_migrations(free, &MigrationRule::ALL);
+    let free = wrap_dockerfile(free, &DockerfileRule::ALL);
+    wrap_compose(free, &ComposeRule::ALL);
+    all
+}
+
+const fn copy_rules<'slots>(slots: &'slots mut [RuleId], rules: &[RuleId]) -> &'slots mut [RuleId] {
+    match (slots, rules) {
+        ([slot, free @ ..], [rule, others @ ..]) => {
+            *slot = *rule;
+            copy_rules(free, others)
+        }
+        (free, _) => free,
+    }
+}
+
+const fn wrap_migrations<'slots>(
+    slots: &'slots mut [RuleId],
+    rules: &[MigrationRule],
+) -> &'slots mut [RuleId] {
+    match (slots, rules) {
+        ([slot, free @ ..], [rule, others @ ..]) => {
+            *slot = RuleId::Migration(*rule);
+            wrap_migrations(free, others)
+        }
+        (free, _) => free,
+    }
+}
+
+const fn wrap_dockerfile<'slots>(
+    slots: &'slots mut [RuleId],
+    rules: &[DockerfileRule],
+) -> &'slots mut [RuleId] {
+    match (slots, rules) {
+        ([slot, free @ ..], [rule, others @ ..]) => {
+            *slot = RuleId::Dockerfile(*rule);
+            wrap_dockerfile(free, others)
+        }
+        (free, _) => free,
+    }
+}
+
+const fn wrap_compose<'slots>(slots: &'slots mut [RuleId], rules: &[ComposeRule]) -> &'slots mut [RuleId] {
+    match (slots, rules) {
+        ([slot, free @ ..], [rule, others @ ..]) => {
+            *slot = RuleId::Compose(*rule);
+            wrap_compose(free, others)
+        }
+        (free, _) => free,
+    }
+}
+
+pub fn migration_index(rule: MigrationRule, code_rules: usize) -> usize {
+    code_rules.saturating_add(rule.position())
+}
+
+pub fn dockerfile_index(rule: DockerfileRule, code_rules: usize) -> usize {
+    code_rules
+        .saturating_add(MigrationRule::ALL.len())
+        .saturating_add(rule.position())
+}
+
+pub fn compose_index(rule: ComposeRule, code_rules: usize) -> usize {
+    code_rules
+        .saturating_add(MigrationRule::ALL.len())
+        .saturating_add(DockerfileRule::ALL.len())
+        .saturating_add(rule.position())
+}
+
+impl Serialize for RuleId {
+    fn serialize<Target: Serializer>(&self, serializer: Target) -> Result<Target::Ok, Target::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+struct RuleVisitor;
+
+impl Visitor<'_> for RuleVisitor {
+    type Value = RuleId;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(EXPECTED_RULE)
+    }
+
+    fn visit_str<Failure: de::Error>(self, text: &str) -> Result<RuleId, Failure> {
+        text.parse()
+            .map_err(|_| Failure::invalid_value(Unexpected::Str(text), &self))
+    }
+}
+
+impl<'de> Deserialize<'de> for RuleId {
+    fn deserialize<Source: Deserializer<'de>>(deserializer: Source) -> Result<Self, Source::Error> {
+        deserializer.deserialize_str(RuleVisitor)
+    }
+}

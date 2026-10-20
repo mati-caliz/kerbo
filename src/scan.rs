@@ -49,15 +49,17 @@ impl ParserPool {
     fn parser(&mut self, language: Language) -> Result<&mut Parser, String> {
         match self.parsers.entry(language) {
             Entry::Occupied(entry) => Ok(entry.into_mut()),
-            Entry::Vacant(entry) => {
-                let mut parser = Parser::new();
-                parser
-                    .set_language(&language.grammar())
-                    .map_err(|error| error.to_string())?;
-                Ok(entry.insert(parser))
-            }
+            Entry::Vacant(entry) => Ok(entry.insert(parser_for(language)?)),
         }
     }
+}
+
+fn parser_for(language: Language) -> Result<Parser, String> {
+    let mut parser = Parser::new();
+    if let Some(grammar) = language.grammar() {
+        parser.set_language(&grammar).map_err(|error| error.to_string())?;
+    }
+    Ok(parser)
 }
 
 #[derive(Debug)]
@@ -125,8 +127,7 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
     if config.is_ignored(relative) {
         return Some(Vec::new());
     }
-    let mut parser = Parser::new();
-    parser.set_language(&file.language.grammar()).ok()?;
+    let mut parser = parser_for(file.language).ok()?;
     let limits = config.limits_for(relative, file.language, file.is_test);
     let crate_macros = MacroIndex::shared().crate_of(file.language, &file.identity.absolute);
     let unit = SourceUnit {

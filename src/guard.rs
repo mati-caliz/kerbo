@@ -167,12 +167,15 @@ fn count_tests(markers: &[Marker]) -> usize {
 }
 
 fn markers_of(source: &str, language: Language) -> Vec<Marker> {
+    let (Some(grammar), Some(profile)) = (language.grammar(), language.profile()) else {
+        return Vec::new();
+    };
     let mut parser = Parser::new();
-    if parser.set_language(&language.grammar()).is_err() {
+    if parser.set_language(&grammar).is_err() {
         return Vec::new();
     }
     parser.parse(source, None).map_or_else(Vec::new, |tree| {
-        find_markers(tree.root_node(), source.as_bytes(), language.profile())
+        find_markers(tree.root_node(), source.as_bytes(), profile)
     })
 }
 
@@ -227,7 +230,10 @@ fn marker_message(rule: RuleId, marker: &Marker) -> Message {
         | RuleId::StarImport
         | RuleId::RedundantModifier
         | RuleId::FinalParameter
-        | RuleId::FinalClass => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
+        | RuleId::FinalClass
+        | RuleId::Migration(_)
+        | RuleId::Dockerfile(_)
+        | RuleId::Compose(_) => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
     }
 }
 

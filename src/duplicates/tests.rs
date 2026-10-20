@@ -13,7 +13,7 @@ const SMALL_TILE_LIMIT: usize = 9;
 fn units_of(language: Language, style: DuplicateStyle, source: &str) -> DuplicateUnits {
     let mut parser = Parser::new();
     parser
-        .set_language(&language.grammar())
+        .set_language(&language.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("el archivo se parsea");
     duplicate_units(tree.root_node(), source.as_bytes(), style, SMALL_TILE_LIMIT)
@@ -205,7 +205,7 @@ fn go_nodes_follow_the_shape_and_order_of_go_ast() {
 fn go_files_that_do_not_parse_are_left_out() {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Go.grammar())
+        .set_language(&Language::Go.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let source = "package p\nfunc f( {";
     let tree = parser.parse(source, None).expect("el archivo se parsea");

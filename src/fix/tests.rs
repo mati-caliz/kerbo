@@ -7,7 +7,7 @@ use crate::syntax::descendants;
 fn parse(source: &str) -> Tree {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Java.grammar())
+        .set_language(&Language::Java.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     parser.parse(source, None).expect("el archivo se parsea")
 }

@@ -3,13 +3,24 @@ use std::str::FromStr;
 use clap::ValueEnum;
 use serde::Deserialize;
 
+use crate::deploy;
 use crate::i18n::Problem;
 use crate::language::Language;
 use crate::rules::RuleId;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
-    values: [Option<u32>; RuleId::ALL.len()],
+    values: [Option<u32>; RuleId::CODE_RULES.len()],
+    silenced_families: u64,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            values: [None; RuleId::CODE_RULES.len()],
+            silenced_families: ALL_FAMILIES_SILENCED,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,11 +39,15 @@ pub enum Preset {
 }
 
 const ALWAYS_REPORTED: Option<u32> = Some(0);
+const FAMILY_LIMIT: usize = 0;
+const ALL_FAMILIES_SILENCED: u64 = u64::MAX;
+const NO_FAMILY_SILENCED: u64 = 0;
 const GO_STRICT: [Option<usize>; 5] = [Some(400), Some(80), Some(10), Some(15), Some(4)];
 const PYTHON_STRICT: [Option<usize>; 5] = [None, None, Some(10), None, Some(6)];
 const JAVA_STRICT: [Option<usize>; 5] = [Some(500), Some(80), Some(8), Some(15), Some(5)];
 const ECMASCRIPT_STRICT: [Option<usize>; 5] = [Some(400), Some(120), Some(10), Some(15), Some(4)];
 const RUST_STRICT: [Option<usize>; 5] = [None, Some(80), None, Some(15), Some(4)];
+const UNMEASURED_STRICT: [Option<usize>; 5] = [None; 5];
 const RUST_UNMEASURED: &[RuleId] = &[
     RuleId::FileLength,
     RuleId::CyclomaticComplexity,
@@ -75,7 +90,12 @@ impl DuplicateLimits {
     const fn for_language(self, language: Language) -> usize {
         match language {
             Language::Go => self.nodes,
-            Language::Python | Language::Java | Language::Rust => self.tokens,
+            Language::Python
+            | Language::Java
+            | Language::Rust
+            | Language::Sql
+            | Language::Dockerfile
+            | Language::Compose => self.tokens,
             Language::TypeScript | Language::Tsx | Language::JavaScript => self.lines,
         }
     }
@@ -86,7 +106,8 @@ const MINIMAL: [Option<usize>; 5] = [Some(1500), Some(300), Some(25), Some(30), 
 impl Limits {
     fn with_metrics([file, function, cyclomatic, cognitive, parameters]: [Option<usize>; 5]) -> Self {
         let mut limits = Self {
-            values: [ALWAYS_REPORTED; RuleId::ALL.len()],
+            values: [ALWAYS_REPORTED; RuleId::CODE_RULES.len()],
+            silenced_families: NO_FAMILY_SILENCED,
         };
         let metrics = [
             (RuleId::FileLength, file),
@@ -102,15 +123,26 @@ impl Limits {
     }
 
     pub fn get(self, rule: RuleId) -> Option<usize> {
-        self.values
-            .get(rule.index())
-            .copied()
-            .flatten()
-            .and_then(|value| usize::try_from(value).ok())
+        family_bit(rule).map_or_else(
+            || {
+                self.values
+                    .get(rule.index())
+                    .copied()
+                    .flatten()
+                    .and_then(|value| usize::try_from(value).ok())
+            },
+            |bit| (self.silenced_families & bit == 0).then_some(FAMILY_LIMIT),
+        )
     }
 
     pub fn with_rule(mut self, rule: RuleId, max: Option<usize>) -> Self {
-        if let Some(slot) = self.values.get_mut(rule.index()) {
+        if let Some(bit) = family_bit(rule) {
+            self.silenced_families = if max.is_some() {
+                self.silenced_families & !bit
+            } else {
+                self.silenced_families | bit
+            };
+        } else if let Some(slot) = self.values.get_mut(rule.index()) {
             *slot = max.map(|value| u32::try_from(value).unwrap_or(u32::MAX));
         }
         self
@@ -119,6 +151,11 @@ impl Limits {
     pub fn with_override(self, limit_override: LimitOverride) -> Self {
         self.with_rule(limit_override.rule, Some(limit_override.value))
     }
+}
+
+fn family_bit(rule: RuleId) -> Option<u64> {
+    let offset = rule.index().checked_sub(RuleId::CODE_RULES.len())?;
+    1_u64.checked_shl(u32::try_from(offset).ok()?)
 }
 
 impl Preset {
@@ -149,6 +186,7 @@ impl Preset {
             .fold(base, |limits, &rule| limits.with_rule(rule, None));
         let base = unmeasured(language)
             .iter()
+            .chain(&deploy::relaxed_by(self))
             .fold(base, |limits, &rule| limits.with_rule(rule, None));
         if !is_test {
             return base;
@@ -161,7 +199,12 @@ impl Preset {
                 base.with_rule(RuleId::FunctionLength, None)
             }
             Language::Python => base.with_rule(RuleId::ParameterCount, None),
-            Language::Go | Language::Java | Language::Rust => base,
+            Language::Go
+            | Language::Java
+            | Language::Rust
+            | Language::Sql
+            | Language::Dockerfile
+            | Language::Compose => base,
         }
     }
 }
@@ -173,12 +216,14 @@ const fn strict(language: Language) -> [Option<usize>; 5] {
         Language::Java => JAVA_STRICT,
         Language::TypeScript | Language::Tsx | Language::JavaScript => ECMASCRIPT_STRICT,
         Language::Rust => RUST_STRICT,
+        Language::Sql | Language::Dockerfile | Language::Compose => UNMEASURED_STRICT,
     }
 }
 
 const fn unmeasured(language: Language) -> &'static [RuleId] {
     match language {
         Language::Rust => RUST_UNMEASURED,
+        Language::Sql | Language::Dockerfile | Language::Compose => &RuleId::CODE_RULES,
         Language::Go
         | Language::Python
         | Language::Java

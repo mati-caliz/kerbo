@@ -23,7 +23,7 @@ use crate::rules::RuleId;
 
 pub const DEFAULT_MAX_BYTES: usize = 256 * 1024 * 1024;
 const FORMAT_DIRECTORY: &str = "analysis-v2";
-const FORMAT_VERSION: u64 = 2;
+const FORMAT_VERSION: u64 = 3;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisSubject<'subject> {

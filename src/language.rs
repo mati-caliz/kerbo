@@ -3,6 +3,7 @@ use std::path::{Component, Path};
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
+use crate::deploy;
 use crate::profile::{self, Profile};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
@@ -15,6 +16,9 @@ pub enum Language {
     Tsx,
     JavaScript,
     Rust,
+    Sql,
+    Dockerfile,
+    Compose,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -25,6 +29,8 @@ pub enum Stack {
     Java,
     Go,
     Rust,
+    Sql,
+    Docker,
 }
 
 impl Language {
@@ -35,10 +41,16 @@ impl Language {
             Self::Java => Stack::Java,
             Self::TypeScript | Self::Tsx | Self::JavaScript => Stack::Typescript,
             Self::Rust => Stack::Rust,
+            Self::Sql => Stack::Sql,
+            Self::Dockerfile | Self::Compose => Stack::Docker,
         }
     }
 
     pub fn from_path(path: &Path) -> Option<Self> {
+        deploy::detect(path).or_else(|| Self::from_extension(path))
+    }
+
+    fn from_extension(path: &Path) -> Option<Self> {
         match path.extension()?.to_str()? {
             "go" => Some(Self::Go),
             "py" | "pyi" => Some(Self::Python),
@@ -51,20 +63,26 @@ impl Language {
         }
     }
 
-    pub fn grammar(self) -> tree_sitter::Language {
-        match self {
-            Self::Go => tree_sitter_go::LANGUAGE.into(),
-            Self::Python => tree_sitter_python::LANGUAGE.into(),
-            Self::Java => tree_sitter_java::LANGUAGE.into(),
-            Self::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
-            Self::Tsx => tree_sitter_typescript::LANGUAGE_TSX.into(),
-            Self::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
-            Self::Rust => tree_sitter_rust::LANGUAGE.into(),
-        }
+    pub fn grammar(self) -> Option<tree_sitter::Language> {
+        let grammar = match self {
+            Self::Go => tree_sitter_go::LANGUAGE,
+            Self::Python => tree_sitter_python::LANGUAGE,
+            Self::Java => tree_sitter_java::LANGUAGE,
+            Self::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT,
+            Self::Tsx => tree_sitter_typescript::LANGUAGE_TSX,
+            Self::JavaScript => tree_sitter_javascript::LANGUAGE,
+            Self::Rust => tree_sitter_rust::LANGUAGE,
+            Self::Compose => tree_sitter_yaml::LANGUAGE,
+            Self::Sql | Self::Dockerfile => return None,
+        };
+        Some(grammar.into())
     }
 
     pub fn is_test_path(self, relative_path: &Path) -> bool {
-        let test_files = &self.profile().test_files;
+        let Some(profile) = self.profile() else {
+            return false;
+        };
+        let test_files = &profile.test_files;
         let file_name = relative_path
             .file_name()
             .and_then(|name| name.to_str())
@@ -82,13 +100,14 @@ impl Language {
             })
     }
 
-    pub const fn profile(self) -> &'static Profile {
+    pub const fn profile(self) -> Option<&'static Profile> {
         match self {
-            Self::Go => &profile::GO,
-            Self::Python => &profile::PYTHON,
-            Self::Java => &profile::JAVA,
-            Self::TypeScript | Self::Tsx | Self::JavaScript => &profile::ECMASCRIPT,
-            Self::Rust => &profile::RUST,
+            Self::Go => Some(&profile::GO),
+            Self::Python => Some(&profile::PYTHON),
+            Self::Java => Some(&profile::JAVA),
+            Self::TypeScript | Self::Tsx | Self::JavaScript => Some(&profile::ECMASCRIPT),
+            Self::Rust => Some(&profile::RUST),
+            Self::Sql | Self::Dockerfile | Self::Compose => None,
         }
     }
 }
@@ -119,6 +138,38 @@ mod tests {
         );
         assert_eq!(Language::from_path(Path::new("README.md")), None);
         assert_eq!(Language::from_path(Path::new("Makefile")), None);
+        assert_eq!(
+            Language::from_path(Path::new("prisma/migrations/1_init/migration.sql")),
+            Some(Language::Sql)
+        );
+        assert_eq!(
+            Language::from_path(Path::new("db/V2__add_index.sql")),
+            Some(Language::Sql)
+        );
+        assert_eq!(Language::from_path(Path::new("seed/data.sql")), None);
+        assert_eq!(
+            Language::from_path(Path::new("api/Dockerfile.prod")),
+            Some(Language::Dockerfile)
+        );
+        assert_eq!(
+            Language::from_path(Path::new("web.Dockerfile")),
+            Some(Language::Dockerfile)
+        );
+        assert_eq!(Language::from_path(Path::new("Dockerfile.dockerignore")), None);
+        assert_eq!(
+            Language::from_path(Path::new("docker-compose.prod.yml")),
+            Some(Language::Compose)
+        );
+        assert_eq!(
+            Language::from_path(Path::new("compose.yaml")),
+            Some(Language::Compose)
+        );
+        assert_eq!(
+            Language::from_path(Path::new("docker-compose-ci.yaml")),
+            Some(Language::Compose)
+        );
+        assert_eq!(Language::from_path(Path::new("compose-config.yml")), None);
+        assert_eq!(Language::from_path(Path::new("config.yml")), None);
     }
 
     #[test]
@@ -144,6 +195,8 @@ mod tests {
         assert_eq!(Language::Java.stack(), Stack::Java);
         assert_eq!(Language::Go.stack(), Stack::Go);
         assert_eq!(Language::Rust.stack(), Stack::Rust);
+        assert_eq!(Language::Sql.stack(), Stack::Sql);
+        assert_eq!(Language::Compose.stack(), Stack::Docker);
     }
 
     #[test]
@@ -156,9 +209,13 @@ mod tests {
             Language::Tsx,
             Language::JavaScript,
             Language::Rust,
+            Language::Compose,
         ] {
             let mut parser = tree_sitter::Parser::new();
-            assert!(parser.set_language(&language.grammar()).is_ok(), "{language:?}");
+            let grammar = language.grammar().expect("tiene gramática de tree-sitter");
+            assert!(parser.set_language(&grammar).is_ok(), "{language:?}");
         }
+        assert!(Language::Sql.grammar().is_none());
+        assert!(!Language::Dockerfile.is_test_path(Path::new("tests/Dockerfile")));
     }
 }

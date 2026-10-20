@@ -14,13 +14,17 @@ use crate::test_support::TempTree;
 fn kinds_in(language: Language, source: &str) -> Vec<(MarkerKind, String)> {
     let mut parser = Parser::new();
     parser
-        .set_language(&language.grammar())
+        .set_language(&language.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("se parsea");
-    find_markers(tree.root_node(), source.as_bytes(), language.profile())
-        .into_iter()
-        .map(|marker| (marker.kind, marker.text))
-        .collect()
+    find_markers(
+        tree.root_node(),
+        source.as_bytes(),
+        language.profile().expect("tiene perfil"),
+    )
+    .into_iter()
+    .map(|marker| (marker.kind, marker.text))
+    .collect()
 }
 
 #[test]

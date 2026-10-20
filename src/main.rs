@@ -4,6 +4,7 @@ mod baseline;
 mod cache;
 mod cli;
 mod config;
+mod deploy;
 mod diff;
 mod duplicates;
 mod fix;

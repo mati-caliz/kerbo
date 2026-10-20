@@ -52,7 +52,7 @@ fn strict() -> Limits {
 fn lints(source: &str, limits: Limits) -> Vec<LintFinding> {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Java.grammar())
+        .set_language(&Language::Java.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("el archivo se parsea");
     find_lints(tree.root_node(), source.as_bytes(), LintStyle::Checkstyle, limits)
@@ -149,7 +149,7 @@ fn respects_each_rule_switch_and_other_languages() {
     assert_eq!(rendered(&lints(source, recommended)), ["1:8 unused-import a.B"]);
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Java.grammar())
+        .set_language(&Language::Java.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("el archivo se parsea");
     let unmeasured = find_lints(

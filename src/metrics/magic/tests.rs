@@ -9,7 +9,7 @@ use crate::rules::RuleId;
 fn magic_numbers(language: Language, source: &str) -> Vec<(usize, String)> {
     let mut parser = Parser::new();
     parser
-        .set_language(&language.grammar())
+        .set_language(&language.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let limits = Limits::default().with_rule(RuleId::MagicNumber, Some(0));
     analyze(&mut parser, language, source.as_bytes(), limits)
@@ -176,7 +176,7 @@ limit = 50
 fn skips_magic_numbers_when_the_rule_is_off() {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Go.grammar())
+        .set_language(&Language::Go.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let analysis = analyze(
         &mut parser,

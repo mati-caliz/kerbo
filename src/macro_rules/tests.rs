@@ -187,7 +187,7 @@ fn crate_tree() -> TempTree {
 fn measure(path: &Path, source: &str, macros: Option<&Arc<CrateMacros>>) -> Vec<FunctionMetrics> {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Rust.grammar())
+        .set_language(&Language::Rust.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let unit = SourceUnit {
         language: Language::Rust,

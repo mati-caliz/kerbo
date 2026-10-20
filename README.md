@@ -5,7 +5,8 @@ Español · [English](README.en.md)
 Analizador de calidad de código para **Java, TypeScript/JavaScript, Python, Go y Rust** en un solo
 binario. Aplica las mismas reglas en todos los lenguajes, en segundos y con pocos megas de
 memoria, y cuenta igual que la herramienta que ya usás en cada uno (ESLint, ruff, Checkstyle y
-PMD, golangci-lint, clippy).
+PMD, golangci-lint, clippy). También revisa las migraciones de Postgres como squawk, los
+Dockerfile como hadolint y los archivos de docker compose.
 
 ```console
 $ kerbo check
@@ -153,7 +154,7 @@ lang = "es"                       # opcional: es o en; si falta, el del sistema
 [[limits]]                        # un umbral para todos los lenguajes, o para uno
 rule = "cyclomatic-complexity"
 max = 12
-language = "java"                 # opcional: typescript, python, java o go
+language = "java"                 # opcional: typescript, python, java, go, rust, sql o docker
 reason = "el equipo acordó 12 para los servicios"
 
 [[exceptions]]                    # por carpeta o archivo
@@ -245,6 +246,52 @@ argumentos.
 
 Esos son los umbrales del preset `strict`. Más reglas y la capa para agentes de IA están en la
 [hoja de ruta](ROADMAP.md).
+
+## Migraciones y contenedores
+
+kerbo también revisa lo que se despliega junto al código: las migraciones de Postgres, los
+Dockerfile y los archivos de docker compose.
+
+**Migraciones.** Son migraciones los `.sql` dentro de una carpeta `migrations`, `migration` o
+`drizzle` (Prisma, drizzle, sqlx, golang-migrate) y los que siguen el nombre de Flyway
+(`V3__agrega_indice.sql`, `R__vistas.sql`); el resto de los `.sql` (semillas, dumps) no se mira.
+En Alembic se lee el `upgrade()` de cada revisión: las llamadas `op.*` y `batch_op.*` se traducen
+a la regla que marcaría el SQL que generan, el SQL de `op.execute(...)` se analiza como cualquier
+migración y las ramas de otro dialecto (`if dialect == "mysql"`) se saltean. Las reglas son las de
+[squawk](https://squawk.sh), con sus nombres y su criterio, suponiendo como él con
+`--assume-in-transaction` que cada archivo corre en una transacción (así lo hacen Prisma,
+drizzle, Flyway y Alembic en Postgres): un índice sobre una tabla creada en la misma migración no
+se marca.
+
+| Regla | Qué marca |
+|---|---|
+| `require-concurrent-index-creation` | `CREATE INDEX` sin `CONCURRENTLY` sobre una tabla que ya existía |
+| `require-concurrent-index-deletion` | `DROP INDEX` sin `CONCURRENTLY` |
+| `adding-required-field` | `ADD COLUMN ... NOT NULL` sin `DEFAULT` ni columna generada |
+| `adding-not-nullable-field` | `SET NOT NULL` sin un `CHECK (columna IS NOT NULL) NOT VALID` validado antes |
+| `changing-column-type` | `ALTER COLUMN ... TYPE` (también en tipos compuestos) |
+| `renaming-column`, `renaming-table` | renombres de columnas, atributos y tablas |
+| `ban-drop-column`, `ban-drop-table` | borrados de columnas, atributos y tablas |
+
+**Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` y `*.Dockerfile`, contra
+[hadolint](https://github.com/hadolint/hadolint): las 38 reglas DL más comunes, con su código como
+nombre (`kerbo explain DL3008`). El shell de cada `RUN` se lee con un parser propio que separa los
+comandos como ShellCheck. Quedan afuera las reglas de ShellCheck (`SC*`), las que hadolint trae
+apagadas o atadas a su configuración (DL1001, DL3026 y DL3048 a DL3058) y DL3001, DL3010, DL3011,
+DL3028, DL3030, DL3033 a DL3041, DL3043, DL3044, DL3046, DL3060, DL3063, DL3065 y DL4005. `recommended` apaga las de nivel `info` de hadolint y `minimal` deja sólo las de nivel
+`error`.
+
+**docker compose.** `compose.yaml`, `docker-compose.yml` y sus variantes (`docker-compose.prod.yml`),
+con anclas y `<<:` resueltos. No hay herramienta de referencia: el criterio es propio.
+
+| Regla | Qué marca |
+|---|---|
+| `compose-memory-limit` | un servicio con `image` o `build` sin `deploy.resources.limits.memory` ni `mem_limit`; los que usan `extends` y los fragmentos de un override se saltean |
+| `compose-healthcheck-start-period` | un `healthcheck` activo sin `start_period` |
+| `compose-healthcheck-interval` | un `interval` de menos de 5 s o más de 5 min, o un `timeout` igual o mayor que el intervalo |
+
+Cada una se apaga como cualquier otra regla, con `[[limits]]` sin `max` y su motivo; el `max` no
+aplica. Con `--language sql` o `--language docker` se analiza sólo eso.
 
 ## Cómo está armado
 

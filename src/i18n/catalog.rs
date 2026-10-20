@@ -9,6 +9,26 @@ pub struct Explanation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RuleText {
+    pub description: &'static str,
+    pub explanation: Explanation,
+}
+
+impl RuleText {
+    pub const fn new(
+        description: &'static str,
+        fix: &'static str,
+        why: &'static str,
+        example: &'static str,
+    ) -> Self {
+        Self {
+            description,
+            explanation: Explanation { fix, why, example },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Text {
     WhyLabel,
     FixLabel,
@@ -99,6 +119,10 @@ pub enum Message {
     },
     Cheat(Cheat),
     Rule(RuleId),
+    Violation {
+        rule: RuleId,
+        subject: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -185,6 +209,14 @@ pub enum Notice {
     Summary(Summary),
     BaselineSaved { count: usize, path: String },
     HookHeader { count: usize },
+}
+
+pub fn with_subject(description: &str, subject: &str) -> String {
+    if subject.is_empty() {
+        description.to_owned()
+    } else {
+        format!("{description}: `{subject}`")
+    }
 }
 
 pub trait Catalog: Sync {

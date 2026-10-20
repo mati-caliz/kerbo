@@ -7,7 +7,7 @@ use crate::profile::CommentedCodeStyle;
 fn commented_lines(source: &str) -> Vec<usize> {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Python.grammar())
+        .set_language(&Language::Python.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("el archivo se parsea");
     find_commented_code(tree.root_node(), source.as_bytes(), CommentedCodeStyle::Eradicate)
@@ -55,7 +55,7 @@ fn skips_inline_script_metadata() {
 fn other_languages_are_not_measured_yet() {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Python.grammar())
+        .set_language(&Language::Python.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse("# x = 1\n", None).expect("el archivo se parsea");
     assert_eq!(
@@ -67,7 +67,7 @@ fn other_languages_are_not_measured_yet() {
 fn go_commented_lines(source: &str) -> Vec<usize> {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Go.grammar())
+        .set_language(&Language::Go.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("el archivo se parsea");
     find_commented_code(tree.root_node(), source.as_bytes(), CommentedCodeStyle::Gocritic)

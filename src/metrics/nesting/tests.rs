@@ -8,7 +8,7 @@ use crate::rules::RuleId;
 fn nesting_of(language: Language, source: &str, limit: usize) -> Vec<(usize, usize)> {
     let mut parser = Parser::new();
     parser
-        .set_language(&language.grammar())
+        .set_language(&language.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     analyze(
         &mut parser,

@@ -7,7 +7,7 @@ use crate::limits::Limits;
 fn cognitive_by_line(source: &str) -> Vec<(usize, Option<usize>)> {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::Java.grammar())
+        .set_language(&Language::Java.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     analyze(&mut parser, Language::Java, source.as_bytes(), Limits::default())
         .expect("el archivo se parsea")

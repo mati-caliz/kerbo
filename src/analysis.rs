@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use tree_sitter::Parser;
 
+use crate::deploy::{self, Violation};
 use crate::duplicates::{DuplicateUnits, duplicate_units};
 use crate::language::Language;
 use crate::limits::Limits;
@@ -28,6 +29,23 @@ pub struct FileAnalysis {
     pub duplicate_units: Option<DuplicateUnits>,
     pub commented_code: Vec<CommentedCode>,
     pub lints: Vec<LintFinding>,
+    pub violations: Vec<Violation>,
+}
+
+impl FileAnalysis {
+    const fn of_violations(violations: Vec<Violation>) -> Self {
+        Self {
+            file_lines: 0,
+            functions: Vec::new(),
+            nesting: Vec::new(),
+            magic_numbers: Vec::new(),
+            short_names: Vec::new(),
+            duplicate_units: None,
+            commented_code: Vec::new(),
+            lints: Vec::new(),
+            violations,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -69,9 +87,12 @@ pub fn analyze_unit(
     limits: Limits,
 ) -> Result<FileAnalysis, ParseFailed> {
     let SourceUnit { language, source, .. } = unit;
+    if let Some(violations) = deploy::analyze(parser, language, source) {
+        return violations.map(FileAnalysis::of_violations);
+    }
+    let profile = language.profile().ok_or(ParseFailed)?;
     let tree = parser.parse(source, None).ok_or(ParseFailed)?;
     let root = tree.root_node();
-    let profile = language.profile();
     let line_map = LineMap::new(root, source, profile);
     let file_lines = line_map.count(0, line_map.total_rows().saturating_sub(1), profile.file_lines);
     let file_lines = if line_map.total_rows() == 0 { 0 } else { file_lines };
@@ -108,5 +129,10 @@ pub fn analyze_unit(
         duplicate_units: limits
             .get(RuleId::DuplicateCode)
             .and_then(|limit| duplicate_units(root, source, profile.duplicates, limit)),
+        violations: if language == Language::Python {
+            deploy::alembic_violations(root, source)
+        } else {
+            Vec::new()
+        },
     })
 }
