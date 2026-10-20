@@ -114,6 +114,27 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     para quien lo parsea con código. El mismo formato en el hook y en el servidor MCP.
   - Un test fija la salida y otro el tope de tokens de un reporte de ejemplo, así un cambio que
     la agrande se ve.
+- **Cuánto gasta un agente de punta a punta** (pendiente). La velocidad de kerbo ya está medida;
+  falta medir lo que paga quien lo usa con un agente: correr el gate, leer la salida, arreglar y
+  volver a correr hasta que pase.
+  - Arnés: el mismo repo, en el mismo commit y con los mismos problemas, y un agente (Claude Code
+    sin interfaz, con el mismo modelo y la misma instrucción) que tiene que dejar el gate en
+    verde. Una vez con las herramientas de hoy (Checkstyle, PMD y SpotBugs por Maven o Gradle;
+    ESLint; ruff; golangci-lint; clippy) y otra con kerbo (`--format agent`, el modo instantáneo
+    y el hook).
+  - Medir tokens de entrada y de salida, costo, cantidad de llamadas a herramientas y de corridas
+    del gate, tiempo total, si terminó en verde y si hizo trampa (supresiones, umbrales aflojados,
+    tests vaciados), revisado con la antitrampa de kerbo en las dos corridas.
+  - Varias corridas por caso, porque un agente no responde siempre igual; se publica la mediana y
+    la dispersión, con la misma tabla y la fecha que la de velocidad.
+  - Casos chicos y grandes por lenguaje: un problema suelto, decenas de la misma regla y un repo
+    sin gate que se adopta con línea de base.
+  - Lo que se espera ver, y hay que confirmar con números: los logs de Maven y Gradle, el XML de
+    SpotBugs y el mismo problema reportado por dos herramientas inflan la entrada; sin modo
+    instantáneo el agente vuelve a correr el gate entero después de cada arreglo; sin
+    identificadores estables no sabe qué ya arregló.
+  - El arnés queda en el repo y corre antes de cada versión, así una regresión en el consumo se
+    ve igual que una en la paridad.
 
 ### 4. Editor (LSP) e inspecciones de IntelliJ como mapa (el LSP, hecho en 0.5)
 
