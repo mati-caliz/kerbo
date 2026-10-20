@@ -1,9 +1,9 @@
-use super::{BlockUnit, Cheat, Lang, LangPreference, Message, Notice, Problem, Summary, Text};
+use super::{BlockUnit, Cheat, FixNotice, Lang, LangPreference, Message, Notice, Problem, Summary, Text};
 use crate::rules::RuleId;
 
 const LANGS: [Lang; 2] = [Lang::Spanish, Lang::English];
 
-const TEXTS: [Text; 27] = [
+const TEXTS: [Text; 34] = [
     Text::WhyLabel,
     Text::FixLabel,
     Text::ExampleLabel,
@@ -12,6 +12,9 @@ const TEXTS: [Text; 27] = [
     Text::McpPathsDescription,
     Text::McpDiffDescription,
     Text::McpExplainDescription,
+    Text::McpFixDescription,
+    Text::McpRulesDescription,
+    Text::McpDryRunDescription,
     Text::AboutKerbo,
     Text::AboutCheck,
     Text::AboutBaseline,
@@ -19,6 +22,10 @@ const TEXTS: [Text; 27] = [
     Text::AboutHook,
     Text::AboutMcp,
     Text::AboutLsp,
+    Text::AboutFix,
+    Text::HelpFixRule,
+    Text::HelpDryRun,
+    Text::FixAllTitle,
     Text::HelpRule,
     Text::HelpConfig,
     Text::HelpPaths,
@@ -170,6 +177,7 @@ fn notices() -> Vec<Notice> {
             known: 0,
             milliseconds: 5,
             deviations: 0,
+            suppressed: 0,
         }),
         Notice::Summary(Summary {
             files: 3,
@@ -177,12 +185,40 @@ fn notices() -> Vec<Notice> {
             known: 4,
             milliseconds: 5,
             deviations: 1,
+            suppressed: 0,
         }),
         Notice::BaselineSaved {
             count: 1,
             path: "kerbo-baseline.json".to_owned(),
         },
         Notice::HookHeader { count: 2 },
+        Notice::Summary(Summary {
+            files: 1,
+            problems: 0,
+            known: 0,
+            milliseconds: 5,
+            deviations: 0,
+            suppressed: 2,
+        }),
+        Notice::Suppressed {
+            path: "Dockerfile".to_owned(),
+            line: 4,
+            rule: RuleId::FileLength,
+            reason: String::new(),
+        },
+        Notice::Suppressed {
+            path: "Dockerfile".to_owned(),
+            line: 4,
+            rule: RuleId::FileLength,
+            reason: "la imagen fija las versiones".to_owned(),
+        },
+        Notice::Fix(FixNotice::Applied { count: 3, files: 1 }),
+        Notice::Fix(FixNotice::Previewed { count: 1, files: 2 }),
+        Notice::Fix(FixNotice::Withheld {
+            path: "A.java".to_owned(),
+            introduced: 1,
+        }),
+        Notice::Fix(FixNotice::Left { count: 2 }),
     ]
 }
 

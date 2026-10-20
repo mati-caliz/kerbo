@@ -1,4 +1,9 @@
 mod hunk;
+mod patch;
+mod plan;
+
+pub use patch::file_patch;
+pub use plan::{compatible, edits_of};
 
 use tree_sitter::{Node, Point};
 

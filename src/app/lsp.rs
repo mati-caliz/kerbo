@@ -71,8 +71,8 @@ fn handle(method: &str, message: &Value, lang: Lang, documents: &mut Documents) 
         }
         "textDocument/codeAction" => {
             let text = document(documents, uri, None);
-            let range = message.pointer("/params/range");
-            respond(id, &actions::code_actions(uri, &text, range, lang))
+            let params = message.get("params");
+            respond(id, &actions::code_actions(uri, &text, params, lang))
         }
         _ => id.map_or_else(Vec::new, |id| {
             let text = lang.problem(&Problem::UnknownMethod(method.to_owned()));
@@ -93,7 +93,7 @@ fn initialize_result() -> Value {
         "capabilities": {
             "positionEncoding": "utf-16",
             "textDocumentSync": { "openClose": true, "change": FULL_SYNC, "save": { "includeText": true } },
-            "codeActionProvider": { "codeActionKinds": [actions::QUICK_FIX] },
+            "codeActionProvider": { "codeActionKinds": [actions::QUICK_FIX, actions::FIX_ALL] },
         },
         "serverInfo": { "name": "kerbo", "version": env!("CARGO_PKG_VERSION") },
     })

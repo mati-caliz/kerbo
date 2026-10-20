@@ -7,6 +7,7 @@ use crate::rules::RuleId;
 mod deploy;
 mod dockerfile;
 mod explanations;
+mod fixes;
 
 const SINGLE: usize = 1;
 
@@ -20,7 +21,7 @@ impl Catalog for English {
             Text::FixLabel => "How to fix it",
             Text::ExampleLabel => "Example",
             Text::McpInstructions => {
-                "Use kerbo_check after editing code: with diff (for example HEAD) it looks only at what changed and catches cheats such as new suppressions or skipped tests. kerbo_explain says how to fix each rule."
+                "Use kerbo_check after editing code: with diff (for example HEAD) it looks only at what changed and catches cheats such as new suppressions or skipped tests. kerbo_fix applies the mechanical fixes at once (with dry_run it only returns the patch). kerbo_explain says how to fix each rule."
             }
             Text::McpCheckDescription => {
                 "Analyzes files or folders and returns the prioritized problems, with a stable id and a fix hint."
@@ -30,6 +31,17 @@ impl Catalog for English {
             Text::McpExplainDescription => {
                 "Explains a kerbo rule: why it exists, how to fix it and an example."
             }
+            Text::McpFixDescription => {
+                "Applies at once the mechanical fixes that do not overlap, analyzes the fixed files again and returns the patch."
+            }
+            Text::McpRulesDescription => "Only the fixes of these rules; all of them by default",
+            Text::McpDryRunDescription => "Returns the patch without writing the files",
+            Text::AboutFix => {
+                "Applies at once every mechanical fix that does not overlap and analyzes the fixed files again"
+            }
+            Text::HelpFixRule => "Only the fixes of this rule (can be repeated)",
+            Text::HelpDryRun => "Shows the patch without writing the files",
+            Text::FixAllTitle => "fix everything mechanical in the file",
             Text::AboutKerbo => "Multi-language code quality analyzer",
             Text::AboutCheck => "Analyzes the files and lists the problems",
             Text::AboutBaseline => {
@@ -39,7 +51,9 @@ impl Catalog for English {
             Text::AboutHook => {
                 "Hook for agents: reviews the file that was just edited (reads the Claude Code event from stdin)"
             }
-            Text::AboutMcp => "MCP server over stdio: kerbo_check and kerbo_explain tools for agents",
+            Text::AboutMcp => {
+                "MCP server over stdio: kerbo_check, kerbo_fix and kerbo_explain tools for agents"
+            }
             Text::AboutLsp => {
                 "LSP server over stdio: the problems in your editor while you type (IntelliJ, VS Code, Neovim)"
             }
@@ -248,6 +262,13 @@ impl Catalog for English {
     fn notice(&self, notice: &Notice) -> String {
         match notice {
             Notice::Summary(summary) => summarize(summary),
+            Notice::Suppressed {
+                path,
+                line,
+                rule,
+                reason,
+            } => fixes::suppressed(path, *line, *rule, reason),
+            Notice::Fix(notice) => fixes::notice(notice),
             Notice::BaselineSaved { count, path } => {
                 format!("{} saved in {path}", counted(*count, "problem", "problems"))
             }
@@ -274,10 +295,11 @@ fn summarize(summary: &Summary) -> String {
         String::new()
     };
     format!(
-        "{}, {}{known}, {} ms{deviations}",
+        "{}, {}{known}, {} ms{deviations}{}",
         counted(summary.files, "file", "files"),
         counted(summary.problems, "problem", "problems"),
-        summary.milliseconds
+        summary.milliseconds,
+        fixes::suppressed_suffix(summary.suppressed)
     )
 }
 

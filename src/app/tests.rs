@@ -236,7 +236,7 @@ fn mcp_server_lists_and_runs_its_tools() {
             .expect("hay respuesta")
     };
     assert_eq!(by_id(1)["result"]["protocolVersion"], "2025-03-26");
-    assert_eq!(by_id(2)["result"]["tools"].as_array().map(Vec::len), Some(2));
+    assert_eq!(by_id(2)["result"]["tools"].as_array().map(Vec::len), Some(3));
     let check_text = by_id(3)["result"]["content"][0]["text"]
         .as_str()
         .expect("texto")
@@ -323,4 +323,59 @@ fn the_hook_and_the_mcp_server_follow_the_language() {
         .expect("texto");
     assert!(explained.contains("Why: A bare 86400"));
     assert_eq!(responses[2]["error"]["message"], "unknown method: nope");
+}
+
+#[test]
+fn mcp_server_fixes_or_previews_the_mechanical_fixes() {
+    let tree = TempTree::new("mcp-fix");
+    let original = "import java.util.List;\nfinal class Cart {}\n";
+    tree.write("Cart.java", original);
+    let requests = [
+        r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"kerbo_fix","arguments":{"dry_run":true}}}"#,
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"kerbo_fix","arguments":{"rules":["nope"]}}}"#,
+        r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"kerbo_fix","arguments":{"rules":["unused-import"]}}}"#,
+    ];
+    let outcome = execute_with_input(&["kerbo", "mcp"], tree.path(), &requests.join("\n"));
+    let responses: Vec<serde_json::Value> = outcome
+        .report
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("cada respuesta es JSON"))
+        .collect();
+    let text = |index: usize| {
+        responses[index]["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned()
+    };
+    assert!(
+        text(0).starts_with("--- a/Cart.java\n+++ b/Cart.java\n@@ -1 +0,0 @@\n-import java.util.List;\n")
+    );
+    assert!(text(0).ends_with("1 arreglos en 1 archivos; no se escribió nada"));
+    assert_eq!(responses[1]["result"]["isError"], true);
+    assert!(text(2).ends_with("1 arreglos aplicados en 1 archivos"));
+    let fixed = std::fs::read_to_string(tree.path().join("Cart.java")).expect("se lee");
+    assert_eq!(fixed, "final class Cart {}\n");
+}
+
+#[test]
+fn respects_the_ignore_comments_and_shows_why_in_the_log() {
+    let tree = TempTree::new("check-ignored");
+    tree.write(
+        "Dockerfile",
+        "FROM debian:12\n# hadolint ignore=DL3008 # las versiones las fija la imagen\nRUN apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*\n",
+    );
+    let outcome = execute(&["kerbo", "check", path_of(&tree)], tree.path());
+    assert!(!outcome.report.contains("dl3008"), "{}", outcome.report);
+    assert!(
+        outcome
+            .log
+            .contains("Dockerfile:3: dl3008 ignorada en el código: las versiones las fija la imagen"),
+        "{}",
+        outcome.log
+    );
+    assert!(
+        outcome.log.contains(" · 1 ignorados en el código"),
+        "{}",
+        outcome.log
+    );
 }

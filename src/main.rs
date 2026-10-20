@@ -20,6 +20,7 @@ mod profile;
 mod report;
 mod rules;
 mod scan;
+mod suppressions;
 mod syntax;
 #[cfg(test)]
 mod test_support;

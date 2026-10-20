@@ -12,6 +12,7 @@ use crate::i18n::{Lang, LangPreference, Notice, Problem, Summary};
 use crate::report::render;
 use crate::rules::{Diagnostic, RuleId};
 use crate::scan::{ScanFailure, ScanOutcome, ScanRequest, scan};
+use crate::suppressions::Suppressed;
 
 pub const EXIT_CLEAN: u8 = 0;
 pub const EXIT_FINDINGS: u8 = 1;
@@ -34,6 +35,7 @@ pub fn run(
         Command::Check(arguments) => (check(arguments, directory, lang, terminal), EXIT_FAILURE),
         Command::Baseline(arguments) => (baseline(arguments, directory, lang, terminal), EXIT_FAILURE),
         Command::Explain { rule } => (explain_rule(*rule, lang, terminal), EXIT_FAILURE),
+        Command::Fix(arguments) => (fixing::run(arguments, directory, lang, terminal), EXIT_FAILURE),
         Command::Hook(arguments) => (
             hook::run(arguments, directory, lang, terminal),
             hook::NON_BLOCKING_ERROR,
@@ -58,6 +60,7 @@ pub struct Findings {
     pub diagnostics: Vec<Diagnostic>,
     pub known: usize,
     pub deviations: usize,
+    pub suppressed: Vec<Suppressed>,
     pub failures: Vec<ScanFailure>,
 }
 
@@ -71,9 +74,11 @@ pub fn findings(request: &FindingsRequest<'_>, directory: &Path) -> Result<Findi
     let config = Config::load(request.scan.config.as_deref(), directory)?;
     let outcome = scan_with(request.scan, &config);
     let mut diagnostics = outcome.diagnostics;
+    let mut suppressed = outcome.suppressed;
     if let Some(reference) = request.diff {
         let changes = ChangedLines::since(reference, directory)?;
         diagnostics.retain(|diagnostic| changes.touches(diagnostic));
+        suppressed.retain(|item| changes.touches(&item.diagnostic));
         let project_root = config
             .root()
             .canonicalize()
@@ -98,6 +103,7 @@ pub fn findings(request: &FindingsRequest<'_>, directory: &Path) -> Result<Findi
         diagnostics,
         known,
         deviations: config.deviations(),
+        suppressed,
         failures: outcome.failures,
     })
 }
@@ -124,8 +130,10 @@ fn check(
         known: found.known,
         milliseconds: started.elapsed().as_millis(),
         deviations: found.deviations,
+        suppressed: found.suppressed.len(),
     });
     write_failures(&found.failures, terminal.log)
+        .and_then(|()| write_suppressed(&found.suppressed, lang, terminal.log))
         .and_then(|()| writeln!(terminal.log, "kerbo: {}", lang.notice(&summary)))
         .map_err(|error| write_error(&error))?;
     Ok(exit_status(&found.failures, &found.diagnostics))
@@ -185,6 +193,19 @@ fn write_failures(failures: &[ScanFailure], log: &mut dyn Write) -> io::Result<(
     Ok(())
 }
 
+fn write_suppressed(suppressed: &[Suppressed], lang: Lang, log: &mut dyn Write) -> io::Result<()> {
+    for item in suppressed {
+        let notice = Notice::Suppressed {
+            path: item.diagnostic.path.clone(),
+            line: item.diagnostic.line,
+            rule: item.diagnostic.rule,
+            reason: item.reason.clone(),
+        };
+        writeln!(log, "kerbo: {}", lang.notice(&notice))?;
+    }
+    Ok(())
+}
+
 fn write_error(error: &io::Error) -> Problem {
     Problem::WriteReport(error.to_string())
 }
@@ -199,6 +220,7 @@ const fn exit_status(failures: &[ScanFailure], diagnostics: &[Diagnostic]) -> u8
     }
 }
 
+mod fixing;
 mod hook;
 mod lsp;
 mod mcp;

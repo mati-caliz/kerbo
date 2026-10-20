@@ -444,10 +444,37 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   - La misma paridad contra PMD para quien usa el quickstart en vez de Checkstyle:
     `UnnecessaryImport` resuelve tipos con el classpath y no va a coincidir sin las firmas de la
     etapa 9; `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal`, sí.
-  - `kerbo fix`: aplicar todos los arreglos que no se pisan de una vez, en el CLI y como acción
-    "arreglar todo" del LSP. Hoy se aplican de a uno.
-  - El LSP ofrece las acciones de las líneas pedidas sin mirar `context.diagnostics`; con un
-    editor que pide el archivo entero llegan todas.
+  - `kerbo fix` (hecho, 2026-10-20): aplica de una vez todos los arreglos que no se pisan, en el
+    CLI, en el servidor MCP (`kerbo_fix`) y como acción `source.fixAll.kerbo` del LSP. Genérico
+    sobre el `Fix`: lo que agreguen las reglas de Python, TypeScript o shell con arreglo entra sin
+    tocar nada más.
+    - Se pisan dos arreglos si alguna de sus ediciones empieza en el mismo punto o se superponen
+      sus rangos; uno que termina donde empieza otro no se pisa (`fix::compatible`, en el orden
+      del reporte).
+    - Por archivo: elegir los compatibles, aplicarlos, volver a analizar el texto en memoria y
+      repetir, hasta diez vueltas. Así entra lo que destapa un arreglo (una clase que pasa a
+      `final` deja de más el `final` de sus métodos, y se saca en la vuelta siguiente).
+    - Antes de escribir se comparan las huellas de lo que queda con las de antes: si aparece un
+      problema nuevo, el archivo no se escribe, se listan los problemas y sale con `1`. Se
+      escribe a un temporal oculto en la misma carpeta (con los permisos del original) y se
+      renombra.
+    - `--rule` (repetible) y las rutas filtran; `--dry-run` (alias `--diff`, como ruff) muestra
+      el parche sin escribir. El parche es un diff de líneas propio (Myers, sin contexto; si la
+      distancia pasa de 1.000 líneas, un solo bloque entre el prefijo y el sufijo comunes), sin
+      sumar una dependencia.
+  - El LSP respeta `context.diagnostics` (hecho): si el editor manda problemas, sólo se ofrecen
+    las acciones rápidas de los de kerbo con el mismo código y la misma línea; si no, las de las
+    líneas pedidas. `context.only` filtra por tipo de acción (jerárquico: `source` incluye
+    `source.fixAll.kerbo`).
+  - Pendientes de `kerbo fix`:
+    - El "arreglar todo" del LSP hace una sola vuelta (el protocolo pide ediciones sobre el texto
+      original); lo que destapa se ofrece en la siguiente.
+    - No detecta un arreglo que rompe la sintaxis: tree-sitter se recupera y el análisis sigue.
+      Comparar los nodos `ERROR` de antes y después es barato y cerraría el hueco.
+    - El parche no lleva contexto y muestra las líneas sin el `\r` final: en un archivo con CRLF
+      `git apply` no lo aplica tal cual.
+    - `--diff <referencia>` como en `check` (arreglar sólo lo que toca el cambio) no existe:
+      `--diff` es el alias de `--dry-run`.
   - Sumar Qodana al arnés de paridad para las reglas que coinciden con una inspección (imports
     sin usar y modificadores redundantes).
   - El arnés de esta paridad (correr Checkstyle con los seis chequeos, kerbo en JSON y comparar
@@ -616,9 +643,30 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Los Dockerfile y compose en carpetas ocultas (`.devcontainer/`, `.github/`) no entran cuando
     se analiza una carpeta, porque el recorrido saltea lo oculto para todos los lenguajes; sí
     cuando se los nombra.
-  - `squawk-ignore` y `# hadolint ignore=` no se respetan (las excepciones van en `kerbo.toml`
-    con su motivo); que el antitrampa los marque como supresión nueva, como `noqa` o
-    `eslint-disable`.
+  - `squawk-ignore` y `# hadolint ignore=` (hecho, 2026-10-20): se respetan como en la
+    herramienta original y la antitrampa los marca como supresión nueva, igual que
+    `# shellcheck disable=`. Un solo registro, `SYNTAXES` en `src/suppressions.rs` (comentario,
+    marcador y alcance), alimenta las dos cosas; los códigos se comparan con el nombre de la
+    regla sin distinguir mayúsculas (`DL3008` con `dl3008`, `SC2086` con la regla de shell que
+    se llame `sc2086`), así que sumar una herramienta es sumar una fila.
+    - Alcance: `squawk-ignore` y `hadolint ignore=` valen para la línea siguiente que no sea
+      blanca ni comentario (se pueden apilar); `squawk-ignore-file` y `hadolint global ignore=`,
+      para el archivo entero. Sólo cuentan como comentario al principio de la línea.
+    - Lo que sigue a la lista de reglas es el motivo. Cada problema ignorado sale en el log como
+      `Dockerfile:3: dl3008 ignorada en el código: <motivo>` (o `sin motivo`) y el resumen suma
+      `· N ignorados en el código`; con `--diff`, sólo los de las líneas cambiadas.
+    - Para que la antitrampa corra en SQL y Dockerfile, `suppression-added` queda prendida en
+      esos lenguajes (el resto de las reglas de código siguen sin medirse ahí).
+  - Pendientes de las supresiones en el código:
+    - `squawk-ignore-file` sin reglas (todas) y `# shellcheck disable=all` no se reconocen: haría
+      falta saber qué familia de reglas es de cada herramienta.
+    - ShellCheck: una directiva antes de un comando compuesto vale para todo el bloque y una antes
+      del primer comando, para el archivo entero; hoy vale para la línea siguiente. Lo cierra quien
+      sume las reglas `SC*`.
+    - squawk asocia el comentario a la sentencia siguiente; kerbo, a la línea siguiente: un
+      `ALTER TABLE` partido en varias líneas con la violación más abajo no queda cubierto.
+    - SARIF no los manda como `suppressions` (`kind: inSource`, con `justification`); GitHub los
+      mostraría como resueltos.
   - compose: el límite de CPU, `restart`, imágenes sin versión fija (como DL3006/DL3007) y los
     servicios que dependen de otro sin `condition: service_healthy`.
 

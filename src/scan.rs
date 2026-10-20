@@ -15,6 +15,7 @@ use crate::language::{Language, Stack};
 use crate::limits::{LimitOverride, Limits};
 use crate::macro_rules::MacroIndex;
 use crate::rules::{Diagnostic, FileIdentity, RuleId, evaluate};
+use crate::suppressions::{Suppressed, split};
 
 const PATH_SEPARATOR: &str = "/";
 
@@ -28,6 +29,7 @@ pub struct ScanFailure {
 pub struct ScanOutcome {
     pub files: usize,
     pub diagnostics: Vec<Diagnostic>,
+    pub suppressed: Vec<Suppressed>,
     pub failures: Vec<ScanFailure>,
 }
 
@@ -96,6 +98,7 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
         match result {
             Ok(checked) => {
                 outcome.diagnostics.extend(checked.diagnostics);
+                outcome.suppressed.extend(checked.suppressed);
                 pooled.extend(checked.pooled);
             }
             Err(failure) => failures.push(failure),
@@ -138,7 +141,7 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
     };
     let mut analysis = analyze_unit(&mut parser, unit, limits).ok()?;
     let pooled = pooled_file(&file.identity, &mut analysis, limits);
-    let mut diagnostics = evaluate(&file.identity, &analysis, limits);
+    let (mut diagnostics, _suppressed) = split(source, evaluate(&file.identity, &analysis, limits));
     diagnostics.extend(find_duplicates(pooled.into_iter().collect()));
     Some(diagnostics)
 }
@@ -146,6 +149,7 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
 #[derive(Debug)]
 struct Checked {
     diagnostics: Vec<Diagnostic>,
+    suppressed: Vec<Suppressed>,
     pooled: Option<(Stack, PooledFile)>,
 }
 
@@ -275,8 +279,10 @@ fn check_file(
     let mut analysis = cached_or_fresh(cached, || analyze_unit(parser, unit, limits))
         .map_err(|error| failure(error.to_string()))?;
     let pooled = pooled_file(&file.identity, &mut analysis, limits);
+    let (diagnostics, suppressed) = split(&source, evaluate(&file.identity, &analysis, limits));
     Ok(Checked {
-        diagnostics: evaluate(&file.identity, &analysis, limits),
+        diagnostics,
+        suppressed,
         pooled: pooled.map(|pooled| (file.language.stack(), pooled)),
     })
 }

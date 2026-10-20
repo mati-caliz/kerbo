@@ -155,10 +155,17 @@ fn offers_the_mechanical_fix_as_a_quick_fix() {
     let (_, replies) = serve(&input);
     assert_eq!(
         replies[0]["result"]["capabilities"]["codeActionProvider"]["codeActionKinds"],
-        json!(["quickfix"])
+        json!(["quickfix", "source.fixAll"])
     );
     let actions = replies[2]["result"].as_array().expect("una lista de acciones");
-    assert_eq!(actions.len(), 2);
+    assert_eq!(actions.len(), 3);
+    assert_eq!(actions[2]["kind"], "source.fixAll.kerbo");
+    assert_eq!(
+        actions[2]["edit"]["changes"][uri.as_str()]
+            .as_array()
+            .map(Vec::len),
+        Some(2)
+    );
     assert_eq!(actions[0]["kind"], "quickfix");
     assert_eq!(actions[0]["title"], "kerbo: borrá el import");
     assert_eq!(actions[0]["diagnostics"][0]["code"], "unused-import");
@@ -178,4 +185,36 @@ fn offers_the_mechanical_fix_as_a_quick_fix() {
         json!([]),
         "cerrado, se lee del disco y el archivo está vacío"
     );
+}
+
+#[test]
+fn answers_only_the_diagnostics_and_kinds_the_editor_asks_for() {
+    let tree = TempTree::new("lsp-context");
+    let path = tree.path().join("Cart.java");
+    let uri = format!("file://{}", path.to_str().expect("UTF-8").replace(' ', "%20"));
+    let text = "import java.util.List;\nfinal class Cart {\n  void add(int count) {}\n}\n";
+    let whole = json!({ "start": { "line": 0, "character": 0 }, "end": { "line": 3, "character": 0 } });
+    let reported = json!([
+        { "range": { "start": { "line": 2, "character": 2 }, "end": { "line": 2, "character": 9 } }, "source": "kerbo", "code": "final-parameter" },
+        { "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 9 } }, "source": "otro", "code": "unused-import" },
+    ]);
+    let action = |id: u64, context: &Value| json!({ "jsonrpc": "2.0", "id": id, "method": "textDocument/codeAction", "params": { "textDocument": { "uri": uri }, "range": whole, "context": context } });
+    let messages = [
+        json!({ "jsonrpc": "2.0", "method": "textDocument/didOpen", "params": { "textDocument": { "uri": uri, "text": text } } }),
+        action(1, &json!({ "diagnostics": reported, "only": ["quickfix"] })),
+        action(2, &json!({ "diagnostics": [], "only": ["source.fixAll"] })),
+        action(3, &json!({ "diagnostics": [], "only": ["refactor"] })),
+    ];
+    let input: String = messages.iter().map(frame).collect();
+    let (_, replies) = serve(&input);
+    let asked = replies[1]["result"].as_array().expect("una lista de acciones");
+    assert_eq!(asked.len(), 1);
+    assert_eq!(asked[0]["diagnostics"][0]["code"], "final-parameter");
+    let everything = replies[2]["result"].as_array().expect("una lista de acciones");
+    assert_eq!(everything.len(), 1);
+    assert_eq!(
+        everything[0]["title"],
+        "kerbo: arreglar todo lo mecánico del archivo"
+    );
+    assert_eq!(replies[3]["result"], json!([]));
 }

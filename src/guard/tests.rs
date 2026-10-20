@@ -266,3 +266,59 @@ fn reports_emptied_tests_and_loosened_thresholds_in_the_change() {
         "vaciar un test sin tocar su firma también cuenta"
     );
 }
+
+#[test]
+fn marks_the_ignore_comments_of_squawk_hadolint_and_shellcheck() {
+    let tree = TempTree::new("guard-directives");
+    git(tree.path(), &["init", "-q"]);
+    tree.write("Dockerfile", "FROM debian:12\nRUN apt-get update\n");
+    tree.write("migrations/0001.sql", "ALTER TABLE a ADD COLUMN b int;\n");
+    git(tree.path(), &["add", "."]);
+    git(tree.path(), &["commit", "-q", "-m", "base"]);
+    tree.write(
+        "Dockerfile",
+        "FROM debian:12\n# hadolint ignore=DL3008\nRUN apt-get update\n# shellcheck disable=SC2086\n",
+    );
+    tree.write(
+        "migrations/0001.sql",
+        "-- squawk-ignore ban-drop-column\nALTER TABLE a DROP COLUMN b;\n",
+    );
+    let root = tree.path().canonicalize().expect("existe");
+    let changes = ChangedLines::since("HEAD", &root).expect("git responde");
+    let config = Config::load(None, &root).expect("sin archivo");
+    let request = GuardRequest {
+        changes: &changes,
+        config: &config,
+        project_root: &root,
+        stacks: &[],
+    };
+    let found: Vec<(String, usize, String)> = inspect(&request)
+        .into_iter()
+        .filter(|diagnostic| diagnostic.rule == RuleId::SuppressionAdded)
+        .map(|diagnostic| {
+            let marker = diagnostic
+                .fingerprint
+                .rsplit(':')
+                .next()
+                .unwrap_or_default()
+                .to_owned();
+            (diagnostic.relative_path, diagnostic.line, marker)
+        })
+        .collect();
+    assert_eq!(
+        found,
+        [
+            ("Dockerfile".to_owned(), 2, "hadolint ignore=DL3008#1".to_owned()),
+            (
+                "Dockerfile".to_owned(),
+                4,
+                "shellcheck disable=SC2086#1".to_owned()
+            ),
+            (
+                "migrations/0001.sql".to_owned(),
+                1,
+                "squawk-ignore ban-drop-column#1".to_owned()
+            ),
+        ]
+    );
+}

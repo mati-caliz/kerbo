@@ -7,6 +7,7 @@ use crate::rules::RuleId;
 mod deploy;
 mod dockerfile;
 mod explanations;
+mod fixes;
 
 #[derive(Debug)]
 pub struct Spanish;
@@ -18,7 +19,7 @@ impl Catalog for Spanish {
             Text::FixLabel => "Cómo se arregla",
             Text::ExampleLabel => "Ejemplo",
             Text::McpInstructions => {
-                "Usá kerbo_check después de editar código: con diff (por ejemplo HEAD) mira sólo lo cambiado y detecta trampas como supresiones nuevas o tests salteados. kerbo_explain dice cómo arreglar cada regla."
+                "Usá kerbo_check después de editar código: con diff (por ejemplo HEAD) mira sólo lo cambiado y detecta trampas como supresiones nuevas o tests salteados. kerbo_fix aplica de una vez los arreglos mecánicos (con dry_run sólo devuelve el parche). kerbo_explain dice cómo arreglar cada regla."
             }
             Text::McpCheckDescription => {
                 "Analiza archivos o carpetas y devuelve los problemas priorizados, con id estable y pista de arreglo."
@@ -28,6 +29,17 @@ impl Catalog for Spanish {
             Text::McpExplainDescription => {
                 "Explica una regla de kerbo: por qué existe, cómo se arregla y un ejemplo."
             }
+            Text::McpFixDescription => {
+                "Aplica de una vez los arreglos mecánicos que no se pisan entre sí, vuelve a analizar lo arreglado y devuelve el parche."
+            }
+            Text::McpRulesDescription => "Sólo los arreglos de estas reglas; por defecto, todos",
+            Text::McpDryRunDescription => "Devuelve el parche sin escribir los archivos",
+            Text::AboutFix => {
+                "Aplica de una vez todos los arreglos mecánicos que no se pisan y vuelve a analizar lo arreglado"
+            }
+            Text::HelpFixRule => "Sólo los arreglos de esta regla (se puede repetir)",
+            Text::HelpDryRun => "Muestra el parche sin escribir los archivos",
+            Text::FixAllTitle => "arreglar todo lo mecánico del archivo",
             Text::AboutKerbo => "Analizador de calidad multi-lenguaje",
             Text::AboutCheck => "Analiza los archivos y lista los problemas",
             Text::AboutBaseline => {
@@ -37,7 +49,9 @@ impl Catalog for Spanish {
             Text::AboutHook => {
                 "Hook para agentes: revisa el archivo recién editado (lee el evento de Claude Code por stdin)"
             }
-            Text::AboutMcp => "Servidor MCP por stdio: herramientas kerbo_check y kerbo_explain para agentes",
+            Text::AboutMcp => {
+                "Servidor MCP por stdio: herramientas kerbo_check, kerbo_fix y kerbo_explain para agentes"
+            }
             Text::AboutLsp => {
                 "Servidor LSP por stdio: los problemas en el editor mientras escribís (IntelliJ, VS Code, Neovim)"
             }
@@ -242,6 +256,13 @@ impl Catalog for Spanish {
     fn notice(&self, notice: &Notice) -> String {
         match notice {
             Notice::Summary(summary) => summarize(summary),
+            Notice::Suppressed {
+                path,
+                line,
+                rule,
+                reason,
+            } => fixes::suppressed(path, *line, *rule, reason),
+            Notice::Fix(notice) => fixes::notice(notice),
             Notice::BaselineSaved { count, path } => format!("{count} problemas guardados en {path}"),
             Notice::HookHeader { count } => format!("{count} problemas en lo que acabás de editar:"),
         }
@@ -255,6 +276,7 @@ fn summarize(summary: &Summary) -> String {
         known,
         milliseconds,
         deviations,
+        suppressed,
     } = *summary;
     let known = if known > 0 {
         format!(" (y {known} en la línea de base)")
@@ -266,7 +288,10 @@ fn summarize(summary: &Summary) -> String {
     } else {
         String::new()
     };
-    format!("{files} archivos, {problems} problemas{known}, {milliseconds} ms{deviations}")
+    format!(
+        "{files} archivos, {problems} problemas{known}, {milliseconds} ms{deviations}{}",
+        fixes::suppressed_suffix(suppressed)
+    )
 }
 
 const fn block_unit(unit: BlockUnit) -> &'static str {

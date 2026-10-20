@@ -45,6 +45,15 @@ pub fn find_markers(root: Node<'_>, source: &[u8], profile: &Profile) -> Vec<Mar
     markers
 }
 
+pub fn directive_marker(line: usize, text: &str) -> Marker {
+    Marker {
+        kind: MarkerKind::Suppression,
+        line,
+        end_line: line,
+        text: shorten(text),
+    }
+}
+
 fn classify(node: Node<'_>, source: &[u8], profile: &Profile) -> Vec<Marker> {
     let guard = &profile.guard;
     let kind = node.kind();

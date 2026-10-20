@@ -45,6 +45,8 @@ kerbo check --diff main           # sólo lo que tocan las líneas cambiadas des
 kerbo check --format sarif        # también json, agent, agent-json; sarif lo leen GitHub y los editores
 kerbo check --no-cache            # analiza todo de cero, sin leer ni escribir la caché
 kerbo baseline                    # acepta lo que ya hay: desde ahora sólo se reporta lo nuevo
+kerbo fix                         # aplica de una vez todos los arreglos mecánicos
+kerbo fix --dry-run --rule unused-import src  # sólo muestra el parche, de una regla y una carpeta
 kerbo explain cognitive-complexity  # por qué existe una regla y cómo se arregla
 ```
 
@@ -62,6 +64,22 @@ Los mensajes salen en español o en inglés. Manda `--lang en` (o `es`), despué
 `kerbo.toml` y después el locale del sistema (`LC_ALL`, `LC_MESSAGES`, `LANG`); sin nada de eso,
 español. El idioma sólo cambia el texto para personas: los identificadores de reglas, los `id`
 estables y la forma del JSON, de SARIF y de `--format agent` y `agent-json` son los mismos.
+
+### Arreglar de una vez
+
+`kerbo fix` aplica todos los arreglos mecánicos (un import que sobra, un modificador de más, un
+`final` que falta) en una sola corrida. Entre los arreglos de un archivo elige los que no se pisan
+(dos que tocan el mismo rango no van juntos), los aplica, vuelve a analizar el texto arreglado y
+repite hasta que no quede ninguno, así un arreglo que destapa otro (una clase que pasa a `final`
+deja de más el `final` de sus métodos) también entra; los que se siguen pisando después de diez
+vueltas quedan avisados. Después compara lo que queda con lo que había: si aparece un problema que
+antes no estaba, ese archivo no se escribe y se lista lo nuevo. Cada archivo se escribe entero a un
+temporal en la misma carpeta que después se renombra, así nunca queda a medio escribir.
+
+`--rule` (se puede repetir) limita los arreglos a esas reglas y las rutas, a esas carpetas o
+archivos. `--dry-run` (o `--diff`) no escribe nada y muestra el parche en diff unificado sin
+contexto (`git apply --unidiff-zero`). Sale con `0` si todo quedó escrito, `1` si algún archivo no
+se escribió porque el arreglo dejaba algo nuevo y `2` si algo no se pudo leer o escribir.
 
 ### Adoptarlo en un repo que ya existe
 
@@ -83,8 +101,18 @@ para zafar en vez de arreglar, sólo en las líneas nuevas:
 | `test-removed` | tests borrados, comparando contra la referencia; si los tests sólo se movieron de archivo, no avisa |
 | `type-escape` | `any` y `as unknown as` en TypeScript |
 
-Todo se detecta sobre el árbol de sintaxis: un `eslint-disable` dentro de un string no cuenta. Si
-una excepción es legítima, va en `kerbo.toml` con su `reason`, a la vista de todos.
+Todo se detecta sobre el árbol de sintaxis: un `eslint-disable` dentro de un string no cuenta.
+También cuentan como supresión nueva los comentarios de las herramientas que kerbo reemplaza:
+`-- squawk-ignore` y `-- squawk-ignore-file` en las migraciones, `# hadolint ignore=` y
+`# hadolint global ignore=` en los Dockerfile, y `# shellcheck disable=`. Si una excepción es
+legítima, va en `kerbo.toml` con su `reason`, a la vista de todos.
+
+Esos comentarios, además, se respetan al reportar como lo hace la herramienta original: el
+problema de las reglas nombradas en la línea siguiente (o en todo el archivo, con `-file` y
+`global`) no se cuenta. Lo que sigue a la lista de reglas es el motivo
+(`# hadolint ignore=DL3008 # la imagen base fija las versiones`), y cada problema ignorado sale en
+el log con su motivo, o `sin motivo`, igual que los desvíos de `kerbo.toml`; el resumen suma
+cuántos se ignoraron en el código.
 
 ### Para agentes de IA
 
@@ -113,8 +141,9 @@ una excepción es legítima, va en `kerbo.toml` con su `reason`, a la vista de t
 
   En un repo git sólo mira lo que cambió respecto de `HEAD`, antitrampa incluida, y respeta la línea
   de base: el agente no se pone a arreglar código que no tocó. Si kerbo falla, el hook no bloquea.
-- **Servidor MCP** (`kerbo mcp`, por stdio) con dos herramientas, `kerbo_check` (carpetas, `diff`
-  y lenguajes; devuelve la salida para agentes) y `kerbo_explain`. En Claude Code:
+- **Servidor MCP** (`kerbo mcp`, por stdio) con tres herramientas: `kerbo_check` (carpetas, `diff`
+  y lenguajes; devuelve la salida para agentes), `kerbo_fix` (lo mismo que `kerbo fix`, con
+  carpetas, reglas, lenguajes y `dry_run`; devuelve el parche y el resumen) y `kerbo_explain`. En Claude Code:
   `claude mcp add kerbo -- kerbo mcp`; en Cursor y otros clientes, un servidor stdio con el
   comando `kerbo` y el argumento `mcp`.
 
@@ -123,7 +152,10 @@ una excepción es legítima, va en `kerbo.toml` con su `reason`, a la vista de t
 `kerbo lsp` es un servidor LSP: el editor le pasa el archivo mientras escribís y kerbo marca los
 problemas al instante, sin esperar a que guardes, con el `kerbo.toml` y la línea de base del repo.
 Los que tienen arreglo mecánico aparecen como acción rápida (*quick fix*): borrar el import,
-sacar el modificador o agregar el `final`.
+sacar el modificador o agregar el `final`. Si el editor manda los problemas que tiene a la vista
+(`context.diagnostics`), sólo se ofrecen los de esos; si no, los de las líneas pedidas. La acción
+`source.fixAll.kerbo` arregla de una vez todo lo mecánico del archivo que no se pisa (en VS Code,
+`"editor.codeActionsOnSave": { "source.fixAll": "explicit" }` lo corre al guardar).
 
 - **IntelliJ IDEA, PyCharm, GoLand, WebStorm** (Community o Ultimate): instalá el plugin
   [LSP4IJ](https://plugins.jetbrains.com/plugin/23257-lsp4ij), y en *Settings → Languages &
@@ -317,7 +349,14 @@ Un arreglo mecánico (`src/fix.rs`) es una lista de ediciones de rango (línea y
 de fin y el texto nuevo) más el bloque de diff unificado que resulta, calculado durante el análisis
 y guardado en la caché con el resto. El LSP manda las ediciones como acción rápida y `--format
 agent` manda el diff; una regla nueva sólo tiene que armar el `Fix` (borrar un nodo o insertar
-antes de uno).
+antes de uno) y le llegan solos `kerbo fix`, `kerbo_fix` y el "arreglar todo" del LSP, que eligen
+los arreglos que no se pisan con `fix::compatible`.
+
+Los comentarios que silencian una herramienta original están en un solo registro,
+`SYNTAXES` de `src/suppressions.rs`: el comentario (`--` o `#`), el marcador y si vale para la
+línea siguiente o para el archivo. De ahí salen tanto la antitrampa como lo que se ignora al
+reportar; los códigos se comparan con el nombre de la regla sin distinguir mayúsculas, así que una
+herramienta nueva sólo suma su fila.
 
 ## Desarrollo
 

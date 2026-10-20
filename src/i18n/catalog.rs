@@ -38,6 +38,9 @@ pub enum Text {
     McpPathsDescription,
     McpDiffDescription,
     McpExplainDescription,
+    McpFixDescription,
+    McpRulesDescription,
+    McpDryRunDescription,
     AboutKerbo,
     AboutCheck,
     AboutBaseline,
@@ -45,6 +48,10 @@ pub enum Text {
     AboutHook,
     AboutMcp,
     AboutLsp,
+    AboutFix,
+    HelpFixRule,
+    HelpDryRun,
+    FixAllTitle,
     HelpRule,
     HelpConfig,
     HelpPaths,
@@ -202,13 +209,34 @@ pub struct Summary {
     pub known: usize,
     pub milliseconds: u128,
     pub deviations: usize,
+    pub suppressed: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Notice {
     Summary(Summary),
-    BaselineSaved { count: usize, path: String },
-    HookHeader { count: usize },
+    BaselineSaved {
+        count: usize,
+        path: String,
+    },
+    HookHeader {
+        count: usize,
+    },
+    Suppressed {
+        path: String,
+        line: usize,
+        rule: RuleId,
+        reason: String,
+    },
+    Fix(FixNotice),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FixNotice {
+    Applied { count: usize, files: usize },
+    Previewed { count: usize, files: usize },
+    Withheld { path: String, introduced: usize },
+    Left { count: usize },
 }
 
 pub fn with_subject(description: &str, subject: &str) -> String {

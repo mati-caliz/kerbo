@@ -1,7 +1,7 @@
 mod markers;
 mod settings;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
@@ -12,8 +12,9 @@ use crate::diff::{ChangedLines, Changes};
 use crate::i18n::{Cheat, Message};
 use crate::language::{Language, Stack};
 use crate::rules::{Diagnostic, RuleId};
+use crate::suppressions::directives;
 
-use self::markers::{Marker, MarkerKind, find_markers};
+use self::markers::{Marker, MarkerKind, directive_marker, find_markers};
 
 const FIRST_LINE: usize = 1;
 const FIRST_COLUMN: usize = 1;
@@ -167,6 +168,22 @@ fn count_tests(markers: &[Marker]) -> usize {
 }
 
 fn markers_of(source: &str, language: Language) -> Vec<Marker> {
+    let mut markers = syntax_markers(source, language);
+    let marked: HashSet<usize> = markers
+        .iter()
+        .filter(|marker| marker.kind == MarkerKind::Suppression)
+        .map(|marker| marker.line)
+        .collect();
+    markers.extend(
+        directives(source)
+            .into_iter()
+            .filter(|directive| !marked.contains(&directive.line))
+            .map(|directive| directive_marker(directive.line, &directive.text)),
+    );
+    markers
+}
+
+fn syntax_markers(source: &str, language: Language) -> Vec<Marker> {
     let (Some(grammar), Some(profile)) = (language.grammar(), language.profile()) else {
         return Vec::new();
     };

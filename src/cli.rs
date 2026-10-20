@@ -16,6 +16,9 @@ const EXPLAIN_COMMAND: &str = "explain";
 const HOOK_COMMAND: &str = "hook";
 const MCP_COMMAND: &str = "mcp";
 const LSP_COMMAND: &str = "lsp";
+const FIX_COMMAND: &str = "fix";
+const RULES_ARGUMENT: &str = "rules";
+const DRY_RUN_ARGUMENT: &str = "dry_run";
 const LANG_ARGUMENT: &str = "lang";
 const RULE_ARGUMENT: &str = "rule";
 const CONFIG_ARGUMENT: &str = "config";
@@ -43,6 +46,7 @@ pub enum Command {
         #[arg(value_parser = localized_parser::<RuleId>(Lang::default()))]
         rule: RuleId,
     },
+    Fix(FixArgs),
     Hook(HookArgs),
     Mcp,
     Lsp,
@@ -54,6 +58,7 @@ impl Command {
             Self::Check(arguments) => arguments.scan.config.as_deref(),
             Self::Baseline(arguments) => arguments.config.as_deref(),
             Self::Hook(arguments) => arguments.config.as_deref(),
+            Self::Fix(arguments) => arguments.config.as_deref(),
             Self::Explain { .. } | Self::Mcp | Self::Lsp => None,
         }
     }
@@ -63,6 +68,20 @@ impl Command {
 pub struct HookArgs {
     #[arg(long)]
     pub config: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+pub struct FixArgs {
+    #[arg(default_value = ".")]
+    pub paths: Vec<PathBuf>,
+    #[arg(long = "language", value_enum)]
+    pub languages: Vec<Stack>,
+    #[arg(long = "rule", value_parser = localized_parser::<RuleId>(Lang::default()))]
+    pub rules: Vec<RuleId>,
+    #[arg(long)]
+    pub config: Option<PathBuf>,
+    #[arg(long, visible_alias = "diff")]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]
@@ -129,6 +148,7 @@ pub fn command(lang: Lang) -> clap::Command {
                         .value_parser(localized_parser::<RuleId>(lang))
                 })
         })
+        .mut_subcommand(FIX_COMMAND, |fix| fix_command(fix, lang))
         .mut_subcommand(HOOK_COMMAND, |hook| {
             config_argument(hook, lang).about(lang.text(Text::AboutHook))
         })
@@ -145,6 +165,18 @@ fn scan_command(command: clap::Command, lang: Lang) -> clap::Command {
                 .value_name(lang.text(Text::ValueRuleLimit))
                 .value_parser(localized_parser::<LimitOverride>(lang))
         })
+}
+
+fn fix_command(command: clap::Command, lang: Lang) -> clap::Command {
+    config_argument(command, lang)
+        .about(lang.text(Text::AboutFix))
+        .mut_arg(PATHS_ARGUMENT, |arg| arg.help(lang.text(Text::HelpPaths)))
+        .mut_arg(LANGUAGES_ARGUMENT, |arg| arg.help(lang.text(Text::HelpLanguages)))
+        .mut_arg(RULES_ARGUMENT, |arg| {
+            arg.help(lang.text(Text::HelpFixRule))
+                .value_parser(localized_parser::<RuleId>(lang))
+        })
+        .mut_arg(DRY_RUN_ARGUMENT, |arg| arg.help(lang.text(Text::HelpDryRun)))
 }
 
 fn config_argument(command: clap::Command, lang: Lang) -> clap::Command {

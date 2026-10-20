@@ -1,6 +1,6 @@
 use tree_sitter::{Node, Parser, Tree};
 
-use super::{Fix, TextEdit, TextPoint, apply};
+use super::{Fix, TextEdit, TextPoint, apply, compatible, edits_of, file_patch};
 use crate::language::Language;
 use crate::syntax::descendants;
 
@@ -75,4 +75,55 @@ fn rejects_edits_outside_the_text() {
         replacement: "x".to_owned(),
     };
     assert_eq!(apply(&[inside_a_character], "ñ"), None);
+}
+
+fn edit(line: usize, start: usize, end: usize, replacement: &str) -> Fix {
+    Fix {
+        edits: vec![TextEdit {
+            start: TextPoint { line, column: start },
+            end: TextPoint { line, column: end },
+            replacement: replacement.to_owned(),
+        }],
+        hunk: String::new(),
+    }
+}
+
+#[test]
+fn keeps_only_the_fixes_that_do_not_touch_each_other() {
+    let first_word = edit(1, 1, 4, "");
+    let overlapping = edit(1, 3, 6, "x");
+    let same_start = edit(1, 1, 1, "y");
+    let touching = edit(1, 4, 5, "z");
+    let other_line = edit(2, 1, 1, "final ");
+    let fixes = [first_word, overlapping, same_start, touching, other_line];
+    let chosen = compatible(&fixes);
+    assert_eq!(chosen.len(), 3);
+    let fixed_text = apply(&edits_of(&chosen), "abcde\nint a;\n").expect("caen en el texto");
+    assert_eq!(fixed_text, "ze\nfinal int a;\n");
+}
+
+#[test]
+fn writes_one_hunk_per_change_with_the_numbers_of_both_sides() {
+    let old = "import a.B;\nimport c.D;\nclass A {\r\n  void m(int v) {}\n}\n";
+    let new = "import c.D;\nclass A {\r\n  void m(final int v) {}\n}\n// fin\n";
+    assert_eq!(
+        file_patch("src/A.java", old, new).as_deref(),
+        Some(
+            "--- a/src/A.java\n+++ b/src/A.java\n@@ -1 +0,0 @@\n-import a.B;\n@@ -4 +3 @@\n-  void m(int v) {}\n+  void m(final int v) {}\n@@ -5,0 +5 @@\n+// fin\n"
+        )
+    );
+    assert_eq!(file_patch("a", old, old), None);
+}
+
+#[test]
+fn falls_back_to_one_hunk_when_everything_changes() {
+    let old: String = (0..1_200)
+        .map(|line| ["a", &line.to_string(), "\n"].concat())
+        .collect();
+    let new: String = (0..1_200)
+        .map(|line| ["b", &line.to_string(), "\n"].concat())
+        .collect();
+    let patch = file_patch("big", &old, &new).expect("cambia");
+    assert!(patch.contains("@@ -1,1200 +1,1200 @@"));
+    assert_eq!(patch.matches("@@ ").count(), 1);
 }

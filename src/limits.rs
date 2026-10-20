@@ -186,6 +186,7 @@ impl Preset {
             .fold(base, |limits, &rule| limits.with_rule(rule, None));
         let base = unmeasured(language)
             .iter()
+            .filter(|&&rule| rule != RuleId::SuppressionAdded)
             .chain(&deploy::relaxed_by(self))
             .fold(base, |limits, &rule| limits.with_rule(rule, None));
         if !is_test {

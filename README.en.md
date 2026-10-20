@@ -45,6 +45,8 @@ kerbo check --diff main           # only what the lines changed since main touch
 kerbo check --format sarif        # also json, agent, agent-json; GitHub and editors read sarif
 kerbo check --no-cache            # analyze everything from scratch, without reading or writing the cache
 kerbo baseline                    # accept what is already there: from now on only new problems
+kerbo fix                         # apply every mechanical fix at once
+kerbo fix --dry-run --rule unused-import src  # only show the patch, for one rule and one folder
 kerbo explain cognitive-complexity  # why a rule exists and how to fix it
 ```
 
@@ -63,6 +65,24 @@ Messages come out in Spanish or English. `--lang en` (or `es`) wins, then `lang`
 `kerbo.toml`, then the system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`); without any of them,
 Spanish. The language only changes the text meant for people: rule identifiers, stable `id`s and
 the shape of the JSON, SARIF, `--format agent` and `agent-json` output stay the same.
+
+### Fixing everything at once
+
+`kerbo fix` applies every mechanical fix (an import that is not needed, an extra modifier, a
+missing `final`) in a single run. Among the fixes of a file it picks the ones that do not overlap
+(two that touch the same range do not go together), applies them, analyzes the fixed text again
+and repeats until none is left, so a fix that uncovers another one (a class that becomes `final`
+makes the `final` of its methods redundant) also goes in; the ones that still overlap after ten
+rounds are reported. Then it compares what is left with what was there: if a problem shows up that
+was not there before, that file is not written and the new problems are listed. Each file is
+written whole to a temporary file in the same folder that is then renamed, so it is never left
+half written.
+
+`--rule` (can be repeated) limits the fixes to those rules and the paths, to those folders or
+files. `--dry-run` (or `--diff`) writes nothing and shows the patch as a unified diff without
+context (`git apply --unidiff-zero`). It exits with `0` if everything was written, `1` if some file
+was not written because the fix left something new and `2` if something could not be read or
+written.
 
 ### Adopting it in an existing repo
 
@@ -84,8 +104,18 @@ dodge a rule instead of fixing it, only on the new lines:
 | `test-removed` | deleted tests, compared against the reference; if the tests only moved to another file, it stays quiet |
 | `type-escape` | `any` and `as unknown as` in TypeScript |
 
-Everything is detected on the syntax tree: an `eslint-disable` inside a string does not count. If
-an exception is legitimate, it goes in `kerbo.toml` with its `reason`, in plain sight.
+Everything is detected on the syntax tree: an `eslint-disable` inside a string does not count.
+The comments of the tools kerbo replaces count as a new suppression too: `-- squawk-ignore` and
+`-- squawk-ignore-file` in migrations, `# hadolint ignore=` and `# hadolint global ignore=` in
+Dockerfiles, and `# shellcheck disable=`. If an exception is legitimate, it goes in `kerbo.toml`
+with its `reason`, in plain sight.
+
+Those comments are also honored when reporting, the way the original tool does it: the problem of
+the rules named on the next line (or in the whole file, with `-file` and `global`) is not counted.
+What follows the list of rules is the reason
+(`# hadolint ignore=DL3008 # the base image pins the versions`), and every ignored problem shows up
+in the log with its reason, or `no reason given`, just like the deviations in `kerbo.toml`; the
+summary adds how many were ignored in the code.
 
 ### For AI agents
 
@@ -116,8 +146,9 @@ an exception is legitimate, it goes in `kerbo.toml` with its `reason`, in plain 
   In a git repo it only looks at what changed against `HEAD`, anti-cheat included, and it honors
   the baseline: the agent does not start fixing code it did not touch. If kerbo fails, the hook
   does not block.
-- **MCP server** (`kerbo mcp`, over stdio) with two tools, `kerbo_check` (folders, `diff` and
-  languages; returns the output for agents) and `kerbo_explain`. In Claude Code:
+- **MCP server** (`kerbo mcp`, over stdio) with three tools: `kerbo_check` (folders, `diff` and
+  languages; returns the output for agents), `kerbo_fix` (the same as `kerbo fix`, with folders,
+  rules, languages and `dry_run`; returns the patch and the summary) and `kerbo_explain`. In Claude Code:
   `claude mcp add kerbo -- kerbo mcp --lang en`; in Cursor and other clients, a stdio server with
   the command `kerbo` and the arguments `mcp --lang en`.
 
@@ -126,7 +157,10 @@ an exception is legitimate, it goes in `kerbo.toml` with its `reason`, in plain 
 `kerbo lsp` is an LSP server: the editor passes it the file while you type and kerbo flags the
 problems instantly, without waiting for you to save, with the repo's `kerbo.toml` and baseline.
 The ones with a mechanical fix show up as a quick fix: delete the import, drop the modifier or add
-the `final`.
+the `final`. If the editor sends the problems it has on screen (`context.diagnostics`), only those
+are offered; otherwise, the ones on the requested lines. The `source.fixAll.kerbo` action fixes
+everything mechanical in the file that does not overlap at once (in VS Code,
+`"editor.codeActionsOnSave": { "source.fixAll": "explicit" }` runs it on save).
 
 - **IntelliJ IDEA, PyCharm, GoLand, WebStorm** (Community or Ultimate): install the
   [LSP4IJ](https://plugins.jetbrains.com/plugin/23257-lsp4ij) plugin, and in *Settings →
@@ -321,7 +355,14 @@ The CLI texts (report, `explain`, errors, hook, MCP and LSP) live in a typed cat
 A mechanical fix (`src/fix.rs`) is a list of range edits (start and end line and column and the
 new text) plus the resulting unified diff hunk, computed during the analysis and stored in the
 cache with the rest. The LSP sends the edits as a quick fix and `--format agent` sends the diff; a
-new rule only has to build the `Fix` (delete a node or insert before one).
+new rule only has to build the `Fix` (delete a node or insert before one) and it gets
+`kerbo fix`, `kerbo_fix` and the LSP's "fix all" for free, which pick the fixes that do not overlap
+with `fix::compatible`.
+
+The comments that silence an original tool live in a single registry, `SYNTAXES` in
+`src/suppressions.rs`: the comment (`--` or `#`), the marker and whether it applies to the next
+line or to the file. Both the anti-cheat and what is ignored when reporting come from there; the
+codes are compared with the rule name ignoring case, so a new tool only adds its row.
 
 ## Development
 

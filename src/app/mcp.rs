@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+use super::fixing::{FixRequest, fix_files};
 use super::{EXIT_CLEAN, FindingsRequest, Terminal, findings, write_error};
 use crate::cli::ScanArgs;
 use crate::i18n::{Lang, Problem, Text};
@@ -17,6 +18,8 @@ const PARSE_ERROR: i64 = -32_700;
 const INVALID_PARAMS: i64 = -32_602;
 const CHECK_TOOL: &str = "kerbo_check";
 const EXPLAIN_TOOL: &str = "kerbo_explain";
+const FIX_TOOL: &str = "kerbo_fix";
+const NEWLINE: &str = "\n";
 const CURRENT_DIRECTORY: &str = ".";
 
 #[derive(Debug, Default, Deserialize)]
@@ -27,6 +30,19 @@ struct CheckArguments {
     diff: Option<String>,
     #[serde(default)]
     languages: Vec<Stack>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixArguments {
+    #[serde(default)]
+    paths: Vec<String>,
+    #[serde(default)]
+    rules: Vec<String>,
+    #[serde(default)]
+    languages: Vec<Stack>,
+    #[serde(default)]
+    dry_run: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -108,6 +124,19 @@ fn tools(lang: Lang) -> Value {
             },
         },
         {
+            "name": FIX_TOOL,
+            "description": lang.text(Text::McpFixDescription),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "paths": { "type": "array", "items": { "type": "string" }, "description": lang.text(Text::McpPathsDescription) },
+                    "rules": { "type": "array", "items": { "type": "string", "enum": rules }, "description": lang.text(Text::McpRulesDescription) },
+                    "languages": { "type": "array", "items": { "type": "string", "enum": ["typescript", "python", "java", "go"] } },
+                    "dry_run": { "type": "boolean", "description": lang.text(Text::McpDryRunDescription) },
+                },
+            },
+        },
+        {
             "name": EXPLAIN_TOOL,
             "description": lang.text(Text::McpExplainDescription),
             "inputSchema": {
@@ -129,6 +158,11 @@ fn call_tool(params: &Value, directory: &Path, lang: Lang) -> Result<Value, (i64
             directory,
             lang,
         ),
+        FIX_TOOL => run_fix(
+            serde_json::from_value(arguments).map_err(invalid)?,
+            directory,
+            lang,
+        ),
         EXPLAIN_TOOL => run_explain(
             &serde_json::from_value::<ExplainArguments>(arguments).map_err(invalid)?,
             lang,
@@ -143,17 +177,40 @@ fn call_tool(params: &Value, directory: &Path, lang: Lang) -> Result<Value, (i64
     })
 }
 
-fn run_check(arguments: CheckArguments, directory: &Path, lang: Lang) -> Result<String, Problem> {
-    let paths = if arguments.paths.is_empty() {
+fn project_paths(paths: Vec<String>, directory: &Path) -> Vec<PathBuf> {
+    let paths = if paths.is_empty() {
         vec![CURRENT_DIRECTORY.to_owned()]
     } else {
-        arguments.paths
+        paths
     };
+    paths
+        .into_iter()
+        .map(|path| directory.join(PathBuf::from(path)))
+        .collect()
+}
+
+fn run_fix(arguments: FixArguments, directory: &Path, lang: Lang) -> Result<String, Problem> {
+    let rules = arguments
+        .rules
+        .iter()
+        .map(|rule| rule.parse())
+        .collect::<Result<Vec<RuleId>, Problem>>()?;
+    let request = FixRequest {
+        paths: project_paths(arguments.paths, directory),
+        languages: &arguments.languages,
+        rules: &rules,
+        config: None,
+        write: !arguments.dry_run,
+    };
+    let outcome = fix_files(&request, directory)?;
+    let mut text = outcome.patch();
+    text.push_str(&outcome.notices(lang).join(NEWLINE));
+    Ok(text)
+}
+
+fn run_check(arguments: CheckArguments, directory: &Path, lang: Lang) -> Result<String, Problem> {
     let scan = ScanArgs {
-        paths: paths
-            .into_iter()
-            .map(|path| directory.join(PathBuf::from(path)))
-            .collect(),
+        paths: project_paths(arguments.paths, directory),
         languages: arguments.languages,
         overrides: Vec::new(),
         config: None,
