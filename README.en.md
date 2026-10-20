@@ -367,7 +367,10 @@ codes are compared with the rule name ignoring case, so a new tool only adds its
 ## Development
 
 The gate (formatting, strict clippy, size ceilings, tests with coverage and `cargo-deny`) is
-`scripts/verify-rust.sh` and runs in a container, so all you need is Docker.
+`scripts/verify-rust.sh` and runs in a container, so all you need is Docker. On Windows, from Git
+Bash, run it as `MSYS_NO_PATHCONV=1 bash scripts/verify-rust.sh`: otherwise Git Bash rewrites the
+paths passed to `docker run`. `.gitattributes` keeps text files with LF even with `core.autocrlf`
+on, so `cargo fmt --check` does not trip over line endings.
 
 ## License
 

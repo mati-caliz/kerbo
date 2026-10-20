@@ -368,9 +368,10 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     guardar la huella de cada archivo y recombinar sólo los grupos que tocan lo que cambió.
 - Perfilar la corrida en frío de VS Code: 34 s con 126 a 145 s de CPU para 15.395 archivos es
   mucho más que lo medido en el resto; alguna regla o algún archivo pesa de más.
-- El gate no corre tal cual en un checkout de Windows con `core.autocrlf=true`: los `.rs` salen
-  con CRLF y `cargo fmt --check` falla, y Git Bash convierte las rutas de `docker run` si no se
-  pone `MSYS_NO_PATHCONV=1`. Un `.gitattributes` con `eol=lf` resuelve lo primero.
+- El gate en un checkout de Windows con `core.autocrlf=true` (hecho: el `.gitattributes` deja los
+  archivos de texto con LF, y el README dice que desde Git Bash se corre con
+  `MSYS_NO_PATHCONV=1`, porque el script se copia de afuera y no se edita). Un checkout hecho
+  antes del `.gitattributes` conserva los CRLF hasta `git rm --cached -r . && git reset --hard`.
 - Una sola pasada por función para todas las métricas, en lugar de una por métrica.
 - Un demonio por máquina, con los árboles y la caché en memoria, compartido por el hook, el
   servidor MCP, el LSP y `kerbo check`: varias sesiones de agentes en el mismo repo no repiten el

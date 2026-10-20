@@ -361,7 +361,11 @@ herramienta nueva sólo suma su fila.
 ## Desarrollo
 
 El gate (formato, clippy en modo estricto, techos de tamaño, tests con cobertura y `cargo-deny`)
-es `scripts/verify-rust.sh` y corre en un contenedor, así que sólo hace falta Docker.
+es `scripts/verify-rust.sh` y corre en un contenedor, así que sólo hace falta Docker. En Windows,
+desde el bash de Git, va con `MSYS_NO_PATHCONV=1 bash scripts/verify-rust.sh`: sin eso Git Bash
+convierte las rutas que se le pasan a `docker run`. El `.gitattributes` deja los archivos de texto
+con LF aunque `core.autocrlf` esté prendido, así `cargo fmt --check` no falla por los finales de
+línea.
 
 ## Licencia
 
