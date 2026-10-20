@@ -144,6 +144,9 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 - Caché por contenido de archivo, comprimida y con tope de tamaño: sólo se analiza lo que
   cambió. Es lo que hace posible el modo instantáneo en repos grandes.
 - Una sola pasada por función para todas las métricas, en lugar de una por métrica.
+- Un demonio por máquina, con los árboles y la caché en memoria, compartido por el hook, el
+  servidor MCP, el LSP y `kerbo check`: varias sesiones de agentes en el mismo repo no repiten el
+  trabajo, y el hook responde sin arrancar un proceso por edición.
 
 ### 8. Java sintáctico
 
@@ -157,11 +160,14 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 - Lo de SpotBugs sobre el código fuente: nulos, recursos sin cerrar, excepciones tragadas.
 - Contaminación de entradas hacia SQL, comandos, rutas y HTML, en todos los lenguajes.
 
-### 10. Go, Python y TypeScript completos
+### 10. Go, Python, TypeScript y shell completos
 
 - Cada lenguaje contra su herramienta (golangci-lint, ruff, ESLint), regla por regla.
+- Shell contra ShellCheck.
+- Código muerto entre archivos: exports que nadie importa y dependencias declaradas que nadie
+  usa, con paridad contra knip, vulture y depcheck donde las haya.
 
-### 11. Tests inteligentes, dependencias y secretos
+### 11. Tests y chequeos inteligentes, dependencias y secretos
 
 - Correr sólo los tests que afecta el cambio y reusar resultados.
 - Primero medir, por lenguaje, cuánto de una corrida con un cambio chico es arranque y cuánto son
@@ -176,8 +182,24 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   - Go: `go test` ya compila y guarda resultados en caché; sólo la selección de tests.
 - Procesos vivos con tope de memoria y servicios de los tests (bases en contenedores) reusados en
   vez de levantados de cero.
+- Los chequeos de tipos en caliente, sin reimplementarlos: `tsc` incremental y sólo en los
+  paquetes del monorepo que toca el cambio, y el demonio de mypy (`dmypy`) vivo entre corridas.
+- **Mutation testing sólo sobre lo cambiado**: con el mapa de qué test ejecuta qué código, mutar
+  las líneas del cambio y correr sólo los tests que las cubren. Marca el test que pasa sin
+  verificar nada, que es la trampa típica de un agente.
+- `kerbo gate`: el gate entero (análisis, tipos, tests, cobertura) con un planificador propio que
+  decide el orden y cuántos pasos en paralelo según la memoria libre.
 - Vulnerabilidades de dependencias con OSV y secretos versionados.
 
-### 12. Formateo propio
+### 12. Migraciones y contenedores
+
+- **Migraciones peligrosas** en drizzle, Prisma, Flyway y Alembic: índices sin `CONCURRENTLY`,
+  `NOT NULL` sin default, cambios de tipo en tablas grandes, renombres de algo que el código
+  desplegado todavía usa. Lo que bloquea una tabla en Postgres se marca antes de llegar a
+  producción.
+- **Dockerfile** contra hadolint, y reglas para compose: límite de memoria en cada servicio y
+  healthchecks con `start_period` e intervalos razonables.
+
+### 13. Formateo propio
 
 - Lenguaje por lenguaje, y sólo cuando la salida sea idéntica a la de la herramienta actual.
