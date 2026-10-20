@@ -2,11 +2,13 @@ mod ecmascript;
 mod go;
 mod java;
 mod python;
+mod rust;
 
 pub use ecmascript::ECMASCRIPT;
 pub use go::GO;
 pub use java::JAVA;
 pub use python::PYTHON;
+pub use rust::RUST;
 
 pub const NO_PARTIAL_UNITS: PartialUnits = PartialUnits {
     complexity_only: &[],
@@ -17,6 +19,7 @@ pub type Kinds = &'static [&'static str];
 
 #[derive(Debug)]
 pub struct Profile {
+    pub metrics: MetricsStyle,
     pub units: Kinds,
     pub inline_functions: Kinds,
     pub partial_units: PartialUnits,
@@ -131,7 +134,14 @@ pub struct ShortCircuit {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetricsStyle {
+    Shared,
+    Clippy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShortNameStyle {
+    Unmeasured,
     Eslint,
     Checkstyle,
     Varnamelen,
@@ -147,6 +157,7 @@ pub enum CommentedCodeStyle {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DuplicateStyle {
+    Unmeasured,
     CpdJava,
     CpdPython,
     Dupl,
@@ -155,6 +166,7 @@ pub enum DuplicateStyle {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MagicNumberStyle {
+    Unmeasured,
     Eslint,
     Checkstyle,
     Mnd,
@@ -166,6 +178,7 @@ pub enum NestingStyle {
     Unmeasured,
     Blocks,
     ControlFlow,
+    Clippy,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

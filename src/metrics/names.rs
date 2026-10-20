@@ -18,6 +18,7 @@ pub struct ShortName {
 pub fn find_short_names(root: Node<'_>, source: &[u8], style: ShortNameStyle) -> Vec<ShortName> {
     let nodes = descendants(root);
     match style {
+        ShortNameStyle::Unmeasured => Vec::new(),
         ShortNameStyle::Eslint => eslint::reported(&nodes, source),
         ShortNameStyle::Checkstyle => checkstyle::reported(&nodes, source),
         ShortNameStyle::Varnamelen => varnamelen::reported(root, source),

@@ -1,4 +1,8 @@
-use tree_sitter::Node;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+
+use tree_sitter::{Node, Parser, Tree};
 
 use crate::profile::{Kinds, Profile};
 
@@ -85,4 +89,37 @@ pub fn named_children(node: Node<'_>) -> Vec<Node<'_>> {
 
 pub const fn one_based(position: usize) -> usize {
     position.saturating_add(1)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SnippetLanguage {
+    Python,
+    Go,
+    Rust,
+}
+
+thread_local! {
+    static SNIPPET_PARSERS: RefCell<HashMap<SnippetLanguage, Parser>> = RefCell::new(HashMap::new());
+}
+
+// Los comentarios candidatos y los argumentos de macros se compilan aparte; crear un parser por
+// fragmento costaba más que analizar el archivo entero.
+pub fn parse_snippet(language: SnippetLanguage, text: &str) -> Option<Tree> {
+    SNIPPET_PARSERS.with(|parsers| {
+        let mut parsers = parsers.borrow_mut();
+        let parser = match parsers.entry(language) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => {
+                let mut parser = Parser::new();
+                let grammar = match language {
+                    SnippetLanguage::Python => tree_sitter_python::LANGUAGE,
+                    SnippetLanguage::Go => tree_sitter_go::LANGUAGE,
+                    SnippetLanguage::Rust => tree_sitter_rust::LANGUAGE,
+                };
+                parser.set_language(&grammar.into()).ok()?;
+                entry.insert(parser)
+            }
+        };
+        parser.parse(text, None)
+    })
 }

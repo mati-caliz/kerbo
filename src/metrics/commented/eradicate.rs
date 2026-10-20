@@ -4,8 +4,8 @@ use regex::{Regex, RegexSet};
 use tree_sitter::Node;
 
 use super::python_tokens::has_consecutive_names;
-use super::{CommentedCode, SnippetLanguage, at, parse_snippet};
-use crate::syntax::{descendants, named_children};
+use super::{CommentedCode, at};
+use crate::syntax::{SnippetLanguage, descendants, named_children, parse_snippet};
 
 const COMMENT: &str = "comment";
 const SCRIPT_TAG: &str = "# /// script";

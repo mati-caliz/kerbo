@@ -3,8 +3,8 @@ use std::sync::LazyLock;
 use regex::Regex;
 use tree_sitter::Node;
 
-use super::{CommentedCode, SnippetLanguage, parse_snippet};
-use crate::syntax::{descendants, named_children};
+use super::CommentedCode;
+use crate::syntax::{SnippetLanguage, descendants, named_children, parse_snippet};
 
 const COMMENT: &str = "comment";
 const LINE_TERMINATOR: &str = "\n";

@@ -1,10 +1,11 @@
 use super::{
     CaseShape, CognitiveShape, CommentedCodeStyle, CountedLines, DuplicateStyle, GuardShape, LineSpan,
-    LogicalShape, MagicNumberStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, ShortNameStyle,
-    SpanBounds, TestFiles,
+    LogicalShape, MagicNumberStyle, MetricsStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile,
+    ShortNameStyle, SpanBounds, TestFiles,
 };
 
 pub static GO: Profile = Profile {
+    metrics: MetricsStyle::Shared,
     units: &["function_declaration", "method_declaration"],
     inline_functions: &["func_literal"],
     partial_units: NO_PARTIAL_UNITS,

@@ -1,8 +1,9 @@
 # kerbo
 
-> Analizador de calidad de código multi-lenguaje (Java, TypeScript/JavaScript, Python y Go) en un
-> solo binario escrito en Rust. Reemplaza a Checkstyle, PMD, ESLint, ruff y golangci-lint con las
-> mismas reglas y un solo reporte, y suma guardarraíles para código escrito por agentes de IA.
+> Analizador de calidad de código multi-lenguaje (Java, TypeScript/JavaScript, Python, Go y Rust)
+> en un solo binario escrito en Rust. Reemplaza a Checkstyle, PMD, ESLint, ruff, golangci-lint y
+> clippy con las mismas reglas y un solo reporte, y suma guardarraíles para código escrito por
+> agentes de IA.
 
 - Estado: en desarrollo. El prototipo mide largo de archivo y de función, complejidad
   ciclomática y cognitiva y parámetros, con cero diferencias contra las herramientas originales

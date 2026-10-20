@@ -16,6 +16,7 @@ const CONFIG_NAMES: &[&str] = &[
     ".coveragerc",
     "clippy.toml",
     ".clippy.toml",
+    "Cargo.toml",
     "package.json",
     "pom.xml",
     "build.gradle",
@@ -33,14 +34,8 @@ const CONFIG_PREFIXES: &[&str] = &[
     "jest.config.",
 ];
 const COVERAGE_FILES: &[&str] = &["vitest.config.", "jest.config.", ".coveragerc"];
-const COVERAGE_WORDS: &[&str] = &[
-    "coverage",
-    "fail_under",
-    "fail-under",
-    "minimum",
-    "covered",
-    "threshold",
-];
+const COVERAGE_WORDS: &[&str] = &["coverage", "fail_under", "fail-under", "covered"];
+const FLOOR_WORDS: &[&str] = &["minimum", "threshold"];
 const CEILING_WORDS: &[&str] = &[
     "max",
     "complexity",
@@ -60,15 +55,17 @@ const LOOSENING_FLAGS: &[&str] = &["disable", "skip", "allow", "ignore"];
 const NEGATION_PREFIX: &str = "no";
 const TIGHTENING_FLAGS: &[&str] = &["strict", "enable", NEGATION_PREFIX];
 const SEVERITIES: &[&str] = &["off", "warn", "error"];
+const LINT_LEVELS: &[&str] = &["allow", "warn", "deny", "forbid"];
 const PRESETS: &[&str] = &["strict", "recommended", "minimal"];
 const BOOLEANS: &[&str] = &["false", "true"];
 const PLACEHOLDER: &str = "#";
 const KEY_CHARACTERS: &[char] = &['_', '-'];
-const MEASURED_LANGUAGES: [Language; 4] = [
+const MEASURED_LANGUAGES: [Language; 5] = [
     Language::Go,
     Language::Python,
     Language::Java,
     Language::TypeScript,
+    Language::Rust,
 ];
 const FIRST_COLUMN: usize = 1;
 const ALLOWED_OCCURRENCES: usize = 0;
@@ -204,7 +201,7 @@ fn settings_of(line: &str) -> Vec<Setting> {
         found.push(setting(trimmed, start, end, Value::Number(number)));
     }
     for (start, word) in words(trimmed) {
-        let known = [SEVERITIES, PRESETS, BOOLEANS]
+        let known = [SEVERITIES, LINT_LEVELS, PRESETS, BOOLEANS]
             .iter()
             .any(|scale| scale.contains(&word));
         if known {
@@ -266,7 +263,8 @@ fn is_looser(old: &Setting, new: &Setting, coverage_file: bool) -> bool {
     match (&old.value, &new.value) {
         (Value::Number(before), Value::Number(after)) => {
             let name = setting_name(&key);
-            if coverage_file || mentions(&key, COVERAGE_WORDS) || is_floor(name) {
+            let floor_word = mentions(&key, FLOOR_WORDS) && !mentions(name, CEILING_WORDS);
+            if coverage_file || mentions(&key, COVERAGE_WORDS) || floor_word || is_floor(name) {
                 after < before
             } else if mentions(name, CEILING_WORDS) || mentions(&key, CEILING_WORDS) {
                 after > before
@@ -282,6 +280,9 @@ fn is_looser(old: &Setting, new: &Setting, coverage_file: bool) -> bool {
 fn looser_word(key: &str, before: &str, after: &str) -> bool {
     let rank = |scale: &[&str], word: &str| scale.iter().position(|entry| *entry == word);
     if let (Some(old), Some(new)) = (rank(SEVERITIES, before), rank(SEVERITIES, after)) {
+        return new < old;
+    }
+    if let (Some(old), Some(new)) = (rank(LINT_LEVELS, before), rank(LINT_LEVELS, after)) {
         return new < old;
     }
     if let (Some(old), Some(new)) = (rank(PRESETS, before), rank(PRESETS, after)) {

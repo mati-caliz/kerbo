@@ -1,9 +1,11 @@
 use super::{
     CaseShape, CognitiveShape, CommentedCodeStyle, DuplicateStyle, GuardShape, LineSpan, LogicalShape,
-    MagicNumberStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, ShortNameStyle, TestFiles,
+    MagicNumberStyle, MetricsStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, ShortNameStyle,
+    TestFiles,
 };
 
 pub static PYTHON: Profile = Profile {
+    metrics: MetricsStyle::Shared,
     units: &["function_definition"],
     inline_functions: &["lambda"],
     partial_units: NO_PARTIAL_UNITS,

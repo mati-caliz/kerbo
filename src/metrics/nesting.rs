@@ -1,3 +1,5 @@
+mod clippy;
+
 use tree_sitter::Node;
 
 use crate::profile::NestingStyle;
@@ -51,6 +53,7 @@ pub fn find_deep_nesting(root: Node<'_>, style: NestingStyle, limit: Option<usiz
         NestingStyle::Unmeasured => Vec::new(),
         NestingStyle::Blocks => block_nesting(root, limit),
         NestingStyle::ControlFlow => control_nesting(root, limit),
+        NestingStyle::Clippy => clippy::reported(root, limit),
     }
 }
 

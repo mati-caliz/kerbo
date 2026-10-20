@@ -89,6 +89,7 @@ pub fn duplicate_units(
     limit: usize,
 ) -> Option<DuplicateUnits> {
     match style {
+        DuplicateStyle::Unmeasured => None,
         DuplicateStyle::Sonar => Some(DuplicateUnits::Repeated(sonar::repeated_blocks(
             root, source, limit,
         ))),

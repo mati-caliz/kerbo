@@ -1,9 +1,9 @@
 # kerbo
 
-Analizador de calidad de código para **Java, TypeScript/JavaScript, Python y Go** en un solo
+Analizador de calidad de código para **Java, TypeScript/JavaScript, Python, Go y Rust** en un solo
 binario. Aplica las mismas reglas en todos los lenguajes, en segundos y con pocos megas de
 memoria, y cuenta igual que la herramienta que ya usás en cada uno (ESLint, ruff, Checkstyle y
-PMD, golangci-lint).
+PMD, golangci-lint, clippy).
 
 ```console
 $ kerbo check
@@ -60,8 +60,8 @@ para zafar en vez de arreglar, sólo en las líneas nuevas:
 
 | Regla | Qué detecta |
 |---|---|
-| `suppression-added` | `eslint-disable`, `@ts-ignore`, `noqa`, `type: ignore`, `nolint`, `#nosec`, `@SuppressWarnings`, `NOPMD`, `CHECKSTYLE:OFF`, `istanbul ignore`, `NOSONAR`…, y un umbral aflojado en la configuración: un máximo que sube, un mínimo o una cobertura que baja, una regla que pasa a `off`, `strict` que pasa a `false` o un preset más laxo |
-| `test-disabled` | `it.skip`, `it.only`, `xit`, `describe.only`, `@Disabled`, `@Ignore`, `@pytest.mark.skip`, `t.Skip()`…, y un test que queda vacío |
+| `suppression-added` | `eslint-disable`, `@ts-ignore`, `noqa`, `type: ignore`, `nolint`, `#nosec`, `@SuppressWarnings`, `NOPMD`, `CHECKSTYLE:OFF`, `istanbul ignore`, `NOSONAR`, `#[allow]`, `#[expect]`…, y un umbral aflojado en la configuración: un máximo que sube, un mínimo o una cobertura que baja, una regla que pasa a `off` o a `allow`, `strict` que pasa a `false` o un preset más laxo |
+| `test-disabled` | `it.skip`, `it.only`, `xit`, `describe.only`, `@Disabled`, `@Ignore`, `@pytest.mark.skip`, `t.Skip()`, `#[ignore]`…, y un test que queda vacío |
 | `test-removed` | tests borrados, comparando contra la referencia; si los tests sólo se movieron de archivo, no avisa |
 | `type-escape` | `any` y `as unknown as` en TypeScript |
 
@@ -169,27 +169,36 @@ pestaña de cambios del pull request) y falla el job si hay problemas.
 
 ## Reglas
 
-| Regla | TypeScript / JavaScript | Python | Java | Go |
-|---|---|---|---|---|
-| `file-length` | 400 líneas de código | — | 500 líneas | 400 líneas |
-| `function-length` | 120 líneas de código | — | 80 líneas desde la llave | 80 líneas internas |
-| `cyclomatic-complexity` | 10 | 10 | 8 | 10 |
-| `cognitive-complexity` | 15 | — | 15 | 15 |
-| `parameter-count` | 4 | 6 (sin `self` ni `cls`) | 5 (sin `@Override`) | 4 |
-| `nesting-depth` | 4 bloques | — | — | 4 bloques de control |
-| `short-name` | menos de 2 caracteres salvo `i`, `j` y `_`, sin contar propiedades | `l`, `O` e `I` | locales de menos de 3 caracteres salvo `i` y `j` | menos de 3 caracteres si el último uso está a más de 5 líneas |
-| `magic-number` | fuera de constantes de módulo, enums, tipos y defaults; -1, 0, 1 y 2 valen | sólo en comparaciones; 0 y 1 valen | fuera de campos, constantes y `hashCode`; -1, 0, 1 y 2 valen | en argumentos, asignaciones, casos, condiciones, operaciones y retornos; 0 y 1 valen |
-| `duplicate-code` | funciones iguales de 3 líneas o más y ramas repetidas de un `if` o un `switch`, dentro del archivo | bloques de 100 tokens repetidos entre archivos o dentro de uno | lo mismo, sin contar anotaciones, `import` ni `;` | bloques de 150 nodos del árbol repetidos dentro de un paquete |
-| `commented-code` | — | comentarios en su propia línea que compilan como Python | — | grupos de comentarios dentro de una función que compilan como una sentencia de Go |
+| Regla | TypeScript / JavaScript | Python | Java | Go | Rust |
+|---|---|---|---|---|---|
+| `file-length` | 400 líneas de código | — | 500 líneas | 400 líneas | — |
+| `function-length` | 120 líneas de código | — | 80 líneas desde la llave | 80 líneas internas | 80 líneas con código del cuerpo, contadas sobre el texto |
+| `cyclomatic-complexity` | 10 | 10 | 8 | 10 | — |
+| `cognitive-complexity` | 15 | — | 15 | 15 | 15, la de clippy y no la de Sonar |
+| `parameter-count` | 4 | 6 (sin `self` ni `cls`) | 5 (sin `@Override`) | 4 | 4 (con el receptor, sin implementaciones de un trait) |
+| `nesting-depth` | 4 bloques | — | — | 4 bloques de control | 4 bloques, `impl`, `trait` o módulos |
+| `short-name` | menos de 2 caracteres salvo `i`, `j` y `_`, sin contar propiedades | `l`, `O` e `I` | locales de menos de 3 caracteres salvo `i` y `j` | menos de 3 caracteres si el último uso está a más de 5 líneas | — |
+| `magic-number` | fuera de constantes de módulo, enums, tipos y defaults; -1, 0, 1 y 2 valen | sólo en comparaciones; 0 y 1 valen | fuera de campos, constantes y `hashCode`; -1, 0, 1 y 2 valen | en argumentos, asignaciones, casos, condiciones, operaciones y retornos; 0 y 1 valen | — |
+| `duplicate-code` | funciones iguales de 3 líneas o más y ramas repetidas de un `if` o un `switch`, dentro del archivo | bloques de 100 tokens repetidos entre archivos o dentro de uno | lo mismo, sin contar anotaciones, `import` ni `;` | bloques de 150 nodos del árbol repetidos dentro de un paquete | — |
+| `commented-code` | — | comentarios en su propia línea que compilan como Python | — | grupos de comentarios dentro de una función que compilan como una sentencia de Go | — |
 
 Cada lenguaje cuenta como su herramienta de referencia: ESLint y sonarjs, ruff, Checkstyle y PMD,
 cyclop, gocognit, funlen, revive, mnd y varnamelen; los bloques duplicados, CPD de PMD, dupl y sonarjs (`no-identical-functions` y
-`no-duplicated-branches`); el código comentado, ERA001 de ruff y `commentedOutCode` de gocritic. Esas diferencias de criterio no están documentadas en ningún
+`no-duplicated-branches`); el código comentado, ERA001 de ruff y `commentedOutCode` de gocritic; Rust, clippy. Esas diferencias de criterio no están documentadas en ningún
 lado; cada una salió de comparar contra repos reales y quedó fijada en un test de
 `src/metrics/tests.rs` (el anidamiento, los números mágicos y los nombres cortos, en los `tests.rs` de su módulo). En
 los tests no se buscan números mágicos ni bloques duplicados, en los de TypeScript no se mide el largo de función y en
 los de Python no se cuentan los parámetros. El preset `minimal` no busca números mágicos ni duplicados, y `recommended` marca
 los bloques desde 150 tokens (225 nodos en Go y funciones de 5 líneas en TypeScript).
+
+En Rust, kerbo mide sólo lo que mide clippy (`too_many_lines`, `too_many_arguments`,
+`cognitive_complexity` y `excessive_nesting`), y la complejidad cognitiva es la de clippy, no la de
+Sonar: arranca en 1 y suma cada `if`, cada `match` de más de un brazo y cada guarda sobre el código
+ya expandido, así que también suman los `for`, los `while`, cada `?` y cada `.await`, los `assert!`
+y los `matches!`. Después descuenta los `return`: todos si la función devuelve `Result`, la mitad
+si no. Los closures se miden aparte, también los que van adentro de una macro. kerbo no expande
+macros: imita las de la biblioteca estándar y las de `log`, y de las demás cuenta sólo los
+argumentos; una macro propia del crate que esconde un `if` es la diferencia que queda.
 
 Esos son los umbrales del preset `strict`. Más reglas y la capa para agentes de IA están en la
 [hoja de ruta](ROADMAP.md).

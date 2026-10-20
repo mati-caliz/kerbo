@@ -31,6 +31,15 @@ const GO_STRICT: [Option<usize>; 5] = [Some(400), Some(80), Some(10), Some(15), 
 const PYTHON_STRICT: [Option<usize>; 5] = [None, None, Some(10), None, Some(6)];
 const JAVA_STRICT: [Option<usize>; 5] = [Some(500), Some(80), Some(8), Some(15), Some(5)];
 const ECMASCRIPT_STRICT: [Option<usize>; 5] = [Some(400), Some(120), Some(10), Some(15), Some(4)];
+const RUST_STRICT: [Option<usize>; 5] = [None, Some(80), None, Some(15), Some(4)];
+const RUST_UNMEASURED: &[RuleId] = &[
+    RuleId::FileLength,
+    RuleId::CyclomaticComplexity,
+    RuleId::MagicNumber,
+    RuleId::ShortName,
+    RuleId::DuplicateCode,
+    RuleId::CommentedCode,
+];
 const NESTING_STRICT: Option<usize> = Some(4);
 const NESTING_RECOMMENDED: Option<usize> = Some(5);
 const NESTING_MINIMAL: Option<usize> = Some(6);
@@ -56,7 +65,7 @@ impl DuplicateLimits {
     const fn for_language(self, language: Language) -> usize {
         match language {
             Language::Go => self.nodes,
-            Language::Python | Language::Java => self.tokens,
+            Language::Python | Language::Java | Language::Rust => self.tokens,
             Language::TypeScript | Language::Tsx | Language::JavaScript => self.lines,
         }
     }
@@ -122,6 +131,9 @@ impl Preset {
         } else {
             base
         };
+        let base = unmeasured(language)
+            .iter()
+            .fold(base, |limits, &rule| limits.with_rule(rule, None));
         if !is_test {
             return base;
         }
@@ -133,7 +145,7 @@ impl Preset {
                 base.with_rule(RuleId::FunctionLength, None)
             }
             Language::Python => base.with_rule(RuleId::ParameterCount, None),
-            Language::Go | Language::Java => base,
+            Language::Go | Language::Java | Language::Rust => base,
         }
     }
 }
@@ -144,6 +156,19 @@ const fn strict(language: Language) -> [Option<usize>; 5] {
         Language::Python => PYTHON_STRICT,
         Language::Java => JAVA_STRICT,
         Language::TypeScript | Language::Tsx | Language::JavaScript => ECMASCRIPT_STRICT,
+        Language::Rust => RUST_STRICT,
+    }
+}
+
+const fn unmeasured(language: Language) -> &'static [RuleId] {
+    match language {
+        Language::Rust => RUST_UNMEASURED,
+        Language::Go
+        | Language::Python
+        | Language::Java
+        | Language::TypeScript
+        | Language::Tsx
+        | Language::JavaScript => &[],
     }
 }
 

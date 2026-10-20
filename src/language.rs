@@ -14,6 +14,7 @@ pub enum Language {
     TypeScript,
     Tsx,
     JavaScript,
+    Rust,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -23,6 +24,7 @@ pub enum Stack {
     Python,
     Java,
     Go,
+    Rust,
 }
 
 impl Language {
@@ -32,6 +34,7 @@ impl Language {
             Self::Python => Stack::Python,
             Self::Java => Stack::Java,
             Self::TypeScript | Self::Tsx | Self::JavaScript => Stack::Typescript,
+            Self::Rust => Stack::Rust,
         }
     }
 
@@ -43,6 +46,7 @@ impl Language {
             "ts" | "mts" | "cts" => Some(Self::TypeScript),
             "tsx" => Some(Self::Tsx),
             "js" | "mjs" | "cjs" | "jsx" => Some(Self::JavaScript),
+            "rs" => Some(Self::Rust),
             _ => None,
         }
     }
@@ -55,6 +59,7 @@ impl Language {
             Self::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
             Self::Tsx => tree_sitter_typescript::LANGUAGE_TSX.into(),
             Self::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
+            Self::Rust => tree_sitter_rust::LANGUAGE.into(),
         }
     }
 
@@ -83,6 +88,7 @@ impl Language {
             Self::Python => &profile::PYTHON,
             Self::Java => &profile::JAVA,
             Self::TypeScript | Self::Tsx | Self::JavaScript => &profile::ECMASCRIPT,
+            Self::Rust => &profile::RUST,
         }
     }
 }
@@ -107,6 +113,10 @@ mod tests {
             Language::from_path(Path::new("x.cjs")),
             Some(Language::JavaScript)
         );
+        assert_eq!(
+            Language::from_path(Path::new("src/main.rs")),
+            Some(Language::Rust)
+        );
         assert_eq!(Language::from_path(Path::new("README.md")), None);
         assert_eq!(Language::from_path(Path::new("Makefile")), None);
     }
@@ -122,6 +132,8 @@ mod tests {
         assert!(Language::Go.is_test_path(Path::new("pkg/a_test.go")));
         assert!(Language::Java.is_test_path(Path::new("src/test/java/ATest.java")));
         assert!(!Language::Java.is_test_path(Path::new("/src/main/java/A.java")));
+        assert!(Language::Rust.is_test_path(Path::new("tests/cli.rs")));
+        assert!(!Language::Rust.is_test_path(Path::new("src/lib.rs")));
     }
 
     #[test]
@@ -131,6 +143,7 @@ mod tests {
         assert_eq!(Language::Python.stack(), Stack::Python);
         assert_eq!(Language::Java.stack(), Stack::Java);
         assert_eq!(Language::Go.stack(), Stack::Go);
+        assert_eq!(Language::Rust.stack(), Stack::Rust);
     }
 
     #[test]
@@ -142,6 +155,7 @@ mod tests {
             Language::TypeScript,
             Language::Tsx,
             Language::JavaScript,
+            Language::Rust,
         ] {
             let mut parser = tree_sitter::Parser::new();
             assert!(parser.set_language(&language.grammar()).is_ok(), "{language:?}");

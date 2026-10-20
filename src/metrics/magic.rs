@@ -19,6 +19,7 @@ pub struct MagicNumber {
 pub fn find_magic_numbers(root: Node<'_>, source: &[u8], style: MagicNumberStyle) -> Vec<MagicNumber> {
     let nodes = descendants(root);
     let reported = match style {
+        MagicNumberStyle::Unmeasured => Vec::new(),
         MagicNumberStyle::Eslint => nodes
             .into_iter()
             .filter_map(|node| eslint::reported(node, source))

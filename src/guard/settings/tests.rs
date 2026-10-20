@@ -71,3 +71,23 @@ fn ignores_tightening_and_unrelated_numbers() {
     );
     assert_eq!(tightened, Vec::new());
 }
+
+#[test]
+fn reports_clippy_thresholds_raised_and_lints_allowed() {
+    let clippy = loosened(
+        "too-many-lines-threshold = 80\ncognitive-complexity-threshold = 15\n",
+        "too-many-lines-threshold = 120\ncognitive-complexity-threshold = 10\n",
+        "clippy.toml",
+    );
+    assert_eq!(clippy, [(1, "too-many-lines-threshold = 120".to_owned())]);
+    let cargo = loosened(
+        "[lints.clippy]\ncognitive_complexity = \"deny\"\ntoo_many_arguments = \"warn\"\n",
+        "[lints.clippy]\ncognitive_complexity = \"allow\"\ntoo_many_arguments = \"forbid\"\n",
+        "Cargo.toml",
+    );
+    assert_eq!(
+        cargo,
+        [(2, "cognitive_complexity = \"allow\"".to_owned())],
+        "pasar un lint a allow afloja; a forbid, endurece"
+    );
+}

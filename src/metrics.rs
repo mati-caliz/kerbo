@@ -1,3 +1,4 @@
+mod clippy;
 mod cognitive;
 mod cognitive_pmd;
 pub mod commented;
@@ -13,7 +14,7 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 use crate::lines::LineMap;
-use crate::profile::{Profile, SpanBounds};
+use crate::profile::{MetricsStyle, Profile, SpanBounds};
 use crate::syntax::{function_name, one_based, parent_skipping_parentheses};
 
 const CALL_KIND: &str = "call_expression";
@@ -57,7 +58,11 @@ pub fn measure_functions(
     let mut functions = Vec::new();
     let mut pending = vec![root];
     while let Some(node) = pending.pop() {
-        functions.extend(measure_unit(node, &context));
+        if profile.metrics == MetricsStyle::Clippy {
+            functions.extend(clippy::measure(node, source));
+        } else {
+            functions.extend(measure_unit(node, &context));
+        }
         let mut cursor = node.walk();
         pending.extend(node.children(&mut cursor));
     }

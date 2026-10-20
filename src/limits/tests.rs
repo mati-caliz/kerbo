@@ -105,3 +105,25 @@ fn overrides_parse_and_replace_a_single_limit() {
         None
     );
 }
+
+#[test]
+fn rust_measures_only_what_clippy_measures() {
+    for preset in [Preset::Strict, Preset::Recommended, Preset::Minimal] {
+        let rust = preset.limits(Language::Rust, false);
+        for rule in [
+            RuleId::FileLength,
+            RuleId::CyclomaticComplexity,
+            RuleId::MagicNumber,
+            RuleId::ShortName,
+            RuleId::DuplicateCode,
+            RuleId::CommentedCode,
+        ] {
+            assert_eq!(rust.get(rule), None, "{rule:?} en {preset:?}");
+        }
+    }
+    let strict = Preset::Strict.limits(Language::Rust, false);
+    assert_eq!(strict.get(RuleId::FunctionLength), Some(80));
+    assert_eq!(strict.get(RuleId::CognitiveComplexity), Some(15));
+    assert_eq!(strict.get(RuleId::ParameterCount), Some(4));
+    assert_eq!(strict.get(RuleId::NestingDepth), Some(4));
+}

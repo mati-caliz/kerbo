@@ -1,7 +1,7 @@
 use super::{
     CaseShape, CognitiveShape, CommentedCodeStyle, DuplicateStyle, GuardShape, LineSpan, LogicalShape,
-    MagicNumberStyle, NestingStyle, ParameterShape, PartialUnits, Profile, ShortCircuit, ShortNameStyle,
-    TestFiles,
+    MagicNumberStyle, MetricsStyle, NestingStyle, ParameterShape, PartialUnits, Profile, ShortCircuit,
+    ShortNameStyle, TestFiles,
 };
 
 const FUNCTIONS: &[&str] = &[
@@ -14,6 +14,7 @@ const FUNCTIONS: &[&str] = &[
 ];
 
 pub static ECMASCRIPT: Profile = Profile {
+    metrics: MetricsStyle::Shared,
     units: FUNCTIONS,
     inline_functions: &[],
     partial_units: PartialUnits {

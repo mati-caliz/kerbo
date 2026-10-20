@@ -86,7 +86,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 ### 3. Capa para agentes de IA (hecho: 0.3 y el servidor MCP en 0.4)
 
 - **Antitrampa**: avisar cuando un cambio agrega una supresión (`eslint-disable`, `noqa`,
-  `nolint`, `@SuppressWarnings`; `#[allow]` llega con Rust), afloja un umbral en una
+  `nolint`, `@SuppressWarnings`, `#[allow]`), afloja un umbral en una
   configuración, o borra, saltea o vacía un test.
 - `--format agent`: JSON compacto, priorizado y con tope, e identificadores estables por
   problema (regla + símbolo + contexto, no número de línea).
@@ -107,7 +107,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   ni limitado a `src/main` (más de 30 minutos, cuatro núcleos y la máquina en swap). Necesita una
   máquina dedicada con 16 GB.
 
-### 5. Más reglas universales y Rust (las reglas, hecho en 0.6)
+### 5. Más reglas universales y Rust (hecho: las reglas en 0.6, Rust en main)
 
 - Anidamiento (hecho para TypeScript y Go, con paridad contra `max-depth` de ESLint y
   `max-control-nesting` de revive; Java mide `if`, `for` y `try` por separado y va con las reglas
@@ -131,7 +131,14 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   del estándar lo hace: ahí no hay contra qué medir.
 - Comentarios que narran lo obvio: ninguna herramienta lo detecta, así que no hay paridad posible.
   Pasa a la capa para agentes, donde el criterio puede ser propio.
-- **Rust** como quinto lenguaje (contra clippy), así kerbo se analiza a sí mismo.
+- **Rust** como quinto lenguaje (hecho, con paridad contra clippy 0.1.99: `too_many_lines`,
+  `too_many_arguments`, `cognitive_complexity` y `excessive_nesting`, que son las reglas del
+  estándar; la complejidad se cuenta como clippy, sobre el código ya bajado a HIR, y el largo sobre
+  el texto). Cero diferencias en kerbo mismo, que ahora se analiza solo. En ocho crates de
+  terceros (aho-corasick, clap_builder, ignore, indexmap, regex-syntax, serde_json, toml_parser y
+  winnow, unos 31.000 avisos) lo que difiere es lo que no se ve sin compilar: macros propias o de
+  otros crates que esconden un `if`, código escrito adentro de una macro, un `#[cfg]` adentro de
+  una función y closures que devuelven `Result` sin decirlo.
 
 ### 6. Distribución
 

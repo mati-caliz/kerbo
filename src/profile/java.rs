@@ -1,10 +1,11 @@
 use super::{
     CaseShape, CognitiveShape, CommentedCodeStyle, CountedLines, DuplicateStyle, GuardShape, LineSpan,
-    LogicalShape, MagicNumberStyle, NestingStyle, ParameterShape, PartialUnits, PmdShape, Profile,
-    ShortNameStyle, SpanBounds, TestFiles,
+    LogicalShape, MagicNumberStyle, MetricsStyle, NestingStyle, ParameterShape, PartialUnits, PmdShape,
+    Profile, ShortNameStyle, SpanBounds, TestFiles,
 };
 
 pub static JAVA: Profile = Profile {
+    metrics: MetricsStyle::Shared,
     units: &[
         "method_declaration",
         "constructor_declaration",
