@@ -105,7 +105,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   ni limitado a `src/main` (más de 30 minutos, cuatro núcleos y la máquina en swap). Necesita una
   máquina dedicada con 16 GB.
 
-### 5. Más reglas universales y Rust
+### 5. Más reglas universales y Rust (las reglas, hecho en 0.6)
 
 - Anidamiento (hecho para TypeScript y Go, con paridad contra `max-depth` de ESLint y
   `max-control-nesting` de revive; Java mide `if`, `for` y `try` por separado y va con las reglas
