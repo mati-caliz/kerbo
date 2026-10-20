@@ -11,6 +11,7 @@ mod i18n;
 mod language;
 mod limits;
 mod lines;
+mod macro_rules;
 mod metrics;
 mod profile;
 mod report;

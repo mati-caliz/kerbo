@@ -214,9 +214,10 @@ En Rust, kerbo mide sólo lo que mide clippy (`too_many_lines`, `too_many_argume
 Sonar: arranca en 1 y suma cada `if`, cada `match` de más de un brazo y cada guarda sobre el código
 ya expandido, así que también suman los `for`, los `while`, cada `?` y cada `.await`, los `assert!`
 y los `matches!`. Después descuenta los `return`: todos si la función devuelve `Result`, la mitad
-si no. Los closures se miden aparte, también los que van adentro de una macro. kerbo no expande
-macros: imita las de la biblioteca estándar y las de `log`, y de las demás cuenta sólo los
-argumentos; una macro propia del crate que esconde un `if` es la diferencia que queda.
+si no. Los closures se miden aparte, también los que van adentro de una macro. Las `macro_rules!`
+del propio crate se expanden como rustc, leyendo las definiciones de todos sus archivos; las de la
+biblioteca estándar y las de `log` se imitan, y de las de otras dependencias se cuentan sólo los
+argumentos.
 
 Esos son los umbrales del preset `strict`. Más reglas y la capa para agentes de IA están en la
 [hoja de ruta](ROADMAP.md).
@@ -234,9 +235,9 @@ tamaño y fecha), y la ruta queda afuera, así un archivo movido o el mismo arch
 se vuelve a analizar. Las reglas y los duplicados entre archivos se calculan siempre sobre lo
 guardado. Está partida en 256 archivos por el primer byte de la clave, cada uno con su tope y
 desalojo del menos usado; cada entrada va comprimida con LZ4 y con su suma de control, y se
-escribe a un temporal que se renombra. Lo que en el futuro dependa de más de un archivo (por
-ejemplo, las `macro_rules!` del crate para Rust) suma su huella a la clave y guarda lo suyo como
-otro tipo de entrada en el mismo almacén.
+escribe a un temporal que se renombra. En Rust el resultado de un archivo depende también de las
+`macro_rules!` del crate, así que la clave suma una huella del texto de todos los archivos del
+crate y de la ruta del archivo dentro de él: cambiar una macro vuelve a analizar a quien la usa.
 
 Los textos del CLI (reporte, `explain`, errores, hook, MCP y LSP) viven en un catálogo tipado en
 `src/i18n/`, uno por idioma; el compilador asegura que cada mensaje exista en los dos.

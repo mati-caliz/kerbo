@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::has_modifier;
+use crate::macro_rules::Code;
 
 const BODY_FIELD: &str = "body";
 const ASYNC: &str = "async";
@@ -14,9 +15,17 @@ const MARKER_LENGTH: usize = 2;
 // Calca too_many_lines de clippy, que lee el texto y no el árbol: cuenta las líneas del cuerpo con
 // algo fuera de un comentario, así que un "//" o un "/*" adentro de un string cuenta como
 // comentario igual que allá. El cuerpo de una función async es el bloque async que arma rustc, que
-// clippy no reconoce como bloque: ahí las llaves quedan y suman sus líneas.
-pub(super) fn too_many_lines(function: Node<'_>, source: &[u8]) -> Option<usize> {
-    let text = function.child_by_field_name(BODY_FIELD)?.utf8_text(source).ok()?;
+// clippy no reconoce como bloque: ahí las llaves quedan y suman sus líneas. El texto es el que
+// marca el span del cuerpo: si las llaves vienen de una `macro_rules!`, el de la definición, con
+// los `$` adentro.
+pub(super) fn too_many_lines(function: Node<'_>, code: &Code<'_>) -> Option<usize> {
+    let body = function.child_by_field_name(BODY_FIELD)?;
+    let open = code.origin_at(body.start_byte())?;
+    let close = code.origin_at(body.end_byte().checked_sub(1)?)?;
+    (open.source == close.source).then_some(())?;
+    let source = code.scope().source_text(open.source)?;
+    let raw = source.get(open.offset..=close.offset)?;
+    let text = std::str::from_utf8(raw).ok()?;
     let inner = if has_modifier(function, ASYNC) {
         text
     } else {

@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::macros;
+use crate::macro_rules::Code;
 use crate::syntax::{children_with_fields, named_children};
 
 const BASE_COMPLEXITY: usize = 1;
@@ -124,30 +125,30 @@ enum Step<'tree> {
 // mitad si no, y un `return` justo después de otro no cuenta. Los cuerpos de los closures quedan
 // afuera: cada closure se mide aparte. El salteo de `#[test]` que trae clippy no actúa, porque el
 // atributo ya se expandió cuando el lint lo busca.
-pub(super) fn of_function(function: Node<'_>, source: &[u8]) -> Option<usize> {
+pub(super) fn of_function(function: Node<'_>, code: &Code<'_>) -> Option<usize> {
     let body = function.child_by_field_name(BODY_FIELD)?;
     let returns_result = function
         .child_by_field_name(RETURN_TYPE_FIELD)
-        .is_some_and(|declared| names_result(declared, source));
-    Some(score(body, source, returns_result))
+        .is_some_and(|declared| names_result(declared, code.bytes()));
+    Some(score(body, code, returns_result))
 }
 
-pub(super) fn of_closure(closure: Node<'_>, source: &[u8]) -> Option<usize> {
+pub(super) fn of_closure(closure: Node<'_>, code: &Code<'_>) -> Option<usize> {
     let body = closure.child_by_field_name(BODY_FIELD)?;
     let returns_result = closure.child_by_field_name(RETURN_TYPE_FIELD).map_or_else(
-        || ends_in_result(body, source),
-        |declared| names_result(declared, source),
+        || ends_in_result(body, code.bytes()),
+        |declared| names_result(declared, code.bytes()),
     );
-    Some(score(body, source, returns_result))
+    Some(score(body, code, returns_result))
 }
 
-fn score(body: Node<'_>, source: &[u8], returns_result: bool) -> usize {
+fn score(body: Node<'_>, code: &Code<'_>, returns_result: bool) -> usize {
     let mut tally = Tally {
         complexity: BASE_COMPLEXITY,
         returns: 0,
         after_return: false,
     };
-    visit(body, source, &mut tally);
+    visit(body, code, &mut tally);
     let adjustment = if returns_result {
         tally.returns
     } else {
@@ -159,18 +160,18 @@ fn score(body: Node<'_>, source: &[u8], returns_result: bool) -> usize {
         .unwrap_or(tally.complexity)
 }
 
-fn visit(root: Node<'_>, source: &[u8], tally: &mut Tally) {
+fn visit(root: Node<'_>, code: &Code<'_>, tally: &mut Tally) {
     let mut steps = vec![Step::Enter(root)];
     while let Some(step) = steps.pop() {
         match step {
             Step::Expression => tally.expression(),
             Step::Returned => tally.returned(),
-            Step::Enter(node) => enter(node, source, tally, &mut steps),
+            Step::Enter(node) => enter(node, code, tally, &mut steps),
         }
     }
 }
 
-fn enter<'tree>(node: Node<'tree>, source: &[u8], tally: &mut Tally, steps: &mut Vec<Step<'tree>>) {
+fn enter<'tree>(node: Node<'tree>, code: &Code<'_>, tally: &mut Tally, steps: &mut Vec<Step<'tree>>) {
     let kind = node.kind();
     if is_item(kind) {
         return;
@@ -180,7 +181,7 @@ fn enter<'tree>(node: Node<'tree>, source: &[u8], tally: &mut Tally, steps: &mut
         return;
     }
     if kind == MACRO {
-        expand_macro(node, source, tally);
+        expand_macro(node, code, tally);
         return;
     }
     steps.extend(after_children(kind).iter().copied());
@@ -231,9 +232,19 @@ fn visited_children(node: Node<'_>) -> Vec<Node<'_>> {
         .collect()
 }
 
-fn expand_macro(invocation: Node<'_>, source: &[u8], tally: &mut Tally) {
+// Una `macro_rules!` del crate se expande como rustc y se cuenta lo que deja, que es lo que ve
+// clippy en el HIR; las demás se calcan con la tabla de `macros`.
+fn expand_macro(invocation: Node<'_>, code: &Code<'_>, tally: &mut Tally) {
     tally.expression();
-    let expansion = macros::expand(invocation, source);
+    if let Some(expansion) = code.expand_node(invocation) {
+        let expanded = expansion.code(code.scope());
+        if let Some(content) = expansion.content() {
+            visit(content, &expanded, tally);
+        }
+        tally.expression();
+        return;
+    }
+    let expansion = macros::expand(invocation, code);
     tally.add(expansion.added);
     for _ in 0..expansion.returns {
         tally.returned();
@@ -241,7 +252,7 @@ fn expand_macro(invocation: Node<'_>, source: &[u8], tally: &mut Tally) {
     }
     for argument in &expansion.arguments {
         if let Some(expression) = argument.expression() {
-            visit(expression, argument.text.as_bytes(), tally);
+            visit(expression, &argument.code(code), tally);
         }
     }
     tally.expression();

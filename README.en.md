@@ -239,9 +239,9 @@ the content, the language, the effective thresholds of that file and the identit
 clone is not analyzed again. Rules and cross-file duplicates are always computed over what was
 stored. It is split into 256 files by the first byte of the key, each with its own cap and
 least-recently-used eviction; each entry is LZ4-compressed with its checksum, and it is written to
-a temporary file that is renamed. Whatever later depends on more than one file (for example, the
-crate's `macro_rules!` for Rust) adds its fingerprint to the key and stores its own data as another
-kind of entry in the same store.
+a temporary file that is renamed. In Rust the result of a file also depends on the crate's
+`macro_rules!`, so the key adds a fingerprint of the text of every file in the crate and of the
+file's path inside it: changing a macro analyzes again whoever uses it.
 
 The CLI texts (report, `explain`, errors, hook, MCP and LSP) live in a typed catalog in
 `src/i18n/`, one per language; the compiler makes sure every message exists in both.

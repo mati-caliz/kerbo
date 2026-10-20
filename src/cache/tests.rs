@@ -25,6 +25,12 @@ const JAVA_METHOD: &str =
 const GO_SOURCE: &str = "package sample\n\nfunc Many(a, b, c, d, e int) int {\n\tif a > b {\n\t\treturn c\n\t}\n\treturn d + e\n}\n";
 const PYTHON_SOURCE: &str =
     "def build(first, second, third, fourth, fifth, sixth, seventh):\n    # x = 1\n    return first * 42\n";
+const RUST_BRANCHES: usize = 40;
+const RUST_MANIFEST: &str = "[package]\nname = \"sample\"\nversion = \"0.1.0\"\n";
+const RUST_CALLER_PATH: &str = "src/caller.rs";
+const RUST_CALLER: &str = "pub fn count(flag: bool) -> usize {\n    let mut total = 0;\n    branches!(flag, total);\n    total\n}\n";
+const RUST_COUNTING_BRANCH: &str = "        $total += 1;\n";
+const RUST_CONDITIONAL_BRANCH: &str = "        if $flag {\n            $total += 1;\n        }\n";
 const TYPESCRIPT_SOURCE: &str = "function pick(flag: boolean, value: number) {\n  if (flag) {\n    value = value + 1;\n    return value * 3;\n  } else {\n    value = value + 1;\n    return value * 3;\n  }\n}\n";
 
 fn analysis_of(language: Language, source: &str, limits: Limits) -> FileAnalysis {
@@ -150,12 +156,28 @@ fn the_key_changes_with_content_language_and_limits() {
     let tree = TempTree::new("cache-keys");
     let cache = AnalysisCache::open(tree.path().to_path_buf(), DEFAULT_MAX_BYTES);
     let limits = strict(Language::Java);
-    let base = cache.analysis_key(Language::Java, limits, b"class A {}");
-    assert_eq!(base, cache.analysis_key(Language::Java, limits, b"class A {}"));
-    assert_ne!(base, cache.analysis_key(Language::Java, limits, b"class B {}"));
-    assert_ne!(base, cache.analysis_key(Language::Go, limits, b"class A {}"));
+    let base = cache.analysis_key(Language::Java, limits, b"class A {}", None);
+    assert_eq!(
+        base,
+        cache.analysis_key(Language::Java, limits, b"class A {}", None)
+    );
+    assert_ne!(
+        base,
+        cache.analysis_key(Language::Java, limits, b"class B {}", None)
+    );
+    assert_ne!(
+        base,
+        cache.analysis_key(Language::Go, limits, b"class A {}", None)
+    );
     let looser = limits.with_rule(RuleId::NestingDepth, Some(SMALL_DUPLICATE_LIMIT));
-    assert_ne!(base, cache.analysis_key(Language::Java, looser, b"class A {}"));
+    assert_ne!(
+        base,
+        cache.analysis_key(Language::Java, looser, b"class A {}", None)
+    );
+    assert_ne!(
+        base,
+        cache.analysis_key(Language::Java, limits, b"class A {}", Some(0))
+    );
 }
 
 #[test]
@@ -221,7 +243,7 @@ fn a_cached_scan_reports_exactly_what_a_fresh_one_does() {
     assert_ne!(shard_files(&directory).len(), 0);
     let warm = AnalysisCache::open(directory.clone(), DEFAULT_MAX_BYTES);
     let limits = strict(Language::Go).with_override(DUPLICATE_OVERRIDE[0]);
-    let key = warm.analysis_key(Language::Go, limits, GO_SOURCE.as_bytes());
+    let key = warm.analysis_key(Language::Go, limits, GO_SOURCE.as_bytes(), None);
     assert!(warm.analysis(key).is_some());
     assert_eq!(summary(&scan_project(tree.path(), Some(&warm))), fresh);
     for shard in shard_files(&directory) {
@@ -248,6 +270,36 @@ fn an_edited_file_is_analyzed_again() {
     let after = summary(&scan_project(tree.path(), Some(&edited)));
     assert_ne!(before, after);
     assert_eq!(after, summary(&scan_project(tree.path(), None)));
+}
+
+fn rust_crate_root(branch: &str) -> String {
+    format!(
+        "macro_rules! branches {{\n    ($flag:expr, $total:ident) => {{\n{}    }};\n}}\n\nmod caller;\n",
+        branch.repeat(RUST_BRANCHES)
+    )
+}
+
+#[test]
+fn a_rust_file_is_analyzed_again_when_a_macro_of_its_crate_changes() {
+    let tree = TempTree::new("cache-macros");
+    tree.write("Cargo.toml", RUST_MANIFEST);
+    tree.write("src/lib.rs", &rust_crate_root(RUST_COUNTING_BRANCH));
+    tree.write(RUST_CALLER_PATH, RUST_CALLER);
+    let directory = tree.path().join("cache");
+    let cache = AnalysisCache::open(directory.clone(), DEFAULT_MAX_BYTES);
+    let before = scan_project(tree.path(), Some(&cache));
+    tree.write("src/lib.rs", &rust_crate_root(RUST_CONDITIONAL_BRANCH));
+    let edited = AnalysisCache::open(directory, DEFAULT_MAX_BYTES);
+    let after = scan_project(tree.path(), Some(&edited));
+    assert!(!caller_is_too_complex(&before));
+    assert!(caller_is_too_complex(&after));
+    assert_eq!(summary(&after), summary(&scan_project(tree.path(), None)));
+}
+
+fn caller_is_too_complex(outcome: &ScanOutcome) -> bool {
+    outcome.diagnostics.iter().any(|diagnostic| {
+        diagnostic.relative_path == RUST_CALLER_PATH && diagnostic.rule == RuleId::CognitiveComplexity
+    })
 }
 
 #[test]

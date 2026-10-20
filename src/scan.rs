@@ -7,12 +7,13 @@ use ignore::WalkBuilder;
 use rayon::prelude::*;
 use tree_sitter::Parser;
 
-use crate::analysis::{FileAnalysis, ParseFailed, analyze};
+use crate::analysis::{FileAnalysis, ParseFailed, SourceUnit, analyze_unit};
 use crate::cache::{AnalysisCache, CacheKey};
 use crate::config::Config;
 use crate::duplicates::{PooledFile, find_duplicates};
 use crate::language::{Language, Stack};
 use crate::limits::{LimitOverride, Limits};
+use crate::macro_rules::MacroIndex;
 use crate::rules::{Diagnostic, FileIdentity, RuleId, evaluate};
 
 const PATH_SEPARATOR: &str = "/";
@@ -77,9 +78,12 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
         (request.stacks.is_empty() || request.stacks.contains(&file.language.stack()))
             && !request.config.is_ignored(Path::new(&file.identity.relative))
     });
+    let macros = MacroIndex::for_one_scan();
     let results: Vec<Result<Checked, ScanFailure>> = files
         .par_iter()
-        .map_init(ParserPool::default, |pool, file| check_file(pool, file, request))
+        .map_init(ParserPool::default, |pool, file| {
+            check_file(pool, file, request, &macros)
+        })
         .collect();
     let mut outcome = ScanOutcome {
         files: files.len(),
@@ -124,7 +128,14 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
     let mut parser = Parser::new();
     parser.set_language(&file.language.grammar()).ok()?;
     let limits = config.limits_for(relative, file.language, file.is_test);
-    let mut analysis = analyze(&mut parser, file.language, source, limits).ok()?;
+    let crate_macros = MacroIndex::shared().crate_of(file.language, &file.identity.absolute);
+    let unit = SourceUnit {
+        language: file.language,
+        source,
+        path: Some(&file.identity.absolute),
+        crate_macros: crate_macros.as_ref(),
+    };
+    let mut analysis = analyze_unit(&mut parser, unit, limits).ok()?;
     let pooled = pooled_file(&file.identity, &mut analysis, limits);
     let mut diagnostics = evaluate(&file.identity, &analysis, limits);
     diagnostics.extend(find_duplicates(pooled.into_iter().collect()));
@@ -224,6 +235,7 @@ fn check_file(
     pool: &mut ParserPool,
     file: &SourceFile,
     request: &ScanRequest<'_>,
+    macros: &MacroIndex,
 ) -> Result<Checked, ScanFailure> {
     let failure = |reason: String| ScanFailure {
         path: file.identity.display.clone(),
@@ -241,10 +253,20 @@ fn check_file(
         .fold(configured, |limits, &limit_override| {
             limits.with_override(limit_override)
         });
+    let crate_macros = macros.crate_of(file.language, &file.identity.absolute);
+    let context = crate_macros
+        .as_ref()
+        .map(|crate_macros| crate_macros.analysis_context(&file.identity.absolute));
     let cached = request
         .cache
-        .map(|cache| (cache, cache.analysis_key(file.language, limits, &source)));
-    let mut analysis = cached_or_fresh(cached, || analyze(parser, file.language, &source, limits))
+        .map(|cache| (cache, cache.analysis_key(file.language, limits, &source, context)));
+    let unit = SourceUnit {
+        language: file.language,
+        source: &source,
+        path: Some(&file.identity.absolute),
+        crate_macros: crate_macros.as_ref(),
+    };
+    let mut analysis = cached_or_fresh(cached, || analyze_unit(parser, unit, limits))
         .map_err(|error| failure(error.to_string()))?;
     let pooled = pooled_file(&file.identity, &mut analysis, limits);
     Ok(Checked {

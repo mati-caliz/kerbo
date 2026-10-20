@@ -1,6 +1,7 @@
 use tree_sitter::{Node, Tree};
 
-use crate::syntax::{SnippetLanguage, children_with_fields, parse_snippet};
+use crate::macro_rules::Code;
+use crate::syntax::{SnippetLanguage, children_with_fields, descendants, parse_snippet};
 
 const MACRO_FIELD: &str = "macro";
 const BODY_FIELD: &str = "body";
@@ -22,19 +23,37 @@ const DEBUG_ASSERTION_CONDITIONS: usize = 2;
 const MATCHES_ARMS: usize = 1;
 const READY_ARMS: usize = 1;
 const READY_RETURNS: usize = 1;
+const ALL_ARGUMENTS: usize = usize::MAX;
+const BLOCK_START: &str = "{";
+const CONDITION_ONLY: usize = 1;
+const BOTH_SIDES: usize = 2;
+const VISIBLE_ARGUMENTS: &[(&str, usize)] = &[
+    ("assert", CONDITION_ONLY),
+    ("assert_eq", BOTH_SIDES),
+    ("assert_ne", BOTH_SIDES),
+    ("matches", ALL_ARGUMENTS),
+    ("vec", ALL_ARGUMENTS),
+    ("write", ALL_ARGUMENTS),
+    ("writeln", ALL_ARGUMENTS),
+    ("format_args", ALL_ARGUMENTS),
+];
 
 #[derive(Debug)]
-pub(super) struct Argument {
-    pub tree: Tree,
-    pub text: String,
-    pub first_row: usize,
+pub(in crate::metrics) struct Argument {
+    tree: Tree,
+    text: String,
+    start: usize,
 }
 
 impl Argument {
-    pub(super) fn expression(&self) -> Option<Node<'_>> {
+    pub(in crate::metrics) fn expression(&self) -> Option<Node<'_>> {
         let function = self.tree.root_node().named_child(0)?;
         let statement = function.child_by_field_name(BODY_FIELD)?.named_child(0)?;
         statement.named_child(0)
+    }
+
+    pub(in crate::metrics) fn code<'argument>(&'argument self, parent: &Code<'argument>) -> Code<'argument> {
+        parent.snippet(self.text.as_bytes(), WRAPPER_PREFIX.len(), self.start)
     }
 }
 
@@ -48,10 +67,12 @@ pub(super) struct Expansion {
 // Lo que suma cada macro de la biblioteca estándar una vez expandida, que es lo que mira clippy:
 // assert! es un `if`, la versión debug lo envuelve en otro `if cfg!(..)`, matches! es un `match`
 // de dos brazos y ready! uno con un `return`. Las de `log` (y las de `tracing` sin su puente a
-// `log`) chequean el nivel con un `if`, pero sólo se cuentan cuando el archivo las toma de esos
-// crates: muchos crates tienen su propio `debug!`. Los argumentos se compilan aparte y se cuentan
-// como código propio; de una macro desconocida sólo se cuentan los argumentos que son expresiones.
-pub(super) fn expand(invocation: Node<'_>, source: &[u8]) -> Expansion {
+// `log`) chequean el nivel con un `if`, pero sólo se cuentan cuando se llaman con la ruta del
+// crate o el archivo los usa: muchos crates tienen su propio `debug!`. Los argumentos se compilan
+// aparte y se cuentan como código propio; de una macro desconocida sólo se cuentan los argumentos
+// que son expresiones.
+pub(super) fn expand(invocation: Node<'_>, code: &Code<'_>) -> Expansion {
+    let source = code.bytes();
     let name = macro_name(invocation, source);
     let pieces = argument_pieces(invocation);
     let parsed = |tokens: &[Node<'_>]| parse_argument(tokens, source);
@@ -78,7 +99,7 @@ pub(super) fn expand(invocation: Node<'_>, source: &[u8]) -> Expansion {
         (DEBUG_ASSERTION_CONDITIONS, 0)
     } else if name == READY {
         (READY_ARMS, READY_RETURNS)
-    } else if LOG_LEVELS.contains(&name) && uses_logging_crate(source) {
+    } else if LOG_LEVELS.contains(&name) && uses_logging_crate(invocation, code) {
         (LOG_CONDITIONS, 0)
     } else {
         (0, 0)
@@ -90,16 +111,51 @@ pub(super) fn expand(invocation: Node<'_>, source: &[u8]) -> Expansion {
     }
 }
 
+// Los argumentos que la expansión de la biblioteca estándar deja fuera de un bloque propio, que es
+// lo único que excessive_nesting alcanza a ver: la condición de assert!, los dos lados de
+// assert_eq!, todo lo de vec!, write! y format_args!. debug_assert!, format! o println! envuelven
+// todo en un bloque de la expansión.
+pub(in crate::metrics) fn arguments_outside_blocks(invocation: Node<'_>, code: &Code<'_>) -> Vec<Argument> {
+    let name = macro_name(invocation, code.bytes());
+    let Some(&(_, visible)) = VISIBLE_ARGUMENTS.iter().find(|(known, _)| *known == name) else {
+        return Vec::new();
+    };
+    if !descendants(invocation)
+        .iter()
+        .any(|token| token.kind() == BLOCK_START)
+    {
+        return Vec::new();
+    }
+    if name == MATCHES {
+        return expand(invocation, code).arguments;
+    }
+    argument_pieces(invocation)
+        .iter()
+        .take(visible)
+        .filter_map(|piece| parse_argument(piece, code.bytes()))
+        .collect()
+}
+
 fn macro_name<'source>(invocation: Node<'_>, source: &'source [u8]) -> &'source str {
     invocation
         .child_by_field_name(MACRO_FIELD)
         .and_then(|name| name.utf8_text(source).ok())
         .and_then(|path| path.rsplit(PATH_SEPARATOR).next())
+        .map(str::trim)
         .unwrap_or_default()
 }
 
-fn uses_logging_crate(source: &[u8]) -> bool {
-    std::str::from_utf8(source).is_ok_and(|text| LOGGING_CRATES.iter().any(|path| text.contains(path)))
+fn uses_logging_crate(invocation: Node<'_>, code: &Code<'_>) -> bool {
+    let path: String = invocation
+        .child_by_field_name(MACRO_FIELD)
+        .and_then(|name| name.utf8_text(code.bytes()).ok())
+        .unwrap_or_default()
+        .split_whitespace()
+        .collect();
+    let file = std::str::from_utf8(code.scope().current_text()).unwrap_or_default();
+    LOGGING_CRATES
+        .iter()
+        .any(|crate_path| path.starts_with(crate_path) || file.contains(crate_path))
 }
 
 fn argument_pieces(invocation: Node<'_>) -> Vec<Vec<Node<'_>>> {
@@ -128,10 +184,9 @@ fn parse_argument(tokens: &[Node<'_>], source: &[u8]) -> Option<Argument> {
     let text = std::str::from_utf8(source.get(start..end)?).ok()?;
     let wrapped = format!("{WRAPPER_PREFIX}{text}{WRAPPER_SUFFIX}");
     let tree = parse_snippet(SnippetLanguage::Rust, &wrapped)?;
-    let first_row = tokens.first()?.start_position().row;
     (!tree.root_node().has_error()).then_some(Argument {
         tree,
         text: wrapped,
-        first_row,
+        start,
     })
 }

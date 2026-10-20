@@ -43,9 +43,16 @@ impl AnalysisCache {
         }
     }
 
-    pub fn analysis_key(&self, language: Language, limits: Limits, source: &[u8]) -> CacheKey {
+    pub fn analysis_key(
+        &self,
+        language: Language,
+        limits: Limits,
+        source: &[u8],
+        context: Option<u64>,
+    ) -> CacheKey {
         let mut builder = KeyBuilder::new(self.salt, EntryKind::FileAnalysis);
         language.hash(&mut builder);
+        context.hash(&mut builder);
         for rule in RuleId::ALL {
             limits.get(rule).hash(&mut builder);
         }

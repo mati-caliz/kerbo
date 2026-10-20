@@ -14,7 +14,8 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 use crate::lines::LineMap;
-use crate::profile::{MetricsStyle, Profile, SpanBounds};
+use crate::macro_rules::MacroScope;
+use crate::profile::{Profile, SpanBounds};
 use crate::syntax::{function_name, one_based, parent_skipping_parentheses};
 
 const CALL_KIND: &str = "call_expression";
@@ -58,14 +59,16 @@ pub fn measure_functions(
     let mut functions = Vec::new();
     let mut pending = vec![root];
     while let Some(node) = pending.pop() {
-        if profile.metrics == MetricsStyle::Clippy {
-            functions.extend(clippy::measure(node, source));
-        } else {
-            functions.extend(measure_unit(node, &context));
-        }
+        functions.extend(measure_unit(node, &context));
         let mut cursor = node.walk();
         pending.extend(node.children(&mut cursor));
     }
+    functions.sort_by_key(|function| (function.line, function.column));
+    functions
+}
+
+pub fn measure_clippy_functions(root: Node<'_>, scope: &MacroScope<'_>) -> Vec<FunctionMetrics> {
+    let mut functions = clippy::measure_file(root, scope);
     functions.sort_by_key(|function| (function.line, function.column));
     functions
 }

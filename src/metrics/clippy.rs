@@ -1,204 +1,179 @@
 mod cognitive;
 mod lines;
-mod macros;
+pub(super) mod macros;
 mod parameters;
 
-use std::sync::LazyLock;
+use std::collections::HashSet;
 
-use regex::{Captures, Regex};
 use tree_sitter::Node;
 
-use super::{FunctionMetrics, unmeasured};
-use crate::syntax::{SnippetLanguage, children_with_fields, descendants, one_based, parse_snippet};
+use super::FunctionMetrics;
+use crate::macro_rules::{Code, Expansion, MacroScope};
+use crate::syntax::{children_with_fields, function_name, one_based};
 
 const FUNCTION: &str = "function_item";
 const SIGNATURE: &str = "function_signature_item";
 const CLOSURE: &str = "closure_expression";
 const MACRO: &str = "macro_invocation";
-const MACRO_DEFINITION: &str = "macro_definition";
-const MACRO_RULE: &str = "macro_rule";
-const RIGHT_FIELD: &str = "right";
-const CONTAINERS: &[&str] = &["impl_item", "trait_item"];
-const PLACEHOLDER_PREFIX: char = '_';
-static METAVARIABLE: LazyLock<Option<Regex>> =
-    LazyLock::new(|| Regex::new(r"\$([A-Za-z_][A-Za-z0-9_]*)").ok());
-const REPETITION_START: &[u8] = b"$(";
-const REPETITION_OPERATORS: &[u8] = b"*+?";
-const OPENING: u8 = b'(';
-const CLOSING: u8 = b')';
-const BLANK_BYTE: u8 = b' ';
 const MODIFIERS: &str = "function_modifiers";
+const BODY_FIELD: &str = "body";
 
-pub(super) fn measure(node: Node<'_>, source: &[u8]) -> Vec<FunctionMetrics> {
+type MetricKey = (usize, usize, usize, Option<usize>, Option<usize>, Option<usize>);
+
+pub(super) fn measure_file(root: Node<'_>, scope: &MacroScope<'_>) -> Vec<FunctionMetrics> {
+    let code = Code::root(scope.current_text(), scope);
+    let mut functions = measure_tree(root, &code);
+    for invocation in scope.foreign_invocations() {
+        let Some(text) = scope.source_text(invocation.source) else {
+            continue;
+        };
+        let foreign = Code::of_source(text, invocation.source, scope);
+        if let Some(expansion) = foreign.expand_recorded(invocation) {
+            functions.extend(in_expansion(&expansion, scope));
+        }
+    }
+    let mut seen: HashSet<MetricKey> = HashSet::new();
+    functions.retain(|function| {
+        seen.insert((
+            function.line,
+            function.column,
+            function.end_line,
+            function.lines,
+            function.cognitive,
+            function.parameters,
+        ))
+    });
+    functions
+}
+
+fn measure_tree(root: Node<'_>, code: &Code<'_>) -> Vec<FunctionMetrics> {
+    let mut functions = Vec::new();
+    let mut pending = vec![root];
+    while let Some(node) = pending.pop() {
+        functions.extend(measure(node, code));
+        let mut cursor = node.walk();
+        pending.extend(node.children(&mut cursor));
+    }
+    functions
+}
+
+fn measure(node: Node<'_>, code: &Code<'_>) -> Vec<FunctionMetrics> {
     match node.kind() {
-        FUNCTION => vec![FunctionMetrics {
-            lines: lines::too_many_lines(node, source),
-            cognitive: cognitive::of_function(node, source),
-            parameters: parameters::too_many_arguments(node, source),
-            ..unmeasured(node, source)
-        }],
-        SIGNATURE => vec![FunctionMetrics {
-            parameters: parameters::too_many_arguments(node, source),
-            ..unmeasured(node, source)
-        }],
-        CLOSURE => vec![closure(node, source)],
-        MACRO => closures_in_macro(node, source, 0),
-        MACRO_DEFINITION => functions_in_macro_rules(node, source),
+        FUNCTION => function(node, code),
+        SIGNATURE => located(node, code)
+            .map(|located| FunctionMetrics {
+                parameters: parameters::too_many_arguments(node, code.bytes()),
+                ..located
+            })
+            .into_iter()
+            .collect(),
+        CLOSURE => closure(node, code).into_iter().collect(),
+        MACRO => code.expand_node(node).map_or_else(
+            || closures_in_macro(node, code),
+            |expansion| in_expansion(&expansion, code.scope()),
+        ),
         _ => Vec::new(),
     }
 }
 
-fn closure(node: Node<'_>, source: &[u8]) -> FunctionMetrics {
+fn in_expansion(expansion: &Expansion, scope: &MacroScope<'_>) -> Vec<FunctionMetrics> {
+    let code = expansion.code(scope);
+    expansion
+        .content()
+        .map(|content| measure_tree(content, &code))
+        .unwrap_or_default()
+}
+
+// clippy reporta el largo y los parámetros donde arranca la función, también si ese texto viene de
+// una `macro_rules!` (entonces en la definición); la complejidad, sólo si la función entera está
+// escrita en el archivo y no sale de una expansión. Cada valor va aparte porque rustc no repite un
+// aviso idéntico, y una macro que arma la misma función en cada invocación da un solo aviso.
+fn function(node: Node<'_>, code: &Code<'_>) -> Vec<FunctionMetrics> {
+    let Some(located) = located(node, code) else {
+        return Vec::new();
+    };
+    let lines = lines::too_many_lines(node, code);
+    let parameters = parameters::too_many_arguments(node, code.bytes());
+    if is_written_here(node, code) {
+        return vec![FunctionMetrics {
+            lines,
+            cognitive: cognitive::of_function(node, code),
+            parameters,
+            ..located
+        }];
+    }
+    [(lines, None), (None, parameters)]
+        .into_iter()
+        .filter(|(lines, parameters)| lines.is_some() || parameters.is_some())
+        .map(|(lines, parameters)| FunctionMetrics {
+            lines,
+            parameters,
+            ..clone_location(&located)
+        })
+        .collect()
+}
+
+fn closure(node: Node<'_>, code: &Code<'_>) -> Option<FunctionMetrics> {
+    is_written_here(node, code).then_some(())?;
+    Some(FunctionMetrics {
+        cognitive: cognitive::of_closure(node, code),
+        ..located(node, code)?
+    })
+}
+
+fn is_written_here(node: Node<'_>, code: &Code<'_>) -> bool {
+    node.end_byte()
+        .checked_sub(1)
+        .is_some_and(|last| code.is_written_here(node.start_byte(), last))
+}
+
+fn located(node: Node<'_>, code: &Code<'_>) -> Option<FunctionMetrics> {
+    let header_end = node
+        .child_by_field_name(BODY_FIELD)
+        .map_or_else(|| node.end_byte(), |body| body.start_byte());
+    let (row, column) = code.item_position(node.start_byte(), header_end)?;
+    let end_row = node
+        .end_byte()
+        .checked_sub(1)
+        .and_then(|last| code.position(last))
+        .map_or(row, |(end_row, _)| end_row.max(row));
+    Some(FunctionMetrics {
+        name: function_name(node, code.bytes()),
+        line: one_based(row),
+        column: one_based(column),
+        end_line: one_based(end_row),
+        lines: None,
+        cyclomatic: None,
+        cognitive: None,
+        parameters: None,
+    })
+}
+
+fn clone_location(located: &FunctionMetrics) -> FunctionMetrics {
     FunctionMetrics {
-        cognitive: cognitive::of_closure(node, source),
-        ..unmeasured(node, source)
+        name: located.name.clone(),
+        lines: None,
+        cognitive: None,
+        parameters: None,
+        cyclomatic: None,
+        ..*located
     }
 }
 
-// Un closure pasado a una macro es código del usuario que clippy mide aparte después de expandir.
-// tree-sitter no lo ve: se busca en los argumentos compilados aparte y se lleva la línea al
-// archivo original.
-fn closures_in_macro(invocation: Node<'_>, source: &[u8], origin_row: usize) -> Vec<FunctionMetrics> {
-    macros::expand(invocation, source)
+// Un closure pasado a una macro que no es del crate es código del usuario que clippy mide aparte
+// después de expandir. tree-sitter no lo ve: se buscan los argumentos que compilan como expresión.
+fn closures_in_macro(invocation: Node<'_>, code: &Code<'_>) -> Vec<FunctionMetrics> {
+    macros::expand(invocation, code)
         .arguments
         .iter()
         .flat_map(|argument| {
-            let argument_row = origin_row.saturating_add(argument.first_row);
-            let text = argument.text.as_bytes();
+            let argument_code = argument.code(code);
             argument
                 .expression()
-                .map(descendants)
+                .map(|expression| measure_tree(expression, &argument_code))
                 .unwrap_or_default()
-                .into_iter()
-                .flat_map(move |node| match node.kind() {
-                    CLOSURE => {
-                        let row = argument_row.saturating_add(node.start_position().row);
-                        vec![FunctionMetrics {
-                            line: one_based(row),
-                            end_line: one_based(argument_row.saturating_add(node.end_position().row)),
-                            ..closure(node, text)
-                        }]
-                    }
-                    MACRO => closures_in_macro(node, text, argument_row),
-                    _ => Vec::new(),
-                })
-                .collect::<Vec<_>>()
         })
         .collect()
-}
-
-// clippy mide el largo y los parámetros de las funciones que arma una `macro_rules!` local, en la
-// línea de la definición; la complejidad y el anidamiento no, porque ese cuerpo viene de una
-// expansión. Se da por hecho que la macro se usa en algún lado del crate. Los parámetros se miden
-// sólo si el `impl` o el `trait` está en la misma macro: una que arma métodos sueltos suele usarse
-// adentro de la implementación de un trait, que clippy no mira.
-fn functions_in_macro_rules(definition: Node<'_>, source: &[u8]) -> Vec<FunctionMetrics> {
-    children_of_kind(definition, MACRO_RULE)
-        .into_iter()
-        .filter_map(|rule| rule.child_by_field_name(RIGHT_FIELD))
-        .flat_map(|transcriber| functions_in_transcriber(transcriber, source))
-        .collect()
-}
-
-fn delimited_text<'source>(tree: Node<'_>, source: &'source [u8]) -> Option<(&'source str, usize)> {
-    let tokens: Vec<Node<'_>> = children_with_fields(tree)
-        .into_iter()
-        .map(|(_, token)| token)
-        .collect();
-    let (open, close) = (tokens.first()?, tokens.last()?);
-    let text = std::str::from_utf8(source.get(open.end_byte()..close.start_byte())?).ok()?;
-    Some((text, open.start_position().row))
-}
-
-fn functions_in_transcriber(transcriber: Node<'_>, source: &[u8]) -> Vec<FunctionMetrics> {
-    let Some((text, origin_row)) = delimited_text(transcriber, source) else {
-        return Vec::new();
-    };
-    let readable = without_metavariables(text);
-    let Some(tree) = parse_snippet(SnippetLanguage::Rust, &readable) else {
-        return Vec::new();
-    };
-    let snippet = readable.as_bytes();
-    descendants(tree.root_node())
-        .into_iter()
-        .filter(|node| node.kind() == FUNCTION && !node.has_error())
-        .map(|function| FunctionMetrics {
-            lines: lines::too_many_lines(function, text.as_bytes()),
-            parameters: inside_implementation(function)
-                .then(|| parameters::too_many_arguments(function, snippet))
-                .flatten(),
-            line: one_based(origin_row.saturating_add(function.start_position().row)),
-            end_line: one_based(origin_row.saturating_add(function.end_position().row)),
-            ..unmeasured(function, snippet)
-        })
-        .collect()
-}
-
-// tree-sitter no lee `$tipo` en posición de tipo ni las repeticiones `$( .. )*`: se cambian por
-// texto del mismo largo, así las posiciones no se mueven y las líneas se cuentan sobre el original,
-// que es lo que mide clippy.
-fn without_metavariables(text: &str) -> String {
-    let Some(metavariable) = METAVARIABLE.as_ref() else {
-        return text.to_owned();
-    };
-    let marked = metavariable.replace_all(text, |found: &Captures<'_>| {
-        format!(
-            "{PLACEHOLDER_PREFIX}{}",
-            found.get(1).map_or("", |name| name.as_str())
-        )
-    });
-    let mut bytes = marked.into_owned().into_bytes();
-    let mut search_from = 0;
-    while let Some(start) = bytes
-        .get(search_from..)
-        .and_then(|rest| {
-            rest.windows(REPETITION_START.len())
-                .position(|pair| pair == REPETITION_START)
-        })
-        .map(|offset| search_from.saturating_add(offset))
-    {
-        blank_repetition(&mut bytes, start);
-        search_from = start.saturating_add(REPETITION_START.len());
-    }
-    String::from_utf8(bytes).unwrap_or_else(|_| text.to_owned())
-}
-
-fn blank_repetition(bytes: &mut [u8], start: usize) {
-    let mut depth = 0_usize;
-    let mut close = None;
-    for (index, &byte) in bytes.iter().enumerate().skip(start.saturating_add(1)) {
-        if byte == OPENING {
-            depth = depth.saturating_add(1);
-        } else if byte == CLOSING {
-            depth = depth.saturating_sub(1);
-            if depth == 0 {
-                close = Some(index);
-                break;
-            }
-        }
-    }
-    let Some(close) = close else {
-        return;
-    };
-    let after = close.saturating_add(1);
-    let operator = (after..after.saturating_add(2)).find(|&index| {
-        bytes
-            .get(index)
-            .is_some_and(|byte| REPETITION_OPERATORS.contains(byte))
-    });
-    let blanked = [start, start.saturating_add(1), close]
-        .into_iter()
-        .chain(operator.map_or(after..after, |operator| after..operator.saturating_add(1)));
-    for index in blanked {
-        if let Some(byte) = bytes.get_mut(index) {
-            *byte = BLANK_BYTE;
-        }
-    }
-}
-
-fn inside_implementation(function: Node<'_>) -> bool {
-    std::iter::successors(function.parent(), Node::parent)
-        .any(|ancestor| CONTAINERS.contains(&ancestor.kind()))
 }
 
 fn has_modifier(function: Node<'_>, modifier: &str) -> bool {
@@ -224,3 +199,6 @@ fn children_of_kind<'tree>(node: Node<'tree>, kind: &str) -> Vec<Node<'tree>> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod expansion_tests;

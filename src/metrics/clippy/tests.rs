@@ -6,7 +6,7 @@ use crate::limits::Limits;
 use crate::metrics::FunctionMetrics;
 use crate::rules::RuleId;
 
-fn analyze_rust(source: &str, limits: Limits) -> FileAnalysis {
+pub(super) fn analyze_rust(source: &str, limits: Limits) -> FileAnalysis {
     let mut parser = Parser::new();
     parser
         .set_language(&Language::Rust.grammar())
@@ -14,13 +14,11 @@ fn analyze_rust(source: &str, limits: Limits) -> FileAnalysis {
     analyze(&mut parser, Language::Rust, source.as_bytes(), limits).expect("el archivo se parsea")
 }
 
-type MeasuredFunction = (usize, Option<usize>, Option<usize>, Option<usize>);
-
-fn functions(source: &str) -> Vec<FunctionMetrics> {
+pub(super) fn functions(source: &str) -> Vec<FunctionMetrics> {
     analyze_rust(source, Limits::default()).functions
 }
 
-fn named<'list>(functions: &'list [FunctionMetrics], name: &str) -> &'list FunctionMetrics {
+pub(super) fn named<'list>(functions: &'list [FunctionMetrics], name: &str) -> &'list FunctionMetrics {
     functions
         .iter()
         .find(|function| function.name == name)
@@ -190,52 +188,6 @@ mod inner {
         lines,
         [(3, 3)],
         "impl, cuerpo y bloque del if; el loop de adentro ya no se mira, y el módulo suma uno solo"
-    );
-}
-
-#[test]
-fn measures_functions_written_inside_macros_like_clippy() {
-    let measured = functions(
-        "macro_rules! forward {
-    ($name:ident) => {
-        fn $name(&self, value: u8) -> u8 {
-            value
-        }
-    };
-}
-
-macro_rules! wrapper {
-    ($wrapped:ident) => {
-        impl $wrapped {
-            fn new(value: u8) -> $wrapped {
-                $wrapped(value)
-            }
-        }
-    };
-}
-
-quickcheck! {
-    fn holds(value: u8) -> bool {
-        if value > 0 { true } else { false }
-    }
-}
-",
-    );
-    let found: Vec<MeasuredFunction> = measured
-        .iter()
-        .map(|function| {
-            (
-                function.line,
-                function.lines,
-                function.parameters,
-                function.cognitive,
-            )
-        })
-        .collect();
-    assert_eq!(
-        found,
-        [(3, Some(1), None, None), (12, Some(1), Some(1), None)],
-        "en una macro_rules! sólo el largo y, dentro de un impl, los parámetros; lo escrito adentro de una invocación depende de cómo la expande cada macro"
     );
 }
 

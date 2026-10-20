@@ -49,3 +49,47 @@ fn measures_nesting_like_revive_max_control_nesting() {
         nothing
     );
 }
+
+#[test]
+fn nests_only_the_blocks_the_expansion_leaves_in_sight() {
+    let lines: Vec<usize> = nesting_of(
+        Language::Rust,
+        "macro_rules! twice {
+    ($b:block) => {
+        $b;
+        $b
+    };
+}
+
+fn nested_args() {
+    twice!({ { { let _ = 1; } } });
+}
+
+macro_rules! wrapped {
+    ($e:expr) => {
+        { { $e } }
+    };
+}
+
+fn nested_wrapped() -> u8 {
+    wrapped!({ { 1 } })
+}
+
+fn std_blocks(items: &[u8]) {
+    assert!(items.iter().all(|item| { *item > 0 }));
+    debug_assert!(items.iter().all(|item| { *item > 0 }));
+    let _ = vec![{ { 1 } }];
+}
+",
+        1,
+    )
+    .into_iter()
+    .map(|(line, _)| line)
+    .collect();
+    assert_eq!(
+        lines,
+        [9, 23, 25],
+        "un bloque de la expansión corta el recorrido: el de wrapped! y el if de debug_assert!; el \
+         bloque repetido de twice! se marca una sola vez"
+    );
+}

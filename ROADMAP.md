@@ -220,12 +220,38 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   otros crates que esconden un `if`, código escrito adentro de una macro, un `#[cfg]` adentro de
   una función y closures que devuelven `Result` sin decirlo.
 - Paridad total en Rust (pendiente). Lo que falta se puede cerrar sin compilar:
-  - **Expansor de `macro_rules!`**: leer las definiciones de todo el crate antes de analizar y
-    expandir cada invocación como rustc (los fragmentos `expr`, `ident`, `ty`, `tt` y las
-    repeticiones), para contar lo que la macro esconde y medir el código que se escribe adentro
-    de ella (`quickcheck! { fn .. }`). Es la mayor parte de lo que difiere. Pide que el análisis
-    deje de ser sólo archivo por archivo: el modo instantáneo, el hook y el editor tienen que
-    conocer las macros del crate, con una caché para no releerlas en cada cambio.
+  - **Expansor de `macro_rules!`** (hecho). Antes de medir un archivo se leen las definiciones
+    de todo el crate (una vez por corrida; el editor y el hook vuelven a leerlas sólo si cambió
+    algún archivo) y cada invocación se expande como rustc: todos los fragmentos, las
+    repeticiones con separador y las macros recursivas. Cada token recuerda si lo escribió el
+    usuario en la invocación o sale de la definición, porque clippy decide con eso: la
+    complejidad de una función cuenta todo lo que deja la expansión; una función que arma la
+    macro con su propio texto mide largo y parámetros en la definición (un solo aviso aunque se
+    invoque varias veces, y sólo si alguien la invoca) y no mide complejidad; lo escrito entero en
+    la invocación se mide como código propio; el anidamiento deja de bajar en el primer bloque
+    que arma la macro. Una macro definida adentro de una función o de un módulo de tests no se
+    aplica fuera de él, y las de otros archivos llegan si se exportan, si su módulo tiene
+    `#[macro_use]` o si están en la raíz del crate. En los ocho crates de terceros (27.300
+    avisos de clippy) las diferencias bajan de 1.391 a 1.242; en un crate armado con un caso por
+    criterio, de 52 a 0, y kerbo mismo sigue en 0. Lo que queda no es de este expansor: casi todo
+    es código que clippy no compila (`#[cfg]` apagados y ejemplos con features), y el resto,
+    macros de dependencias (`snapbox`, `proptest` y el `quickcheck!` que invoca indexmap desde
+    su propia macro) y closures que devuelven `Result` sin decirlo. Analizar un crate con muchas
+    macros tarda hasta el doble que antes. En la caché por contenido, la clave de un archivo de
+    Rust suma una huella del texto de todo el crate y de la ruta del archivo en él.
+  - Pendientes del expansor:
+    - Bajar el costo: un crate con muchas macros tarda hasta el doble (winnow, de unos 110 a
+      200 ms; serde_json, de 85 a 160 ms) y un archivo suelto suma unos 8 ms; casi todo es
+      expandir.
+    - La huella del crate en la clave de la caché es gruesa: cualquier cambio en un archivo del
+      crate invalida todos los demás archivos de Rust de ese crate. Afinarla a las macros que el
+      archivo usa de verdad (y a las invocaciones que arman funciones) devolvería la caché en
+      caliente en crates que se editan seguido.
+    - Casos sin cubrir: una función armada por una macro cuyos extremos escribió el usuario pero
+      con el `fn` de la definición, y macros no compartidas que invocan funciones-macro de otro
+      archivo.
+    - El arnés de paridad contra clippy (el crate con un caso por criterio y el script que compara
+      los ocho crates de terceros) quedó afuera del repo: sumarlo, como el resto de los arneses.
   - **Macros de otros crates**: las `macro_rules!` de las dependencias, leídas de su código en la
     caché de cargo (`~/.cargo/registry/src`) con el mismo expansor. Las macros procedurales
     (`derive`, `#[tokio::main]`, `automod::dir!`) quedan afuera: hay que compilarlas.

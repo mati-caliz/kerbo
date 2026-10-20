@@ -2,6 +2,7 @@ mod clippy;
 
 use tree_sitter::Node;
 
+use crate::macro_rules::MacroScope;
 use crate::profile::NestingStyle;
 use crate::syntax::one_based;
 
@@ -45,7 +46,12 @@ pub struct NestingFinding {
     pub depth: usize,
 }
 
-pub fn find_deep_nesting(root: Node<'_>, style: NestingStyle, limit: Option<usize>) -> Vec<NestingFinding> {
+pub fn find_deep_nesting(
+    root: Node<'_>,
+    style: NestingStyle,
+    limit: Option<usize>,
+    scope: Option<&MacroScope<'_>>,
+) -> Vec<NestingFinding> {
     let Some(limit) = limit else {
         return Vec::new();
     };
@@ -53,7 +59,9 @@ pub fn find_deep_nesting(root: Node<'_>, style: NestingStyle, limit: Option<usiz
         NestingStyle::Unmeasured => Vec::new(),
         NestingStyle::Blocks => block_nesting(root, limit),
         NestingStyle::ControlFlow => control_nesting(root, limit),
-        NestingStyle::Clippy => clippy::reported(root, limit),
+        NestingStyle::Clippy => scope
+            .map(|scope| clippy::reported(root, limit, scope))
+            .unwrap_or_default(),
     }
 }
 
