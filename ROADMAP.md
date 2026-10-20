@@ -317,8 +317,8 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   - El sitio pasó a tener `styles.css`, `copy.js` y la carpeta `en/` además de `index.html`: si
     el deploy copia sólo `index.html`, hay que sumarlos (en el repo no hay configuración de
     deploy para confirmarlo).
-  - Plurales en español: el reporte sigue diciendo "1 archivos" y "1 problemas" para no tocar los
-    tests de entonces; en inglés ya sale bien.
+  - Plurales en español (hecho: el resumen, la línea de base, el hook y el aviso de tests
+    borrados dicen "1 archivo", "1 problema" y "1 desvío").
   - Quedan en español el error interno "tree-sitter no devolvió un árbol" (`src/analysis.rs`) y el
     nombre "(anónima)" de las funciones sin nombre (`src/syntax.rs`). El segundo forma parte del
     identificador estable: traducirlo cambia los `id` y rompe las líneas de base existentes, así

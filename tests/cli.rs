@@ -49,7 +49,7 @@ mod binary {
         let help = kerbo_with_locale(&["--help"], &directory, Some("en_US.UTF-8"));
         assert!(String::from_utf8_lossy(&help.stdout).contains("Analyzes the files"));
         let flagged = kerbo_with_locale(&["check", "--lang", "es"], &directory, Some("en_US.UTF-8"));
-        assert!(String::from_utf8_lossy(&flagged.stderr).contains("1 archivos, 1 problemas"));
+        assert!(String::from_utf8_lossy(&flagged.stderr).contains("1 archivo, 1 problema"));
         let spanish_help = kerbo(&["--help"], &directory);
         assert!(String::from_utf8_lossy(&spanish_help.stdout).contains("Analiza los archivos"));
         fs::remove_dir_all(directory).expect("se limpia");
@@ -61,7 +61,7 @@ mod binary {
         let output = kerbo(&["check"], &directory);
         assert_eq!(output.status.code(), Some(1));
         assert!(String::from_utf8_lossy(&output.stdout).contains("parameter-count"));
-        assert!(String::from_utf8_lossy(&output.stderr).contains("1 archivos, 1 problemas"));
+        assert!(String::from_utf8_lossy(&output.stderr).contains("1 archivo, 1 problema"));
         fs::remove_dir_all(directory).expect("se limpia");
     }
 

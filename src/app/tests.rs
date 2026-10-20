@@ -91,7 +91,7 @@ fn reports_findings_and_summary() {
     let outcome = execute(&["kerbo", "check", path_of(&tree)], tree.path());
     assert_eq!(outcome.status, EXIT_FINDINGS);
     assert!(outcome.report.contains("parameter-count"));
-    assert!(outcome.log.contains("1 archivos, 1 problemas"));
+    assert!(outcome.log.contains("1 archivo, 1 problema"));
     let sarif = execute(
         &["kerbo", "check", "--format", "sarif", path_of(&tree)],
         tree.path(),
@@ -105,7 +105,7 @@ fn baseline_hides_known_problems_until_they_change() {
     tree.write("many.go", LONG_SIGNATURE);
     let saved = execute(&["kerbo", "baseline", path_of(&tree)], tree.path());
     assert_eq!(saved.status, EXIT_CLEAN);
-    assert!(saved.log.contains("1 problemas guardados"));
+    assert!(saved.log.contains("1 problema guardado"));
     let after = execute(&["kerbo", "check", path_of(&tree)], tree.path());
     assert_eq!(after.status, EXIT_CLEAN);
     assert!(after.log.contains("0 problemas (y 1 en la línea de base)"));
@@ -132,7 +132,7 @@ fn counts_configuration_deviations_and_fails_on_bad_setup() {
     );
     let tuned = execute(&["kerbo", "check", path_of(&tree)], tree.path());
     assert_eq!(tuned.status, EXIT_CLEAN);
-    assert!(tuned.log.contains("1 desvíos del preset"));
+    assert!(tuned.log.contains("1 desvío del preset"));
     tree.write("kerbo.toml", "preset = \"nope\"\n");
     let broken = execute(&["kerbo", "check", path_of(&tree)], tree.path());
     assert_eq!(broken.status, EXIT_FAILURE);
@@ -279,7 +279,7 @@ fn speaks_english_when_asked_by_flag_or_configuration() {
     let configured = execute(&["kerbo", "check", path_of(&tree)], tree.path());
     assert!(configured.log.contains("1 file, 1 problem, "));
     let overridden = execute(&["kerbo", "check", "--lang", "es", path_of(&tree)], tree.path());
-    assert!(overridden.log.contains("1 archivos, 1 problemas"));
+    assert!(overridden.log.contains("1 archivo, 1 problema"));
     let explained = execute(&["kerbo", "explain", "cognitive-complexity"], tree.path());
     assert!(explained.report.contains("Why:") && explained.report.contains("early returns"));
     tree.write(

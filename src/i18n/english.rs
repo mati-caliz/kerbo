@@ -1,5 +1,6 @@
 use super::catalog::{
-    BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text, with_subject,
+    BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text, counted,
+    with_subject,
 };
 use crate::lint::{ImportRedundancy, LintKind};
 use crate::rules::RuleId;
@@ -8,8 +9,6 @@ mod deploy;
 mod dockerfile;
 mod explanations;
 mod fixes;
-
-const SINGLE: usize = 1;
 
 #[derive(Debug)]
 pub struct English;
@@ -301,11 +300,6 @@ fn summarize(summary: &Summary) -> String {
         summary.milliseconds,
         fixes::suppressed_suffix(summary.suppressed)
     )
-}
-
-fn counted(count: usize, singular: &str, plural: &str) -> String {
-    let noun = if count == SINGLE { singular } else { plural };
-    format!("{count} {noun}")
 }
 
 const fn block_unit(unit: BlockUnit) -> &'static str {

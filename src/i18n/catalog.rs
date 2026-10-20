@@ -239,6 +239,13 @@ pub enum FixNotice {
     Left { count: usize },
 }
 
+const SINGLE: usize = 1;
+
+pub fn counted(count: usize, singular: &str, plural: &str) -> String {
+    let noun = if count == SINGLE { singular } else { plural };
+    format!("{count} {noun}")
+}
+
 pub fn with_subject(description: &str, subject: &str) -> String {
     if subject.is_empty() {
         description.to_owned()

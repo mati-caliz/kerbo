@@ -284,11 +284,23 @@ fn english_counts_agree_in_number() {
     );
     assert_eq!(
         Lang::Spanish.notice(&notices()[1]),
-        "3 archivos, 2 problemas (y 4 en la línea de base), 5 ms · 1 desvíos del preset en kerbo.toml"
+        "3 archivos, 2 problemas (y 4 en la línea de base), 5 ms · 1 desvío del preset en kerbo.toml"
     );
     assert_eq!(
         Lang::English.message(&Message::Cheat(cheats().remove(0))),
         "1 test was deleted from this file (3 before, 2 now); the whole change has 1 test fewer"
+    );
+}
+
+#[test]
+fn spanish_counts_agree_in_number() {
+    let spanish = |notice: &Notice| Lang::Spanish.notice(notice);
+    assert_eq!(spanish(&notices()[0]), "1 archivo, 1 problema, 5 ms");
+    assert_eq!(spanish(&notices()[2]), "1 problema guardado en kerbo-baseline.json");
+    assert_eq!(spanish(&notices()[3]), "2 problemas en lo que acabás de editar:");
+    assert_eq!(
+        Lang::Spanish.message(&Message::Cheat(cheats().remove(0))),
+        "1 test borrado de este archivo (3 antes, 2 ahora); en todo el cambio hay 1 test menos"
     );
 }
 

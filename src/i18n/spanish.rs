@@ -1,5 +1,6 @@
 use super::catalog::{
-    BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text, with_subject,
+    BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text, counted,
+    with_subject,
 };
 use crate::lint::{ImportRedundancy, LintKind};
 use crate::rules::RuleId;
@@ -193,7 +194,9 @@ impl Catalog for Spanish {
                 after,
                 net,
             } => format!(
-                "Se borraron {removed} tests de este archivo ({before} antes, {after} ahora); en todo el cambio hay {net} tests menos"
+                "{} de este archivo ({before} antes, {after} ahora); en todo el cambio hay {} menos",
+                counted(*removed, "test borrado", "tests borrados"),
+                counted(*net, "test", "tests")
             ),
             Cheat::EmptyTest { name } => format!("El test `{name}` quedó vacío: pasa sin probar nada"),
             Cheat::TestSkipped { marker } => {
@@ -263,8 +266,14 @@ impl Catalog for Spanish {
                 reason,
             } => fixes::suppressed(path, *line, *rule, reason),
             Notice::Fix(notice) => fixes::notice(notice),
-            Notice::BaselineSaved { count, path } => format!("{count} problemas guardados en {path}"),
-            Notice::HookHeader { count } => format!("{count} problemas en lo que acabás de editar:"),
+            Notice::BaselineSaved { count, path } => {
+                let saved = counted(*count, "problema guardado", "problemas guardados");
+                format!("{saved} en {path}")
+            }
+            Notice::HookHeader { count } => {
+                let problems = counted(*count, "problema", "problemas");
+                format!("{problems} en lo que acabás de editar:")
+            }
         }
     }
 }
@@ -284,12 +293,15 @@ fn summarize(summary: &Summary) -> String {
         String::new()
     };
     let deviations = if deviations > 0 {
-        format!(" · {deviations} desvíos del preset en kerbo.toml")
+        let deviations = counted(deviations, "desvío", "desvíos");
+        format!(" · {deviations} del preset en kerbo.toml")
     } else {
         String::new()
     };
+    let files = counted(files, "archivo", "archivos");
+    let problems = counted(problems, "problema", "problemas");
     format!(
-        "{files} archivos, {problems} problemas{known}, {milliseconds} ms{deviations}{}",
+        "{files}, {problems}{known}, {milliseconds} ms{deviations}{}",
         fixes::suppressed_suffix(suppressed)
     )
 }
