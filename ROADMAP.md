@@ -93,6 +93,27 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 - `kerbo explain <regla>`: por qué existe, ejemplo malo y bueno, cómo se arregla.
 - **Modo instantáneo** sobre los archivos recién tocados (meta: menos de 100 ms), un hook listo
   para Claude Code y un **servidor MCP**.
+- **Salida para agentes con menos tokens** (pendiente). Hoy cada problema es un objeto JSON
+  que repite todas las claves, la ruta del archivo y el texto entero de cómo se arregla. Lo que
+  más ahorra no es el formato sino dejar de repetir:
+  - **Cómo se arregla, una vez por regla**: el texto de `kerbo explain` va en una sección aparte
+    indexada por regla, no en cada problema. Con 30 problemas de la misma regla hoy se manda 30
+    veces el mismo párrafo.
+  - **Agrupado por archivo**: la ruta aparece una sola vez y debajo van sus problemas.
+  - **Identificador corto**: el prefijo más corto del identificador estable que no choca con
+    otro dentro del reporte, sin dejar de ser estable entre corridas (un agente lo usa para
+    seguir un problema de un cambio al siguiente).
+  - **Filas en vez de objetos**: las claves se declaran una vez y cada problema es una fila, al
+    estilo de TOON (Token-Oriented Object Notation), que es lo que mejor rinde con listas de
+    objetos iguales. YAML no sirve para esto: saca llaves y comillas pero repite las claves igual
+    (de 10 a 20 % menos que JSON) y la indentación es frágil.
+  - Medir antes de elegir: contar los tokens de JSON, del JSON sin repeticiones y de las filas
+    sobre reportes reales (un repo con pocos problemas y uno con cientos), con el tokenizador de
+    los modelos que más se usan, y quedarse con lo que menos gaste sin que el agente lo lea peor.
+  - El formato ganador pasa a ser `--format agent` y el JSON queda como `--format agent-json`
+    para quien lo parsea con código. El mismo formato en el hook y en el servidor MCP.
+  - Un test fija la salida y otro el tope de tokens de un reporte de ejemplo, así un cambio que
+    la agrande se ve.
 
 ### 4. Editor (LSP) e inspecciones de IntelliJ como mapa (el LSP, hecho en 0.5)
 
