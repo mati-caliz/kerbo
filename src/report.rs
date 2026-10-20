@@ -61,7 +61,7 @@ mod tests {
 
     use super::{Format, render};
     use crate::fix::Fix;
-    use crate::i18n::{Lang, Message};
+    use crate::i18n::{FunctionName, Lang, Message};
     use crate::rules::{Diagnostic, RuleId};
 
     const UNUSED_IMPORT_HUNK: &str = "@@ -3 +2,0 @@\n-import java.util.List;";
@@ -74,7 +74,7 @@ mod tests {
             end_line: 9,
             rule: RuleId::ParameterCount,
             message: Message::TooManyParameters {
-                function: "f".to_owned(),
+                function: FunctionName::Named("f".to_owned()),
                 count: 5,
                 limit: 4,
             },

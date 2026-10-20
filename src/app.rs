@@ -132,7 +132,7 @@ fn check(
         deviations: found.deviations,
         suppressed: found.suppressed.len(),
     });
-    write_failures(&found.failures, terminal.log)
+    write_failures(&found.failures, lang, terminal.log)
         .and_then(|()| write_suppressed(&found.suppressed, lang, terminal.log))
         .and_then(|()| writeln!(terminal.log, "kerbo: {}", lang.notice(&summary)))
         .map_err(|error| write_error(&error))?;
@@ -156,7 +156,7 @@ fn baseline(
         count: saved,
         path: path.display().to_string(),
     };
-    write_failures(&outcome.failures, terminal.log)
+    write_failures(&outcome.failures, lang, terminal.log)
         .and_then(|()| writeln!(terminal.log, "kerbo: {}", lang.notice(&notice)))
         .map_err(|error| write_error(&error))?;
     Ok(if outcome.failures.is_empty() {
@@ -186,9 +186,9 @@ fn scan_with(arguments: &ScanArgs, config: &Config) -> ScanOutcome {
     })
 }
 
-fn write_failures(failures: &[ScanFailure], log: &mut dyn Write) -> io::Result<()> {
+fn write_failures(failures: &[ScanFailure], lang: Lang, log: &mut dyn Write) -> io::Result<()> {
     for failure in failures {
-        writeln!(log, "kerbo: {} {}", failure.path, failure.reason)?;
+        writeln!(log, "kerbo: {}", lang.problem(&failure.problem))?;
     }
     Ok(())
 }

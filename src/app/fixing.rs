@@ -99,7 +99,7 @@ impl FixOutcome {
         notices.extend(
             self.failures
                 .iter()
-                .map(|failure| format!("{} {}", failure.path, failure.reason)),
+                .map(|failure| lang.problem(&failure.problem)),
         );
         notices
     }
@@ -178,8 +178,10 @@ pub fn fix_files(request: &FixRequest<'_>, directory: &Path) -> Result<FixOutcom
 
 fn fix_file(target: &Target<'_>, relative: &str, write: bool) -> Result<Option<FixedFile>, ScanFailure> {
     let failure = |error: &io::Error| ScanFailure {
-        path: relative.to_owned(),
-        reason: error.to_string(),
+        problem: Problem::Unreadable {
+            path: relative.to_owned(),
+            detail: error.to_string(),
+        },
     };
     let original = fs::read_to_string(target.absolute).map_err(|error| failure(&error))?;
     let Some(before) = check_text(target.absolute, original.as_bytes(), target.config) else {

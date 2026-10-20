@@ -7,7 +7,9 @@ mod catalog;
 mod english;
 mod spanish;
 
-pub use catalog::{BlockUnit, Cheat, Explanation, FixNotice, Message, Notice, Problem, Summary, Text};
+pub use catalog::{
+    BlockUnit, Cheat, Explanation, FixNotice, FunctionName, Message, Notice, Problem, Summary, Text,
+};
 
 use catalog::Catalog;
 

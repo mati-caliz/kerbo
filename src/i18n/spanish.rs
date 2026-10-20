@@ -1,6 +1,5 @@
 use super::catalog::{
-    BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text, counted,
-    with_subject,
+    BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text, counted, with_subject,
 };
 use crate::lint::{ImportRedundancy, LintKind};
 use crate::rules::RuleId;
@@ -9,6 +8,8 @@ mod deploy;
 mod dockerfile;
 mod explanations;
 mod fixes;
+
+const ANONYMOUS_FUNCTION: &str = "(anónima)";
 
 #[derive(Debug)]
 pub struct Spanish;
@@ -115,6 +116,7 @@ impl Catalog for Spanish {
                 lines,
                 limit,
             } => {
+                let function = function.shown_as(ANONYMOUS_FUNCTION);
                 format!("La función `{function}` tiene {lines} líneas (máximo {limit})")
             }
             Message::CyclomaticComplexity {
@@ -122,6 +124,7 @@ impl Catalog for Spanish {
                 value,
                 limit,
             } => {
+                let function = function.shown_as(ANONYMOUS_FUNCTION);
                 format!("La función `{function}` tiene complejidad ciclomática {value} (máximo {limit})")
             }
             Message::CognitiveComplexity {
@@ -129,6 +132,7 @@ impl Catalog for Spanish {
                 value,
                 limit,
             } => {
+                let function = function.shown_as(ANONYMOUS_FUNCTION);
                 format!("La función `{function}` tiene complejidad cognitiva {value} (máximo {limit})")
             }
             Message::TooManyParameters {
@@ -136,6 +140,7 @@ impl Catalog for Spanish {
                 count,
                 limit,
             } => {
+                let function = function.shown_as(ANONYMOUS_FUNCTION);
                 format!("La función `{function}` recibe {count} parámetros (máximo {limit})")
             }
             Message::NestedTooDeep { depth, limit } => {
@@ -223,6 +228,7 @@ impl Catalog for Spanish {
             Problem::CurrentDirectory => "no se pudo leer la carpeta actual".to_owned(),
             Problem::WriteReport(detail) => format!("no se pudo escribir el reporte: {detail}"),
             Problem::Unreadable { path, detail } => format!("{path}: {detail}"),
+            Problem::Unparsable { path } => format!("{path}: tree-sitter no devolvió un árbol"),
             Problem::MissingReason { path } => {
                 format!("{path}: cada ajuste necesita un `reason` que diga por qué se afloja")
             }

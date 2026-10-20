@@ -4,9 +4,10 @@ use std::path::PathBuf;
 use crate::analysis::FileAnalysis;
 use crate::deploy::violation_diagnostics;
 use crate::fix::Fix;
-use crate::i18n::Message;
+use crate::i18n::{FunctionName, Message};
 use crate::limits::Limits;
 use crate::metrics::FunctionMetrics;
+use crate::syntax::ANONYMOUS_FUNCTION_IDENTITY;
 
 mod families;
 mod id;
@@ -251,7 +252,7 @@ fn diagnostic(
 
 fn message(finding: &Finding<'_>, name: &str) -> Message {
     let Finding { value, limit, .. } = *finding;
-    let function = name.to_owned();
+    let function = shown_function_name(name);
     match finding.rule {
         RuleId::FileLength => Message::FileTooLong { lines: value, limit },
         RuleId::FunctionLength => Message::FunctionTooLong {
@@ -292,6 +293,14 @@ fn message(finding: &Finding<'_>, name: &str) -> Message {
         | RuleId::Migration(_)
         | RuleId::Dockerfile(_)
         | RuleId::Compose(_) => Message::Rule(finding.rule),
+    }
+}
+
+fn shown_function_name(identity: &str) -> FunctionName {
+    if identity == ANONYMOUS_FUNCTION_IDENTITY {
+        FunctionName::Anonymous
+    } else {
+        FunctionName::Named(identity.to_owned())
     }
 }
 

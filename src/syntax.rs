@@ -6,7 +6,7 @@ use tree_sitter::{Node, Parser, Tree};
 
 use crate::profile::{Kinds, Profile};
 
-const ANONYMOUS_FUNCTION: &str = "(anónima)";
+pub const ANONYMOUS_FUNCTION_IDENTITY: &str = "(anónima)";
 const NAME_FIELD: &str = "name";
 const NAMING_PARENTS: &[&str] = &[
     "type_alias_declaration",
@@ -65,7 +65,7 @@ pub fn function_name(node: Node<'_>, source: &[u8]) -> String {
     own_name
         .or_else(inherited_name)
         .and_then(|name| name.utf8_text(source).ok())
-        .map_or_else(|| ANONYMOUS_FUNCTION.to_owned(), str::to_owned)
+        .map_or_else(|| ANONYMOUS_FUNCTION_IDENTITY.to_owned(), str::to_owned)
 }
 
 pub fn descendants(root: Node<'_>) -> Vec<Node<'_>> {

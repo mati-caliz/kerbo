@@ -1,6 +1,5 @@
 use super::catalog::{
-    BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text, counted,
-    with_subject,
+    BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text, counted, with_subject,
 };
 use crate::lint::{ImportRedundancy, LintKind};
 use crate::rules::RuleId;
@@ -9,6 +8,8 @@ mod deploy;
 mod dockerfile;
 mod explanations;
 mod fixes;
+
+const ANONYMOUS_FUNCTION: &str = "(anonymous)";
 
 #[derive(Debug)]
 pub struct English;
@@ -115,6 +116,7 @@ impl Catalog for English {
                 lines,
                 limit,
             } => {
+                let function = function.shown_as(ANONYMOUS_FUNCTION);
                 format!("The function `{function}` has {lines} lines (maximum {limit})")
             }
             Message::CyclomaticComplexity {
@@ -122,6 +124,7 @@ impl Catalog for English {
                 value,
                 limit,
             } => {
+                let function = function.shown_as(ANONYMOUS_FUNCTION);
                 format!("The function `{function}` has cyclomatic complexity {value} (maximum {limit})")
             }
             Message::CognitiveComplexity {
@@ -129,6 +132,7 @@ impl Catalog for English {
                 value,
                 limit,
             } => {
+                let function = function.shown_as(ANONYMOUS_FUNCTION);
                 format!("The function `{function}` has cognitive complexity {value} (maximum {limit})")
             }
             Message::TooManyParameters {
@@ -136,6 +140,7 @@ impl Catalog for English {
                 count,
                 limit,
             } => {
+                let function = function.shown_as(ANONYMOUS_FUNCTION);
                 format!("The function `{function}` takes {count} parameters (maximum {limit})")
             }
             Message::NestedTooDeep { depth, limit } => {
@@ -227,6 +232,7 @@ impl Catalog for English {
             Problem::CurrentDirectory => "could not read the current folder".to_owned(),
             Problem::WriteReport(detail) => format!("could not write the report: {detail}"),
             Problem::Unreadable { path, detail } => format!("{path}: {detail}"),
+            Problem::Unparsable { path } => format!("{path}: tree-sitter returned no tree"),
             Problem::MissingReason { path } => {
                 format!("{path}: every adjustment needs a `reason` saying why it is loosened")
             }

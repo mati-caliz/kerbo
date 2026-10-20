@@ -73,28 +73,43 @@ pub enum BlockUnit {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FunctionName {
+    Named(String),
+    Anonymous,
+}
+
+impl FunctionName {
+    pub fn shown_as<'name>(&'name self, anonymous: &'name str) -> &'name str {
+        match self {
+            Self::Named(name) => name,
+            Self::Anonymous => anonymous,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
     FileTooLong {
         lines: usize,
         limit: usize,
     },
     FunctionTooLong {
-        function: String,
+        function: FunctionName,
         lines: usize,
         limit: usize,
     },
     CyclomaticComplexity {
-        function: String,
+        function: FunctionName,
         value: usize,
         limit: usize,
     },
     CognitiveComplexity {
-        function: String,
+        function: FunctionName,
         value: usize,
         limit: usize,
     },
     TooManyParameters {
-        function: String,
+        function: FunctionName,
         count: usize,
         limit: usize,
     },
@@ -165,6 +180,9 @@ pub enum Problem {
     Unreadable {
         path: String,
         detail: String,
+    },
+    Unparsable {
+        path: String,
     },
     MissingReason {
         path: String,

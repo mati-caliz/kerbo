@@ -11,6 +11,7 @@ use crate::analysis::{FileAnalysis, ParseFailed, SourceUnit, analyze_unit};
 use crate::cache::{AnalysisCache, AnalysisSubject, CacheKey};
 use crate::config::Config;
 use crate::duplicates::{PooledFile, find_duplicates};
+use crate::i18n::Problem;
 use crate::language::{Language, Stack};
 use crate::limits::{LimitOverride, Limits};
 use crate::macro_rules::MacroIndex;
@@ -21,8 +22,7 @@ const PATH_SEPARATOR: &str = "/";
 
 #[derive(Debug)]
 pub struct ScanFailure {
-    pub path: String,
-    pub reason: String,
+    pub problem: Problem,
 }
 
 #[derive(Debug, Default)]
@@ -190,8 +190,10 @@ fn collect_files(roots: &[PathBuf], project_root: &Path) -> (Vec<SourceFile>, Ve
                 Ok(_) => {}
                 Err(error) => {
                     failures.push(ScanFailure {
-                        path: root.display().to_string(),
-                        reason: error.to_string(),
+                        problem: Problem::Unreadable {
+                            path: root.display().to_string(),
+                            detail: error.to_string(),
+                        },
                     });
                 }
             }
@@ -242,9 +244,11 @@ fn check_file(
     request: &ScanRequest<'_>,
     macros: &MacroIndex,
 ) -> Result<Checked, ScanFailure> {
-    let failure = |reason: String| ScanFailure {
-        path: file.identity.display.clone(),
-        reason,
+    let failure = |detail: String| ScanFailure {
+        problem: Problem::Unreadable {
+            path: file.identity.display.clone(),
+            detail,
+        },
     };
     let source = fs::read(&file.identity.absolute).map_err(|error| failure(error.to_string()))?;
     let parser = pool.parser(file.language).map_err(failure)?;
@@ -276,8 +280,14 @@ fn check_file(
         path: Some(&file.identity.absolute),
         crate_macros: crate_macros.as_ref(),
     };
-    let mut analysis = cached_or_fresh(cached, || analyze_unit(parser, unit, limits))
-        .map_err(|error| failure(error.to_string()))?;
+    let mut analysis =
+        cached_or_fresh(cached, || analyze_unit(parser, unit, limits)).map_err(|ParseFailed| {
+            ScanFailure {
+                problem: Problem::Unparsable {
+                    path: file.identity.display.clone(),
+                },
+            }
+        })?;
     let pooled = pooled_file(&file.identity, &mut analysis, limits);
     let (diagnostics, suppressed) = split(&source, evaluate(&file.identity, &analysis, limits));
     Ok(Checked {

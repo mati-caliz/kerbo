@@ -1,4 +1,6 @@
-use super::{BlockUnit, Cheat, FixNotice, Lang, LangPreference, Message, Notice, Problem, Summary, Text};
+use super::{
+    BlockUnit, Cheat, FixNotice, FunctionName, Lang, LangPreference, Message, Notice, Problem, Summary, Text,
+};
 use crate::rules::RuleId;
 
 const LANGS: [Lang; 2] = [Lang::Spanish, Lang::English];
@@ -41,7 +43,7 @@ const TEXTS: [Text; 34] = [
 ];
 
 fn messages() -> Vec<Message> {
-    let function = || "process".to_owned();
+    let function = || FunctionName::Named("process".to_owned());
     vec![
         Message::FileTooLong {
             lines: 900,
@@ -136,6 +138,7 @@ fn problems() -> Vec<Problem> {
             path: path(),
             detail: detail(),
         },
+        Problem::Unparsable { path: path() },
         Problem::MissingReason { path: path() },
         Problem::MaxWithoutRule { path: path() },
         Problem::InvalidPattern {
@@ -296,7 +299,10 @@ fn english_counts_agree_in_number() {
 fn spanish_counts_agree_in_number() {
     let spanish = |notice: &Notice| Lang::Spanish.notice(notice);
     assert_eq!(spanish(&notices()[0]), "1 archivo, 1 problema, 5 ms");
-    assert_eq!(spanish(&notices()[2]), "1 problema guardado en kerbo-baseline.json");
+    assert_eq!(
+        spanish(&notices()[2]),
+        "1 problema guardado en kerbo-baseline.json"
+    );
     assert_eq!(spanish(&notices()[3]), "2 problemas en lo que acabás de editar:");
     assert_eq!(
         Lang::Spanish.message(&Message::Cheat(cheats().remove(0))),

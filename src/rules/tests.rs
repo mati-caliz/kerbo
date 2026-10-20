@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
+use tree_sitter::Parser;
+
 use super::{FileIdentity, RuleId, evaluate};
-use crate::analysis::FileAnalysis;
+use crate::analysis::{FileAnalysis, analyze};
 use crate::i18n::{Lang, Problem};
 use crate::language::Language;
 use crate::limits::{Limits, Preset};
@@ -167,6 +169,32 @@ fn values_at_the_limit_pass() {
             Preset::Strict.limits(Language::Java, false)
         )
         .is_empty()
+    );
+}
+
+#[test]
+fn anonymous_functions_keep_their_fingerprint_and_translate_their_name() {
+    let mut parser = Parser::new();
+    parser
+        .set_language(&Language::TypeScript.grammar().expect("tiene gramática"))
+        .expect("la gramática carga");
+    let source = "export default function (a, b, c, d, e) { return a; }\n";
+    let limits = Limits::default().with_rule(RuleId::ParameterCount, Some(1));
+    let analysis =
+        analyze(&mut parser, Language::TypeScript, source.as_bytes(), limits).expect("el archivo se parsea");
+    let diagnostics = evaluate(&file("src/a.ts"), &analysis, limits);
+    let anonymous = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.rule == RuleId::ParameterCount)
+        .expect("la función anónima se pasa de parámetros");
+    assert_eq!(anonymous.fingerprint, "parameter-count:src/a.ts:(anónima)#1");
+    assert_eq!(
+        Lang::English.message(&anonymous.message),
+        "The function `(anonymous)` takes 5 parameters (maximum 1)"
+    );
+    assert_eq!(
+        Lang::Spanish.message(&anonymous.message),
+        "La función `(anónima)` recibe 5 parámetros (máximo 1)"
     );
 }
 

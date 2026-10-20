@@ -1,4 +1,3 @@
-use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -50,12 +49,6 @@ impl FileAnalysis {
 
 #[derive(Debug)]
 pub struct ParseFailed;
-
-impl fmt::Display for ParseFailed {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("tree-sitter no devolvió un árbol")
-    }
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct SourceUnit<'unit> {

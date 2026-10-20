@@ -319,10 +319,9 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     deploy para confirmarlo).
   - Plurales en español (hecho: el resumen, la línea de base, el hook y el aviso de tests
     borrados dicen "1 archivo", "1 problema" y "1 desvío").
-  - Quedan en español el error interno "tree-sitter no devolvió un árbol" (`src/analysis.rs`) y el
-    nombre "(anónima)" de las funciones sin nombre (`src/syntax.rs`). El segundo forma parte del
-    identificador estable: traducirlo cambia los `id` y rompe las líneas de base existentes, así
-    que hay que separar el nombre que se muestra del que entra en el identificador.
+  - El error "tree-sitter no devolvió un árbol" y el nombre de las funciones sin nombre (hecho:
+    los dos pasan por el catálogo; el identificador estable sigue usando "(anónima)", así las
+    líneas de base existentes no cambian, y un test lo fija).
   - `README.en.md` y `site/en/` se mantienen a mano: un cambio en la versión en español tiene que
     pasar también a la otra. Un test o un chequeo del gate que compare las secciones de los dos
     README avisaría cuando se desfasan.

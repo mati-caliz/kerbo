@@ -4,7 +4,7 @@ use regex::Regex;
 
 use super::short_id::shortest_unique;
 use super::{SHOWN_LIMIT, build, write};
-use crate::i18n::{Lang, Message};
+use crate::i18n::{FunctionName, Lang, Message};
 use crate::rules::{Diagnostic, RuleId};
 
 const LARGE_SAMPLE_FILES: usize = 8;
@@ -31,7 +31,7 @@ fn diagnostic(path: &str, rule: RuleId, line: usize, measure: Measure) -> Diagno
         end_line: line + value,
         rule,
         message: Message::TooManyParameters {
-            function: "f".to_owned(),
+            function: FunctionName::Named("f".to_owned()),
             count: value,
             limit,
         },
