@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 
 use super::{EXIT_CLEAN, FindingsRequest, Terminal, findings, write_error};
 use crate::cli::ScanArgs;
-use crate::explain::explain;
+use crate::i18n::{Lang, Problem, Text};
 use crate::language::Stack;
 use crate::report::{Format, render};
 use crate::rules::RuleId;
@@ -35,14 +35,14 @@ struct ExplainArguments {
     rule: String,
 }
 
-pub fn serve(directory: &Path, terminal: &mut Terminal<'_>) -> Result<u8, String> {
+pub fn serve(directory: &Path, lang: Lang, terminal: &mut Terminal<'_>) -> Result<u8, Problem> {
     let reader = BufReader::new(&mut *terminal.input);
     for line in reader.lines() {
-        let line = line.map_err(|error| format!("no se pudo leer el pedido: {error}"))?;
+        let line = line.map_err(|error| Problem::ReadRequest(error.to_string()))?;
         if line.trim().is_empty() {
             continue;
         }
-        if let Some(response) = respond(&line, directory) {
+        if let Some(response) = respond(&line, directory, lang) {
             writeln!(terminal.report, "{response}")
                 .and_then(|()| terminal.report.flush())
                 .map_err(|error| write_error(&error))?;
@@ -51,27 +51,27 @@ pub fn serve(directory: &Path, terminal: &mut Terminal<'_>) -> Result<u8, String
     Ok(EXIT_CLEAN)
 }
 
-fn respond(line: &str, directory: &Path) -> Option<Value> {
+fn respond(line: &str, directory: &Path, lang: Lang) -> Option<Value> {
     let Ok(message) = serde_json::from_str::<Value>(line) else {
         return Some(error_response(
             &Value::Null,
             PARSE_ERROR,
-            "el pedido no es JSON válido",
+            &lang.problem(&Problem::InvalidRequest),
         ));
     };
     let id = message.get("id")?.clone();
     let method = message.get("method").and_then(Value::as_str).unwrap_or_default();
     let params = message.get("params").cloned().unwrap_or(Value::Null);
     let result = match method {
-        "initialize" => Ok(initialize(&params)),
+        "initialize" => Ok(initialize(&params, lang)),
         "ping" => Ok(json!({})),
-        "tools/list" => Ok(json!({ "tools": tools() })),
-        "tools/call" => call_tool(&params, directory),
-        _ => Err((METHOD_NOT_FOUND, format!("método desconocido: {method}"))),
+        "tools/list" => Ok(json!({ "tools": tools(lang) })),
+        "tools/call" => call_tool(&params, directory, lang),
+        _ => Err((METHOD_NOT_FOUND, Problem::UnknownMethod(method.to_owned()))),
     };
     Some(match result {
         Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
-        Err((code, text)) => error_response(&id, code, &text),
+        Err((code, problem)) => error_response(&id, code, &lang.problem(&problem)),
     })
 }
 
@@ -79,7 +79,7 @@ fn error_response(id: &Value, code: i64, text: &str) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": text } })
 }
 
-fn initialize(params: &Value) -> Value {
+fn initialize(params: &Value, lang: Lang) -> Value {
     let version = params
         .get("protocolVersion")
         .and_then(Value::as_str)
@@ -88,28 +88,28 @@ fn initialize(params: &Value) -> Value {
         "protocolVersion": version,
         "capabilities": { "tools": {} },
         "serverInfo": { "name": "kerbo", "version": env!("CARGO_PKG_VERSION") },
-        "instructions": "Usá kerbo_check después de editar código: con diff (por ejemplo HEAD) mira sólo lo cambiado y detecta trampas como supresiones nuevas o tests salteados. kerbo_explain dice cómo arreglar cada regla.",
+        "instructions": lang.text(Text::McpInstructions),
     })
 }
 
-fn tools() -> Value {
+fn tools(lang: Lang) -> Value {
     let rules: Vec<&str> = RuleId::ALL.iter().map(|rule| rule.as_str()).collect();
     json!([
         {
             "name": CHECK_TOOL,
-            "description": "Analiza archivos o carpetas y devuelve los problemas priorizados, con id estable y pista de arreglo.",
+            "description": lang.text(Text::McpCheckDescription),
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "paths": { "type": "array", "items": { "type": "string" }, "description": "Archivos o carpetas; por defecto la carpeta del proyecto" },
-                    "diff": { "type": "string", "description": "Referencia de git: sólo lo cambiado desde ahí, con antitrampa" },
+                    "paths": { "type": "array", "items": { "type": "string" }, "description": lang.text(Text::McpPathsDescription) },
+                    "diff": { "type": "string", "description": lang.text(Text::McpDiffDescription) },
                     "languages": { "type": "array", "items": { "type": "string", "enum": ["typescript", "python", "java", "go"] } },
                 },
             },
         },
         {
             "name": EXPLAIN_TOOL,
-            "description": "Explica una regla de kerbo: por qué existe, cómo se arregla y un ejemplo.",
+            "description": lang.text(Text::McpExplainDescription),
             "inputSchema": {
                 "type": "object",
                 "properties": { "rule": { "type": "string", "enum": rules } },
@@ -119,22 +119,31 @@ fn tools() -> Value {
     ])
 }
 
-fn call_tool(params: &Value, directory: &Path) -> Result<Value, (i64, String)> {
+fn call_tool(params: &Value, directory: &Path, lang: Lang) -> Result<Value, (i64, Problem)> {
     let name = params.get("name").and_then(Value::as_str).unwrap_or_default();
     let arguments = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
-    let invalid = |error: serde_json::Error| (INVALID_PARAMS, format!("argumentos inválidos: {error}"));
+    let invalid = |error: serde_json::Error| (INVALID_PARAMS, Problem::InvalidArguments(error.to_string()));
     let outcome = match name {
-        CHECK_TOOL => run_check(serde_json::from_value(arguments).map_err(invalid)?, directory),
-        EXPLAIN_TOOL => run_explain(&serde_json::from_value::<ExplainArguments>(arguments).map_err(invalid)?),
-        _ => return Err((INVALID_PARAMS, format!("herramienta desconocida: {name}"))),
+        CHECK_TOOL => run_check(
+            serde_json::from_value(arguments).map_err(invalid)?,
+            directory,
+            lang,
+        ),
+        EXPLAIN_TOOL => run_explain(
+            &serde_json::from_value::<ExplainArguments>(arguments).map_err(invalid)?,
+            lang,
+        ),
+        _ => return Err((INVALID_PARAMS, Problem::UnknownTool(name.to_owned()))),
     };
     Ok(match outcome {
         Ok(text) => json!({ "content": [{ "type": "text", "text": text }], "isError": false }),
-        Err(text) => json!({ "content": [{ "type": "text", "text": text }], "isError": true }),
+        Err(problem) => {
+            json!({ "content": [{ "type": "text", "text": lang.problem(&problem) }], "isError": true })
+        }
     })
 }
 
-fn run_check(arguments: CheckArguments, directory: &Path) -> Result<String, String> {
+fn run_check(arguments: CheckArguments, directory: &Path, lang: Lang) -> Result<String, Problem> {
     let paths = if arguments.paths.is_empty() {
         vec![CURRENT_DIRECTORY.to_owned()]
     } else {
@@ -157,19 +166,11 @@ fn run_check(arguments: CheckArguments, directory: &Path) -> Result<String, Stri
     };
     let found = findings(&request, directory)?;
     let mut output = Vec::new();
-    render(&found.diagnostics, Format::Agent, &mut output).map_err(|error| write_error(&error))?;
+    render(&found.diagnostics, Format::Agent, lang, &mut output).map_err(|error| write_error(&error))?;
     Ok(String::from_utf8_lossy(&output).trim_end().to_owned())
 }
 
-fn run_explain(arguments: &ExplainArguments) -> Result<String, String> {
+fn run_explain(arguments: &ExplainArguments, lang: Lang) -> Result<String, Problem> {
     let rule: RuleId = arguments.rule.parse()?;
-    let explanation = explain(rule);
-    Ok(format!(
-        "{}: {}\nPor qué: {}\nCómo se arregla: {}\nEjemplo: {}",
-        rule.as_str(),
-        rule.description(),
-        explanation.why,
-        explanation.fix,
-        explanation.example
-    ))
+    Ok(lang.explanation_text(rule))
 }

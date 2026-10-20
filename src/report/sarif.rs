@@ -1,5 +1,6 @@
 use serde_json::{Value, json};
 
+use crate::i18n::Lang;
 use crate::rules::{Diagnostic, RuleId};
 
 const SARIF_SCHEMA: &str = "https://json.schemastore.org/sarif-2.1.0.json";
@@ -8,14 +9,14 @@ const INFORMATION_URI: &str = "https://kerbo.matiascaliz.com.ar";
 const SOURCE_ROOT: &str = "%SRCROOT%";
 const FINGERPRINT_KEY: &str = "kerbo/v1";
 
-pub(super) fn document(diagnostics: &[Diagnostic]) -> Value {
+pub(super) fn document(diagnostics: &[Diagnostic], lang: Lang) -> Value {
     let rules: Vec<Value> = RuleId::ALL
         .iter()
         .map(|rule| {
             json!({
                 "id": rule.as_str(),
                 "name": rule.as_str(),
-                "shortDescription": { "text": rule.description() },
+                "shortDescription": { "text": lang.describe(*rule) },
                 "defaultConfiguration": { "level": "error" },
             })
         })
@@ -30,18 +31,18 @@ pub(super) fn document(diagnostics: &[Diagnostic]) -> Value {
                 "informationUri": INFORMATION_URI,
                 "rules": rules,
             }},
-            "results": diagnostics.iter().map(result).collect::<Vec<Value>>(),
+            "results": diagnostics.iter().map(|diagnostic| result(diagnostic, lang)).collect::<Vec<Value>>(),
         }],
     })
 }
 
-fn result(diagnostic: &Diagnostic) -> Value {
+fn result(diagnostic: &Diagnostic, lang: Lang) -> Value {
     let rule_index = RuleId::ALL.iter().position(|rule| *rule == diagnostic.rule);
     json!({
         "ruleId": diagnostic.rule.as_str(),
         "ruleIndex": rule_index,
         "level": "error",
-        "message": { "text": diagnostic.message },
+        "message": { "text": lang.message(&diagnostic.message) },
         "locations": [{ "physicalLocation": {
             "artifactLocation": { "uri": diagnostic.relative_path, "uriBaseId": SOURCE_ROOT },
             "region": {

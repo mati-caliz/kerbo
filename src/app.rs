@@ -7,8 +7,8 @@ use crate::cache::AnalysisCache;
 use crate::cli::{CheckArgs, Command, ScanArgs};
 use crate::config::Config;
 use crate::diff::ChangedLines;
-use crate::explain::explain;
 use crate::guard::{GuardRequest, inspect};
+use crate::i18n::{Lang, LangPreference, Notice, Problem, Summary};
 use crate::report::render;
 use crate::rules::{Diagnostic, RuleId};
 use crate::scan::{ScanFailure, ScanOutcome, ScanRequest, scan};
@@ -23,30 +23,34 @@ pub struct Terminal<'output> {
     pub log: &'output mut dyn Write,
 }
 
-struct Summary {
-    files: usize,
-    problems: usize,
-    known: usize,
-    deviations: usize,
-    started: Instant,
-}
-
-pub fn run(command: &Command, directory: &Path, terminal: &mut Terminal<'_>) -> u8 {
+pub fn run(
+    command: &Command,
+    preference: LangPreference,
+    directory: &Path,
+    terminal: &mut Terminal<'_>,
+) -> u8 {
+    let lang = preference.resolve(configured_lang(command.config(), directory));
     let (result, failure_status) = match command {
-        Command::Check(arguments) => (check(arguments, directory, terminal), EXIT_FAILURE),
-        Command::Baseline(arguments) => (baseline(arguments, directory, terminal), EXIT_FAILURE),
-        Command::Explain { rule } => (explain_rule(*rule, terminal), EXIT_FAILURE),
+        Command::Check(arguments) => (check(arguments, directory, lang, terminal), EXIT_FAILURE),
+        Command::Baseline(arguments) => (baseline(arguments, directory, lang, terminal), EXIT_FAILURE),
+        Command::Explain { rule } => (explain_rule(*rule, lang, terminal), EXIT_FAILURE),
         Command::Hook(arguments) => (
-            hook::run(arguments, directory, terminal),
+            hook::run(arguments, directory, lang, terminal),
             hook::NON_BLOCKING_ERROR,
         ),
-        Command::Mcp => (mcp::serve(directory, terminal), EXIT_FAILURE),
-        Command::Lsp => (lsp::serve(terminal), EXIT_FAILURE),
+        Command::Mcp => (mcp::serve(directory, lang, terminal), EXIT_FAILURE),
+        Command::Lsp => (lsp::serve(lang, terminal), EXIT_FAILURE),
     };
-    result.unwrap_or_else(|error| {
-        let _written = writeln!(terminal.log, "kerbo: {error}");
+    result.unwrap_or_else(|problem| {
+        let _written = writeln!(terminal.log, "kerbo: {}", lang.problem(&problem));
         failure_status
     })
+}
+
+pub fn configured_lang(explicit: Option<&Path>, directory: &Path) -> Option<Lang> {
+    Config::load(explicit, directory)
+        .ok()
+        .and_then(|config| config.lang())
 }
 
 pub struct Findings {
@@ -63,9 +67,8 @@ pub struct FindingsRequest<'request> {
     pub use_baseline: bool,
 }
 
-pub fn findings(request: &FindingsRequest<'_>, directory: &Path) -> Result<Findings, String> {
-    let config =
-        Config::load(request.scan.config.as_deref(), directory).map_err(|error| error.to_string())?;
+pub fn findings(request: &FindingsRequest<'_>, directory: &Path) -> Result<Findings, Problem> {
+    let config = Config::load(request.scan.config.as_deref(), directory)?;
     let outcome = scan_with(request.scan, &config);
     let mut diagnostics = outcome.diagnostics;
     if let Some(reference) = request.diff {
@@ -99,7 +102,12 @@ pub fn findings(request: &FindingsRequest<'_>, directory: &Path) -> Result<Findi
     })
 }
 
-fn check(arguments: &CheckArgs, directory: &Path, terminal: &mut Terminal<'_>) -> Result<u8, String> {
+fn check(
+    arguments: &CheckArgs,
+    directory: &Path,
+    lang: Lang,
+    terminal: &mut Terminal<'_>,
+) -> Result<u8, Problem> {
     let started = Instant::now();
     let request = FindingsRequest {
         scan: &arguments.scan,
@@ -107,36 +115,41 @@ fn check(arguments: &CheckArgs, directory: &Path, terminal: &mut Terminal<'_>) -
         use_baseline: !arguments.no_baseline,
     };
     let found = findings(&request, directory)?;
-    render(&found.diagnostics, arguments.format, terminal.report)
+    render(&found.diagnostics, arguments.format, lang, terminal.report)
         .and_then(|()| terminal.report.flush())
         .map_err(|error| write_error(&error))?;
-    let summary = Summary {
+    let summary = Notice::Summary(Summary {
         files: found.files,
         problems: found.diagnostics.len(),
         known: found.known,
+        milliseconds: started.elapsed().as_millis(),
         deviations: found.deviations,
-        started,
-    };
+    });
     write_failures(&found.failures, terminal.log)
-        .and_then(|()| write_summary(&summary, terminal.log))
+        .and_then(|()| writeln!(terminal.log, "kerbo: {}", lang.notice(&summary)))
         .map_err(|error| write_error(&error))?;
     Ok(exit_status(&found.failures, &found.diagnostics))
 }
 
-fn baseline(arguments: &ScanArgs, directory: &Path, terminal: &mut Terminal<'_>) -> Result<u8, String> {
-    let config = Config::load(arguments.config.as_deref(), directory).map_err(|error| error.to_string())?;
+fn baseline(
+    arguments: &ScanArgs,
+    directory: &Path,
+    lang: Lang,
+    terminal: &mut Terminal<'_>,
+) -> Result<u8, Problem> {
+    let config = Config::load(arguments.config.as_deref(), directory)?;
     let outcome = scan_with(arguments, &config);
     let path = config.root().join(BASELINE_FILE);
-    let saved = Baseline::save(&outcome.diagnostics, &path)
-        .map_err(|error| format!("{}: {error}", path.display()))?;
+    let saved = Baseline::save(&outcome.diagnostics, &path).map_err(|error| Problem::Unreadable {
+        path: path.display().to_string(),
+        detail: error.to_string(),
+    })?;
+    let notice = Notice::BaselineSaved {
+        count: saved,
+        path: path.display().to_string(),
+    };
     write_failures(&outcome.failures, terminal.log)
-        .and_then(|()| {
-            writeln!(
-                terminal.log,
-                "kerbo: {saved} problemas guardados en {}",
-                path.display()
-            )
-        })
+        .and_then(|()| writeln!(terminal.log, "kerbo: {}", lang.notice(&notice)))
         .map_err(|error| write_error(&error))?;
     Ok(if outcome.failures.is_empty() {
         EXIT_CLEAN
@@ -145,18 +158,8 @@ fn baseline(arguments: &ScanArgs, directory: &Path, terminal: &mut Terminal<'_>)
     })
 }
 
-fn explain_rule(rule: RuleId, terminal: &mut Terminal<'_>) -> Result<u8, String> {
-    let explanation = explain(rule);
-    writeln!(
-        terminal.report,
-        "{}: {}\n\nPor qué: {}\nCómo se arregla: {}\nEjemplo: {}",
-        rule.as_str(),
-        rule.description(),
-        explanation.why,
-        explanation.fix,
-        explanation.example
-    )
-    .map_err(|error| write_error(&error))?;
+fn explain_rule(rule: RuleId, lang: Lang, terminal: &mut Terminal<'_>) -> Result<u8, Problem> {
+    writeln!(terminal.report, "{}", lang.explanation_text(rule)).map_err(|error| write_error(&error))?;
     Ok(EXIT_CLEAN)
 }
 
@@ -182,24 +185,8 @@ fn write_failures(failures: &[ScanFailure], log: &mut dyn Write) -> io::Result<(
     Ok(())
 }
 
-fn write_summary(summary: &Summary, log: &mut dyn Write) -> io::Result<()> {
-    write!(
-        log,
-        "kerbo: {} archivos, {} problemas",
-        summary.files, summary.problems
-    )?;
-    if summary.known > 0 {
-        write!(log, " (y {} en la línea de base)", summary.known)?;
-    }
-    write!(log, ", {} ms", summary.started.elapsed().as_millis())?;
-    if summary.deviations > 0 {
-        write!(log, " · {} desvíos del preset en kerbo.toml", summary.deviations)?;
-    }
-    writeln!(log)
-}
-
-fn write_error(error: &io::Error) -> String {
-    format!("no se pudo escribir el reporte: {error}")
+fn write_error(error: &io::Error) -> Problem {
+    Problem::WriteReport(error.to_string())
 }
 
 const fn exit_status(failures: &[ScanFailure], diagnostics: &[Diagnostic]) -> u8 {

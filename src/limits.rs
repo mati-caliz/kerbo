@@ -3,6 +3,7 @@ use std::str::FromStr;
 use clap::ValueEnum;
 use serde::Deserialize;
 
+use crate::i18n::Problem;
 use crate::language::Language;
 use crate::rules::RuleId;
 
@@ -173,17 +174,17 @@ const fn unmeasured(language: Language) -> &'static [RuleId] {
 }
 
 impl FromStr for LimitOverride {
-    type Err = String;
+    type Err = Problem;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let (rule_name, value) = text
             .split_once('=')
-            .ok_or_else(|| format!("se esperaba regla=valor y llegó `{text}`"))?;
+            .ok_or_else(|| Problem::ExpectedRuleLimit(text.to_owned()))?;
         let rule = rule_name.trim().parse()?;
         let value = value
             .trim()
             .parse()
-            .map_err(|_| format!("`{}` no es un número entero no negativo", value.trim()))?;
+            .map_err(|_| Problem::NotANonNegativeInteger(value.trim().to_owned()))?;
         Ok(Self { rule, value })
     }
 }

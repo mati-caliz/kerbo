@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 use super::{path_from_uri, utf16_column};
 use crate::app::{EXIT_CLEAN, Terminal, run};
 use crate::cli::Command;
+use crate::i18n::{Lang, LangPreference};
 use crate::test_support::TempTree;
 
 fn frame(message: &Value) -> String {
@@ -22,10 +23,19 @@ fn replies(output: &str) -> Vec<Value> {
 }
 
 fn serve(input: &str) -> (u8, Vec<Value>) {
+    serve_in(Lang::Spanish, input)
+}
+
+fn serve_in(lang: Lang, input: &str) -> (u8, Vec<Value>) {
     let (mut report, mut log) = (Vec::new(), Vec::new());
     let mut bytes = input.as_bytes();
+    let preference = LangPreference {
+        flag: Some(lang),
+        locale: Lang::Spanish,
+    };
     let status = run(
         &Command::Lsp,
+        preference,
         &PathBuf::from("."),
         &mut Terminal {
             input: &mut bytes,
@@ -98,4 +108,29 @@ fn reads_uris_columns_and_bad_input() {
     assert_eq!(untitled[0]["params"]["diagnostics"], json!([]));
     assert_ne!(serve("Content-Length: 5\r\n\r\n{bad}").0, EXIT_CLEAN);
     assert_ne!(serve("Sin-Largo: 1\r\n\r\n{}").0, EXIT_CLEAN);
+}
+
+#[test]
+fn speaks_the_chosen_language_to_the_editor() {
+    let tree = TempTree::new("lsp-english");
+    let path = tree.path().join("cart.ts");
+    tree.write("cart.ts", "");
+    let uri = format!("file://{}", path.to_str().expect("UTF-8").replace(' ', "%20"));
+    let opened = json!({ "jsonrpc": "2.0", "method": "textDocument/didOpen", "params": { "textDocument": { "uri": uri, "text": "export function wide(ab, bc, cd, de, ef) {}\n" } } });
+    let hover = json!({ "jsonrpc": "2.0", "id": 1, "method": "textDocument/hover", "params": {} });
+    let input = format!("{}{}", frame(&opened), frame(&hover));
+    let (_, english) = serve_in(Lang::English, &input);
+    assert_eq!(
+        english[0]["params"]["diagnostics"][0]["message"],
+        "The function `wide` takes 5 parameters (maximum 4) — group the parameters that travel together into an object"
+    );
+    assert_eq!(
+        english[1]["error"]["message"],
+        "unknown method: textDocument/hover"
+    );
+    let (_, spanish) = serve(&input);
+    assert_eq!(
+        spanish[1]["error"]["message"],
+        "método desconocido: textDocument/hover"
+    );
 }

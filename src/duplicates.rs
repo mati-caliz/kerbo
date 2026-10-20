@@ -19,6 +19,7 @@ use tree_sitter::Node;
 pub use go_syntax::SyntaxNode;
 pub use sonar::{RepeatedBlock, RepeatedKind};
 
+use crate::i18n::{BlockUnit, Message};
 use crate::profile::DuplicateStyle;
 use crate::rules::{Diagnostic, FileIdentity, RuleId};
 
@@ -26,8 +27,6 @@ const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0100_0000_01b3;
 const SUPPRESSION_OFF: &str = "CPD-OFF";
 const SUPPRESSION_ON: &str = "CPD-ON";
-const TOKEN_UNIT: &str = "tokens";
-const SYNTAX_UNIT: &str = "nodos";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CpdToken {
@@ -117,9 +116,10 @@ fn repeated_diagnostics(file: &PooledFile) -> Vec<Diagnostic> {
         .map(|block| {
             let occurrence = occurrences.entry(block.content).or_default();
             *occurrence = occurrence.saturating_add(1);
-            let what = match block.kind {
-                RepeatedKind::Function => "Esta función repite la",
-                RepeatedKind::Branch => "Esta rama repite la",
+            let original_line = block.original_line;
+            let message = match block.kind {
+                RepeatedKind::Function => Message::RepeatedFunction { original_line },
+                RepeatedKind::Branch => Message::RepeatedBranch { original_line },
             };
             Diagnostic {
                 path: file.identity.display.clone(),
@@ -127,7 +127,7 @@ fn repeated_diagnostics(file: &PooledFile) -> Vec<Diagnostic> {
                 column: 1,
                 end_line: block.end_line,
                 rule: RuleId::DuplicateCode,
-                message: format!("{what} de la línea {}", block.original_line),
+                message,
                 value: block.lines,
                 limit: file.limit,
                 fingerprint: format!(
@@ -159,9 +159,12 @@ fn pooled_diagnostics(files: Vec<PooledFile>) -> Vec<Diagnostic> {
         })
         .collect();
     let (groups, unit) = if syntax_files.is_empty() {
-        (cpd_groups(token_files, threshold), TOKEN_UNIT)
+        (cpd_groups(token_files, threshold), BlockUnit::Tokens)
     } else {
-        (dupl::clone_groups(syntax_files, threshold), SYNTAX_UNIT)
+        (
+            dupl::clone_groups(syntax_files, threshold),
+            BlockUnit::SyntaxNodes,
+        )
     };
     report(&identities, &groups, unit)
 }
@@ -187,7 +190,7 @@ fn cpd_groups(files: Vec<Vec<CpdToken>>, tile: usize) -> Vec<CloneGroup> {
         .collect()
 }
 
-fn report(identities: &[(FileIdentity, usize)], groups: &[CloneGroup], unit: &str) -> Vec<Diagnostic> {
+fn report(identities: &[(FileIdentity, usize)], groups: &[CloneGroup], unit: BlockUnit) -> Vec<Diagnostic> {
     let mut occurrences: HashMap<(usize, u64), usize> = HashMap::new();
     let mut diagnostics = Vec::new();
     for group in groups {
@@ -218,10 +221,12 @@ fn report(identities: &[(FileIdentity, usize)], groups: &[CloneGroup], unit: &st
                 column: 1,
                 end_line: copy.end_line,
                 rule: RuleId::DuplicateCode,
-                message: format!(
-                    "Este bloque de {} {unit} está repetido en {others} (máximo {limit})",
-                    group.size
-                ),
+                message: Message::DuplicatedBlock {
+                    size: group.size,
+                    unit,
+                    copies: others,
+                    limit: *limit,
+                },
                 value: group.size,
                 limit: *limit,
                 fingerprint: format!(

@@ -3,7 +3,8 @@ use std::path::{Path, PathBuf};
 use clap::Parser;
 
 use super::{EXIT_CLEAN, EXIT_FAILURE, EXIT_FINDINGS, Terminal, run};
-use crate::cli::{Cli, Command};
+use crate::cli::{Cli, Command, try_parse};
+use crate::i18n::{Lang, LangPreference};
 use crate::test_support::TempTree;
 
 const LONG_SIGNATURE: &str = "package sample\n\nfunc Many(a, b, c, d, e int) {}\n";
@@ -19,11 +20,16 @@ fn execute(arguments: &[&str], directory: &Path) -> Outcome {
 }
 
 fn execute_with_input(arguments: &[&str], directory: &Path, input: &str) -> Outcome {
-    let cli = Cli::try_parse_from(arguments).expect("los argumentos son válidos");
+    let cli = try_parse(Lang::Spanish, arguments).expect("los argumentos son válidos");
     let (mut report, mut log) = (Vec::new(), Vec::new());
     let mut input = input.as_bytes();
+    let preference = LangPreference {
+        flag: cli.lang,
+        locale: Lang::Spanish,
+    };
     let status = run(
         &cli.command,
+        preference,
         directory,
         &mut Terminal {
             input: &mut input,
@@ -256,4 +262,65 @@ fn mcp_server_lists_and_runs_its_tools() {
             .iter()
             .any(|response| response["error"]["code"] == -32_700)
     );
+}
+
+#[test]
+fn speaks_english_when_asked_by_flag_or_configuration() {
+    let tree = TempTree::new("app-english");
+    tree.write("many.go", LONG_SIGNATURE);
+    let flagged = execute(&["kerbo", "--lang", "en", "check", path_of(&tree)], tree.path());
+    assert!(
+        flagged
+            .report
+            .contains("The function `Many` takes 5 parameters (maximum 4)")
+    );
+    assert!(flagged.log.contains("1 file, 1 problem, "));
+    tree.write("kerbo.toml", "lang = \"en\"\n");
+    let configured = execute(&["kerbo", "check", path_of(&tree)], tree.path());
+    assert!(configured.log.contains("1 file, 1 problem, "));
+    let overridden = execute(&["kerbo", "check", "--lang", "es", path_of(&tree)], tree.path());
+    assert!(overridden.log.contains("1 archivos, 1 problemas"));
+    let explained = execute(&["kerbo", "explain", "cognitive-complexity"], tree.path());
+    assert!(explained.report.contains("Why:") && explained.report.contains("early returns"));
+    tree.write(
+        "kerbo.toml",
+        "[[limits]]\nrule = \"parameter-count\"\nreason = \" \"\n",
+    );
+    let broken = execute(&["kerbo", "--lang", "en", "check", path_of(&tree)], tree.path());
+    assert!(broken.log.contains("every adjustment needs a `reason`"));
+}
+
+#[test]
+fn the_hook_and_the_mcp_server_follow_the_language() {
+    let tree = TempTree::new("app-english-agents");
+    tree.write("many.go", LONG_SIGNATURE);
+    let event = format!(
+        "{{\"cwd\": \"{}\", \"tool_input\": {{\"file_path\": \"many.go\"}}}}",
+        path_of(&tree)
+    );
+    let hook = execute_with_input(&["kerbo", "hook", "--lang", "en"], tree.path(), &event);
+    assert!(hook.log.contains("1 problem in what you just edited:"));
+    assert!(hook.log.contains("More detail: kerbo explain <rule>"));
+    let requests = [
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"kerbo_explain","arguments":{"rule":"magic-number"}}}"#,
+        r#"{"jsonrpc":"2.0","id":3,"method":"nope"}"#,
+    ];
+    let mcp = execute_with_input(
+        &["kerbo", "mcp", "--lang", "en"],
+        tree.path(),
+        &requests.join("\n"),
+    );
+    let responses: Vec<serde_json::Value> = mcp
+        .report
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("cada respuesta es JSON"))
+        .collect();
+    let instructions = responses[0]["result"]["instructions"].as_str().expect("texto");
+    assert!(instructions.starts_with("Use kerbo_check"));
+    let explained = responses[1]["result"]["content"][0]["text"]
+        .as_str()
+        .expect("texto");
+    assert!(explained.contains("Why: A bare 86400"));
+    assert_eq!(responses[2]["error"]["message"], "unknown method: nope");
 }

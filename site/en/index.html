@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kerbo — one quality bar for all your code</title>
+<meta name="description" content="kerbo replaces Checkstyle, PMD, ESLint, ruff and golangci-lint with a single binary: the same rules for Java, TypeScript, Python and Go, in seconds and megabytes, plus guardrails for the code AI agents write.">
+<link rel="canonical" href="https://kerbo.matiascaliz.com.ar/en/">
+<link rel="alternate" hreflang="es" href="https://kerbo.matiascaliz.com.ar/">
+<link rel="alternate" hreflang="en" href="https://kerbo.matiascaliz.com.ar/en/">
+<link rel="alternate" hreflang="x-default" href="https://kerbo.matiascaliz.com.ar/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0f12">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="es_AR">
+<meta property="og:url" content="https://kerbo.matiascaliz.com.ar/en/">
+<meta property="og:title" content="kerbo — one quality bar for all your code">
+<meta property="og:description" content="One binary instead of five linters: Java, TypeScript, Python and Go with the same rules, in seconds and megabytes. With guardrails for AI agents.">
+<meta property="og:image" content="https://kerbo.matiascaliz.com.ar/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<script defer src="/estadisticas/script.js" data-website-id="a6dac83f-4d19-4f69-985c-f1ce5419135e" data-host-url="/estadisticas" data-domains="kerbo.matiascaliz.com.ar" data-do-not-track="true" data-performance="true"></script>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="kerb kerb--thin" aria-hidden="true"></div>
+<header class="nav">
+  <div class="wrap nav__inner">
+    <a class="brand" href="/en/" aria-label="kerbo, home"><img src="/favicon.svg" alt="" width="28" height="28">kerbo</a>
+    <nav class="nav__links" aria-label="Sections">
+      <a href="#why">Why</a>
+      <a href="#agents">AI agents</a>
+      <a href="#java">Java</a>
+      <a href="https://github.com/mati-caliz/kerbo" data-umami-event="github" data-umami-event-placement="nav">GitHub</a>
+      <a class="nav__lang" href="/" hreflang="es" lang="es" data-umami-event="language" data-umami-event-placement="nav">Español</a>
+      <a class="btn btn--solid btn--small" href="#install" data-umami-event="install-open" data-umami-event-placement="nav">Install</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <span class="pill">Version 0.6 available · open source, Apache 2.0</span>
+    <h1>One quality bar for <em>all</em> your code.</h1>
+    <p class="lead">kerbo checks Java, TypeScript, Python and Go with <strong>a 7 MB binary</strong>, up to 23 times faster and with 90 times less memory: the same rules and a single report, counting exactly like Checkstyle, PMD, ESLint, ruff and golangci-lint. It is built so that <strong>AI agents cannot weasel out</strong> of the rules.</p>
+    <div class="install" id="install-hero">
+      <code>curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh</code>
+      <button class="copy" type="button" data-copy="curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh" data-umami-event="install-copy" data-umami-event-placement="hero">Copy</button>
+    </div>
+    <div class="actions">
+      <a class="btn btn--red" href="#install" data-umami-event="install-open" data-umami-event-placement="hero">Try it on your repo</a>
+      <a class="btn btn--ghost" href="https://github.com/mati-caliz/kerbo" data-umami-event="github" data-umami-event-placement="hero">View on GitHub</a>
+    </div>
+
+    <div class="terminal" role="img" aria-label="Output of kerbo check in a terminal">
+      <div class="terminal__bar" aria-hidden="true"><span></span><span></span><span></span></div>
+<pre><span class="t-prompt">$</span> <span class="t-cmd">kerbo check --lang en api web edge broker</span>
+<span class="t-path">api/src/main/java/billing/InvoiceService.java:88:5</span>: <span class="t-rule">cyclomatic-complexity</span> The function `settle` has cyclomatic complexity 11 (maximum 8)
+<span class="t-path">web/src/features/orders/use-cart.ts:42:1</span>: <span class="t-rule">cognitive-complexity</span> The function `applyPromotions` has cognitive complexity 19 (maximum 15)
+<span class="t-path">edge/src/ingest/rtsp_source.py:43:5</span>: <span class="t-rule">parameter-count</span> The function `__init__` takes 8 parameters (maximum 6)
+<span class="t-path">broker/internal/session/store.go:12:1</span>: <span class="t-rule">file-length</span> The file has 512 lines (maximum 400)
+<span class="t-ok">kerbo: 5810 files, 4 problems, 2250 ms</span></pre>
+    </div>
+  </div>
+
+  <section id="why">
+    <div class="wrap">
+      <p class="eyebrow">Why</p>
+      <h2>Five tools, five configurations and a server in swap.</h2>
+      <p class="section-lead">A repo with a Java backend, a TypeScript front end and a Python service carries one linter per language today, each with its plugins, its runtime, its report format and its own way of counting the same thing. kerbo is a single native engine that applies the same rules to all of them.</p>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat__value">23<small>×</small></div>
+          <div class="stat__label">faster than Checkstyle + PMD on a Java backend of 3,143 files</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value">14<small>×</small></div>
+          <div class="stat__label">faster than ESLint + sonarjs on a TypeScript front end of 2,667 files</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value">90<small>×</small></div>
+          <div class="stat__label">less memory: 8 MB against 740 MB on the same Java backend</div>
+        </div>
+      </div>
+      <div class="bench" role="region" aria-label="Speed and memory comparison" tabindex="0">
+        <table>
+          <thead>
+            <tr><th scope="col">Language</th><th scope="col">Tool</th><th scope="col">Time</th><th scope="col">CPU</th><th scope="col">Memory</th></tr>
+          </thead>
+          <tbody>
+            <tr><td rowspan="2">Java · 3,143 files</td><td>Checkstyle + PMD</td><td>21.2 s</td><td>47.9 s</td><td>740 MB</td></tr>
+            <tr class="ours"><td>kerbo</td><td>0.9 s</td><td>2.6 s</td><td>8 MB</td></tr>
+            <tr><td rowspan="2">TypeScript · 2,667 files</td><td>ESLint + sonarjs</td><td>15.7 s</td><td>27.2 s</td><td>606 MB</td></tr>
+            <tr class="ours"><td>kerbo</td><td>1.1 s</td><td>3.0 s</td><td>10 MB</td></tr>
+            <tr><td rowspan="2">Go · 65 files</td><td>golangci-lint</td><td>0.87 s</td><td>0.90 s</td><td>165 MB</td></tr>
+            <tr class="ours"><td>kerbo</td><td>0.04 s</td><td>0.09 s</td><td>5 MB</td></tr>
+            <tr><td rowspan="2">Python · 154 files</td><td>ruff</td><td>0.06 s</td><td>0.04 s</td><td>18 MB</td></tr>
+            <tr class="ours"><td>kerbo</td><td>0.10 s</td><td>0.29 s</td><td>7 MB</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="footnote">Measured on October 19, 2026 on production repos, with version 0.1. A fair comparison: each tool runs only the five rules kerbo mirrors (file and function length, cyclomatic and cognitive complexity, and parameters), with the same thresholds and on the same files, and both give exactly the same results. In Python, ruff is already written in Rust and is still faster; there kerbo wins on memory and on being a single tool for everything.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow">What it does</p>
+      <h2>Rules written once, applied the same way in every language.</h2>
+      <div class="cards">
+        <article class="card">
+          <div class="card__icon">01 · one binary</div>
+          <h3>No runtimes, no plugins</h3>
+          <p>No <code>node_modules</code> with ESLint per repo, no tool venvs, no Gradle or Maven plugins. One Rust executable, the same for all your repos.</p>
+        </article>
+        <article class="card">
+          <div class="card__icon">02 · same bar</div>
+          <h3>Universal rules</h3>
+          <p>File and function length, cyclomatic and cognitive complexity, and parameters: one definition and one threshold across the four languages, magic numbers and short names in all four, nesting in TypeScript and Go, duplicate blocks in all four and commented-out code in Python and Go. And Rust, with clippy's rules.</p>
+        </article>
+        <article class="card">
+          <div class="card__icon">03 · parity</div>
+          <h3>Same results as what it replaces</h3>
+          <p>Every rule is validated against the original tool on real repos. If it does not flag exactly the same, it does not ship: zero differences on the measured production repos in all four languages, except for two documented limits of the TypeScript parser.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="agents">
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">For AI agents</p>
+        <h2>Guardrails for the code Claude Code, Cursor and Copilot write.</h2>
+        <p class="section-lead">Today's linters talk to a person. An agent that writes and fixes in short loops needs something else: to know exactly what to fix, and that nobody lets it "fix" a problem by hiding it.</p>
+      </div>
+      <ul class="list">
+        <li><strong>Anti-cheat.</strong> Warns when a change dodges a problem instead of fixing it: a new <code>eslint-disable</code>, <code>noqa</code> or <code>@SuppressWarnings</code>, a loosened threshold, a deleted, skipped or emptied test, an <code>any</code>.</li>
+        <li><strong>Output for agents.</strong> Compact, prioritized JSON with how to fix each problem, and no filler that burns tokens.</li>
+        <li><strong>Claude Code hook.</strong> Reviews every file the agent edits, in milliseconds, and hands back what it found so the agent fixes it in the same turn.</li>
+        <li><strong>Stable identifiers and <code>kerbo explain</code>.</strong> On the next turn the agent knows what it fixed, what is left and how to fix each rule.</li>
+        <li><strong>MCP server</strong> for Claude Code, Cursor and any client. <strong>Coming up:</strong> imports that do not exist and functions that duplicate another one in the repo.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="java">
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">The ruff of Java</p>
+        <h2>Checkstyle, PMD and SpotBugs, without a JVM and without compiling.</h2>
+        <p class="section-lead">Python has ruff and JavaScript has Oxlint and Biome. Java is still stuck with three tools that each start a JVM, and SpotBugs forces you to compile before analyzing.</p>
+      </div>
+      <div>
+        <ul class="list">
+          <li><strong>Today:</strong> complexity, length and parameters counted exactly like Checkstyle and PMD, without starting any JVM.</li>
+          <li><strong>Coming up:</strong> every shape rule of Checkstyle and PMD, and SpotBugs' data-flow analysis on the source code (nulls, unclosed resources, swallowed exceptions) without going through bytecode.</li>
+          <li><strong>Seconds instead of minutes</strong> in the gate, without fighting the build for memory.</li>
+        </ul>
+        <div class="replaces" aria-label="Tools it replaces">
+          <span>Checkstyle</span><span>PMD</span><span>SpotBugs</span><span>ESLint</span><span>ruff</span><span>golangci-lint</span><span class="arrow">→</span><span class="into">kerbo</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow">Roadmap</p>
+      <h2>Where it stands and what comes next.</h2>
+      <div class="steps">
+        <div class="step step--now">
+          <div class="step__when">Today · 0.6</div>
+          <h3>Ready for a real repo, for agents and for the editor</h3>
+          <p>Exact parity in four languages, also in nesting, magic numbers, short names, duplicate blocks and commented-out code. <code>kerbo.toml</code>, baseline, <code>--diff</code>, SARIF, GitHub Action, anti-cheat, Claude Code hook, MCP and LSP for IntelliJ, VS Code and Neovim, with messages in English and Spanish.</p>
+        </div>
+        <div class="step">
+          <div class="step__when">Next</div>
+          <h3>More rules</h3>
+          <p>Binaries for macOS and Windows, and crates.io. After that, full syntactic Java.</p>
+        </div>
+        <div class="step">
+          <div class="step__when">Later</div>
+          <h3>Data flow and more</h3>
+          <p>SpotBugs-style checks without compiling, its own formatter, tests that run only when the change affects them, dependencies and secrets.</p>
+        </div>
+      </div>
+      <p class="footnote">Open source under the Apache 2.0 license, free for commercial use too. The <a href="https://github.com/mati-caliz/kerbo/blob/main/ROADMAP.md">full roadmap</a> (in Spanish) is in the repo.</p>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <div class="cta">
+        <p class="eyebrow">Install</p>
+        <h2>Try it on your repo in a minute.</h2>
+        <p class="section-lead">On Linux, one command: it downloads the static binary, verifies the sha256 and puts it in <code>~/.local/bin</code>. On macOS and Windows, with Rust: <code>cargo install --git https://github.com/mati-caliz/kerbo --locked</code>. Messages follow your locale; <code>--lang en</code> or <code>lang = "en"</code> in <code>kerbo.toml</code> forces English.</p>
+        <div class="install">
+          <code>curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh</code>
+          <button class="copy" type="button" data-copy="curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh" data-umami-event="install-copy" data-umami-event-placement="install">Copy</button>
+        </div>
+        <div class="install">
+          <code>kerbo check --lang en</code>
+          <button class="copy" type="button" data-copy="kerbo check --lang en" data-umami-event="install-copy" data-umami-event-placement="usage">Copy</button>
+        </div>
+        <div class="actions">
+          <a class="btn btn--red" href="https://github.com/mati-caliz/kerbo" data-umami-event="github" data-umami-event-placement="install">View on GitHub</a>
+          <a class="btn btn--ghost" href="mailto:lantix.argentina@gmail.com?subject=kerbo" data-umami-event="contact" data-umami-event-channel="mail" data-umami-event-placement="install">Write to us</a>
+        </div>
+        <p class="note">Want to try it with your team, use Java or work with AI agents? Write to us and we will run it together on your repo.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="kerb" aria-hidden="true"></div>
+<footer>
+  <div class="wrap footer__inner">
+    <span>kerbo · a project by <a href="https://matiascaliz.com.ar/">Matías Caliz</a></span>
+    <span><a href="https://www.linkedin.com/in/matias-caliz/" rel="noopener">LinkedIn</a> · <a href="mailto:lantix.argentina@gmail.com" data-umami-event="contact" data-umami-event-channel="mail" data-umami-event-placement="footer">lantix.argentina@gmail.com</a></span>
+  </div>
+</footer>
+<script src="/copy.js" data-copied="Copied" data-failed="Copy it by hand" defer></script>
+</body>
+</html>

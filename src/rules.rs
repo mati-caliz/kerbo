@@ -5,6 +5,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use crate::analysis::FileAnalysis;
+use crate::i18n::{Message, Problem};
 use crate::limits::Limits;
 use crate::metrics::FunctionMetrics;
 
@@ -87,35 +88,16 @@ impl RuleId {
             Self::CommentedCode => "commented-code",
         }
     }
-
-    pub const fn description(self) -> &'static str {
-        match self {
-            Self::FileLength => "El archivo supera el máximo de líneas",
-            Self::FunctionLength => "La función supera el máximo de líneas",
-            Self::CyclomaticComplexity => "La función tiene demasiados caminos posibles",
-            Self::CognitiveComplexity => "La función es difícil de leer: demasiadas ramas anidadas",
-            Self::ParameterCount => "La función recibe demasiados parámetros",
-            Self::SuppressionAdded => "El cambio silencia una herramienta en vez de arreglar la causa",
-            Self::TestDisabled => "El cambio saltea o enfoca un test, y deja otros sin correr",
-            Self::TestRemoved => "El cambio borra tests",
-            Self::TypeEscape => "El cambio escapa del sistema de tipos",
-            Self::NestingDepth => "Demasiados bloques anidados",
-            Self::MagicNumber => "Un número sin nombre en medio de la lógica",
-            Self::ShortName => "Un nombre demasiado corto o ambiguo para lo que abarca",
-            Self::DuplicateCode => "Un bloque de código copiado y pegado en otro lugar",
-            Self::CommentedCode => "Código comentado en vez de borrado",
-        }
-    }
 }
 
 impl FromStr for RuleId {
-    type Err = String;
+    type Err = Problem;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         Self::ALL
             .into_iter()
             .find(|rule| rule.as_str() == text)
-            .ok_or_else(|| format!("no existe la regla `{text}`"))
+            .ok_or_else(|| Problem::UnknownRule(text.to_owned()))
     }
 }
 
@@ -126,20 +108,18 @@ pub struct FileIdentity {
     pub absolute: PathBuf,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Diagnostic {
     pub path: String,
     pub line: usize,
     pub column: usize,
     pub end_line: usize,
     pub rule: RuleId,
-    pub message: String,
+    pub message: Message,
     pub value: usize,
     pub limit: usize,
     pub fingerprint: String,
-    #[serde(skip)]
     pub relative_path: String,
-    #[serde(skip)]
     pub absolute_path: PathBuf,
 }
 
@@ -198,10 +178,10 @@ fn nesting_diagnostics<'analysis>(
             column: found.column,
             end_line: found.line,
             rule: RuleId::NestingDepth,
-            message: format!(
-                "Este bloque está {} niveles adentro (máximo {limit})",
-                found.depth
-            ),
+            message: Message::NestedTooDeep {
+                depth: found.depth,
+                limit,
+            },
             value: found.depth,
             limit,
             fingerprint: format!("nesting-depth:{}:{}#{occurrence}", file.relative, found.depth),
@@ -225,7 +205,9 @@ fn magic_number_diagnostics<'analysis>(
             column: found.column,
             end_line: found.line,
             rule: RuleId::MagicNumber,
-            message: format!("El número `{}` no tiene nombre", found.text),
+            message: Message::UnnamedNumber {
+                number: found.text.clone(),
+            },
             value: MAGIC_NUMBER_COUNT,
             limit: NO_MAGIC_NUMBERS,
             fingerprint: format!("magic-number:{}:{}#{occurrence}", file.relative, found.text),
@@ -249,7 +231,9 @@ fn short_name_diagnostics<'analysis>(
             column: found.column,
             end_line: found.line,
             rule: RuleId::ShortName,
-            message: format!("`{}` es un nombre demasiado corto o ambiguo", found.name),
+            message: Message::ShortName {
+                name: found.name.clone(),
+            },
             value: found.name.chars().count(),
             limit: NO_MAGIC_NUMBERS,
             fingerprint: format!("short-name:{}:{}#{occurrence}", file.relative, found.name),
@@ -273,7 +257,7 @@ fn commented_code_diagnostics<'analysis>(
             column: found.column,
             end_line: found.line,
             rule: RuleId::CommentedCode,
-            message: RuleId::CommentedCode.description().to_owned(),
+            message: Message::Rule(RuleId::CommentedCode),
             value: MAGIC_NUMBER_COUNT,
             limit: NO_MAGIC_NUMBERS,
             fingerprint: format!("commented-code:{}:{}#{occurrence}", file.relative, found.text),
@@ -338,18 +322,31 @@ fn diagnostic(
     }
 }
 
-fn message(finding: &Finding<'_>, name: &str) -> String {
+fn message(finding: &Finding<'_>, name: &str) -> Message {
     let Finding { value, limit, .. } = *finding;
+    let function = name.to_owned();
     match finding.rule {
-        RuleId::FileLength => format!("El archivo tiene {value} líneas (máximo {limit})"),
-        RuleId::FunctionLength => format!("La función `{name}` tiene {value} líneas (máximo {limit})"),
-        RuleId::CyclomaticComplexity => {
-            format!("La función `{name}` tiene complejidad ciclomática {value} (máximo {limit})")
-        }
-        RuleId::CognitiveComplexity => {
-            format!("La función `{name}` tiene complejidad cognitiva {value} (máximo {limit})")
-        }
-        RuleId::ParameterCount => format!("La función `{name}` recibe {value} parámetros (máximo {limit})"),
+        RuleId::FileLength => Message::FileTooLong { lines: value, limit },
+        RuleId::FunctionLength => Message::FunctionTooLong {
+            function,
+            lines: value,
+            limit,
+        },
+        RuleId::CyclomaticComplexity => Message::CyclomaticComplexity {
+            function,
+            value,
+            limit,
+        },
+        RuleId::CognitiveComplexity => Message::CognitiveComplexity {
+            function,
+            value,
+            limit,
+        },
+        RuleId::ParameterCount => Message::TooManyParameters {
+            function,
+            count: value,
+            limit,
+        },
         RuleId::SuppressionAdded
         | RuleId::TestDisabled
         | RuleId::TestRemoved
@@ -358,7 +355,7 @@ fn message(finding: &Finding<'_>, name: &str) -> String {
         | RuleId::MagicNumber
         | RuleId::ShortName
         | RuleId::DuplicateCode
-        | RuleId::CommentedCode => finding.rule.description().to_owned(),
+        | RuleId::CommentedCode => Message::Rule(finding.rule),
     }
 }
 

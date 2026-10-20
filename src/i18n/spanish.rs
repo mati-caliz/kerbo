@@ -1,0 +1,241 @@
+use super::catalog::{BlockUnit, Catalog, Cheat, Explanation, Message, Notice, Problem, Summary, Text};
+use crate::rules::RuleId;
+
+mod explanations;
+
+#[derive(Debug)]
+pub struct Spanish;
+
+impl Catalog for Spanish {
+    fn text(&self, text: Text) -> &'static str {
+        match text {
+            Text::WhyLabel => "Por qué",
+            Text::FixLabel => "Cómo se arregla",
+            Text::ExampleLabel => "Ejemplo",
+            Text::HookMoreDetail => "Más detalle: kerbo explain <regla>",
+            Text::McpInstructions => {
+                "Usá kerbo_check después de editar código: con diff (por ejemplo HEAD) mira sólo lo cambiado y detecta trampas como supresiones nuevas o tests salteados. kerbo_explain dice cómo arreglar cada regla."
+            }
+            Text::McpCheckDescription => {
+                "Analiza archivos o carpetas y devuelve los problemas priorizados, con id estable y pista de arreglo."
+            }
+            Text::McpPathsDescription => "Archivos o carpetas; por defecto la carpeta del proyecto",
+            Text::McpDiffDescription => "Referencia de git: sólo lo cambiado desde ahí, con antitrampa",
+            Text::McpExplainDescription => {
+                "Explica una regla de kerbo: por qué existe, cómo se arregla y un ejemplo."
+            }
+            Text::AboutKerbo => "Analizador de calidad multi-lenguaje",
+            Text::AboutCheck => "Analiza los archivos y lista los problemas",
+            Text::AboutBaseline => {
+                "Guarda los problemas actuales como línea de base: después sólo se reportan los nuevos"
+            }
+            Text::AboutExplain => "Explica una regla: por qué existe y cómo se arregla",
+            Text::AboutHook => {
+                "Hook para agentes: revisa el archivo recién editado (lee el evento de Claude Code por stdin)"
+            }
+            Text::AboutMcp => "Servidor MCP por stdio: herramientas kerbo_check y kerbo_explain para agentes",
+            Text::AboutLsp => {
+                "Servidor LSP por stdio: los problemas en el editor mientras escribís (IntelliJ, VS Code, Neovim)"
+            }
+            Text::HelpRule => "La regla, por ejemplo cognitive-complexity",
+            Text::HelpConfig => "Usa esta configuración en vez de buscar kerbo.toml",
+            Text::HelpPaths => "Archivos o carpetas a analizar",
+            Text::HelpLanguages => "Analizar sólo estas pilas (se puede repetir)",
+            Text::HelpMax => {
+                "Cambia el máximo de una regla en todos los lenguajes, también en los tests (se puede repetir)"
+            }
+            Text::HelpFormat => "Formato de salida",
+            Text::HelpDiff => "Sólo los problemas en líneas cambiadas desde esta referencia de git",
+            Text::HelpNoBaseline => "Reporta también lo que está en la línea de base",
+            Text::HelpLang => "Idioma de los mensajes; si no se indica, el de kerbo.toml o el del sistema",
+            Text::ValueFile => "ARCHIVO",
+            Text::ValueRuleLimit => "REGLA=VALOR",
+            Text::ValueReference => "REFERENCIA",
+        }
+    }
+
+    fn rule_description(&self, rule: RuleId) -> &'static str {
+        match rule {
+            RuleId::FileLength => "El archivo supera el máximo de líneas",
+            RuleId::FunctionLength => "La función supera el máximo de líneas",
+            RuleId::CyclomaticComplexity => "La función tiene demasiados caminos posibles",
+            RuleId::CognitiveComplexity => "La función es difícil de leer: demasiadas ramas anidadas",
+            RuleId::ParameterCount => "La función recibe demasiados parámetros",
+            RuleId::SuppressionAdded => "El cambio silencia una herramienta en vez de arreglar la causa",
+            RuleId::TestDisabled => "El cambio saltea o enfoca un test, y deja otros sin correr",
+            RuleId::TestRemoved => "El cambio borra tests",
+            RuleId::TypeEscape => "El cambio escapa del sistema de tipos",
+            RuleId::NestingDepth => "Demasiados bloques anidados",
+            RuleId::MagicNumber => "Un número sin nombre en medio de la lógica",
+            RuleId::ShortName => "Un nombre demasiado corto o ambiguo para lo que abarca",
+            RuleId::DuplicateCode => "Un bloque de código copiado y pegado en otro lugar",
+            RuleId::CommentedCode => "Código comentado en vez de borrado",
+        }
+    }
+
+    fn explanation(&self, rule: RuleId) -> Explanation {
+        explanations::explanation(rule)
+    }
+
+    fn message(&self, message: &Message) -> String {
+        match message {
+            Message::FileTooLong { lines, limit } => {
+                format!("El archivo tiene {lines} líneas (máximo {limit})")
+            }
+            Message::FunctionTooLong {
+                function,
+                lines,
+                limit,
+            } => {
+                format!("La función `{function}` tiene {lines} líneas (máximo {limit})")
+            }
+            Message::CyclomaticComplexity {
+                function,
+                value,
+                limit,
+            } => {
+                format!("La función `{function}` tiene complejidad ciclomática {value} (máximo {limit})")
+            }
+            Message::CognitiveComplexity {
+                function,
+                value,
+                limit,
+            } => {
+                format!("La función `{function}` tiene complejidad cognitiva {value} (máximo {limit})")
+            }
+            Message::TooManyParameters {
+                function,
+                count,
+                limit,
+            } => {
+                format!("La función `{function}` recibe {count} parámetros (máximo {limit})")
+            }
+            Message::NestedTooDeep { depth, limit } => {
+                format!("Este bloque está {depth} niveles adentro (máximo {limit})")
+            }
+            Message::UnnamedNumber { number } => format!("El número `{number}` no tiene nombre"),
+            Message::ShortName { name } => format!("`{name}` es un nombre demasiado corto o ambiguo"),
+            Message::RepeatedFunction { original_line } => {
+                format!("Esta función repite la de la línea {original_line}")
+            }
+            Message::RepeatedBranch { original_line } => {
+                format!("Esta rama repite la de la línea {original_line}")
+            }
+            Message::DuplicatedBlock {
+                size,
+                unit,
+                copies,
+                limit,
+            } => format!(
+                "Este bloque de {size} {} está repetido en {copies} (máximo {limit})",
+                block_unit(*unit)
+            ),
+            Message::Cheat(cheat) => self.cheat(cheat),
+            Message::Rule(rule) => self.rule_description(*rule).to_owned(),
+        }
+    }
+
+    fn cheat(&self, cheat: &Cheat) -> String {
+        match cheat {
+            Cheat::TestsRemoved {
+                removed,
+                before,
+                after,
+                net,
+            } => format!(
+                "Se borraron {removed} tests de este archivo ({before} antes, {after} ahora); en todo el cambio hay {net} tests menos"
+            ),
+            Cheat::EmptyTest { name } => format!("El test `{name}` quedó vacío: pasa sin probar nada"),
+            Cheat::TestSkipped { marker } => {
+                format!("`{marker}` deja tests sin correr: arreglá el test en vez de saltearlo")
+            }
+            Cheat::TypeEscaped { marker } => {
+                format!("`{marker}` escapa del sistema de tipos: tipá el valor de verdad")
+            }
+            Cheat::SuppressionAdded { marker } => {
+                format!(
+                    "Se agregó `{marker}`: arreglá la causa, o dejá la excepción en kerbo.toml con su motivo"
+                )
+            }
+            Cheat::ThresholdLoosened { old, new } => {
+                format!(
+                    "Se aflojó un umbral: `{old}` pasó a `{new}`. Arreglá el código en vez de bajar la vara"
+                )
+            }
+        }
+    }
+
+    fn problem(&self, problem: &Problem) -> String {
+        match problem {
+            Problem::CurrentDirectory => "no se pudo leer la carpeta actual".to_owned(),
+            Problem::WriteReport(detail) => format!("no se pudo escribir el reporte: {detail}"),
+            Problem::Unreadable { path, detail } => format!("{path}: {detail}"),
+            Problem::MissingReason { path } => {
+                format!("{path}: cada ajuste necesita un `reason` que diga por qué se afloja")
+            }
+            Problem::MaxWithoutRule { path } => {
+                format!("{path}: una excepción con `max` tiene que nombrar la `rule`")
+            }
+            Problem::InvalidPattern {
+                path,
+                pattern,
+                detail,
+            } => format!("{path}: patrón `{pattern}`: {detail}"),
+            Problem::UnknownBaselineVersion { path, version } => {
+                format!("{path}: versión {version} desconocida")
+            }
+            Problem::GitUnavailable(detail) => format!("no se pudo correr git: {detail}"),
+            Problem::GitFailed { command, detail } => format!("git {command}: {detail}"),
+            Problem::UnknownRule(rule) => format!("no existe la regla `{rule}`"),
+            Problem::ExpectedRuleLimit(text) => format!("se esperaba regla=valor y llegó `{text}`"),
+            Problem::NotANonNegativeInteger(text) => format!("`{text}` no es un número entero no negativo"),
+            Problem::ReadEvent(detail) => format!("no se pudo leer el evento: {detail}"),
+            Problem::InvalidEvent(detail) => format!("el evento no es JSON válido: {detail}"),
+            Problem::ReadRequest(detail) => format!("no se pudo leer el pedido: {detail}"),
+            Problem::InvalidRequest => "el pedido no es JSON válido".to_owned(),
+            Problem::UnknownMethod(method) => format!("método desconocido: {method}"),
+            Problem::UnknownTool(tool) => format!("herramienta desconocida: {tool}"),
+            Problem::InvalidArguments(detail) => format!("argumentos inválidos: {detail}"),
+            Problem::ReadEditor(detail) => format!("no se pudo leer del editor: {detail}"),
+            Problem::MissingContentLength => "falta el encabezado Content-Length".to_owned(),
+            Problem::IncompleteMessage(detail) => format!("mensaje incompleto: {detail}"),
+            Problem::InvalidMessage(detail) => format!("el mensaje no es JSON válido: {detail}"),
+        }
+    }
+
+    fn notice(&self, notice: &Notice) -> String {
+        match notice {
+            Notice::Summary(summary) => summarize(summary),
+            Notice::BaselineSaved { count, path } => format!("{count} problemas guardados en {path}"),
+            Notice::HookHeader { count } => format!("{count} problemas en lo que acabás de editar:"),
+        }
+    }
+}
+
+fn summarize(summary: &Summary) -> String {
+    let Summary {
+        files,
+        problems,
+        known,
+        milliseconds,
+        deviations,
+    } = *summary;
+    let known = if known > 0 {
+        format!(" (y {known} en la línea de base)")
+    } else {
+        String::new()
+    };
+    let deviations = if deviations > 0 {
+        format!(" · {deviations} desvíos del preset en kerbo.toml")
+    } else {
+        String::new()
+    };
+    format!("{files} archivos, {problems} problemas{known}, {milliseconds} ms{deviations}")
+}
+
+const fn block_unit(unit: BlockUnit) -> &'static str {
+    match unit {
+        BlockUnit::Tokens => "tokens",
+        BlockUnit::SyntaxNodes => "nodos",
+    }
+}

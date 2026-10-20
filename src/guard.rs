@@ -9,6 +9,7 @@ use tree_sitter::Parser;
 
 use crate::config::Config;
 use crate::diff::{ChangedLines, Changes};
+use crate::i18n::{Cheat, Message};
 use crate::language::{Language, Stack};
 use crate::rules::{Diagnostic, RuleId};
 
@@ -140,10 +141,12 @@ fn removed_tests(counts: &[TestCount<'_>]) -> Vec<Diagnostic> {
         .map(|count| {
             let removed = count.before - count.after;
             Diagnostic {
-                message: format!(
-                    "Se borraron {removed} tests de este archivo ({} antes, {} ahora); en todo el cambio hay {net} tests menos",
-                    count.before, count.after
-                ),
+                message: Message::Cheat(Cheat::TestsRemoved {
+                    removed,
+                    before: count.before,
+                    after: count.after,
+                    net,
+                }),
                 value: removed,
                 ..base_diagnostic(
                     &count.file,
@@ -199,16 +202,14 @@ fn marker_diagnostic(file: &Inspected<'_>, rule: RuleId, marker: &Marker, occurr
     }
 }
 
-fn marker_message(rule: RuleId, marker: &Marker) -> String {
-    let text = &marker.text;
+fn marker_message(rule: RuleId, marker: &Marker) -> Message {
+    let text = marker.text.clone();
     if marker.kind == MarkerKind::EmptyTest {
-        return format!("El test `{text}` quedó vacío: pasa sin probar nada");
+        return Message::Cheat(Cheat::EmptyTest { name: text });
     }
     match rule {
-        RuleId::TestDisabled => {
-            format!("`{text}` deja tests sin correr: arreglá el test en vez de saltearlo")
-        }
-        RuleId::TypeEscape => format!("`{text}` escapa del sistema de tipos: tipá el valor de verdad"),
+        RuleId::TestDisabled => Message::Cheat(Cheat::TestSkipped { marker: text }),
+        RuleId::TypeEscape => Message::Cheat(Cheat::TypeEscaped { marker: text }),
         RuleId::SuppressionAdded
         | RuleId::FileLength
         | RuleId::FunctionLength
@@ -220,9 +221,7 @@ fn marker_message(rule: RuleId, marker: &Marker) -> String {
         | RuleId::MagicNumber
         | RuleId::ShortName
         | RuleId::DuplicateCode
-        | RuleId::CommentedCode => {
-            format!("Se agregó `{text}`: arreglá la causa, o dejá la excepción en kerbo.toml con su motivo")
-        }
+        | RuleId::CommentedCode => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
     }
 }
 
@@ -233,7 +232,7 @@ fn base_diagnostic(file: &Inspected<'_>, rule: RuleId, line: usize, fingerprint:
         column: FIRST_COLUMN,
         end_line: line,
         rule,
-        message: String::new(),
+        message: Message::Rule(rule),
         value: 1,
         limit: ALLOWED_OCCURRENCES,
         fingerprint,

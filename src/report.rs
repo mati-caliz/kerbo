@@ -2,9 +2,11 @@ use std::io::{self, Write};
 
 use clap::ValueEnum;
 
+use crate::i18n::Lang;
 use crate::rules::Diagnostic;
 
 mod agent;
+mod json;
 mod sarif;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -18,6 +20,7 @@ pub enum Format {
 pub fn render<W: Write + ?Sized>(
     diagnostics: &[Diagnostic],
     format: Format,
+    lang: Lang,
     writer: &mut W,
 ) -> io::Result<()> {
     match format {
@@ -30,20 +33,20 @@ pub fn render<W: Write + ?Sized>(
                     diagnostic.line,
                     diagnostic.column,
                     diagnostic.rule.as_str(),
-                    diagnostic.message
+                    lang.message(&diagnostic.message)
                 )?;
             }
         }
         Format::Json => {
-            serde_json::to_writer(&mut *writer, diagnostics)?;
+            serde_json::to_writer(&mut *writer, &json::document(diagnostics, lang))?;
             writeln!(writer)?;
         }
         Format::Sarif => {
-            serde_json::to_writer(&mut *writer, &sarif::document(diagnostics))?;
+            serde_json::to_writer(&mut *writer, &sarif::document(diagnostics, lang))?;
             writeln!(writer)?;
         }
         Format::Agent => {
-            serde_json::to_writer(&mut *writer, &agent::document(diagnostics))?;
+            serde_json::to_writer(&mut *writer, &agent::document(diagnostics, lang))?;
             writeln!(writer)?;
         }
     }
@@ -55,6 +58,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{Format, render};
+    use crate::i18n::{Lang, Message};
     use crate::rules::{Diagnostic, RuleId};
 
     fn sample() -> Vec<Diagnostic> {
@@ -64,7 +68,11 @@ mod tests {
             column: 1,
             end_line: 9,
             rule: RuleId::ParameterCount,
-            message: "La función `f` recibe 5 parámetros (máximo 4)".to_owned(),
+            message: Message::TooManyParameters {
+                function: "f".to_owned(),
+                count: 5,
+                limit: 4,
+            },
             value: 5,
             limit: 4,
             fingerprint: "parameter-count:src/a.go:f#1".to_owned(),
@@ -76,7 +84,7 @@ mod tests {
     #[test]
     fn renders_one_line_per_problem_as_text() {
         let mut output = Vec::new();
-        render(&sample(), Format::Text, &mut output).expect("se escribe en memoria");
+        render(&sample(), Format::Text, Lang::Spanish, &mut output).expect("se escribe en memoria");
         assert_eq!(
             String::from_utf8_lossy(&output),
             "src/a.go:3:1: parameter-count La función `f` recibe 5 parámetros (máximo 4)\n"
@@ -86,7 +94,7 @@ mod tests {
     #[test]
     fn renders_json_with_stable_rule_ids() {
         let mut output = Vec::new();
-        render(&sample(), Format::Json, &mut output).expect("se escribe en memoria");
+        render(&sample(), Format::Json, Lang::Spanish, &mut output).expect("se escribe en memoria");
         let parsed: serde_json::Value = serde_json::from_slice(&output).expect("es JSON válido");
         assert_eq!(parsed[0]["rule"], "parameter-count");
         assert_eq!(parsed[0]["limit"], 4);
@@ -95,7 +103,7 @@ mod tests {
     #[test]
     fn renders_sarif_that_github_can_read() {
         let mut output = Vec::new();
-        render(&sample(), Format::Sarif, &mut output).expect("se escribe en memoria");
+        render(&sample(), Format::Sarif, Lang::Spanish, &mut output).expect("se escribe en memoria");
         let parsed: serde_json::Value = serde_json::from_slice(&output).expect("es JSON válido");
         assert_eq!(parsed["version"], "2.1.0");
         let run = &parsed["runs"][0];
@@ -126,7 +134,7 @@ mod tests {
         cheating.limit = 0;
         diagnostics.push(cheating);
         let mut output = Vec::new();
-        render(&diagnostics, Format::Agent, &mut output).expect("se escribe en memoria");
+        render(&diagnostics, Format::Agent, Lang::Spanish, &mut output).expect("se escribe en memoria");
         let parsed: serde_json::Value = serde_json::from_slice(&output).expect("es JSON válido");
         assert_eq!(parsed["problems"], 2);
         assert_eq!(parsed["more"], 0);
@@ -139,5 +147,42 @@ mod tests {
             "agrupá los parámetros que viajan juntos en un objeto"
         );
         assert_eq!(parsed["items"][1]["file"], "src/a.go");
+    }
+
+    fn rendered(format: Format, lang: Lang) -> String {
+        let mut output = Vec::new();
+        render(&sample(), format, lang, &mut output).expect("se escribe en memoria");
+        String::from_utf8_lossy(&output).into_owned()
+    }
+
+    #[test]
+    fn english_changes_only_the_text_meant_for_people() {
+        assert_eq!(
+            rendered(Format::Text, Lang::English),
+            "src/a.go:3:1: parameter-count The function `f` takes 5 parameters (maximum 4)\n"
+        );
+        let json: serde_json::Value =
+            serde_json::from_str(&rendered(Format::Json, Lang::English)).expect("es JSON válido");
+        assert_eq!(
+            json[0]["message"],
+            "The function `f` takes 5 parameters (maximum 4)"
+        );
+        assert_eq!(json[0]["fingerprint"], "parameter-count:src/a.go:f#1");
+        let sarif: serde_json::Value =
+            serde_json::from_str(&rendered(Format::Sarif, Lang::English)).expect("es JSON válido");
+        assert_eq!(
+            sarif["runs"][0]["tool"]["driver"]["rules"][4]["shortDescription"]["text"],
+            "The function takes too many parameters"
+        );
+        let english: serde_json::Value =
+            serde_json::from_str(&rendered(Format::Agent, Lang::English)).expect("es JSON válido");
+        let spanish: serde_json::Value =
+            serde_json::from_str(&rendered(Format::Agent, Lang::Spanish)).expect("es JSON válido");
+        assert_eq!(
+            english["items"][0]["fix"],
+            "group the parameters that travel together into an object"
+        );
+        assert_eq!(english["items"][0]["id"], spanish["items"][0]["id"]);
+        assert_eq!(english["explain"], spanish["explain"]);
     }
 }

@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use super::{EXIT_CLEAN, Terminal, write_error};
 use crate::baseline::{BASELINE_FILE, Baseline};
 use crate::config::Config;
-use crate::explain::explain;
+use crate::i18n::{Lang, Problem};
 use crate::rules::Diagnostic;
 use crate::scan::check_text;
 
@@ -20,28 +20,28 @@ const HEX_RADIX: u32 = 16;
 const ESCAPE: u8 = b'%';
 const ESCAPED_WIDTH: usize = 3;
 
-pub fn serve(terminal: &mut Terminal<'_>) -> Result<u8, String> {
+pub fn serve(lang: Lang, terminal: &mut Terminal<'_>) -> Result<u8, Problem> {
     let mut reader = BufReader::new(&mut *terminal.input);
     while let Some(message) = read_message(&mut reader)? {
         let method = message.get("method").and_then(Value::as_str).unwrap_or_default();
         if method == "exit" {
             break;
         }
-        for reply in handle(method, &message) {
+        for reply in handle(method, &message, lang) {
             write_message(terminal.report, &reply).map_err(|error| write_error(&error))?;
         }
     }
     Ok(EXIT_CLEAN)
 }
 
-fn handle(method: &str, message: &Value) -> Vec<Value> {
+fn handle(method: &str, message: &Value, lang: Lang) -> Vec<Value> {
     let id = message.get("id").cloned();
     let text_at = |pointer: &str| message.pointer(pointer).and_then(Value::as_str);
     let uri = text_at("/params/textDocument/uri").unwrap_or_default();
     match method {
         "initialize" => respond(id, &initialize_result()),
         "shutdown" => respond(id, &Value::Null),
-        "textDocument/didOpen" => vec![publish(uri, text_at("/params/textDocument/text"))],
+        "textDocument/didOpen" => vec![publish(uri, text_at("/params/textDocument/text"), lang)],
         "textDocument/didChange" => {
             let text = message
                 .pointer("/params/contentChanges")
@@ -49,13 +49,13 @@ fn handle(method: &str, message: &Value) -> Vec<Value> {
                 .and_then(|changes| changes.last())
                 .and_then(|change| change.get("text"))
                 .and_then(Value::as_str);
-            vec![publish(uri, text)]
+            vec![publish(uri, text, lang)]
         }
-        "textDocument/didSave" => vec![publish(uri, text_at("/params/text"))],
+        "textDocument/didSave" => vec![publish(uri, text_at("/params/text"), lang)],
         "textDocument/didClose" => vec![notification(uri, &[])],
         _ => id.map_or_else(Vec::new, |id| {
-            let error =
-                json!({ "code": METHOD_NOT_FOUND, "message": format!("método desconocido: {method}") });
+            let text = lang.problem(&Problem::UnknownMethod(method.to_owned()));
+            let error = json!({ "code": METHOD_NOT_FOUND, "message": text });
             vec![json!({ "jsonrpc": "2.0", "id": id, "error": error })]
         }),
     }
@@ -77,7 +77,7 @@ fn initialize_result() -> Value {
     })
 }
 
-fn publish(uri: &str, text: Option<&str>) -> Value {
+fn publish(uri: &str, text: Option<&str>, lang: Lang) -> Value {
     let Some(path) = path_from_uri(uri) else {
         return notification(uri, &[]);
     };
@@ -85,7 +85,7 @@ fn publish(uri: &str, text: Option<&str>) -> Value {
     let lines: Vec<&str> = text.lines().collect();
     let diagnostics: Vec<Value> = diagnose(&path, &text)
         .iter()
-        .map(|diagnostic| to_lsp(diagnostic, &lines))
+        .map(|diagnostic| to_lsp(diagnostic, &lines, lang))
         .collect();
     notification(uri, &diagnostics)
 }
@@ -110,7 +110,7 @@ fn notification(uri: &str, diagnostics: &[Value]) -> Value {
     })
 }
 
-fn to_lsp(diagnostic: &Diagnostic, lines: &[&str]) -> Value {
+fn to_lsp(diagnostic: &Diagnostic, lines: &[&str], lang: Lang) -> Value {
     let line = diagnostic.line.saturating_sub(1);
     let text = lines.get(line).copied().unwrap_or_default();
     let start = utf16_column(text, diagnostic.column.saturating_sub(1));
@@ -122,7 +122,11 @@ fn to_lsp(diagnostic: &Diagnostic, lines: &[&str]) -> Value {
         "severity": WARNING,
         "source": "kerbo",
         "code": diagnostic.rule.as_str(),
-        "message": format!("{} — {}", diagnostic.message, explain(diagnostic.rule).fix),
+        "message": format!(
+            "{} — {}",
+            lang.message(&diagnostic.message),
+            lang.explain(diagnostic.rule).fix
+        ),
     })
 }
 
@@ -154,13 +158,13 @@ fn path_from_uri(uri: &str) -> Option<PathBuf> {
     String::from_utf8(decoded).ok().map(PathBuf::from)
 }
 
-fn read_message(reader: &mut impl BufRead) -> Result<Option<Value>, String> {
+fn read_message(reader: &mut impl BufRead) -> Result<Option<Value>, Problem> {
     let mut length: Option<usize> = None;
     loop {
         let mut header = String::new();
         let read = reader
             .read_line(&mut header)
-            .map_err(|error| format!("no se pudo leer del editor: {error}"))?;
+            .map_err(|error| Problem::ReadEditor(error.to_string()))?;
         if read == 0 {
             return Ok(None);
         }
@@ -172,14 +176,14 @@ fn read_message(reader: &mut impl BufRead) -> Result<Option<Value>, String> {
             length = value.trim().parse().ok();
         }
     }
-    let length = length.ok_or("falta el encabezado Content-Length")?;
+    let length = length.ok_or(Problem::MissingContentLength)?;
     let mut body = vec![0; length];
     reader
         .read_exact(&mut body)
-        .map_err(|error| format!("mensaje incompleto: {error}"))?;
+        .map_err(|error| Problem::IncompleteMessage(error.to_string()))?;
     serde_json::from_slice(&body)
         .map(Some)
-        .map_err(|error| format!("el mensaje no es JSON válido: {error}"))
+        .map_err(|error| Problem::InvalidMessage(error.to_string()))
 }
 
 fn write_message(writer: &mut dyn Write, message: &Value) -> std::io::Result<()> {

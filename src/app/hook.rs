@@ -8,8 +8,8 @@ use crate::baseline::{BASELINE_FILE, Baseline};
 use crate::cli::HookArgs;
 use crate::config::Config;
 use crate::diff::ChangedLines;
-use crate::explain::explain;
 use crate::guard::{GuardRequest, inspect};
+use crate::i18n::{Lang, Notice, Problem, Text};
 use crate::language::Language;
 use crate::rules::Diagnostic;
 use crate::scan::{ScanRequest, scan};
@@ -29,14 +29,19 @@ struct ToolInput {
     file_path: Option<PathBuf>,
 }
 
-pub fn run(arguments: &HookArgs, directory: &Path, terminal: &mut Terminal<'_>) -> Result<u8, String> {
+pub fn run(
+    arguments: &HookArgs,
+    directory: &Path,
+    lang: Lang,
+    terminal: &mut Terminal<'_>,
+) -> Result<u8, Problem> {
     let mut text = String::new();
     terminal
         .input
         .read_to_string(&mut text)
-        .map_err(|error| format!("no se pudo leer el evento: {error}"))?;
+        .map_err(|error| Problem::ReadEvent(error.to_string()))?;
     let event: HookEvent =
-        serde_json::from_str(&text).map_err(|error| format!("el evento no es JSON válido: {error}"))?;
+        serde_json::from_str(&text).map_err(|error| Problem::InvalidEvent(error.to_string()))?;
     let base = event.cwd.unwrap_or_else(|| directory.to_path_buf());
     let Some(file) = event
         .tool_input
@@ -52,13 +57,13 @@ pub fn run(arguments: &HookArgs, directory: &Path, terminal: &mut Terminal<'_>) 
     if diagnostics.is_empty() {
         return Ok(EXIT_CLEAN);
     }
-    write_feedback(&diagnostics, terminal.log).map_err(|error| write_error(&error))?;
+    write_feedback(&diagnostics, lang, terminal.log).map_err(|error| write_error(&error))?;
     Ok(FEEDBACK_FOR_AGENT)
 }
 
-fn review(file: &Path, arguments: &HookArgs) -> Result<Vec<Diagnostic>, String> {
+fn review(file: &Path, arguments: &HookArgs) -> Result<Vec<Diagnostic>, Problem> {
     let start = file.parent().unwrap_or(file);
-    let config = Config::load(arguments.config.as_deref(), start).map_err(|error| error.to_string())?;
+    let config = Config::load(arguments.config.as_deref(), start)?;
     let roots = [file.to_path_buf()];
     let outcome = scan(&ScanRequest {
         roots: &roots,
@@ -93,12 +98,11 @@ fn review(file: &Path, arguments: &HookArgs) -> Result<Vec<Diagnostic>, String> 
     }
 }
 
-fn write_feedback(diagnostics: &[Diagnostic], log: &mut dyn Write) -> std::io::Result<()> {
-    writeln!(
-        log,
-        "kerbo: {} problemas en lo que acabás de editar:",
-        diagnostics.len()
-    )?;
+fn write_feedback(diagnostics: &[Diagnostic], lang: Lang, log: &mut dyn Write) -> std::io::Result<()> {
+    let header = Notice::HookHeader {
+        count: diagnostics.len(),
+    };
+    writeln!(log, "kerbo: {}", lang.notice(&header))?;
     for diagnostic in diagnostics {
         writeln!(
             log,
@@ -106,9 +110,9 @@ fn write_feedback(diagnostics: &[Diagnostic], log: &mut dyn Write) -> std::io::R
             diagnostic.relative_path,
             diagnostic.line,
             diagnostic.rule.as_str(),
-            diagnostic.message,
-            explain(diagnostic.rule).fix
+            lang.message(&diagnostic.message),
+            lang.explain(diagnostic.rule).fix
         )?;
     }
-    writeln!(log, "Más detalle: kerbo explain <regla>")
+    writeln!(log, "{}", lang.text(Text::HookMoreDetail))
 }

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use tree_sitter::Parser;
 
 use super::{DuplicateUnits, PooledFile, duplicate_units, find_duplicates, image_hash};
+use crate::i18n::Lang;
 use crate::language::Language;
 use crate::profile::DuplicateStyle;
 use crate::rules::{FileIdentity, RuleId};
@@ -121,7 +122,11 @@ fn reports_every_copy_of_a_block_longer_than_the_limit() {
             .iter()
             .all(|diagnostic| diagnostic.rule == RuleId::DuplicateCode)
     );
-    assert!(diagnostics[0].message.contains("B.java:1"));
+    assert!(
+        Lang::Spanish
+            .message(&diagnostics[0].message)
+            .contains("B.java:1")
+    );
 }
 
 #[test]
@@ -230,7 +235,7 @@ fn go_reports_each_copy_of_a_repeated_function_with_its_lines() {
         vec![("p/a.go", 1, 11), ("p/b.go", 1, 11)],
         "dos archivos iguales: el bloque es el archivo entero, desde `package`"
     );
-    assert!(diagnostics[0].message.contains("nodos"));
+    assert!(Lang::Spanish.message(&diagnostics[0].message).contains("nodos"));
 }
 
 #[test]

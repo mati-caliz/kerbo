@@ -11,3 +11,21 @@
 - Licencia del núcleo: Apache 2.0, gratis también para uso comercial. Plan pago para equipos
   más adelante.
 - Lista de espera y pruebas piloto: lantix.argentina@gmail.com
+- Mensajes del CLI en español o inglés: `--lang`, `lang` en `kerbo.toml` o el locale del sistema.
+
+## Páginas
+
+- [Sitio en español](https://kerbo.matiascaliz.com.ar/)
+- [README en español](https://github.com/mati-caliz/kerbo/blob/main/README.md)
+- [Hoja de ruta](https://github.com/mati-caliz/kerbo/blob/main/ROADMAP.md)
+
+## English
+
+> Multi-language code quality analyzer (Java, TypeScript/JavaScript, Python, Go and Rust) in a
+> single binary written in Rust. It replaces Checkstyle, PMD, ESLint, ruff, golangci-lint and
+> clippy with the same rules and a single report, and adds guardrails for code written by AI
+> agents. CLI messages in English with `--lang en`, `lang = "en"` in `kerbo.toml` or an English
+> system locale.
+
+- [English site](https://kerbo.matiascaliz.com.ar/en/)
+- [README in English](https://github.com/mati-caliz/kerbo/blob/main/README.en.md)

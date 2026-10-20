@@ -4,6 +4,7 @@ use std::path::Path;
 
 use crate::config::Config;
 use crate::diff::{ChangedLines, Changes};
+use crate::i18n::{Cheat, Message};
 use crate::language::Language;
 use crate::rules::{Diagnostic, RuleId};
 
@@ -334,10 +335,10 @@ fn diagnostic(path: &Path, relative: &str, loosening: &Loosening, occurrence: us
         column: FIRST_COLUMN,
         end_line: line,
         rule: RuleId::SuppressionAdded,
-        message: format!(
-            "Se aflojó un umbral: `{}` pasó a `{}`. Arreglá el código en vez de bajar la vara",
-            old.shown, new.shown
-        ),
+        message: Message::Cheat(Cheat::ThresholdLoosened {
+            old: old.shown.clone(),
+            new: new.shown.clone(),
+        }),
         value: LOOSENED,
         limit: ALLOWED_OCCURRENCES,
         fingerprint: format!("suppression-added:{relative}:{}#{occurrence}", new.key),

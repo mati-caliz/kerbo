@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::i18n::Problem;
 use crate::rules::Diagnostic;
 
 const NEW_FILE_PREFIX: &str = "+++ ";
@@ -39,7 +40,7 @@ struct ParsedDiff {
 }
 
 impl ChangedLines {
-    pub fn since(reference: &str, directory: &Path) -> Result<Self, String> {
+    pub fn since(reference: &str, directory: &Path) -> Result<Self, Problem> {
         let root = PathBuf::from(git(directory, &["rev-parse", "--show-toplevel"])?.trim());
         let diff = git(
             &root,
@@ -109,19 +110,18 @@ impl Changes {
     }
 }
 
-fn git(directory: &Path, arguments: &[&str]) -> Result<String, String> {
+fn git(directory: &Path, arguments: &[&str]) -> Result<String, Problem> {
     let output = Command::new("git")
         .arg("-C")
         .arg(directory)
         .args(arguments)
         .output()
-        .map_err(|error| format!("no se pudo correr git: {error}"))?;
+        .map_err(|error| Problem::GitUnavailable(error.to_string()))?;
     if !output.status.success() {
-        return Err(format!(
-            "git {}: {}",
-            arguments.join(" "),
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+        return Err(Problem::GitFailed {
+            command: arguments.join(" "),
+            detail: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+        });
     }
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }

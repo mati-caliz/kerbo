@@ -1,5 +1,7 @@
 # kerbo
 
+Español · [English](README.en.md)
+
 Analizador de calidad de código para **Java, TypeScript/JavaScript, Python, Go y Rust** en un solo
 binario. Aplica las mismas reglas en todos los lenguajes, en segundos y con pocos megas de
 memoria, y cuenta igual que la herramienta que ya usás en cada uno (ESLint, ruff, Checkstyle y
@@ -54,6 +56,11 @@ archivos, como los bloques duplicados, se recombina con lo guardado). Vive en la
 del usuario (`~/.cache/kerbo`, `~/Library/Caches/kerbo` o `%LOCALAPPDATA%\kerbo`; otra con
 `KERBO_CACHE_DIR`), se comparte entre proyectos y clones, ocupa como mucho 256 MB y se descarta
 sola cuando cambia el binario o la configuración que afecta a un archivo. Si se rompe, se ignora.
+
+Los mensajes salen en español o en inglés. Manda `--lang en` (o `es`), después `lang` en
+`kerbo.toml` y después el locale del sistema (`LC_ALL`, `LC_MESSAGES`, `LANG`); sin nada de eso,
+español. El idioma sólo cambia el texto para personas: los identificadores de reglas, los `id`
+estables y la forma del JSON, de SARIF y de `--format agent` son los mismos.
 
 ### Adoptarlo en un repo que ya existe
 
@@ -132,6 +139,7 @@ nada se afloja en silencio.
 
 ```toml
 preset = "recommended"            # strict (de fábrica), recommended o minimal
+lang = "es"                       # opcional: es o en; si falta, el del sistema
 
 [[limits]]                        # un umbral para todos los lenguajes, o para uno
 rule = "cyclomatic-complexity"
@@ -229,6 +237,9 @@ desalojo del menos usado; cada entrada va comprimida con LZ4 y con su suma de co
 escribe a un temporal que se renombra. Lo que en el futuro dependa de más de un archivo (por
 ejemplo, las `macro_rules!` del crate para Rust) suma su huella a la clave y guarda lo suyo como
 otro tipo de entrada en el mismo almacén.
+
+Los textos del CLI (reporte, `explain`, errores, hook, MCP y LSP) viven en un catálogo tipado en
+`src/i18n/`, uno por idioma; el compilador asegura que cada mensaje exista en los dos.
 
 ## Desarrollo
 

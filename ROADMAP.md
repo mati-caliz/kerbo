@@ -215,7 +215,8 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     workflow de release no corrió nunca en GitHub Actions.
   - El sitio todavía dice que en macOS y Windows se instala con `cargo install --git`.
   - Binario para Windows ARM e instalador en PowerShell para quien no tiene el bash de Git.
-- Mensajes, README y sitio en inglés además de español.
+- Mensajes, README y sitio en inglés además de español (hecho: `--lang`, `lang` en `kerbo.toml`
+  o el locale del sistema, con español por defecto; `README.en.md` y el sitio en `/en/`).
 
 ### 7. Caché y rendimiento
 

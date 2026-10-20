@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 
-use crate::explain::explain;
+use crate::i18n::Lang;
 use crate::rules::{Diagnostic, RuleId};
 
 const SHOWN_LIMIT: usize = 30;
@@ -11,13 +11,13 @@ const CHEATING_RULES: [RuleId; 4] = [
     RuleId::TypeEscape,
 ];
 
-pub(super) fn document(diagnostics: &[Diagnostic]) -> Value {
+pub(super) fn document(diagnostics: &[Diagnostic], lang: Lang) -> Value {
     let mut ordered: Vec<&Diagnostic> = diagnostics.iter().collect();
     ordered.sort_by_key(|diagnostic| std::cmp::Reverse(priority(diagnostic)));
     let shown: Vec<Value> = ordered
         .iter()
         .take(SHOWN_LIMIT)
-        .map(|diagnostic| item(diagnostic))
+        .map(|diagnostic| item(diagnostic, lang))
         .collect();
     json!({
         "problems": diagnostics.len(),
@@ -34,7 +34,7 @@ fn priority(diagnostic: &Diagnostic) -> (bool, usize) {
     (cheating, excess)
 }
 
-fn item(diagnostic: &Diagnostic) -> Value {
+fn item(diagnostic: &Diagnostic, lang: Lang) -> Value {
     json!({
         "id": diagnostic.fingerprint,
         "file": diagnostic.relative_path,
@@ -43,6 +43,6 @@ fn item(diagnostic: &Diagnostic) -> Value {
         "rule": diagnostic.rule.as_str(),
         "value": diagnostic.value,
         "max": diagnostic.limit,
-        "fix": explain(diagnostic.rule).fix,
+        "fix": lang.explain(diagnostic.rule).fix,
     })
 }

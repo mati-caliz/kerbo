@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::{ChangedLines, Changes, LineRange, new_side_range, parse_unified_diff};
+use crate::i18n::Message;
 use crate::rules::{Diagnostic, RuleId};
 use crate::test_support::TempTree;
 
@@ -27,7 +28,7 @@ fn diagnostic(absolute: &Path, line: usize, end_line: usize) -> Diagnostic {
         column: 1,
         end_line,
         rule: RuleId::FunctionLength,
-        message: String::new(),
+        message: Message::Rule(RuleId::FunctionLength),
         value: 1,
         limit: 0,
         fingerprint: String::new(),

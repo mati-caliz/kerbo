@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use super::{FileIdentity, RuleId, evaluate};
 use crate::analysis::FileAnalysis;
+use crate::i18n::{Lang, Problem};
 use crate::language::Language;
 use crate::limits::{Limits, Preset};
 use crate::metrics::FunctionMetrics;
@@ -54,9 +55,9 @@ fn reports_every_limit_exceeded_with_its_value() {
             RuleId::ParameterCount,
         ]
     );
-    let messages: Vec<&str> = diagnostics
+    let messages: Vec<String> = diagnostics
         .iter()
-        .map(|diagnostic| diagnostic.message.as_str())
+        .map(|diagnostic| Lang::Spanish.message(&diagnostic.message))
         .collect();
     assert_eq!(
         messages,
@@ -165,7 +166,10 @@ fn values_at_the_limit_pass() {
 fn rule_ids_round_trip_and_describe_themselves() {
     for rule in RuleId::ALL {
         assert_eq!(rule.as_str().parse::<RuleId>(), Ok(rule));
-        assert_ne!(rule.description(), "");
+        assert_ne!(Lang::Spanish.describe(rule), Lang::English.describe(rule));
     }
-    assert!("nope".parse::<RuleId>().is_err());
+    assert_eq!(
+        "nope".parse::<RuleId>(),
+        Err(Problem::UnknownRule("nope".to_owned()))
+    );
 }

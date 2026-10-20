@@ -1,75 +1,79 @@
-use std::path::PathBuf;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, CommandFactory, FromArgMatches, Parser, Subcommand};
 
+use crate::i18n::{Lang, Problem, Text};
 use crate::language::Stack;
 use crate::limits::LimitOverride;
 use crate::report::Format;
 use crate::rules::RuleId;
 
+const CHECK_COMMAND: &str = "check";
+const BASELINE_COMMAND: &str = "baseline";
+const EXPLAIN_COMMAND: &str = "explain";
+const HOOK_COMMAND: &str = "hook";
+const MCP_COMMAND: &str = "mcp";
+const LSP_COMMAND: &str = "lsp";
+const LANG_ARGUMENT: &str = "lang";
+const RULE_ARGUMENT: &str = "rule";
+const CONFIG_ARGUMENT: &str = "config";
+const PATHS_ARGUMENT: &str = "paths";
+const LANGUAGES_ARGUMENT: &str = "languages";
+const OVERRIDES_ARGUMENT: &str = "overrides";
+const FORMAT_ARGUMENT: &str = "format";
+const DIFF_ARGUMENT: &str = "diff";
+const NO_BASELINE_ARGUMENT: &str = "no_baseline";
+
 #[derive(Debug, Parser)]
-#[command(name = "kerbo", version, about = "Analizador de calidad multi-lenguaje")]
+#[command(name = "kerbo", version)]
 pub struct Cli {
+    #[arg(long, global = true, value_enum)]
+    pub lang: Option<Lang>,
     #[command(subcommand)]
     pub command: Command,
 }
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    #[command(about = "Analiza los archivos y lista los problemas")]
     Check(CheckArgs),
-    #[command(
-        about = "Guarda los problemas actuales como línea de base: después sólo se reportan los nuevos"
-    )]
     Baseline(ScanArgs),
-    #[command(about = "Explica una regla: por qué existe y cómo se arregla")]
     Explain {
-        #[arg(help = "La regla, por ejemplo cognitive-complexity")]
+        #[arg(value_parser = localized_parser::<RuleId>(Lang::default()))]
         rule: RuleId,
     },
-    #[command(
-        about = "Hook para agentes: revisa el archivo recién editado (lee el evento de Claude Code por stdin)"
-    )]
     Hook(HookArgs),
-    #[command(about = "Servidor MCP por stdio: herramientas kerbo_check y kerbo_explain para agentes")]
     Mcp,
-    #[command(
-        about = "Servidor LSP por stdio: los problemas en el editor mientras escribís (IntelliJ, VS Code, Neovim)"
-    )]
     Lsp,
+}
+
+impl Command {
+    pub fn config(&self) -> Option<&Path> {
+        match self {
+            Self::Check(arguments) => arguments.scan.config.as_deref(),
+            Self::Baseline(arguments) => arguments.config.as_deref(),
+            Self::Hook(arguments) => arguments.config.as_deref(),
+            Self::Explain { .. } | Self::Mcp | Self::Lsp => None,
+        }
+    }
 }
 
 #[derive(Debug, Args)]
 pub struct HookArgs {
-    #[arg(
-        long,
-        value_name = "ARCHIVO",
-        help = "Usa esta configuración en vez de buscar kerbo.toml"
-    )]
+    #[arg(long)]
     pub config: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
 pub struct ScanArgs {
-    #[arg(default_value = ".", help = "Archivos o carpetas a analizar")]
+    #[arg(default_value = ".")]
     pub paths: Vec<PathBuf>,
-    #[arg(
-        long = "language",
-        value_enum,
-        help = "Analizar sólo estas pilas (se puede repetir)"
-    )]
+    #[arg(long = "language", value_enum)]
     pub languages: Vec<Stack>,
-    #[arg(
-        long = "max",
-        value_name = "REGLA=VALOR",
-        help = "Cambia el máximo de una regla en todos los lenguajes, también en los tests (se puede repetir)"
-    )]
+    #[arg(long = "max", value_parser = localized_parser::<LimitOverride>(Lang::default()))]
     pub overrides: Vec<LimitOverride>,
-    #[arg(
-        long,
-        value_name = "ARCHIVO",
-        help = "Usa esta configuración en vez de buscar kerbo.toml"
-    )]
+    #[arg(long)]
     pub config: Option<PathBuf>,
     #[arg(long, help = "Analiza todo de cero, sin leer ni escribir la caché")]
     pub no_cache: bool,
@@ -79,14 +83,85 @@ pub struct ScanArgs {
 pub struct CheckArgs {
     #[command(flatten)]
     pub scan: ScanArgs,
-    #[arg(long, value_enum, default_value_t = Format::Text, help = "Formato de salida")]
+    #[arg(long, value_enum, default_value_t = Format::Text)]
     pub format: Format,
-    #[arg(
-        long,
-        value_name = "REFERENCIA",
-        help = "Sólo los problemas en líneas cambiadas desde esta referencia de git"
-    )]
+    #[arg(long)]
     pub diff: Option<String>,
-    #[arg(long, help = "Reporta también lo que está en la línea de base")]
+    #[arg(long)]
     pub no_baseline: bool,
 }
+
+pub fn try_parse<Argument>(
+    lang: Lang,
+    arguments: impl IntoIterator<Item = Argument>,
+) -> Result<Cli, clap::Error>
+where
+    Argument: Into<OsString> + Clone,
+{
+    let matches = command(lang).try_get_matches_from(arguments)?;
+    Cli::from_arg_matches(&matches)
+}
+
+pub fn command(lang: Lang) -> clap::Command {
+    Cli::command()
+        .about(lang.text(Text::AboutKerbo))
+        .mut_arg(LANG_ARGUMENT, |arg| arg.help(lang.text(Text::HelpLang)))
+        .mut_subcommand(CHECK_COMMAND, |check| {
+            scan_command(check, lang)
+                .about(lang.text(Text::AboutCheck))
+                .mut_arg(FORMAT_ARGUMENT, |arg| arg.help(lang.text(Text::HelpFormat)))
+                .mut_arg(DIFF_ARGUMENT, |arg| {
+                    arg.help(lang.text(Text::HelpDiff))
+                        .value_name(lang.text(Text::ValueReference))
+                })
+                .mut_arg(NO_BASELINE_ARGUMENT, |arg| {
+                    arg.help(lang.text(Text::HelpNoBaseline))
+                })
+        })
+        .mut_subcommand(BASELINE_COMMAND, |baseline| {
+            scan_command(baseline, lang).about(lang.text(Text::AboutBaseline))
+        })
+        .mut_subcommand(EXPLAIN_COMMAND, |explain| {
+            explain
+                .about(lang.text(Text::AboutExplain))
+                .mut_arg(RULE_ARGUMENT, |arg| {
+                    arg.help(lang.text(Text::HelpRule))
+                        .value_parser(localized_parser::<RuleId>(lang))
+                })
+        })
+        .mut_subcommand(HOOK_COMMAND, |hook| {
+            config_argument(hook, lang).about(lang.text(Text::AboutHook))
+        })
+        .mut_subcommand(MCP_COMMAND, |mcp| mcp.about(lang.text(Text::AboutMcp)))
+        .mut_subcommand(LSP_COMMAND, |lsp| lsp.about(lang.text(Text::AboutLsp)))
+}
+
+fn scan_command(command: clap::Command, lang: Lang) -> clap::Command {
+    config_argument(command, lang)
+        .mut_arg(PATHS_ARGUMENT, |arg| arg.help(lang.text(Text::HelpPaths)))
+        .mut_arg(LANGUAGES_ARGUMENT, |arg| arg.help(lang.text(Text::HelpLanguages)))
+        .mut_arg(OVERRIDES_ARGUMENT, |arg| {
+            arg.help(lang.text(Text::HelpMax))
+                .value_name(lang.text(Text::ValueRuleLimit))
+                .value_parser(localized_parser::<LimitOverride>(lang))
+        })
+}
+
+fn config_argument(command: clap::Command, lang: Lang) -> clap::Command {
+    command.mut_arg(CONFIG_ARGUMENT, |arg| {
+        arg.help(lang.text(Text::HelpConfig))
+            .value_name(lang.text(Text::ValueFile))
+    })
+}
+
+fn localized_parser<Value>(
+    lang: Lang,
+) -> impl Fn(&str) -> Result<Value, String> + Clone + Send + Sync + 'static
+where
+    Value: FromStr<Err = Problem> + Clone + Send + Sync + 'static,
+{
+    move |text: &str| text.parse().map_err(|problem| lang.problem(&problem))
+}
+
+#[cfg(test)]
+mod tests;

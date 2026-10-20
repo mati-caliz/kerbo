@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use super::Config;
+use crate::i18n::Lang;
 use crate::language::Language;
 use crate::rules::RuleId;
 use crate::test_support::TempTree;
@@ -37,7 +38,21 @@ fn load(contents: &str) -> Result<Config, String> {
     let tree = TempTree::new(&format!("config-{}", contents.len()));
     tree.write("kerbo.toml", contents);
     tree.write("src/deep/a.ts", "");
-    Config::load(None, &tree.path().join("src/deep")).map_err(|error| error.to_string())
+    Config::load(None, &tree.path().join("src/deep")).map_err(|problem| Lang::Spanish.problem(&problem))
+}
+
+#[test]
+fn reads_the_language_of_the_messages() {
+    assert_eq!(
+        load("lang = \"en\"\n").map(|config| config.lang()),
+        Ok(Some(Lang::English))
+    );
+    assert_eq!(
+        load("lang = \"es\"\n").map(|config| config.lang()),
+        Ok(Some(Lang::Spanish))
+    );
+    assert_eq!(load("").map(|config| config.lang()), Ok(None));
+    assert!(load("lang = \"fr\"\n").is_err());
 }
 
 #[test]

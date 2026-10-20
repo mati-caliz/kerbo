@@ -1,30 +1,22 @@
-use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 
+use crate::i18n::{Lang, Problem};
 use crate::language::{Language, Stack};
 use crate::limits::{Limits, Preset};
 use crate::rules::RuleId;
 
 pub const CONFIG_FILE: &str = "kerbo.toml";
 
-#[derive(Debug)]
-pub struct ConfigError(String);
-
-impl fmt::Display for ConfigError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.0)
-    }
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawConfig {
     #[serde(default)]
     preset: Preset,
+    lang: Option<Lang>,
     #[serde(default)]
     limits: Vec<RawLimit>,
     #[serde(default)]
@@ -80,10 +72,11 @@ pub struct Config {
     exceptions: Vec<Exception>,
     ignored: GlobSet,
     deviations: usize,
+    lang: Option<Lang>,
 }
 
 impl Config {
-    pub fn load(explicit: Option<&Path>, start: &Path) -> Result<Self, ConfigError> {
+    pub fn load(explicit: Option<&Path>, start: &Path) -> Result<Self, Problem> {
         let found = explicit.map(Path::to_path_buf).or_else(|| {
             start
                 .ancestors()
@@ -93,8 +86,8 @@ impl Config {
         let Some(path) = found else {
             return Ok(Self::defaults(start.to_path_buf()));
         };
-        let text = fs::read_to_string(&path).map_err(|error| fail(&path, &error.to_string()))?;
-        let raw: RawConfig = toml::from_str(&text).map_err(|error| fail(&path, &error.to_string()))?;
+        let text = fs::read_to_string(&path).map_err(|error| unreadable(&path, error.to_string()))?;
+        let raw: RawConfig = toml::from_str(&text).map_err(|error| unreadable(&path, error.to_string()))?;
         let root = path
             .parent()
             .map_or_else(|| start.to_path_buf(), Path::to_path_buf);
@@ -109,10 +102,11 @@ impl Config {
             exceptions: Vec::new(),
             ignored: GlobSet::empty(),
             deviations: 0,
+            lang: None,
         }
     }
 
-    fn from_raw(raw: RawConfig, root: PathBuf, source: &Path) -> Result<Self, ConfigError> {
+    fn from_raw(raw: RawConfig, root: PathBuf, source: &Path) -> Result<Self, Problem> {
         let reasons = raw
             .limits
             .iter()
@@ -120,10 +114,9 @@ impl Config {
             .chain(raw.exceptions.iter().map(|exception| &exception.reason))
             .chain(raw.ignore.iter().map(|ignore| &ignore.reason));
         if reasons.clone().any(|reason| reason.trim().is_empty()) {
-            return Err(fail(
-                source,
-                "cada ajuste necesita un `reason` que diga por qué se afloja",
-            ));
+            return Err(Problem::MissingReason {
+                path: source.display().to_string(),
+            });
         }
         let deviations = reasons.count();
         let exceptions = raw
@@ -146,8 +139,13 @@ impl Config {
             exceptions,
             ignored: glob_set(&ignore_paths, source)?,
             deviations,
+            lang: raw.lang,
             root,
         })
+    }
+
+    pub const fn lang(&self) -> Option<Lang> {
+        self.lang
     }
 
     pub fn root(&self) -> &Path {
@@ -182,12 +180,11 @@ impl Config {
     }
 }
 
-fn exception(raw: &RawException, source: &Path) -> Result<Exception, ConfigError> {
+fn exception(raw: &RawException, source: &Path) -> Result<Exception, Problem> {
     if raw.rule.is_none() && raw.max.is_some() {
-        return Err(fail(
-            source,
-            "una excepción con `max` tiene que nombrar la `rule`",
-        ));
+        return Err(Problem::MaxWithoutRule {
+            path: source.display().to_string(),
+        });
     }
     Ok(Exception {
         paths: glob_set(&raw.paths, source)?,
@@ -196,18 +193,26 @@ fn exception(raw: &RawException, source: &Path) -> Result<Exception, ConfigError
     })
 }
 
-fn glob_set(patterns: &[String], source: &Path) -> Result<GlobSet, ConfigError> {
+fn glob_set(patterns: &[String], source: &Path) -> Result<GlobSet, Problem> {
     let mut builder = GlobSetBuilder::new();
     for pattern in patterns {
-        let glob =
-            Glob::new(pattern).map_err(|error| fail(source, &format!("patrón `{pattern}`: {error}")))?;
+        let glob = Glob::new(pattern).map_err(|error| Problem::InvalidPattern {
+            path: source.display().to_string(),
+            pattern: pattern.clone(),
+            detail: error.to_string(),
+        })?;
         builder.add(glob);
     }
-    builder.build().map_err(|error| fail(source, &error.to_string()))
+    builder
+        .build()
+        .map_err(|error| unreadable(source, error.to_string()))
 }
 
-fn fail(path: &Path, detail: &str) -> ConfigError {
-    ConfigError(format!("{}: {detail}", path.display()))
+fn unreadable(path: &Path, detail: String) -> Problem {
+    Problem::Unreadable {
+        path: path.display().to_string(),
+        detail,
+    }
 }
 
 #[cfg(test)]

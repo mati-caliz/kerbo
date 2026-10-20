@@ -5,6 +5,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::Problem;
 use crate::rules::Diagnostic;
 
 pub const BASELINE_FILE: &str = "kerbo-baseline.json";
@@ -34,20 +35,23 @@ pub struct Filtered {
 }
 
 impl Baseline {
-    pub fn load(path: &Path) -> Result<Option<Self>, String> {
+    pub fn load(path: &Path) -> Result<Option<Self>, Problem> {
+        let unreadable = |detail: String| Problem::Unreadable {
+            path: path.display().to_string(),
+            detail,
+        };
         let text = match fs::read_to_string(path) {
             Ok(text) => text,
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(format!("{}: {error}", path.display())),
+            Err(error) => return Err(unreadable(error.to_string())),
         };
         let file: BaselineFile =
-            serde_json::from_str(&text).map_err(|error| format!("{}: {error}", path.display()))?;
+            serde_json::from_str(&text).map_err(|error| unreadable(error.to_string()))?;
         if file.version != FORMAT_VERSION {
-            return Err(format!(
-                "{}: versión {} desconocida",
-                path.display(),
-                file.version
-            ));
+            return Err(Problem::UnknownBaselineVersion {
+                path: path.display().to_string(),
+                version: file.version,
+            });
         }
         let known = file
             .problems
@@ -95,6 +99,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{BASELINE_FILE, Baseline};
+    use crate::i18n::Message;
     use crate::rules::{Diagnostic, RuleId};
     use crate::test_support::TempTree;
 
@@ -105,7 +110,7 @@ mod tests {
             column: 1,
             end_line: 2,
             rule: RuleId::CyclomaticComplexity,
-            message: String::new(),
+            message: Message::Rule(RuleId::CyclomaticComplexity),
             value,
             limit: 10,
             fingerprint: fingerprint.to_owned(),
