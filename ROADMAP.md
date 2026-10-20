@@ -369,8 +369,16 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   - El hook y el editor todavía no la usan; la necesitan cuando llegue el expansor de macros.
   - La memoria en caliente de Guava (202 MB) es casi toda tokens de CPD recombinados enteros:
     guardar la huella de cada archivo y recombinar sólo los grupos que tocan lo que cambió.
-- Perfilar la corrida en frío de VS Code: 34 s con 126 a 145 s de CPU para 15.395 archivos es
-  mucho más que lo medido en el resto; alguna regla o algún archivo pesa de más.
+- Perfilar la corrida en frío de VS Code (hecho, 2026-10-20, con el VS Code de ese día: 15.407
+  archivos y 203 MB de código). Pesaban las funciones repetidas de TypeScript
+  (no-identical-functions): cada función se comparaba con todas las anteriores y en cada
+  comparación se volvían a sacar los tokens de las dos, cuadrático en funciones por archivo;
+  `agentService.ts` (750 KB) tardaba 4,4 s y ahora 0,26 s. Ahora cada cuerpo se tokeniza una vez y
+  se busca por tipo y tokens en un mapa. Sin caché, en 4 núcleos y con el mismo reporte (84.292
+  problemas): de 36,2 s y 140 s de CPU a 25,6 s y 99 s. Lo que queda es parejo, unos 0,5 s de CPU
+  por MB (la mitad que Guava por MB), y el archivo más pesado es un fixture de 8 MB
+  (`test-checker.ts`, 2,7 s, casi todo el parseo y las métricas). Los números de la tabla de arriba
+  son de antes del arreglo.
 - El gate en un checkout de Windows con `core.autocrlf=true` (hecho: el `.gitattributes` deja los
   archivos de texto con LF, y el README dice que desde Git Bash se corre con
   `MSYS_NO_PATHCONV=1`, porque el script se copia de afuera y no se edita). Un checkout hecho

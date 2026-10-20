@@ -1,5 +1,8 @@
 mod branches;
 
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+
 use tree_sitter::Node;
 
 use super::{FNV_OFFSET, fnv, image_hash};
@@ -141,37 +144,35 @@ fn is_checked_function(node: Node<'_>) -> bool {
         })
 }
 
-struct Candidate<'tree> {
-    function: Node<'tree>,
-    body: Node<'tree>,
-}
+type BodyShape = (String, Vec<u64>);
 
 fn repeated_functions(context: &Context<'_>, nodes: &[Node<'_>]) -> Vec<RepeatedBlock> {
-    let candidates: Vec<Candidate<'_>> = nodes
-        .iter()
-        .copied()
-        .filter(|&node| is_checked_function(node))
-        .filter_map(|function| {
-            let body = unparenthesized(function.child_by_field_name("body")?);
-            is_big_enough(&tokens(body, context.source), context.min_lines)
-                .then_some(Candidate { function, body })
-        })
-        .collect();
+    let mut first_with_shape: HashMap<BodyShape, Node<'_>> = HashMap::new();
     let mut found = Vec::new();
-    for (index, candidate) in candidates.iter().enumerate() {
-        let original = candidates
-            .iter()
-            .take(index)
-            .find(|earlier| equivalent(candidate.body, earlier.body, context.source));
-        if let Some(earlier) = original {
-            found.push(RepeatedBlock {
+    for function in nodes.iter().copied().filter(|&node| is_checked_function(node)) {
+        let Some(body) = function.child_by_field_name("body").map(unparenthesized) else {
+            continue;
+        };
+        let body_tokens = tokens(body, context.source);
+        if !is_big_enough(&body_tokens, context.min_lines) {
+            continue;
+        }
+        let shape = (
+            body.kind().to_owned(),
+            body_tokens.iter().map(|token| token.image).collect(),
+        );
+        match first_with_shape.entry(shape) {
+            Entry::Occupied(earlier) => found.push(RepeatedBlock {
                 kind: RepeatedKind::Function,
-                line: report_line(candidate.function, context.source),
-                end_line: one_based(candidate.function.end_position().row),
-                original_line: one_based(earlier.function.start_position().row),
-                lines: block_lines(candidate.body, context.source),
-                content: content_hash(&[candidate.body], context.source),
-            });
+                line: report_line(function, context.source),
+                end_line: one_based(function.end_position().row),
+                original_line: one_based(earlier.get().start_position().row),
+                lines: block_lines(body, context.source),
+                content: content_hash(&[body], context.source),
+            }),
+            Entry::Vacant(slot) => {
+                slot.insert(function);
+            }
         }
     }
     found
