@@ -180,10 +180,11 @@ pestaña de cambios del pull request) y falla el job si hay problemas.
 | `short-name` | menos de 2 caracteres salvo `i`, `j` y `_`, sin contar propiedades | `l`, `O` e `I` | locales de menos de 3 caracteres salvo `i` y `j` | menos de 3 caracteres si el último uso está a más de 5 líneas |
 | `magic-number` | fuera de constantes de módulo, enums, tipos y defaults; -1, 0, 1 y 2 valen | sólo en comparaciones; 0 y 1 valen | fuera de campos, constantes y `hashCode`; -1, 0, 1 y 2 valen | en argumentos, asignaciones, casos, condiciones, operaciones y retornos; 0 y 1 valen |
 | `duplicate-code` | funciones iguales de 3 líneas o más y ramas repetidas de un `if` o un `switch`, dentro del archivo | bloques de 100 tokens repetidos entre archivos o dentro de uno | lo mismo, sin contar anotaciones, `import` ni `;` | bloques de 150 nodos del árbol repetidos dentro de un paquete |
+| `commented-code` | — | comentarios en su propia línea que compilan como Python | — | — |
 
 Cada lenguaje cuenta como su herramienta de referencia: ESLint y sonarjs, ruff, Checkstyle y PMD,
 cyclop, gocognit, funlen, revive, mnd y varnamelen; los bloques duplicados, CPD de PMD, dupl y sonarjs (`no-identical-functions` y
-`no-duplicated-branches`). Esas diferencias de criterio no están documentadas en ningún
+`no-duplicated-branches`); el código comentado, ERA001 de ruff. Esas diferencias de criterio no están documentadas en ningún
 lado; cada una salió de comparar contra repos reales y quedó fijada en un test de
 `src/metrics/tests.rs` (el anidamiento, los números mágicos y los nombres cortos, en los `tests.rs` de su módulo). En
 los tests no se buscan números mágicos ni bloques duplicados, en los de TypeScript no se mide el largo de función y en

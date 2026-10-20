@@ -35,6 +35,7 @@ pub struct Profile {
     pub magic_numbers: MagicNumberStyle,
     pub short_names: ShortNameStyle,
     pub duplicates: DuplicateStyle,
+    pub commented_code: CommentedCodeStyle,
     pub comments: Kinds,
     pub literals: Kinds,
     pub function_length_skips_iife: bool,
@@ -59,7 +60,7 @@ pub struct ParameterShape {
     pub static_decorator: Option<&'static str>,
     pub method_container: Option<&'static str>,
     pub excludes_dummy_names: bool,
-    pub exempting_annotation: Option<&'static str>,
+    pub exempting_annotations: Kinds,
     pub names_per_declaration: bool,
 }
 
@@ -135,6 +136,12 @@ pub enum ShortNameStyle {
     Checkstyle,
     Varnamelen,
     Ruff,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommentedCodeStyle {
+    Unmeasured,
+    Eradicate,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,5 +1,6 @@
 mod cognitive;
 mod cognitive_pmd;
+pub mod commented;
 mod cyclomatic;
 pub mod magic;
 pub mod names;

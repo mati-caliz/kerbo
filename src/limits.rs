@@ -118,6 +118,7 @@ impl Preset {
             .with_rule(RuleId::DuplicateCode, duplicates);
         let base = if self == Self::Minimal {
             base.with_rule(RuleId::MagicNumber, None)
+                .with_rule(RuleId::CommentedCode, None)
         } else {
             base
         };

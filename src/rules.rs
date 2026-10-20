@@ -29,10 +29,11 @@ pub enum RuleId {
     MagicNumber,
     ShortName,
     DuplicateCode,
+    CommentedCode,
 }
 
 impl RuleId {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::FileLength,
         Self::FunctionLength,
         Self::CyclomaticComplexity,
@@ -46,6 +47,7 @@ impl RuleId {
         Self::MagicNumber,
         Self::ShortName,
         Self::DuplicateCode,
+        Self::CommentedCode,
     ];
 
     pub const fn index(self) -> usize {
@@ -63,6 +65,7 @@ impl RuleId {
             Self::MagicNumber => 10,
             Self::ShortName => 11,
             Self::DuplicateCode => 12,
+            Self::CommentedCode => 13,
         }
     }
 
@@ -81,6 +84,7 @@ impl RuleId {
             Self::MagicNumber => "magic-number",
             Self::ShortName => "short-name",
             Self::DuplicateCode => "duplicate-code",
+            Self::CommentedCode => "commented-code",
         }
     }
 
@@ -99,6 +103,7 @@ impl RuleId {
             Self::MagicNumber => "Un número sin nombre en medio de la lógica",
             Self::ShortName => "Un nombre demasiado corto o ambiguo para lo que abarca",
             Self::DuplicateCode => "Un bloque de código copiado y pegado en otro lugar",
+            Self::CommentedCode => "Código comentado en vez de borrado",
         }
     }
 }
@@ -172,6 +177,7 @@ pub fn evaluate(file: &FileIdentity, analysis: &FileAnalysis, limits: Limits) ->
         .chain(nesting_diagnostics(file, analysis, limits))
         .chain(magic_number_diagnostics(file, analysis))
         .chain(short_name_diagnostics(file, analysis))
+        .chain(commented_code_diagnostics(file, analysis))
         .collect()
 }
 
@@ -253,6 +259,30 @@ fn short_name_diagnostics<'analysis>(
     })
 }
 
+fn commented_code_diagnostics<'analysis>(
+    file: &'analysis FileIdentity,
+    analysis: &'analysis FileAnalysis,
+) -> impl Iterator<Item = Diagnostic> + 'analysis {
+    let mut occurrences: HashMap<&str, usize> = HashMap::new();
+    analysis.commented_code.iter().map(move |found| {
+        let occurrence = occurrences.entry(found.text.as_str()).or_default();
+        *occurrence = occurrence.saturating_add(1);
+        Diagnostic {
+            path: file.display.clone(),
+            line: found.line,
+            column: found.column,
+            end_line: found.line,
+            rule: RuleId::CommentedCode,
+            message: RuleId::CommentedCode.description().to_owned(),
+            value: MAGIC_NUMBER_COUNT,
+            limit: NO_MAGIC_NUMBERS,
+            fingerprint: format!("commented-code:{}:{}#{occurrence}", file.relative, found.text),
+            relative_path: file.relative.clone(),
+            absolute_path: file.absolute.clone(),
+        }
+    })
+}
+
 fn function_findings(function: &FunctionMetrics, limits: Limits) -> impl Iterator<Item = Finding<'_>> {
     let measured = [
         (RuleId::FunctionLength, function.lines),
@@ -327,7 +357,8 @@ fn message(finding: &Finding<'_>, name: &str) -> String {
         | RuleId::NestingDepth
         | RuleId::MagicNumber
         | RuleId::ShortName
-        | RuleId::DuplicateCode => finding.rule.description().to_owned(),
+        | RuleId::DuplicateCode
+        | RuleId::CommentedCode => finding.rule.description().to_owned(),
     }
 }
 

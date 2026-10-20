@@ -1,7 +1,7 @@
 use super::{
-    CaseShape, CognitiveShape, CountedLines, DuplicateStyle, GuardShape, LineSpan, LogicalShape,
-    MagicNumberStyle, NestingStyle, ParameterShape, PartialUnits, PmdShape, Profile, ShortNameStyle,
-    SpanBounds, TestFiles,
+    CaseShape, CognitiveShape, CommentedCodeStyle, CountedLines, DuplicateStyle, GuardShape, LineSpan,
+    LogicalShape, MagicNumberStyle, NestingStyle, ParameterShape, PartialUnits, PmdShape, Profile,
+    ShortNameStyle, SpanBounds, TestFiles,
 };
 
 pub static JAVA: Profile = Profile {
@@ -25,7 +25,7 @@ pub static JAVA: Profile = Profile {
         static_decorator: None,
         method_container: None,
         excludes_dummy_names: false,
-        exempting_annotation: Some("Override"),
+        exempting_annotations: &["Override"],
         names_per_declaration: false,
     },
     test_files: TestFiles {
@@ -120,6 +120,7 @@ pub static JAVA: Profile = Profile {
     magic_numbers: MagicNumberStyle::Checkstyle,
     short_names: ShortNameStyle::Checkstyle,
     duplicates: DuplicateStyle::CpdJava,
+    commented_code: CommentedCodeStyle::Unmeasured,
     comments: &["line_comment", "block_comment"],
     literals: &["string_literal"],
     function_length_skips_iife: false,

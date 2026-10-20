@@ -73,16 +73,15 @@ fn has_static_decorator(unit: Node<'_>, shape: &ParameterShape, source: &[u8]) -
 }
 
 fn has_exempting_annotation(unit: Node<'_>, shape: &ParameterShape, source: &[u8]) -> bool {
-    let Some(annotation_name) = shape.exempting_annotation else {
-        return false;
-    };
     let mut cursor = unit.walk();
     let modifiers = unit
         .children(&mut cursor)
         .find(|child| child.kind() == MODIFIERS_KIND);
     let decorated = unit.parent().filter(|parent| parent.kind() == DECORATED_KIND);
-    modifiers.is_some_and(|modifiers| annotates_with(modifiers, annotation_name, source))
-        || decorated.is_some_and(|decorated| decorates_with(decorated, annotation_name, source))
+    shape.exempting_annotations.iter().any(|&annotation_name| {
+        modifiers.is_some_and(|modifiers| annotates_with(modifiers, annotation_name, source))
+            || decorated.is_some_and(|decorated| decorates_with(decorated, annotation_name, source))
+    })
 }
 
 fn decorates_with(decorated: Node<'_>, annotation_name: &str, source: &[u8]) -> bool {

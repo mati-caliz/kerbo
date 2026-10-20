@@ -68,6 +68,11 @@ pub const fn explain(rule: RuleId) -> Explanation {
             why: "Un bloque copiado se arregla en un lugar y queda roto en el otro: cada copia es un cambio que hay que acordarse de repetir.",
             example: "Dos servicios que validan igual un pedido pasan a usar el mismo validarPedido(pedido).",
         },
+        RuleId::CommentedCode => Explanation {
+            fix: "borrá el código comentado; si hace falta volver a él, está en el historial de git",
+            why: "El código comentado no se compila ni se prueba: envejece en silencio y el lector no sabe si sigue valiendo.",
+            example: "# total = sumar(pedidos) se borra; si era una alternativa, va al mensaje del commit.",
+        },
         RuleId::TypeEscape => Explanation {
             fix: "tipá el valor; con datos externos, unknown y validación",
             why: "any y as unknown as apagan el compilador justo donde más falta hace.",

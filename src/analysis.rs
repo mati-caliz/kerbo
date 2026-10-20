@@ -6,6 +6,7 @@ use crate::duplicates::{DuplicateUnits, duplicate_units};
 use crate::language::Language;
 use crate::limits::Limits;
 use crate::lines::LineMap;
+use crate::metrics::commented::{CommentedCode, find_commented_code};
 use crate::metrics::magic::{MagicNumber, find_magic_numbers};
 use crate::metrics::names::{ShortName, find_short_names};
 use crate::metrics::nesting::{NestingFinding, find_deep_nesting};
@@ -20,6 +21,7 @@ pub struct FileAnalysis {
     pub magic_numbers: Vec<MagicNumber>,
     pub short_names: Vec<ShortName>,
     pub duplicate_units: Option<DuplicateUnits>,
+    pub commented_code: Vec<CommentedCode>,
 }
 
 #[derive(Debug)]
@@ -54,6 +56,11 @@ pub fn analyze(
         },
         short_names: if limits.get(RuleId::ShortName).is_some() {
             find_short_names(root, source, profile.short_names)
+        } else {
+            Vec::new()
+        },
+        commented_code: if limits.get(RuleId::CommentedCode).is_some() {
+            find_commented_code(root, source, profile.commented_code)
         } else {
             Vec::new()
         },

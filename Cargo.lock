@@ -247,6 +247,7 @@ dependencies = [
  "globset",
  "ignore",
  "rayon",
+ "regex",
  "serde",
  "serde_json",
  "toml",
@@ -256,6 +257,7 @@ dependencies = [
  "tree-sitter-javascript",
  "tree-sitter-python",
  "tree-sitter-typescript",
+ "unicode-ident",
 ]
 
 [[package]]

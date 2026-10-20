@@ -1,7 +1,7 @@
 use super::{
-    CaseShape, CognitiveShape, CountedLines, DuplicateStyle, GuardShape, LineSpan, LogicalShape,
-    MagicNumberStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, ShortNameStyle, SpanBounds,
-    TestFiles,
+    CaseShape, CognitiveShape, CommentedCodeStyle, CountedLines, DuplicateStyle, GuardShape, LineSpan,
+    LogicalShape, MagicNumberStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, ShortNameStyle,
+    SpanBounds, TestFiles,
 };
 
 pub static GO: Profile = Profile {
@@ -18,7 +18,7 @@ pub static GO: Profile = Profile {
         static_decorator: None,
         method_container: None,
         excludes_dummy_names: false,
-        exempting_annotation: None,
+        exempting_annotations: &[],
         names_per_declaration: true,
     },
     test_files: TestFiles {
@@ -79,6 +79,7 @@ pub static GO: Profile = Profile {
     magic_numbers: MagicNumberStyle::Mnd,
     short_names: ShortNameStyle::Varnamelen,
     duplicates: DuplicateStyle::Dupl,
+    commented_code: CommentedCodeStyle::Unmeasured,
     comments: &["comment"],
     literals: &["raw_string_literal", "interpreted_string_literal"],
     function_length_skips_iife: false,

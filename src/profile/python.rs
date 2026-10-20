@@ -1,6 +1,6 @@
 use super::{
-    CaseShape, CognitiveShape, DuplicateStyle, GuardShape, LineSpan, LogicalShape, MagicNumberStyle,
-    NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, ShortNameStyle, TestFiles,
+    CaseShape, CognitiveShape, CommentedCodeStyle, DuplicateStyle, GuardShape, LineSpan, LogicalShape,
+    MagicNumberStyle, NO_PARTIAL_UNITS, NestingStyle, ParameterShape, Profile, ShortNameStyle, TestFiles,
 };
 
 pub static PYTHON: Profile = Profile {
@@ -22,7 +22,7 @@ pub static PYTHON: Profile = Profile {
         static_decorator: Some("staticmethod"),
         method_container: Some("class_definition"),
         excludes_dummy_names: true,
-        exempting_annotation: Some("overload"),
+        exempting_annotations: &["overload", "override"],
         names_per_declaration: false,
     },
     test_files: TestFiles {
@@ -98,6 +98,7 @@ pub static PYTHON: Profile = Profile {
     magic_numbers: MagicNumberStyle::Ruff,
     short_names: ShortNameStyle::Ruff,
     duplicates: DuplicateStyle::CpdPython,
+    commented_code: CommentedCodeStyle::Eradicate,
     comments: &["comment"],
     literals: &["string"],
     function_length_skips_iife: false,

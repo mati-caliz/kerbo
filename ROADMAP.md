@@ -121,8 +121,12 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   con paridad contra `no-identical-functions` y `no-duplicated-branches` de sonarjs, también
   sobre Next.js, React DOM, ESLint y zod). El modo instantáneo y el editor sólo comparan los archivos
   que miran; el repo entero, `kerbo check`.
-- Comentarios que narran lo obvio, con paridad contra la herramienta que ya la tiene en cada
-  lenguaje.
+- Código comentado (hecho para Python, con paridad contra ERA001 de ruff, que es la regla del
+  estándar; sigue Go contra `commentedOutCode` de gocritic). En TypeScript el estándar no lo
+  revisa (`no-commented-code` de sonarjs no está en `recommended`) y en Java ninguna herramienta
+  del estándar lo hace: ahí no hay contra qué medir.
+- Comentarios que narran lo obvio: ninguna herramienta lo detecta, así que no hay paridad posible.
+  Pasa a la capa para agentes, donde el criterio puede ser propio.
 - **Rust** como quinto lenguaje (contra clippy), así kerbo se analiza a sí mismo.
 
 ### 6. Distribución
