@@ -69,7 +69,7 @@ fn summary(outcome: &ScanOutcome) -> Vec<String> {
         .iter()
         .map(|diagnostic| {
             format!(
-                "{}:{}:{} {} {}",
+                "{}:{}:{} {} {:?}",
                 diagnostic.relative_path,
                 diagnostic.line,
                 diagnostic.column,

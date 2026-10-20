@@ -16,20 +16,22 @@ kerbo: 5810 files, 2 problems, 2250 ms
 
 ## Installation
 
-Linux (x86_64, a static binary that runs on any distro):
+Linux and macOS, on x86_64 and ARM (on Linux, a static binary that runs on any distro), and
+Windows x86_64 from Git's bash:
 
 ```sh
 curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh
 ```
 
 The installer downloads the latest version from the
-[releases](https://github.com/mati-caliz/kerbo/releases), verifies the sha256 and leaves `kerbo`
-in `~/.local/bin` (another folder with `KERBO_INSTALL_DIR`).
+[releases](https://github.com/mati-caliz/kerbo/releases) for the machine, verifies the sha256 and
+leaves `kerbo` in `~/.local/bin` (another folder with `KERBO_INSTALL_DIR`).
 
-macOS, Windows and other architectures, with Rust installed:
+With Homebrew or with Rust installed:
 
 ```sh
-cargo install --git https://github.com/mati-caliz/kerbo --locked
+brew install mati-caliz/tap/kerbo
+cargo install kerbo --locked
 ```
 
 ## Usage
@@ -40,12 +42,21 @@ kerbo check api web               # several folders or files
 kerbo check --language java api   # a single stack: typescript, python, java or go
 kerbo check --diff main           # only what the lines changed since main touch
 kerbo check --format sarif        # also json, agent; GitHub and editors read sarif
+kerbo check --no-cache            # analyze everything from scratch, without reading or writing the cache
 kerbo baseline                    # accept what is already there: from now on only new problems
 kerbo explain cognitive-complexity  # why a rule exists and how to fix it
 ```
 
 It honors `.gitignore` and skips hidden files. It exits with `0` when there are no problems, `1`
 when there are and `2` when something could not be read or the configuration is invalid.
+
+`kerbo check`, `kerbo baseline` and the MCP server store what they measure of each file in a
+content cache, so the next run only analyzes what changed (and what is compared across files, like
+duplicate blocks, is recombined with what was stored). It lives in the user's cache folder
+(`~/.cache/kerbo`, `~/Library/Caches/kerbo` or `%LOCALAPPDATA%\kerbo`; another one with
+`KERBO_CACHE_DIR`), is shared across projects and clones, takes at most 256 MB and is discarded on
+its own when the binary or the configuration that affects a file changes. If it breaks, it is
+ignored. `--no-cache` turns it off.
 
 Messages come out in Spanish or English. `--lang en` (or `es`) wins, then `lang` in
 `kerbo.toml`, then the system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`); without any of them,
@@ -221,6 +232,16 @@ The metrics are written once over the [tree-sitter](https://tree-sitter.github.i
 specific to each language lives in `src/profile/`: which node is a function, a decision or a
 logical operator, and how the mimicked tool counts lines. Files are analyzed in parallel and one
 at a time, without loading the whole program.
+
+The cache (`src/cache/`) stores per file what the analysis measures, not the problems: the key is
+the content, the language, the effective thresholds of that file and the identity of the binary
+(version, size and date), and the path is left out, so a moved file or the same file in another
+clone is not analyzed again. Rules and cross-file duplicates are always computed over what was
+stored. It is split into 256 files by the first byte of the key, each with its own cap and
+least-recently-used eviction; each entry is LZ4-compressed with its checksum, and it is written to
+a temporary file that is renamed. Whatever later depends on more than one file (for example, the
+crate's `macro_rules!` for Rust) adds its fingerprint to the key and stores its own data as another
+kind of entry in the same store.
 
 The CLI texts (report, `explain`, errors, hook, MCP and LSP) live in a typed catalog in
 `src/i18n/`, one per language; the compiler makes sure every message exists in both.

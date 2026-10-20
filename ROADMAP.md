@@ -217,6 +217,19 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   - Binario para Windows ARM e instalador en PowerShell para quien no tiene el bash de Git.
 - Mensajes, README y sitio en inglés además de español (hecho: `--lang`, `lang` en `kerbo.toml`
   o el locale del sistema, con español por defecto; `README.en.md` y el sitio en `/en/`).
+- Pendientes del inglés:
+  - El sitio pasó a tener `styles.css`, `copy.js` y la carpeta `en/` además de `index.html`: si
+    el deploy copia sólo `index.html`, hay que sumarlos (en el repo no hay configuración de
+    deploy para confirmarlo).
+  - Plurales en español: el reporte sigue diciendo "1 archivos" y "1 problemas" para no tocar los
+    tests de entonces; en inglés ya sale bien.
+  - Quedan en español el error interno "tree-sitter no devolvió un árbol" (`src/analysis.rs`) y el
+    nombre "(anónima)" de las funciones sin nombre (`src/syntax.rs`). El segundo forma parte del
+    identificador estable: traducirlo cambia los `id` y rompe las líneas de base existentes, así
+    que hay que separar el nombre que se muestra del que entra en el identificador.
+  - `README.en.md` y `site/en/` se mantienen a mano: un cambio en la versión en español tiene que
+    pasar también a la otra. Un test o un chequeo del gate que compare las secciones de los dos
+    README avisaría cuando se desfasan.
 
 ### 7. Caché y rendimiento
 
