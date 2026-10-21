@@ -309,6 +309,14 @@ classes but not `final` parameters. `recommended` does not ask for `final` param
 only checks unused and duplicated imports. Columns count bytes, as in every other rule: with tabs,
 Checkstyle expands them to 8 and reports a different number.
 
+From the rest of `sun_checks.xml`, kerbo does the names (`TypeName`, `MethodName`, `ConstantName`,
+`StaticVariableName`, `MemberName` and `ParameterName`, with the same rule names in kebab case:
+`type-name`, `method-name`...), `UpperEll` (`upper-ell`, fixed automatically) and `EmptyStatement`
+(`empty-statement`). They follow Checkstyle where it is not obvious: `MethodName` skips what carries
+`@Override` and flags the method named like its class; an interface field is a constant;
+`serialVersionUID` is left out; the patterns are ASCII, so an `ñ` in a name is flagged. `minimal`
+does not ask for them.
+
 In Rust, kerbo measures only what clippy measures (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` and `excessive_nesting`), and the cognitive complexity is clippy's, not
 Sonar's: it starts at 1 and adds every `if`, every `match` with more than one arm and every guard

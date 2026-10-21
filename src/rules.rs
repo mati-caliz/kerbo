@@ -13,7 +13,9 @@ mod families;
 mod id;
 mod lints;
 
-pub use families::{ComposeRule, DockerfileRule, EslintRule, GoRule, MigrationRule, PythonRule, ShellRule};
+pub use families::{
+    ComposeRule, DockerfileRule, EslintRule, GoRule, JavaRule, MigrationRule, PythonRule, ShellRule,
+};
 pub use id::RuleId;
 
 const FIRST_LINE: usize = 1;
@@ -298,7 +300,8 @@ fn message(finding: &Finding<'_>, name: &str) -> Message {
         | RuleId::Python(_)
         | RuleId::Eslint(_)
         | RuleId::Shell(_)
-        | RuleId::Go(_) => Message::Rule(finding.rule),
+        | RuleId::Go(_)
+        | RuleId::Java(_) => Message::Rule(finding.rule),
     }
 }
 

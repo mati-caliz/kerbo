@@ -4,6 +4,7 @@ mod final_parameters;
 mod go;
 mod imports;
 mod java;
+mod java_style;
 mod modifiers;
 mod python;
 mod recovered;
@@ -18,7 +19,7 @@ use crate::fix::Fix;
 use crate::language::Language;
 use crate::limits::{Limits, Preset};
 use crate::profile::LintStyle;
-use crate::rules::{EslintRule, GoRule, PythonRule, RuleId};
+use crate::rules::{EslintRule, GoRule, JavaRule, PythonRule, RuleId};
 use crate::syntax::one_based;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +40,7 @@ pub enum LintKind {
     Python(PythonRule),
     Eslint(EslintRule),
     Go(GoRule),
+    Java(JavaRule),
 }
 
 impl LintKind {
@@ -53,6 +55,7 @@ impl LintKind {
             Self::FinalClass => RuleId::FinalClass,
             Self::Python(rule) => RuleId::Python(rule),
             Self::Go(rule) => RuleId::Go(rule),
+            Self::Java(rule) => RuleId::Java(rule),
         }
     }
 }
@@ -80,6 +83,7 @@ pub const LINT_RULES: [RuleId; 6] = [
 ];
 
 pub use go::nolint_ranges as go_nolint_ranges;
+pub use java_style::relaxed_by as java_relaxed_by;
 pub use python::relaxed_by as python_relaxed_by;
 
 pub fn find_lints(
@@ -120,13 +124,17 @@ fn is_declaration_file(path: &Path) -> bool {
 }
 
 fn java_lints(root: Node<'_>, source: &[u8], limits: Limits) -> Vec<LintFinding> {
-    if LINT_RULES.iter().all(|&rule| limits.get(rule).is_none()) {
+    let family_off = JavaRule::ALL
+        .into_iter()
+        .all(|rule| limits.get(RuleId::Java(rule)).is_none());
+    if family_off && LINT_RULES.iter().all(|&rule| limits.get(rule).is_none()) {
         return Vec::new();
     }
     let mut findings = imports::reported(root, source);
     findings.extend(modifiers::reported(root, source));
     findings.extend(final_parameters::reported(root, source));
     findings.extend(final_class::reported(root, source));
+    findings.extend(java_style::reported(root, source));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
     findings.sort_by_key(|finding| (finding.line, finding.column));
     findings

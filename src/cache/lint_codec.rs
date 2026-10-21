@@ -2,7 +2,7 @@ use super::codec::{Corrupt, Reader, Writer};
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::{ImportRedundancy, LintFinding, LintKind};
 use crate::rules::PythonRule;
-use crate::rules::{EslintRule, GoRule};
+use crate::rules::{EslintRule, GoRule, JavaRule};
 
 const UNUSED_IMPORT: u64 = 0;
 const JAVA_LANG_IMPORT: u64 = 1;
@@ -15,6 +15,7 @@ const FINAL_CLASS: u64 = 7;
 const PYTHON: u64 = 8;
 const ESLINT: u64 = 9;
 const GO: u64 = 10;
+const JAVA: u64 = 11;
 const NO_FIX: u64 = 0;
 const WITH_FIX: u64 = 1;
 
@@ -71,6 +72,7 @@ fn write_kind(writer: &mut Writer, kind: LintKind) {
         LintKind::Python(_) => PYTHON,
         LintKind::Eslint(_) => ESLINT,
         LintKind::Go(_) => GO,
+        LintKind::Java(_) => JAVA,
     };
     writer.number(code);
     match kind {
@@ -78,6 +80,7 @@ fn write_kind(writer: &mut Writer, kind: LintKind) {
         LintKind::Python(rule) => writer.size(rule.position()),
         LintKind::Eslint(rule) => writer.size(rule.position()),
         LintKind::Go(rule) => writer.size(rule.position()),
+        LintKind::Java(rule) => writer.size(rule.position()),
         LintKind::UnusedImport
         | LintKind::RedundantImport(ImportRedundancy::JavaLang | ImportRedundancy::SamePackage)
         | LintKind::StarImport
@@ -106,6 +109,7 @@ fn read_kind(reader: &mut Reader<'_>) -> Result<LintKind, Corrupt> {
         PYTHON => LintKind::Python(*PythonRule::ALL.get(reader.size()?).ok_or(Corrupt)?),
         ESLINT => LintKind::Eslint(read_eslint_rule(reader)?),
         GO => LintKind::Go(*GoRule::ALL.get(reader.size()?).ok_or(Corrupt)?),
+        JAVA => LintKind::Java(*JavaRule::ALL.get(reader.size()?).ok_or(Corrupt)?),
         _ => return Err(Corrupt),
     })
 }

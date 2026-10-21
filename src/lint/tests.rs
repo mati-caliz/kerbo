@@ -1,6 +1,6 @@
 use tree_sitter::Parser;
 
-use super::{LintFinding, LintKind, find_lints};
+use super::{LINT_RULES, LintFinding, LintKind, find_lints};
 use crate::analysis::SourceUnit;
 use crate::fix::apply;
 use crate::language::Language;
@@ -69,8 +69,13 @@ fn lints(source: &str, limits: Limits) -> Vec<LintFinding> {
 }
 
 fn rendered(findings: &[LintFinding]) -> Vec<String> {
+    rendered_where(findings, |rule| LINT_RULES.contains(&rule))
+}
+
+fn rendered_where(findings: &[LintFinding], wanted: fn(RuleId) -> bool) -> Vec<String> {
     let mut lines: Vec<String> = findings
         .iter()
+        .filter(|finding| wanted(finding.kind.rule()))
         .map(|finding| {
             format!(
                 "{}:{} {} {}",
@@ -151,7 +156,7 @@ fn respects_each_rule_switch_and_other_languages() {
     let source = "import a.B;\nclass A { void m(int value) {} }\n";
     let without_final = strict().with_rule(RuleId::FinalParameter, None);
     assert_eq!(rendered(&lints(source, without_final)), ["1:8 unused-import a.B"]);
-    let everything_off = super::LINT_RULES
+    let everything_off = LINT_RULES
         .iter()
         .fold(strict(), |limits, &rule| limits.with_rule(rule, None));
     assert_eq!(lints(source, everything_off), Vec::new());
@@ -164,4 +169,28 @@ fn respects_each_rule_switch_and_other_languages() {
     let tree = parser.parse(source, None).expect("el archivo se parsea");
     let unmeasured = find_lints(tree.root_node(), unit(source), LintStyle::Unmeasured, strict());
     assert_eq!(unmeasured, Vec::new());
+}
+
+#[test]
+fn names_literals_and_empty_statements_match_checkstyle() {
+    let source = include_str!("fixtures/Names.java");
+    assert_eq!(
+        rendered_where(&lints(source, strict()), |rule| matches!(rule, RuleId::Java(_))),
+        expected(include_str!("fixtures/Names.checkstyle")),
+        "Names.java contra Checkstyle 14.3"
+    );
+    let fixed = lints(source, strict())
+        .into_iter()
+        .filter_map(|finding| finding.fix)
+        .fold(source.to_owned(), |text, fix| {
+            apply(&fix.edits, &text).unwrap_or(text)
+        });
+    assert!(fixed.contains("= 10L;"));
+    let minimal = Preset::Minimal.limits(Language::Java, false);
+    assert!(
+        lints(source, minimal)
+            .iter()
+            .all(|finding| !matches!(finding.kind.rule(), RuleId::Java(_))),
+        "minimal no pide estilo de nombres"
+    );
 }

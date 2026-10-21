@@ -1,0 +1,20 @@
+6:50 upper-ell 1l
+7:32 constant-name okConstant
+8:22 constant-name BAD_lower
+9:24 static-variable-name Counter
+10:17 member-name Member_field
+14:15 type-name inner_iface
+15:13 constant-name notConst
+16:14 method-name Do_thing
+16:27 parameter-name Param
+19:10 type-name colors
+21:12 type-name point
+23:16 type-name marker
+25:17 method-name Probe
+26:9 empty-statement 
+27:18 upper-ell 10l
+28:36 empty-statement 
+37:22 parameter-name Bad_param
+41:26 empty-statement 
+44:22 parameter-name Values
+47:11 type-name nested_bad

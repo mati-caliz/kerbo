@@ -569,8 +569,18 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
       diferencia.
   - Velocidad: en commons-lang, con y sin las seis reglas, la corrida entera da entre 5,1 y 7,5 s
     en las dos variantes; no se distingue del ruido. Guava sigue en 9 s sin caché.
+- La familia `JavaRule` (2026-10-21): las reglas de `sun_checks.xml` que siguen entran como una
+  familia (`rule_family!`, como Python y Go), así cada una es una entrada y su texto. Primera
+  tanda: `TypeName`, `MethodName`, `ConstantName`, `StaticVariableName`, `MemberName`,
+  `ParameterName`, `UpperEll` (con arreglo) y `EmptyStatement`. Paridad con el arnés de forma, por
+  archivo, línea, columna y regla: cero diferencias sobre commons-lang, junit4 y Guava (9.800
+  avisos, 7.868 de ellos `MethodName` en Guava por los métodos de test con guiones bajos).
+  `minimal` las apaga. Lo fijado en `src/lint/fixtures/Names.java`: `MethodName` saltea
+  `@Override` y marca el método con el nombre de la clase; un campo de interfaz es constante;
+  `serialVersionUID` no; los patrones son ASCII.
 - Pendientes de las reglas de forma, por frecuencia en `sun_checks.xml` entero sobre los mismos
-  cuatro repos (sin contar las que ya hace kerbo):
+  cuatro repos (sin contar las que ya hace kerbo; los nombres, `UpperEll` y `EmptyStatement` ya
+  están):
   - `Indentation` (696.473) y `LineLength` (228.941): son de formato y van con la etapa 13; sin
     medirlas contra el formateador del proyecto marcarían casi todo Guava, que usa
     google-java-format.

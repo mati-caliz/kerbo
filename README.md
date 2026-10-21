@@ -303,6 +303,14 @@ clases finales pero no `final` en los parámetros. `recommended` no pide `final`
 `minimal` sólo revisa imports sin usar y repetidos. Las columnas cuentan bytes, como en el resto de
 las reglas: con tabs, Checkstyle las expande a 8 y da otro número.
 
+Del resto de `sun_checks.xml`, kerbo hace los nombres (`TypeName`, `MethodName`, `ConstantName`,
+`StaticVariableName`, `MemberName` y `ParameterName`, con los mismos nombres de regla en kebab:
+`type-name`, `method-name`...), `UpperEll` (`upper-ell`, se arregla solo) y `EmptyStatement`
+(`empty-statement`). Siguen a Checkstyle en lo que no se ve: `MethodName` no mira lo que lleva
+`@Override` y marca el método que se llama como su clase; un campo de interfaz es una constante;
+`serialVersionUID` queda afuera; los patrones son ASCII, así que una `ñ` en un nombre se marca.
+`minimal` no las pide.
+
 En Rust, kerbo mide sólo lo que mide clippy (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` y `excessive_nesting`), y la complejidad cognitiva es la de clippy, no la de
 Sonar: arranca en 1 y suma cada `if`, cada `match` de más de un brazo y cada guarda sobre el código

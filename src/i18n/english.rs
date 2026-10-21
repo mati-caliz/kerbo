@@ -10,6 +10,7 @@ mod eslint;
 mod explanations;
 mod fixes;
 mod go;
+mod java;
 mod python;
 mod security;
 mod shell;
@@ -128,6 +129,7 @@ impl Catalog for English {
             RuleId::Eslint(rule) => eslint::eslint(rule).description,
             RuleId::Shell(rule) => shell::shell(rule).description,
             RuleId::Go(rule) => go::go(rule).description,
+            RuleId::Java(rule) => java::java(rule).description,
         }
     }
 
@@ -222,6 +224,7 @@ impl Catalog for English {
             }
             LintKind::Python(rule) => with_subject(python::python(rule).description, subject),
             LintKind::Go(rule) => with_subject(go::go(rule).description, subject),
+            LintKind::Java(rule) => with_subject(java::java(rule).description, subject),
         }
     }
 
