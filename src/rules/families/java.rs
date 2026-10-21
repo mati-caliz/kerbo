@@ -41,6 +41,7 @@ rule_family!(JavaRule {
     LeftCurly => "left-curly",
     RightCurly => "right-curly",
     OperatorWrap => "operator-wrap",
+    SameParameterValue => "same-parameter-value",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {

@@ -248,6 +248,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Con el operador adelante, cada línea dice cómo se suma a la anterior sin leer hasta el final.",
         "a +\n b se vuelve a\n + b.",
     ),
+    RuleText::new(
+        "Parámetro privado que siempre recibe el mismo valor",
+        "sacá el parámetro y usá el valor adentro del método",
+        "Si todas las llamadas pasan la misma constante, el parámetro no parametriza nada: sólo agrega ruido en cada llamada. Como SameParameterValue de IntelliJ, para métodos y constructores privados.",
+        "private String etiqueta(String moneda) llamado siempre con \"ARS\" se vuelve private String etiqueta() con \"ARS\" adentro.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

@@ -688,7 +688,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     pasa las columnas de Checkstyle a bytes. Una regla nueva se suma con una entrada en
     `SHAPE_RULES`. Sobre commons-lang, junit4 y Guava: cero diferencias en 41.400 avisos.
 
-### 9. Inspecciones de IntelliJ propias y flujo de datos sin compilar
+### 9. Inspecciones de IntelliJ propias y flujo de datos sin compilar (empezada)
 
 Lo que Qodana tarda de 6 a 13 minutos y 5 GB en hacer por repo, en segundos y dentro de la meta
 de memoria de siempre, medido sobre los mismos tres servicios y Guava. Casi todo el tiempo de
@@ -734,6 +734,28 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
 - Paridad contra Qodana con el perfil `Default`, inspección por inspección. Donde Qodana se
   equivoca por no conocer el framework, la diferencia queda fijada en un test como mejora, no
   como desvío.
+- `SameParameterValue` para lo privado (hecho, 2026-10-21): `same-parameter-value`, en la
+  familia `JavaRule`. El 89 % de lo que marca Qodana (198 de 222 en los tres servicios) son
+  métodos privados, y para ésos alcanza el archivo: todas sus llamadas están en su clase de nivel
+  superior. Así no hace falta el índice, entra en la caché por archivo y funciona igual en el LSP
+  y en el hook.
+  - Lo que se calcó de IntelliJ: con una sola llamada alcanza; cuentan los constructores privados,
+    los de un enum (las constantes con argumentos los llaman) y el de un record privado; el valor
+    se muestra como literal tal cual o como `Clase.CONSTANTE` (un campo static final, uno de una
+    interfaz o una constante de un enum), y `-1` cuenta como constante.
+  - Para no adivinar: si hay otro método con el mismo nombre y la misma cantidad de parámetros en
+    la clase, si se lo usa como referencia o si es varargs, no se marca. Una llamada calificada
+    con otro objeto cuenta igual, aunque vaya a otra clase: sin tipos no se sabe, y contarla sólo
+    puede hacer que falte un aviso, nunca que sobre.
+  - Paridad contra los SARIF de Qodana de los tres servicios, sólo en lo privado: 197
+    coincidencias por archivo, línea y columna, ningún aviso de más y uno de menos
+    (`.product(flan)` de un builder con el mismo nombre que un método privado del test). Los
+    valores mostrados coinciden con los de IntelliJ. En Guava, commons-lang y junit4 da 102 avisos;
+    los revisados a mano son correctos.
+  - Falta lo de paquete y protegido (24 en Qodana; nunca marca lo público): pide el índice del
+    proyecto de arriba y correr sobre el proyecto entero, no sobre un archivo suelto. Después,
+    `UnusedReturnValue` (19) y `SameReturnValue` (18) con el mismo índice, y `unused` (3.919)
+    con las tablas de frameworks.
 
 ### 10. Go, Python, TypeScript y shell completos
 

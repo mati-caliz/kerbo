@@ -248,6 +248,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "With the operator first, each line says how it joins the previous one without reading to the end.",
         "a +\n b becomes a\n + b.",
     ),
+    RuleText::new(
+        "Private parameter that always receives the same value",
+        "remove the parameter and use the value inside the method",
+        "If every call passes the same constant, the parameter parameterizes nothing: it only adds noise to each call. Like IntelliJ's SameParameterValue, for private methods and constructors.",
+        "private String label(String currency) always called with \"USD\" becomes private String label() with \"USD\" inside.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

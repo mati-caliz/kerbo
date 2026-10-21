@@ -239,7 +239,9 @@ fn declarations_flow_and_text_match_checkstyle() {
     assert_eq!(
         rendered_where(&lints(source, strict()), |rule| {
             matches!(rule, RuleId::Java(java)
-                if !DESIGN_JAVA_RULES.contains(&java) && !SPACING_JAVA_RULES.contains(&java))
+                if !DESIGN_JAVA_RULES.contains(&java)
+                    && !SPACING_JAVA_RULES.contains(&java)
+                    && java != JavaRule::SameParameterValue)
         }),
         expected(include_str!("fixtures/Shapes.checkstyle")),
         "Shapes.java contra Checkstyle 14.3"
@@ -304,4 +306,39 @@ fn every_spacing_fix_removes_its_own_problem() {
             "el arreglo de {finding:?} no lo resuelve"
         );
     }
+}
+
+#[test]
+fn same_parameter_value_follows_intellij_for_private_code() {
+    let source = r#"class Prices {
+    private static final int SCALE = 2;
+    enum Currency {
+        PESO("ARS", 2), DOLLAR("USD", 2);
+        Currency(String code, int digits) { }
+    }
+    private record Line(String label, int amount) { }
+    String render() {
+        return format("ARS", SCALE, -1) + format("ARS", SCALE, 7) + new Line("total", 1) + new Line("total", 2);
+    }
+    private String format(String currency, int scale, int sign) { return currency + scale + sign; }
+    private int twice(int value) { return value * 2; }
+    private int twice(long value) { return (int) value * 2; }
+    int run() { return twice(3) + twice(4L); }
+    private int referenced(int value) { return value; }
+    java.util.function.IntUnaryOperator operator() { referenced(1); return this::referenced; }
+    private int spread(int... values) { return values.length; }
+    int spreadAll() { return spread(1) + spread(1); }
+    int visible(int value) { return value; }
+    int callVisible() { return visible(1); }
+}
+"#;
+    let found: Vec<String> = rendered_where(&lints(source, strict()), |rule| {
+        rule == RuleId::Java(JavaRule::SameParameterValue)
+    });
+    assert_eq!(
+        found,
+        expected(
+            "5:35 same-parameter-value digits = 2\n7:32 same-parameter-value label = \"total\"\n11:34 same-parameter-value currency = \"ARS\"\n11:48 same-parameter-value scale = Prices.SCALE"
+        )
+    );
 }

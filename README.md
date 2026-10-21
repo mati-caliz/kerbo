@@ -322,6 +322,13 @@ reacomodar líneas). Siguen a Checkstyle en lo que no se ve: `MethodName` no mir
 `WhitespaceAround` también marca las llaves vacías pegadas (`{}`), como `sun_checks`. `minimal`
 no las pide.
 
+De las inspecciones de IntelliJ, kerbo hace `SameParameterValue` (`same-parameter-value`) para
+métodos y constructores privados (también los de un enum y el de un record privado): un parámetro
+al que todas las llamadas le pasan la misma constante, que se muestra como la muestra IntelliJ
+(`"ARS"`, `Precios.ESCALA`). Si hay otro método con el mismo nombre y la misma cantidad de
+parámetros, o se lo usa como referencia (`this::metodo`), no se sabe qué llamada va a cuál y no
+se marca.
+
 En Rust, kerbo mide sólo lo que mide clippy (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` y `excessive_nesting`), y la complejidad cognitiva es la de clippy, no la de
 Sonar: arranca en 1 y suma cada `if`, cada `match` de más de un brazo y cada guarda sobre el código

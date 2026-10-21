@@ -327,6 +327,12 @@ method named like its class; an interface field is a constant; `serialVersionUID
 the patterns are ASCII, so an `ñ` in a name is flagged; `WhitespaceAround` also flags empty braces
 written together (`{}`), as `sun_checks` does. `minimal` does not ask for them.
 
+From IntelliJ's inspections, kerbo does `SameParameterValue` (`same-parameter-value`) for private
+methods and constructors (also an enum's and a private record's): a parameter that every call
+passes the same constant, shown the way IntelliJ shows it (`"USD"`, `Prices.SCALE`). If another
+method has the same name and number of parameters, or it is used as a reference
+(`this::method`), there is no telling which call goes where and it is not flagged.
+
 In Rust, kerbo measures only what clippy measures (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` and `excessive_nesting`), and the cognitive complexity is clippy's, not
 Sonar's: it starts at 1 and adds every `if`, every `match` with more than one arm and every guard

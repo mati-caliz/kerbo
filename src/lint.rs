@@ -10,6 +10,7 @@ mod java_flow;
 mod java_hidden;
 mod java_order;
 mod java_padding;
+mod java_same_value;
 mod java_shapes;
 mod java_spacing;
 mod java_style;
@@ -159,6 +160,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: Limits) -> Vec<LintFinding>
     findings.extend(java_padding::reported(&nodes, &tokens, &lines, source));
     findings.extend(java_curly::reported(&nodes, &lines));
     findings.extend(java_wrap::reported(&tokens));
+    findings.extend(java_same_value::reported(root, source));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
     findings.sort_by_key(|finding| (finding.line, finding.column));
     findings
