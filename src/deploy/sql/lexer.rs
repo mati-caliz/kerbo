@@ -58,20 +58,37 @@ struct Lexer<'source> {
     line: usize,
     column: usize,
     tokens: Vec<Token>,
+    comments: Vec<Comment>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Comment {
+    pub line: usize,
+    pub column: usize,
+    pub text: String,
 }
 
 pub fn tokenize(source: &str, first_line: usize) -> Vec<Token> {
+    lex(source, first_line).tokens
+}
+
+pub fn comments(source: &str) -> Vec<Comment> {
+    lex(source, 1).comments
+}
+
+fn lex(source: &str, first_line: usize) -> Lexer<'_> {
     let mut lexer = Lexer {
         source,
         characters: source.char_indices().peekable(),
         line: first_line,
         column: 1,
         tokens: Vec::new(),
+        comments: Vec::new(),
     };
     while let Some(&(start, character)) = lexer.characters.peek() {
         lexer.next_token(start, character);
     }
-    lexer.tokens
+    lexer
 }
 
 impl Lexer<'_> {
@@ -104,9 +121,11 @@ impl Lexer<'_> {
             return;
         } else if rest.starts_with(LINE_COMMENT) {
             self.skip_line();
+            self.remember_comment(start, line, column);
             return;
         } else if rest.starts_with(BLOCK_COMMENT_OPEN) {
             self.skip_block_comment();
+            self.remember_comment(start, line, column);
             return;
         } else if character == STRING_QUOTE {
             self.skip_string(false);
@@ -138,6 +157,12 @@ impl Lexer<'_> {
         while self.characters.peek().is_some_and(|&(_, next)| keep(next)) {
             self.advance();
         }
+    }
+
+    fn remember_comment(&mut self, start: usize, line: usize, column: usize) {
+        let end = self.position();
+        let text = self.source.get(start..end).unwrap_or_default().to_owned();
+        self.comments.push(Comment { line, column, text });
     }
 
     fn skip_line(&mut self) {

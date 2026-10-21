@@ -10,7 +10,7 @@ use crate::diff::ChangedLines;
 use crate::guard::{GuardRequest, add_guarded, inspect};
 use crate::i18n::{Lang, LangPreference, Notice, Problem, Summary};
 use crate::osv::{AuditRequest, Curl, Ecosystem, OsvMode, audit, download};
-use crate::report::render;
+use crate::report::{Format, render, render_sarif};
 use crate::rules::{Diagnostic, RuleId};
 use crate::scan::{ScanFailure, ScanOutcome, ScanRequest, scan};
 use crate::suppressions::Suppressed;
@@ -135,7 +135,12 @@ fn check(
         osv: arguments.osv,
     };
     let found = findings(&request, directory)?;
-    render(&found.diagnostics, arguments.format, lang, terminal.report)
+    let rendered = if arguments.format == Format::Sarif {
+        render_sarif(&found.diagnostics, &found.suppressed, lang, terminal.report)
+    } else {
+        render(&found.diagnostics, arguments.format, lang, terminal.report)
+    };
+    rendered
         .and_then(|()| terminal.report.flush())
         .map_err(|error| write_error(&error))?;
     let summary = Notice::Summary(Summary {

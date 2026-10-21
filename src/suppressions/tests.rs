@@ -59,7 +59,7 @@ fn respects_the_rules_named_on_the_next_line_only() {
 #[test]
 fn file_directives_cover_every_line() {
     let rule = RuleId::Migration(MigrationRule::BanDropColumn);
-    let source = "-- squawk-ignore-file ban-drop-column: la columna ya no se lee\nALTER TABLE a DROP COLUMN b;\nALTER TABLE a DROP COLUMN c;\n";
+    let source = "-- squawk-ignore-file ban-drop-column -- la columna ya no se lee\nALTER TABLE a DROP COLUMN b;\nALTER TABLE a DROP COLUMN c;\n";
     let (kept, suppressed) = split(source.as_bytes(), vec![diagnostic(rule, 2), diagnostic(rule, 3)]);
     assert!(kept.is_empty());
     assert_eq!(
@@ -79,7 +79,6 @@ fn ignores_markers_that_are_not_a_leading_comment() {
         directives("RUN echo '# hadolint ignore=DL3008'\n", false),
         Vec::new()
     );
-    assert_eq!(directives("SELECT 1; -- squawk-ignore\n", false), Vec::new());
     let shell = directives("#!/bin/sh\n# shellcheck disable=SC2086\necho $a\n", false);
     assert_eq!(
         shell.first().map(|directive| directive.covered_line),
@@ -87,4 +86,46 @@ fn ignores_markers_that_are_not_a_leading_comment() {
     );
     let (kept, suppressed) = split(b"FROM debian\n", vec![diagnostic(PINNED, 1)]);
     assert_eq!((kept.len(), suppressed.len()), (1, 0));
+}
+
+#[test]
+fn squawk_ignores_cover_their_own_line_and_the_next_one() {
+    let drop_column = RuleId::Migration(MigrationRule::BanDropColumn);
+    let drop_table = RuleId::Migration(MigrationRule::BanDropTable);
+    let source = "ALTER TABLE a DROP COLUMN b; -- squawk-ignore ban-drop-column
+ALTER TABLE a DROP COLUMN c;
+
+ALTER TABLE a DROP COLUMN d;
+/* squawk-ignore ban-drop-table */ DROP TABLE x;
+";
+    let (kept, suppressed) = split(
+        source.as_bytes(),
+        vec![
+            diagnostic(drop_column, 1),
+            diagnostic(drop_column, 2),
+            diagnostic(drop_column, 4),
+            diagnostic(drop_table, 5),
+        ],
+    );
+    assert_eq!(suppressed.len(), 3);
+    assert_eq!(kept.iter().map(|item| item.line).collect::<Vec<_>>(), [4]);
+}
+
+#[test]
+fn a_squawk_ignore_without_rules_silences_nothing_but_a_file_one_silences_every_migration_rule() {
+    let drop_column = RuleId::Migration(MigrationRule::BanDropColumn);
+    let line = split(
+        b"-- squawk-ignore
+ALTER TABLE a DROP COLUMN b;
+",
+        vec![diagnostic(drop_column, 2)],
+    );
+    assert_eq!((line.0.len(), line.1.len()), (1, 0));
+    let file = split(
+        b"-- squawk-ignore-file
+ALTER TABLE a DROP COLUMN b;
+",
+        vec![diagnostic(drop_column, 2), diagnostic(PINNED, 2)],
+    );
+    assert_eq!((file.0.len(), file.1.len()), (1, 1));
 }

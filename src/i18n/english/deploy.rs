@@ -302,6 +302,12 @@ const MIGRATION_TEXTS: [RuleText; MigrationRule::ALL.len()] = [
         "Postgres rejects the statement or keeps one value without saying which.",
         "INSERT INTO t (a, b, a) becomes INSERT INTO t (a, b).",
     ),
+    RuleText::new(
+        "A squawk-ignore names a rule that does not exist",
+        "fix the rule name",
+        "The comment silences nothing: the report it meant to ignore keeps showing up and the misspelled name stays there.",
+        "-- squawk-ignore ban-drop-colum becomes -- squawk-ignore ban-drop-column.",
+    ),
 ];
 
 pub fn migration(rule: MigrationRule) -> RuleText {

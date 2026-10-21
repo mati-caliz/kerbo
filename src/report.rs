@@ -4,6 +4,7 @@ use clap::ValueEnum;
 
 use crate::i18n::Lang;
 use crate::rules::Diagnostic;
+use crate::suppressions::Suppressed;
 
 mod agent;
 mod json;
@@ -43,7 +44,7 @@ pub fn render<W: Write + ?Sized>(
             writeln!(writer)?;
         }
         Format::Sarif => {
-            serde_json::to_writer(&mut *writer, &sarif::document(diagnostics, lang))?;
+            serde_json::to_writer(&mut *writer, &sarif::document(diagnostics, &[], lang))?;
             writeln!(writer)?;
         }
         Format::Agent => agent::write(&agent::build(diagnostics, lang), writer)?,
@@ -55,14 +56,25 @@ pub fn render<W: Write + ?Sized>(
     Ok(())
 }
 
+pub fn render_sarif<W: Write + ?Sized>(
+    diagnostics: &[Diagnostic],
+    suppressed: &[Suppressed],
+    lang: Lang,
+    writer: &mut W,
+) -> io::Result<()> {
+    serde_json::to_writer(&mut *writer, &sarif::document(diagnostics, suppressed, lang))?;
+    writeln!(writer)
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
-    use super::{Format, render};
+    use super::{Format, render, render_sarif};
     use crate::fix::Fix;
     use crate::i18n::{FunctionName, Lang, Message};
     use crate::rules::{Diagnostic, RuleId};
+    use crate::suppressions::Suppressed;
 
     const UNUSED_IMPORT_HUNK: &str = "@@ -3 +2,0 @@\n-import java.util.List;";
 
@@ -104,6 +116,28 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_slice(&output).expect("es JSON válido");
         assert_eq!(parsed[0]["rule"], "parameter-count");
         assert_eq!(parsed[0]["limit"], 4);
+    }
+
+    #[test]
+    fn sarif_marks_what_the_code_silences_as_suppressed_with_its_reason() {
+        let suppressed: Vec<Suppressed> = sample()
+            .into_iter()
+            .map(|diagnostic| Suppressed {
+                diagnostic,
+                reason: "lo exige la API".to_owned(),
+            })
+            .chain(sample().into_iter().map(|diagnostic| Suppressed {
+                diagnostic,
+                reason: String::new(),
+            }))
+            .collect();
+        let mut output = Vec::new();
+        render_sarif(&[], &suppressed, Lang::Spanish, &mut output).expect("se escribe en memoria");
+        let parsed: serde_json::Value = serde_json::from_slice(&output).expect("es JSON válido");
+        let results = &parsed["runs"][0]["results"];
+        assert_eq!(results[0]["suppressions"][0]["kind"], "inSource");
+        assert_eq!(results[0]["suppressions"][0]["justification"], "lo exige la API");
+        assert!(results[1]["suppressions"][0].get("justification").is_none());
     }
 
     #[test]

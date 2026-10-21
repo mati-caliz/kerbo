@@ -49,3 +49,18 @@ fn every_fixture_matches_squawk() {
         assert_eq!(found, expected, "{name}");
     }
 }
+
+#[test]
+fn unknown_rule_names_in_an_ignore_are_reported_where_they_are_written() {
+    let found: Vec<(usize, usize, String)> = violations(
+        "-- squawk-ignore ban-drop-column, ban-drop-colum\nSELECT 1;\n/* squawk-ignore-file nope */\n",
+        1,
+    )
+    .into_iter()
+    .map(|violation| (violation.line, violation.column, violation.subject))
+    .collect();
+    assert_eq!(
+        found,
+        [(1, 35, "ban-drop-colum".to_owned()), (3, 23, "nope".to_owned())]
+    );
+}

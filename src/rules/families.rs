@@ -80,6 +80,7 @@ rule_family!(MigrationRule {
     RequireConcurrentPartitionDetach => "require-concurrent-partition-detach",
     BanUncommittedTransaction => "ban-uncommitted-transaction",
     BanDuplicateColumnAssignments => "ban-duplicate-column-assignments",
+    UnusedIgnore => "unused-ignore",
 });
 
 rule_family!(DockerfileRule {

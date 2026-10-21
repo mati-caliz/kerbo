@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
+use crate::deploy::squawk_ignores;
 use crate::lint::go_nolint_ranges;
-use crate::rules::Diagnostic;
+use crate::rules::{Diagnostic, RuleId};
 use crate::shell::{self, Coverage};
 
 const CODE_SEPARATOR: char = ',';
@@ -9,6 +10,7 @@ const REASON_LEADERS: &[char] = &[' ', '\t', '#', '-', ':', '—'];
 const FIRST_LINE: usize = 1;
 const REPEATED_SHELL_DISABLE: &str = "disable=";
 const GO_EXTENSION: &str = ".go";
+const SQUAWK_NEXT_LINES: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -16,6 +18,8 @@ pub enum Scope {
     File,
     ShellStatement,
     GoNolint,
+    SquawkLines,
+    SquawkFile,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,17 +29,7 @@ pub struct Syntax {
     pub scope: Scope,
 }
 
-pub const SYNTAXES: [Syntax; 5] = [
-    Syntax {
-        comment: "--",
-        marker: "squawk-ignore-file",
-        scope: Scope::File,
-    },
-    Syntax {
-        comment: "--",
-        marker: "squawk-ignore",
-        scope: Scope::NextLine,
-    },
+pub const SYNTAXES: [Syntax; 3] = [
     Syntax {
         comment: "#",
         marker: "hadolint global ignore=",
@@ -72,17 +66,21 @@ pub struct Suppressed {
 
 impl Directive {
     fn covers(&self, diagnostic: &Diagnostic) -> bool {
+        let squawk = matches!(self.scope, Scope::SquawkLines | Scope::SquawkFile);
+        if squawk && !matches!(diagnostic.rule, RuleId::Migration(_)) {
+            return false;
+        }
         let in_scope = match self.scope {
-            Scope::File => true,
+            Scope::File | Scope::SquawkFile => true,
             Scope::NextLine => self.covered_line == Some(diagnostic.line),
             Scope::GoNolint if !diagnostic.path.ends_with(GO_EXTENSION) => false,
-            Scope::ShellStatement | Scope::GoNolint => self
+            Scope::ShellStatement | Scope::GoNolint | Scope::SquawkLines => self
                 .covered_line
                 .zip(self.last_covered_line)
                 .is_some_and(|(first, last)| (first..=last).contains(&diagnostic.line)),
         };
         in_scope
-            && ((self.scope == Scope::GoNolint && self.codes.is_empty())
+            && ((matches!(self.scope, Scope::GoNolint | Scope::SquawkFile) && self.codes.is_empty())
                 || self.codes.iter().any(|code| {
                     diagnostic.rule.as_str().eq_ignore_ascii_case(code)
                         || (self.scope == Scope::ShellStatement && shell::disables(code, diagnostic.rule))
@@ -104,8 +102,28 @@ impl Directive {
 
 pub fn directives(source: &str, go: bool) -> Vec<Directive> {
     let mut found = if go { go_directives(source) } else { Vec::new() };
+    found.extend(squawk_directives(source));
     found.extend(comment_directives(source));
     found
+}
+
+fn squawk_directives(source: &str) -> Vec<Directive> {
+    squawk_ignores(source)
+        .into_iter()
+        .map(|ignore| Directive {
+            line: ignore.line,
+            text: ignore.text,
+            scope: if ignore.whole_file {
+                Scope::SquawkFile
+            } else {
+                Scope::SquawkLines
+            },
+            codes: ignore.rules,
+            reason: ignore.reason,
+            covered_line: Some(ignore.line),
+            last_covered_line: Some(ignore.line.saturating_add(SQUAWK_NEXT_LINES)),
+        })
+        .collect()
 }
 
 fn go_directives(source: &str) -> Vec<Directive> {

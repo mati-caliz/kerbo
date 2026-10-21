@@ -128,7 +128,11 @@ the rules named on the next line (or in the whole file, with `-file` and `global
 What follows the list of rules is the reason
 (`# hadolint ignore=DL3008 # the base image pins the versions`), and every ignored problem shows up
 in the log with its reason, or `no reason given`, just like the deviations in `kerbo.toml`; the
-summary adds how many were ignored in the code.
+summary adds how many were ignored in the code. `squawk-ignore` works, as in squawk, for its own
+line and the next one (also at the end of a line or inside `/* */`, with the reason after another
+`--`), and Go's `//nolint` with golangci-lint's scope. With `--format sarif` whatever is ignored
+comes out as suppressed in the source (`inSource`), with its reason, and GitHub shows it as
+dismissed.
 
 ### For AI agents
 

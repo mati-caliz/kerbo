@@ -1028,14 +1028,16 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
       `· N ignorados en el código`; con `--diff`, sólo los de las líneas cambiadas.
     - Para que la antitrampa corra en SQL y Dockerfile, `suppression-added` queda prendida en
       esos lenguajes (el resto de las reglas de código siguen sin medirse ahí).
-  - Pendientes de las supresiones en el código:
-    - `squawk-ignore-file` sin reglas (todas) no se reconoce: haría falta saber qué familia de
-      reglas es de cada herramienta. `# shellcheck disable=all` y el alcance real de las
-      directivas de ShellCheck quedaron hechos con las reglas `SC*`.
-    - squawk asocia el comentario a la sentencia siguiente; kerbo, a la línea siguiente: un
-      `ALTER TABLE` partido en varias líneas con la violación más abajo no queda cubierto.
-    - SARIF no los manda como `suppressions` (`kind: inSource`, con `justification`); GitHub los
-      mostraría como resueltos.
+  - Lo que faltaba de las supresiones en el código (hecho, 2026-10-21):
+    - `squawk-ignore` vale como en squawk: para la línea del comentario y la siguiente, también al
+      final de una línea o en un `/* */`, y lo que sigue a otro `--` es el motivo. Sin reglas no
+      silencia nada; `squawk-ignore-file` sin reglas silencia todas las de migraciones. Los
+      comentarios salen del lexer de SQL, así que un `--` dentro de un string no cuenta. (La nota
+      vieja decía que squawk asocia el comentario a la sentencia siguiente: no es así.)
+    - `unused-ignore`, la regla de squawk que marca un nombre de regla que no existe en un
+      `squawk-ignore`, en la posición del nombre.
+    - El SARIF manda lo silenciado como resultados con `suppressions` (`kind: inSource` y el
+      motivo como `justification`), así GitHub los muestra como descartados.
   - compose: el límite de CPU, `restart`, imágenes sin versión fija (como DL3006/DL3007) y los
     servicios que dependen de otro sin `condition: service_healthy`.
 

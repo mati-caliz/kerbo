@@ -127,7 +127,10 @@ problema de las reglas nombradas en la línea siguiente (o en todo el archivo, c
 `global`) no se cuenta. Lo que sigue a la lista de reglas es el motivo
 (`# hadolint ignore=DL3008 # la imagen base fija las versiones`), y cada problema ignorado sale en
 el log con su motivo, o `sin motivo`, igual que los desvíos de `kerbo.toml`; el resumen suma
-cuántos se ignoraron en el código.
+cuántos se ignoraron en el código. `squawk-ignore` vale, como en squawk, para su línea y la
+siguiente (también al final de una línea o en un `/* */`, con el motivo después de otro `--`), y
+`//nolint` de Go, con el alcance de golangci-lint. En `--format sarif` lo ignorado sale como
+suprimido en el código (`inSource`), con su motivo, y GitHub lo muestra como descartado.
 
 ### Para agentes de IA
 

@@ -1,6 +1,7 @@
 mod alter;
 mod columns;
 mod cursor;
+mod ignore;
 mod lexer;
 mod squawk;
 
@@ -36,8 +37,25 @@ pub fn violations(source: &str, first_line: usize) -> Vec<Violation> {
     let statements = statements(&tokens);
     let mut found = migration_violations(&statements);
     found.extend(squawk::violations(&statements));
+    found.extend(unknown_ignored_rules(source));
     found.sort_by_key(|violation| (violation.line, violation.column));
     found
+}
+
+pub use ignore::squawk_ignores;
+
+fn unknown_ignored_rules(source: &str) -> Vec<Violation> {
+    squawk_ignores(source)
+        .into_iter()
+        .flat_map(|ignore| ignore.unknown)
+        .map(|unknown| Violation {
+            rule: RuleId::Migration(MigrationRule::UnusedIgnore),
+            line: unknown.line,
+            column: unknown.column,
+            subject: unknown.name,
+            fix: None,
+        })
+        .collect()
 }
 
 pub fn snippet_violations(source: &str, first_line: usize) -> Vec<Violation> {

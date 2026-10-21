@@ -302,6 +302,12 @@ const MIGRATION_TEXTS: [RuleText; MigrationRule::ALL.len()] = [
         "Postgres rechaza la sentencia o se queda con un valor sin avisar cuál.",
         "INSERT INTO t (a, b, a) se vuelve INSERT INTO t (a, b).",
     ),
+    RuleText::new(
+        "Un squawk-ignore nombra una regla que no existe",
+        "corregí el nombre de la regla",
+        "El comentario no silencia nada: el aviso que se quería ignorar sigue saliendo y el nombre mal escrito queda ahí.",
+        "-- squawk-ignore ban-drop-colum se vuelve -- squawk-ignore ban-drop-column.",
+    ),
 ];
 
 pub fn migration(rule: MigrationRule) -> RuleText {

@@ -163,6 +163,8 @@ pub fn relaxed_by(preset: Preset) -> Vec<RuleId> {
         .collect()
 }
 
+pub use sql::squawk_ignores;
+
 pub fn alembic_violations(root: Node<'_>, source: &[u8]) -> Vec<Violation> {
     alembic::violations(root, source)
 }
