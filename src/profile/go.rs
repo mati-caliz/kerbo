@@ -81,7 +81,7 @@ pub static GO: Profile = Profile {
     short_names: ShortNameStyle::Varnamelen,
     duplicates: DuplicateStyle::Dupl,
     commented_code: CommentedCodeStyle::Gocritic,
-    lints: LintStyle::Unmeasured,
+    lints: LintStyle::GolangciLint,
     comments: &["comment"],
     literals: &["raw_string_literal", "interpreted_string_literal"],
     function_length_skips_iife: false,

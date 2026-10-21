@@ -133,5 +133,6 @@ pub fn explanation(rule: RuleId) -> Explanation {
         RuleId::Python(rule) => super::python::python(rule).explanation,
         RuleId::Eslint(rule) => super::eslint::eslint(rule).explanation,
         RuleId::Shell(rule) => super::shell::shell(rule).explanation,
+        RuleId::Go(rule) => super::go::go(rule).explanation,
     }
 }

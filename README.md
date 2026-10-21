@@ -376,6 +376,25 @@ Paridad, contra ShellCheck 0.11: cero diferencias por archivo, línea, columna y
 scripts de kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku y otros (1.680 avisos).
 Los archivos que tree-sitter-bash no parsea se saltean.
 
+### Go contra golangci-lint
+
+En Go, kerbo hace `ineffassign`, la regla del conjunto por defecto de golangci-lint que no necesita
+los tipos del compilador, con el mismo nombre: `kerbo explain ineffassign`, `--max ineffassign=0`
+o `ineffassign = "off"` en `kerbo.toml`. Marca una asignación que nadie lee antes de que se pise o
+termine la función, siguiendo ramas, loops, `switch` con `fallthrough`, `select`, `goto` y
+etiquetas; no cuentan las variables que captura un closure ni aquellas cuya dirección se toma.
+Como golangci-lint, saltea los archivos generados.
+
+`//nolint` vale como en golangci-lint: al final de una línea, para esa línea; en su propia línea,
+para lo que empieza justo abajo en la misma columna (una función, un `if`, el archivo entero si
+está antes de `package`). Sin lista o con `all` silencia todas las reglas, y el motivo de
+`//nolint:ineffassign // motivo` aparece en el reporte.
+
+Paridad, contra golangci-lint 2.15: cero diferencias por archivo, línea, columna y variable en la
+biblioteca estándar de Go, golang/tools, terraform, hugo, caddy, consul, prometheus y otros (103
+avisos en unos 10.500 archivos). El resto del conjunto por defecto (errcheck, govet, staticcheck y unused)
+pide los tipos del compilador y sigue en golangci-lint.
+
 ### Secretos y dependencias vulnerables
 
 `committed-secret` revisa todos los archivos versionados, no sólo el código, con las 222 reglas de

@@ -178,7 +178,7 @@ fn markers_of(source: &str, language: Language) -> Vec<Marker> {
         .map(|marker| marker.line)
         .collect();
     markers.extend(
-        directives(source)
+        directives(source, language == Language::Go)
             .into_iter()
             .filter(|directive| !marked.contains(&directive.line))
             .map(|directive| directive_marker(directive.line, &directive.text)),
@@ -258,7 +258,8 @@ fn marker_message(rule: RuleId, marker: &Marker) -> Message {
         | RuleId::VulnerableDependency
         | RuleId::Python(_)
         | RuleId::Eslint(_)
-        | RuleId::Shell(_) => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
+        | RuleId::Shell(_)
+        | RuleId::Go(_) => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
     }
 }
 

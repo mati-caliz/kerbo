@@ -27,7 +27,7 @@ const NO_CACHE: RuleId = RuleId::Dockerfile(DockerfileRule::Dl3009);
 #[test]
 fn reads_codes_reason_and_the_line_each_directive_covers() {
     let source = "FROM debian\n# hadolint ignore=DL3008, DL3009 # la imagen base fija las versiones\n\n# otro comentario\nRUN apt-get install -y curl\n";
-    let found = directives(source);
+    let found = directives(source, false);
     assert_eq!(found.len(), 1);
     let directive = found.first().expect("hay una directiva");
     assert_eq!(directive.line, 2);
@@ -69,15 +69,18 @@ fn file_directives_cover_every_line() {
             .collect::<Vec<_>>(),
         ["la columna ya no se lee", "la columna ya no se lee"]
     );
-    let global = directives("# hadolint global ignore=DL3008\nRUN x\n");
+    let global = directives("# hadolint global ignore=DL3008\nRUN x\n", false);
     assert_eq!(global.first().map(|directive| directive.scope), Some(Scope::File));
 }
 
 #[test]
 fn ignores_markers_that_are_not_a_leading_comment() {
-    assert_eq!(directives("RUN echo '# hadolint ignore=DL3008'\n"), Vec::new());
-    assert_eq!(directives("SELECT 1; -- squawk-ignore\n"), Vec::new());
-    let shell = directives("#!/bin/sh\n# shellcheck disable=SC2086\necho $a\n");
+    assert_eq!(
+        directives("RUN echo '# hadolint ignore=DL3008'\n", false),
+        Vec::new()
+    );
+    assert_eq!(directives("SELECT 1; -- squawk-ignore\n", false), Vec::new());
+    let shell = directives("#!/bin/sh\n# shellcheck disable=SC2086\necho $a\n", false);
     assert_eq!(
         shell.first().map(|directive| directive.covered_line),
         Some(Some(3))

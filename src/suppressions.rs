@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::lint::go_nolint_ranges;
 use crate::rules::Diagnostic;
 use crate::shell::{self, Coverage};
 
@@ -7,12 +8,14 @@ const CODE_SEPARATOR: char = ',';
 const REASON_LEADERS: &[char] = &[' ', '\t', '#', '-', ':', '—'];
 const FIRST_LINE: usize = 1;
 const REPEATED_SHELL_DISABLE: &str = "disable=";
+const GO_EXTENSION: &str = ".go";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
     NextLine,
     File,
     ShellStatement,
+    GoNolint,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,16 +75,18 @@ impl Directive {
         let in_scope = match self.scope {
             Scope::File => true,
             Scope::NextLine => self.covered_line == Some(diagnostic.line),
-            Scope::ShellStatement => self
+            Scope::GoNolint if !diagnostic.path.ends_with(GO_EXTENSION) => false,
+            Scope::ShellStatement | Scope::GoNolint => self
                 .covered_line
                 .zip(self.last_covered_line)
                 .is_some_and(|(first, last)| (first..=last).contains(&diagnostic.line)),
         };
         in_scope
-            && self.codes.iter().any(|code| {
-                diagnostic.rule.as_str().eq_ignore_ascii_case(code)
-                    || (self.scope == Scope::ShellStatement && shell::disables(code, diagnostic.rule))
-            })
+            && ((self.scope == Scope::GoNolint && self.codes.is_empty())
+                || self.codes.iter().any(|code| {
+                    diagnostic.rule.as_str().eq_ignore_ascii_case(code)
+                        || (self.scope == Scope::ShellStatement && shell::disables(code, diagnostic.rule))
+                }))
     }
 
     const fn with_shell_coverage(mut self, coverage: Option<Coverage>) -> Self {
@@ -97,7 +102,28 @@ impl Directive {
     }
 }
 
-pub fn directives(source: &str) -> Vec<Directive> {
+pub fn directives(source: &str, go: bool) -> Vec<Directive> {
+    let mut found = if go { go_directives(source) } else { Vec::new() };
+    found.extend(comment_directives(source));
+    found
+}
+
+fn go_directives(source: &str) -> Vec<Directive> {
+    go_nolint_ranges(source)
+        .into_iter()
+        .map(|range| Directive {
+            line: range.line,
+            text: range.text,
+            scope: Scope::GoNolint,
+            codes: range.linters,
+            reason: range.reason,
+            covered_line: Some(range.line),
+            last_covered_line: Some(range.last_line),
+        })
+        .collect()
+}
+
+fn comment_directives(source: &str) -> Vec<Directive> {
     if !SYNTAXES.iter().any(|syntax| source.contains(syntax.marker)) {
         return Vec::new();
     }
@@ -149,7 +175,10 @@ pub fn split(source: &[u8], diagnostics: Vec<Diagnostic>) -> (Vec<Diagnostic>, V
     if diagnostics.is_empty() {
         return (diagnostics, Vec::new());
     }
-    let found = directives(&String::from_utf8_lossy(source));
+    let go = diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.path.ends_with(GO_EXTENSION));
+    let found = directives(&String::from_utf8_lossy(source), go);
     if found.is_empty() {
         return (diagnostics, Vec::new());
     }

@@ -1,6 +1,7 @@
 mod ecmascript;
 mod final_class;
 mod final_parameters;
+mod go;
 mod imports;
 mod java;
 mod modifiers;
@@ -17,7 +18,7 @@ use crate::fix::Fix;
 use crate::language::Language;
 use crate::limits::{Limits, Preset};
 use crate::profile::LintStyle;
-use crate::rules::{EslintRule, PythonRule, RuleId};
+use crate::rules::{EslintRule, GoRule, PythonRule, RuleId};
 use crate::syntax::one_based;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,6 +38,7 @@ pub enum LintKind {
     FinalClass,
     Python(PythonRule),
     Eslint(EslintRule),
+    Go(GoRule),
 }
 
 impl LintKind {
@@ -50,6 +52,7 @@ impl LintKind {
             Self::FinalParameter => RuleId::FinalParameter,
             Self::FinalClass => RuleId::FinalClass,
             Self::Python(rule) => RuleId::Python(rule),
+            Self::Go(rule) => RuleId::Go(rule),
         }
     }
 }
@@ -76,6 +79,7 @@ pub const LINT_RULES: [RuleId; 6] = [
     RuleId::FinalClass,
 ];
 
+pub use go::nolint_ranges as go_nolint_ranges;
 pub use python::relaxed_by as python_relaxed_by;
 
 pub fn find_lints(
@@ -88,6 +92,7 @@ pub fn find_lints(
         LintStyle::Unmeasured => Vec::new(),
         LintStyle::Checkstyle => java_lints(root, unit.source, limits),
         LintStyle::Ruff => python::findings(root, unit.source, limits, unit.path),
+        LintStyle::GolangciLint => go::findings(root, unit.source, limits),
         LintStyle::Eslint => {
             let file = ecmascript::SourceFile {
                 source: unit.source,

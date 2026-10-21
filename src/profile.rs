@@ -155,6 +155,7 @@ pub enum LintStyle {
     Checkstyle,
     Ruff,
     Eslint,
+    GolangciLint,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

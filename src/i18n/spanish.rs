@@ -9,6 +9,7 @@ mod dockerfile;
 mod eslint;
 mod explanations;
 mod fixes;
+mod go;
 mod shell;
 
 const ANONYMOUS_FUNCTION: &str = "(anónima)";
@@ -115,6 +116,7 @@ impl Catalog for Spanish {
             RuleId::Python(rule) => python::python(rule).description,
             RuleId::Eslint(rule) => eslint::eslint(rule).description,
             RuleId::Shell(rule) => shell::shell(rule).description,
+            RuleId::Go(rule) => go::go(rule).description,
         }
     }
 
@@ -208,6 +210,7 @@ impl Catalog for Spanish {
                 format!("La clase `{subject}` debería ser final: no se puede heredar desde afuera")
             }
             LintKind::Python(rule) => with_subject(python::python(rule).description, subject),
+            LintKind::Go(rule) => with_subject(go::go(rule).description, subject),
         }
     }
 

@@ -148,9 +148,11 @@ rule_family!(ComposeRule {
 });
 
 mod eslint;
+mod go;
 mod shell;
 
 pub use eslint::{EslintRule, eslint_index};
+pub use go::{GoRule, go_index};
 pub use shell::{ShellRule, shell_index};
 
 pub const FAMILY_RULES: usize = MigrationRule::ALL.len()
@@ -158,7 +160,8 @@ pub const FAMILY_RULES: usize = MigrationRule::ALL.len()
     + ComposeRule::ALL.len()
     + PythonRule::ALL.len()
     + EslintRule::ALL.len()
-    + ShellRule::ALL.len();
+    + ShellRule::ALL.len()
+    + GoRule::ALL.len();
 
 pub const fn with_families<const CODE: usize, const TOTAL: usize>(code: [RuleId; CODE]) -> [RuleId; TOTAL] {
     let mut all = [RuleId::FileLength; TOTAL];
@@ -168,7 +171,8 @@ pub const fn with_families<const CODE: usize, const TOTAL: usize>(code: [RuleId;
     let free = wrap_compose(free, &ComposeRule::ALL);
     let free = wrap_python(free, &PythonRule::ALL);
     let free = eslint::wrap_eslint(free, &EslintRule::ALL);
-    shell::wrap_shell(free, &ShellRule::ALL);
+    let free = shell::wrap_shell(free, &ShellRule::ALL);
+    go::wrap_go(free, &GoRule::ALL);
     all
 }
 
