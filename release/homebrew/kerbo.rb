@@ -1,7 +1,7 @@
 class Kerbo < Formula
   desc "Analizador de calidad multi-lenguaje"
   homepage "https://kerbo.matiascaliz.com.ar"
-  version "0.6.0"
+  version "0.7.0"
   license "Apache-2.0"
 
   on_macos do
