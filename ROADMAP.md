@@ -294,7 +294,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   - Lo que no se puede sin tipos: el `Result` que devuelve un closure sin anotarlo y los módulos
     que declara una macro procedural. Ahí la referencia sigue siendo clippy.
 
-### 6. Distribución (hecho: binarios, crates.io y Homebrew, falta la primera publicación)
+### 6. Distribución (hecho: publicada desde 0.7.0)
 
 - Binarios para macOS (x86 y ARM), Windows y Linux ARM, armados sólo al publicar una versión
   (hecho: el workflow de release corre con un tag `v<versión>` que tiene que coincidir con el
@@ -302,16 +302,14 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   sha256 al release; el instalador elige el de la máquina, también bajo Rosetta).
 - `cargo install kerbo` desde crates.io, y Homebrew (hecho: el paquete lleva sólo el código, los
   tests, el README y la licencia, y pasa `cargo publish --dry-run`; la fórmula usa los binarios
-  del release y el workflow le pone los sha256 de cada versión). El tap
-  `mati-caliz/homebrew-tap` existe desde el 2026-10-21, público, con un README y `Formula/`
-  vacía para que el workflow lo pueda clonar. Pendiente: cargar en kerbo los secretos
-  `HOMEBREW_TAP_TOKEN` (un token fine-grained con escritura sólo sobre el tap) y
-  `CARGO_REGISTRY_TOKEN` (de crates.io); sin ellos el workflow deja la fórmula como artefacto y
-  no publica en crates.io.
+  del release y el workflow le pone los sha256 de cada versión).
+- Primera publicación (hecho, 0.7.0, 2026-10-21): el workflow corrió entero por primera vez y
+  dejó los cinco binarios en el release, la fórmula en `mati-caliz/homebrew-tap` y el crate en
+  crates.io. Los secretos son `HOMEBREW_TAP_TOKEN` (fine-grained, sólo escritura de contenido
+  sobre el tap) y `CARGO_REGISTRY_TOKEN` (`publish-new` y `publish-update`); crates.io rechaza
+  publicar si la cuenta no tiene el mail verificado. 0.4 a 0.6 son releases a mano con sólo el
+  binario de Linux.
 - Pendientes de la distribución:
-  - Publicar el primer tag: hasta entonces `cargo install kerbo` y `brew install
-    mati-caliz/tap/kerbo`, que ya figuran en el README y en el instalador, no funcionan, y el
-    workflow de release no corrió nunca en GitHub Actions.
   - El sitio con el instalador para Linux, macOS y Windows, Homebrew y `cargo install kerbo`
     (hecho).
   - Binario para Windows ARM e instalador en PowerShell para quien no tiene el bash de Git.
