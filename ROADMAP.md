@@ -302,9 +302,12 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   sha256 al release; el instalador elige el de la máquina, también bajo Rosetta).
 - `cargo install kerbo` desde crates.io, y Homebrew (hecho: el paquete lleva sólo el código, los
   tests, el README y la licencia, y pasa `cargo publish --dry-run`; la fórmula usa los binarios
-  del release y el workflow le pone los sha256 de cada versión). Pendiente: crear el tap
-  `mati-caliz/homebrew-tap` y cargar los secretos `HOMEBREW_TAP_TOKEN` y `CARGO_REGISTRY_TOKEN`;
-  sin ellos el workflow deja la fórmula como artefacto y no publica en crates.io.
+  del release y el workflow le pone los sha256 de cada versión). El tap
+  `mati-caliz/homebrew-tap` existe desde el 2026-10-21, público, con un README y `Formula/`
+  vacía para que el workflow lo pueda clonar. Pendiente: cargar en kerbo los secretos
+  `HOMEBREW_TAP_TOKEN` (un token fine-grained con escritura sólo sobre el tap) y
+  `CARGO_REGISTRY_TOKEN` (de crates.io); sin ellos el workflow deja la fórmula como artefacto y
+  no publica en crates.io.
 - Pendientes de la distribución:
   - Publicar el primer tag: hasta entonces `cargo install kerbo` y `brew install
     mati-caliz/tap/kerbo`, que ya figuran en el README y en el instalador, no funcionan, y el
