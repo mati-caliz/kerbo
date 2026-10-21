@@ -1,14 +1,28 @@
 use super::violations;
 use crate::rules::{MigrationRule, RuleId};
 
+const LOCKING_RULES: [MigrationRule; 9] = [
+    MigrationRule::RequireConcurrentIndexCreation,
+    MigrationRule::RequireConcurrentIndexDeletion,
+    MigrationRule::AddingRequiredField,
+    MigrationRule::AddingNotNullableField,
+    MigrationRule::ChangingColumnType,
+    MigrationRule::RenamingColumn,
+    MigrationRule::RenamingTable,
+    MigrationRule::BanDropColumn,
+    MigrationRule::BanDropTable,
+];
+
 fn found(source: &str) -> Vec<(MigrationRule, usize, String)> {
     violations(source, 1)
         .into_iter()
-        .map(|violation| {
+        .filter_map(|violation| {
             let RuleId::Migration(rule) = violation.rule else {
                 panic!("regla inesperada {:?}", violation.rule);
             };
-            (rule, violation.line, violation.subject)
+            LOCKING_RULES
+                .contains(&rule)
+                .then_some((rule, violation.line, violation.subject))
         })
         .collect()
 }

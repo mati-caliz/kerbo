@@ -139,6 +139,14 @@ fn scans_migrations_dockerfiles_and_compose_files_through_the_cache() {
         ("compose.yaml".to_owned(), "compose-memory-limit"),
         (
             "prisma/migrations/1_init/migration.sql".to_owned(),
+            "require-lock-timeout",
+        ),
+        (
+            "prisma/migrations/1_init/migration.sql".to_owned(),
+            "require-statement-timeout",
+        ),
+        (
+            "prisma/migrations/1_init/migration.sql".to_owned(),
             "ban-drop-column",
         ),
     ];
@@ -152,6 +160,6 @@ fn scans_migrations_dockerfiles_and_compose_files_through_the_cache() {
             .collect();
         assert_eq!(found, expected);
     }
-    assert_eq!(run(&[Stack::Sql]).diagnostics.len(), 1);
+    assert_eq!(run(&[Stack::Sql]).diagnostics.len(), 3);
     assert_eq!(run(&[Stack::Docker]).diagnostics.len(), 2);
 }

@@ -543,6 +543,12 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   cerrar y excepciones tragadas (en Qodana los nulos son 145 y los recursos 10).
 - Contaminación de entradas hacia SQL, comandos, rutas y HTML, en todos los lenguajes, sobre el
   mismo grafo.
+- **Renombres de columnas y tablas que el código desplegado todavía usa** (viene de la etapa 12).
+  Sin compilar no hay forma confiable: los nombres pasan por los mapeos del ORM (`@map` de
+  Prisma, `name=` de SQLAlchemy, los nombres de drizzle), cambian de caso y coinciden con palabras
+  comunes (`name`, `status`), así que buscar el nombre viejo en el código da falsos positivos y
+  negativos. Con el índice del proyecto se puede leer el esquema del ORM y cruzarlo con la
+  migración; mientras tanto, como squawk, todo renombre se marca.
 - Paridad contra Qodana con el perfil `Default`, inspección por inspección. Donde Qodana se
   equivoca por no conocer el framework, la diferencia queda fijada en un test como mejora, no
   como desvío.
@@ -963,23 +969,44 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   a la de las reglas de Java). Textos en español e inglés en `src/i18n/*/deploy.rs` y
   `src/i18n/*/dockerfile.rs`, con `kerbo explain` para cada regla.
 - Pendientes:
-  - **Renombres que el código desplegado todavía usa**: no hay forma confiable sin compilar. Los
-    nombres de columnas pasan por los mapeos del ORM (`@map` de Prisma, `name=` de SQLAlchemy,
-    los nombres de drizzle), cambian de caso y coinciden con palabras comunes (`name`, `status`),
-    así que buscar el nombre viejo en el código da falsos positivos y negativos. Mientras tanto,
-    como squawk, todo renombre se marca. Lo confiable sería leer el esquema del ORM (Prisma,
-    drizzle, modelos de SQLAlchemy) y cruzarlo con la migración.
-  - El resto de squawk: `adding-foreign-key-constraint`, `constraint-missing-not-valid`,
-    `ban-drop-not-null`, `ban-drop-constraint`, `adding-field-with-default` con default volátil,
-    `adding-serial-primary-key-field`, `disallowed-unique-constraint`,
-    `ban-concurrent-index-creation-in-transaction`, `require-timeout-settings`,
-    `transaction-nesting`, `renaming-object` y las de preferencia (`prefer-bigint-over-int`,
-    `prefer-text-field`, `prefer-timestamptz`, `prefer-identity`, `prefer-robust-stmts`).
-  - Alembic: expandir los `for` sobre listas literales para contar una vez por tabla, seguir las
+  - Los renombres que el código desplegado todavía usa pasaron a la etapa 9 (piden el índice del
+    proyecto y el esquema del ORM), y las migraciones de Django y Rails, a la etapa 14.
+  - El resto de squawk (hecho, 2026-10-21): las 40 reglas que squawk 2.70 trae prendidas y kerbo
+    no tenía, con su criterio portado del código de squawk (licencia Apache-2.0/MIT; la lista de
+    funciones no volátiles de `adding-field-with-default` está copiada en
+    `src/deploy/sql/squawk/non_volatile_functions.txt` con su origen). Queda afuera
+    `prefer-repack`, que squawk sólo corre con Postgres 19 y con el 15 de fábrica nunca marca.
+    - Nuevas: los timeouts (`require-lock-timeout`, `require-statement-timeout`, sobre la primera
+      sentencia que squawk considera lenta), las restricciones (`constraint-missing-not-valid`,
+      `adding-foreign-key-constraint`, `adding-serial-primary-key-field`,
+      `disallowed-unique-constraint`), `adding-field-with-default` con el mismo criterio de
+      expresiones no volátiles (`-1` y `(0)` cuentan como volátiles, `interval '1 day'` no), los
+      tipos (`prefer-bigint-over-int`, `prefer-bigint-over-smallint`, `prefer-identity`,
+      `prefer-text-field`, `prefer-timestamp-tz`, `ban-char-field`), los borrados
+      (`ban-drop-constraint`, `-default`, `-not-null`, `-generated-expression`, `-type`,
+      `-function`, `-sequence`, `-view`, `-schema`, `-domain`, `-extension`, `-database`),
+      `renaming-object`, `ban-set-schema`, `require-enum-value-ordering`, `ban-alter-identity`, los
+      dominios, `require-concurrent-reindex`, `require-concurrent-partition-detach`,
+      `ban-truncate-cascade`, las de transacciones (`transaction-nesting`,
+      `ban-uncommitted-transaction`, `ban-concurrent-index-creation-in-transaction`,
+      `prefer-robust-stmts`, que reconoce las transacciones de Alembic con `alembic_version`),
+      `identifier-too-long` y `ban-duplicate-column-assignments`, con la inferencia de nombres de
+      columna de squawk para vistas y `SELECT INTO` (`count(*)` se llama `count`, `t.a` se llama
+      `a`, un literal `?column?`).
+    - Frecuencia en el corpus: los timeouts en casi cada archivo (1.730), `ban-drop-constraint`
+      896, `prefer-timestamp-tz` 882, `prefer-bigint-over-int` 830,
+      `constraint-missing-not-valid` 480, `adding-foreign-key-constraint` 412, `prefer-text-field`
+      277 y el resto con menos de 170; 15 de las reglas no aparecen ni una vez.
+    - Paridad contra squawk 2.70.0 (`--assume-in-transaction`, 2026-10-21) en las 1.858
+      migraciones de lobe-chat, documenso, trigger.dev, cal.com, conductor y awesome-compose:
+      **9.612 de 9.612 avisos, ninguno de más**, con las nueve reglas anteriores. Las que no
+      aparecen en el corpus están fijadas con la salida de squawk en `src/deploy/sql/fixtures/`.
+    - `recommended` apaga las de preferencia de tipos (`prefer-*` y `ban-char-field`) y
+      `minimal`, también los timeouts.
+  - Alembic: traducir `op.*` a las 40 reglas nuevas (hoy sólo corren las nueve primeras: los
+    fragmentos de `op.execute(...)` no pasan por las reglas de nivel archivo), expandir los `for` sobre listas literales para contar una vez por tabla, seguir las
     funciones auxiliares que llaman a `op` desde fuera de `upgrade()`, y medir paridad sobre las
     401 revisiones que el modo offline no convierte (habría que levantar cada aplicación).
-  - Migraciones de Django y Rails (`AddIndex` sin `AddIndexConcurrently`, `add_index` sin
-    `algorithm: :concurrently`), con strong_migrations como referencia de Rails.
   - Las reglas de hadolint que faltan (sobre todo DL3046, DL3033 y DL4005) y las de ShellCheck
     sobre el shell de cada `RUN`, que es la etapa 10.
   - Los Dockerfile y compose en carpetas ocultas (hecho: el recorrido entra a `.github/` y
@@ -1015,3 +1042,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
 ### 13. Formateo propio
 
 - Lenguaje por lenguaje, y sólo cuando la salida sea idéntica a la de la herramienta actual.
+
+### 14. Más migraciones: Django y Rails
+
+- Migraciones de Django (sobre el árbol de Python que ya existe: `AddIndex` sin
+  `AddIndexConcurrently`, `AddField` con `null=False` sin default, `RemoveField`, `RenameField`) y
+  de Rails (`add_index` sin `algorithm: :concurrently`, `remove_column`, `change_column`), con
+  strong_migrations como referencia de Rails. Rails pide sumar una gramática de Ruby. Viene de la
+  etapa 12.

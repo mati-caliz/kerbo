@@ -13,7 +13,7 @@ use crate::fix::Fix;
 use crate::i18n::Message;
 use crate::language::Language;
 use crate::limits::{Limits, Preset};
-use crate::rules::{ComposeRule, Diagnostic, DockerfileRule, FileIdentity, RuleId};
+use crate::rules::{ComposeRule, Diagnostic, DockerfileRule, FileIdentity, MigrationRule, RuleId};
 use dockerfile::severity::{Severity, severity};
 
 const SQL_EXTENSION: &str = "sql";
@@ -117,6 +117,27 @@ pub fn analyze(
     }
 }
 
+const MIGRATION_PREFERENCES: [MigrationRule; 7] = [
+    MigrationRule::PreferBigintOverInt,
+    MigrationRule::PreferBigintOverSmallint,
+    MigrationRule::PreferIdentity,
+    MigrationRule::PreferTextField,
+    MigrationRule::PreferTimestampTz,
+    MigrationRule::PreferRobustStmts,
+    MigrationRule::BanCharField,
+];
+const MIGRATION_MINIMAL_OFF: [MigrationRule; 9] = [
+    MigrationRule::PreferBigintOverInt,
+    MigrationRule::PreferBigintOverSmallint,
+    MigrationRule::PreferIdentity,
+    MigrationRule::PreferTextField,
+    MigrationRule::PreferTimestampTz,
+    MigrationRule::PreferRobustStmts,
+    MigrationRule::BanCharField,
+    MigrationRule::RequireLockTimeout,
+    MigrationRule::RequireStatementTimeout,
+];
+
 pub fn relaxed_by(preset: Preset) -> Vec<RuleId> {
     let relaxed: &[Severity] = match preset {
         Preset::Strict => &[],
@@ -128,11 +149,17 @@ pub fn relaxed_by(preset: Preset) -> Vec<RuleId> {
     } else {
         &[]
     };
+    let migrations: &[MigrationRule] = match preset {
+        Preset::Strict => &[],
+        Preset::Recommended => &MIGRATION_PREFERENCES,
+        Preset::Minimal => &MIGRATION_MINIMAL_OFF,
+    };
     DockerfileRule::ALL
         .into_iter()
         .filter(|rule| relaxed.contains(&severity(*rule)))
         .map(RuleId::Dockerfile)
         .chain(compose.iter().copied().map(RuleId::Compose))
+        .chain(migrations.iter().copied().map(RuleId::Migration))
         .collect()
 }
 

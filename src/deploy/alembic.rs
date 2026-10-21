@@ -191,7 +191,8 @@ impl Upgrade {
             .unwrap_or(statement);
         if let Some(sql) = string_value(literal, source) {
             let first_line = one_based(literal.start_position().row);
-            self.violations.extend(super::sql::violations(&sql, first_line));
+            self.violations
+                .extend(super::sql::snippet_violations(&sql, first_line));
         }
     }
 }

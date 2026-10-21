@@ -455,6 +455,25 @@ on a table created in the same migration is not flagged.
 | `changing-column-type` | `ALTER COLUMN ... TYPE` (also on composite types) |
 | `renaming-column`, `renaming-table` | renamed columns, attributes and tables |
 | `ban-drop-column`, `ban-drop-table` | dropped columns, attributes and tables |
+| `require-lock-timeout`, `require-statement-timeout` | the first lock-taking operation without a `SET lock_timeout` or `statement_timeout` before it |
+| `constraint-missing-not-valid`, `adding-foreign-key-constraint` | constraints and foreign keys without `NOT VALID`, or validated in the same transaction |
+| `adding-serial-primary-key-field`, `disallowed-unique-constraint` | `PRIMARY KEY` and `UNIQUE` without `USING INDEX` on a table that already existed |
+| `adding-field-with-default` | a column with a volatile default (`random()`, `gen_random_uuid()`) or a generated one |
+| `prefer-bigint-over-int`, `prefer-bigint-over-smallint`, `prefer-identity`, `prefer-text-field`, `prefer-timestamp-tz`, `ban-char-field` | `int`, `smallint`, `serial`, `varchar(n)`, `timestamp` without a time zone and `char(n)` in new or changed columns |
+| `ban-drop-constraint`, `ban-drop-default`, `ban-drop-not-null`, `ban-drop-generated-expression` | dropped constraints, defaults, `NOT NULL` and generated expressions |
+| `ban-drop-type`, `ban-drop-function`, `ban-drop-sequence`, `ban-drop-view`, `ban-drop-schema`, `ban-drop-domain`, `ban-drop-extension`, `ban-drop-database` | dropped objects the code may use |
+| `renaming-object`, `ban-set-schema` | renamed constraints, indexes, types, views and functions, and objects moved to another schema |
+| `require-enum-value-ordering`, `ban-alter-identity`, `ban-create-domain-with-constraint`, `ban-alter-domain-with-add-constraint` | enum values without a position, changed identities and domains with constraints |
+| `require-concurrent-reindex`, `require-concurrent-partition-detach`, `ban-truncate-cascade` | `REINDEX` and `DETACH PARTITION` without `CONCURRENTLY`, and `TRUNCATE ... CASCADE` |
+| `transaction-nesting`, `ban-uncommitted-transaction`, `ban-concurrent-index-creation-in-transaction`, `prefer-robust-stmts` | `BEGIN`/`COMMIT` inside the tool's transaction, unclosed transactions, `CONCURRENTLY` inside a transaction and statements without `IF [NOT] EXISTS` outside one |
+| `identifier-too-long`, `ban-duplicate-column-assignments` | names longer than 63 bytes and repeated columns in a table, an `INSERT`, a `SET` or a view |
+
+It is squawk 2.70's whole default set except `prefer-repack`, which squawk only runs for
+Postgres 19. `recommended` turns off the type preferences (`prefer-*` and `ban-char-field`) and
+`minimal` also the timeouts. Parity, against squawk 2.70 with `--assume-in-transaction`: all 9,612
+of squawk's reports, none extra, in 1,858 migrations from lobe-chat (drizzle), documenso,
+trigger.dev and cal.com (Prisma), conductor (Flyway) and awesome-compose. In Alembic, for now,
+only the first nine run.
 
 **Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` and `*.Dockerfile`, against
 [hadolint](https://github.com/hadolint/hadolint): the 38 most common DL rules, named by their code

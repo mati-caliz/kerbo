@@ -1,6 +1,8 @@
 mod alter;
+mod columns;
 mod cursor;
 mod lexer;
+mod squawk;
 
 use std::collections::{HashMap, HashSet};
 
@@ -31,6 +33,19 @@ struct Migration {
 
 pub fn violations(source: &str, first_line: usize) -> Vec<Violation> {
     let tokens = tokenize(source, first_line);
+    let statements = statements(&tokens);
+    let mut found = migration_violations(&statements);
+    found.extend(squawk::violations(&statements));
+    found.sort_by_key(|violation| (violation.line, violation.column));
+    found
+}
+
+pub fn snippet_violations(source: &str, first_line: usize) -> Vec<Violation> {
+    let tokens = tokenize(source, first_line);
+    migration_violations(&statements(&tokens))
+}
+
+fn migration_violations(statements: &[&[Token]]) -> Vec<Violation> {
     let mut migration = Migration {
         created_tables: HashSet::new(),
         inside_transaction: true,
@@ -39,7 +54,7 @@ pub fn violations(source: &str, first_line: usize) -> Vec<Violation> {
         externally_validated_tables: HashSet::new(),
         violations: Vec::new(),
     };
-    for statement in statements(&tokens) {
+    for statement in statements {
         migration.statement(statement);
     }
     migration.violations

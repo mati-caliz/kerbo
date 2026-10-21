@@ -452,6 +452,25 @@ se marca.
 | `changing-column-type` | `ALTER COLUMN ... TYPE` (también en tipos compuestos) |
 | `renaming-column`, `renaming-table` | renombres de columnas, atributos y tablas |
 | `ban-drop-column`, `ban-drop-table` | borrados de columnas, atributos y tablas |
+| `require-lock-timeout`, `require-statement-timeout` | la primera operación que toma locks sin un `SET lock_timeout` o `statement_timeout` antes |
+| `constraint-missing-not-valid`, `adding-foreign-key-constraint` | restricciones y claves foráneas sin `NOT VALID`, o validadas en la misma transacción |
+| `adding-serial-primary-key-field`, `disallowed-unique-constraint` | `PRIMARY KEY` y `UNIQUE` sin `USING INDEX` sobre una tabla que ya existía |
+| `adding-field-with-default` | una columna con un default volátil (`random()`, `gen_random_uuid()`) o generada |
+| `prefer-bigint-over-int`, `prefer-bigint-over-smallint`, `prefer-identity`, `prefer-text-field`, `prefer-timestamp-tz`, `ban-char-field` | `int`, `smallint`, `serial`, `varchar(n)`, `timestamp` sin zona y `char(n)` en columnas nuevas o cambiadas |
+| `ban-drop-constraint`, `ban-drop-default`, `ban-drop-not-null`, `ban-drop-generated-expression` | borrados de restricciones, defaults, `NOT NULL` y expresiones generadas |
+| `ban-drop-type`, `ban-drop-function`, `ban-drop-sequence`, `ban-drop-view`, `ban-drop-schema`, `ban-drop-domain`, `ban-drop-extension`, `ban-drop-database` | borrados de objetos que el código puede usar |
+| `renaming-object`, `ban-set-schema` | renombres de restricciones, índices, tipos, vistas y funciones, y objetos movidos a otro esquema |
+| `require-enum-value-ordering`, `ban-alter-identity`, `ban-create-domain-with-constraint`, `ban-alter-domain-with-add-constraint` | valores de enum sin posición, identidades cambiadas y dominios con restricciones |
+| `require-concurrent-reindex`, `require-concurrent-partition-detach`, `ban-truncate-cascade` | `REINDEX` y `DETACH PARTITION` sin `CONCURRENTLY`, y `TRUNCATE ... CASCADE` |
+| `transaction-nesting`, `ban-uncommitted-transaction`, `ban-concurrent-index-creation-in-transaction`, `prefer-robust-stmts` | `BEGIN`/`COMMIT` dentro de la transacción de la herramienta, transacciones sin cerrar, `CONCURRENTLY` en una transacción y sentencias sin `IF [NOT] EXISTS` fuera de ella |
+| `identifier-too-long`, `ban-duplicate-column-assignments` | nombres de más de 63 bytes y columnas repetidas en una tabla, un `INSERT`, un `SET` o una vista |
+
+Es el conjunto por defecto de squawk 2.70 entero, salvo `prefer-repack`, que squawk sólo corre con
+Postgres 19. `recommended` apaga las de preferencia de tipos (`prefer-*` y `ban-char-field`) y
+`minimal`, también los timeouts. Paridad, contra squawk 2.70 con `--assume-in-transaction`: los
+9.612 avisos de squawk, ninguno de más, en 1.858 migraciones de lobe-chat (drizzle), documenso,
+trigger.dev y cal.com (Prisma), conductor (Flyway) y awesome-compose. En Alembic, por ahora, sólo
+corren las nueve primeras.
 
 **Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` y `*.Dockerfile`, contra
 [hadolint](https://github.com/hadolint/hadolint): las 38 reglas DL más comunes, con su código como
