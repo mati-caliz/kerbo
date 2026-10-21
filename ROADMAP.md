@@ -83,7 +83,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   main` marca sólo lo nuevo, así se adopta sin arreglar todo antes.
 - **SARIF** y una **GitHub Action** que anota los problemas en el pull request.
 
-### 3. Capa para agentes de IA (hecho: 0.3 y el servidor MCP en 0.4)
+### 3. Capa para agentes de IA (abierta: lo central en 0.3 y el servidor MCP en 0.4)
 
 - **Antitrampa**: avisar cuando un cambio agrega una supresión (`eslint-disable`, `noqa`,
   `nolint`, `@SuppressWarnings`, `#[allow]`), afloja un umbral en una
@@ -146,6 +146,11 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
       lo confirma o lo revierte.
     - Medir con el tokenizador de los Claude actuales (por la API de conteo de tokens) cuando el
       arnés la use de todos modos.
+- **El demonio para agentes** (pendiente; el demonio en sí se hizo en la fase 7):
+  - Que el hook lo arranque solo la primera vez, en lugar de pedir `kerbo daemon start`.
+  - Atender pedidos en paralelo: hoy va de a uno porque cambia el directorio del proceso, y un
+    `check` largo hace esperar al hook. Pide pasar el directorio a todo lo que hoy resuelve rutas
+    relativas.
 - **Cuánto gasta un agente de punta a punta** (pendiente). La velocidad de kerbo ya está medida;
   falta medir lo que paga quien lo usa con un agente: correr el gate, leer la salida, arreglar y
   volver a correr hasta que pase.
@@ -219,7 +224,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   Sumar Qodana al arnés de paridad cuando una regla de Java coincida con una inspección quedó en
   la etapa 8, con esas reglas.
 
-### 5. Más reglas universales y Rust (hecho: las reglas en 0.6, Rust en main)
+### 5. Más reglas universales y Rust (abierta: las reglas en 0.6, Rust en main)
 
 - Anidamiento (hecho para TypeScript y Go, con paridad contra `max-depth` de ESLint y
   `max-control-nesting` de revive; Java mide `if`, `for` y `try` por separado y va con las reglas
@@ -339,7 +344,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     filas, bloques de instalación y comandos copiables de los dos sitios; si algo está en un
     idioma y no en el otro, el gate falla).
 
-### 7. Caché y rendimiento
+### 7. Caché y rendimiento (cerrada)
 
 - Caché por contenido de archivo, comprimida y con tope de tamaño: sólo se analiza lo que
   cambió (hecho). Guarda lo que mide el análisis de cada archivo, también los tokens y nodos que
@@ -414,9 +419,20 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   se mueve: lo domina leer y parsear. Juntar las pasadas ahorraría como mucho la mitad de ese
   10 %, y obliga a fundir ciclomática y cognitiva, que están ajustadas una por una contra cada
   herramienta de referencia.
-- Un demonio por máquina, con los árboles y la caché en memoria, compartido por el hook, el
-  servidor MCP, el LSP y `kerbo check`: varias sesiones de agentes en el mismo repo no repiten el
-  trabajo, y el hook responde sin arrancar un proceso por edición.
+- Un demonio por máquina (hecho, 2026-10-21): `kerbo daemon start|status|stop`. `kerbo check` y
+  el hook le mandan los argumentos, el directorio, el idioma y la entrada por TCP en `127.0.0.1`
+  (un solo camino para Linux, macOS y Windows; la std no trae named pipes), con el puerto y un
+  token en `daemon.json` dentro de la caché, sólo legible por el dueño. El demonio corre el mismo
+  `app::run` con la caché ya cargada en memoria y devuelve la salida y el código de salida. Si no
+  hay demonio, si es de otro binario o con otro tope de caché, o si algo falla, el comando corre
+  solo como antes, con la entrada ya leída. Se apaga solo tras 30 minutos sin uso. Atiende de a
+  un pedido por vez, porque cambia el directorio del proceso: un `check` largo hace esperar al
+  hook. El MCP y el LSP ya son procesos largos y siguen corriendo en el suyo, con la caché
+  compartida dentro del proceso.
+  En un contenedor con 4 núcleos, sobre kerbo mismo: el hook pasa de 20 a 14 ms con un archivo de
+  Python mínimo y de 29 a 20 ms con uno de Rust, y `kerbo check src` en caliente de 29 a 23 ms,
+  con el mismo reporte. Lo que queda es arrancar el proceso cliente (unos 13 ms). Lo que falta
+  del demonio quedó en la fase 3.
 
 ### 8. Java sintáctico (empezada)
 

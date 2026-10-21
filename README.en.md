@@ -71,8 +71,9 @@ duplicate blocks, is recombined with what was stored). It lives in the user's ca
 `KERBO_CACHE_DIR`), is shared across projects and clones, takes at most 256 MB (another cap with
 `max_megabytes` in the `[cache]` section of `kerbo.toml`, or with `KERBO_CACHE_MAX_MB`, which wins
 over the file) and is discarded on its own when the binary or the configuration that affects a
-file changes. Two runs at once do not overwrite each other: before writing, each one rereads what
-the other left. If it breaks, it is ignored. `--no-cache` turns it off.
+file changes. Two runs at once do not overwrite each other: each part of the cache is written under
+an operating system lock, rereading what the other left. If it breaks, it is ignored. `--no-cache`
+turns it off.
 
 Messages come out in Spanish or English. `--lang en` (or `es`) wins, then `lang` in
 `kerbo.toml`, then the system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`); without any of them,
@@ -163,6 +164,12 @@ dismissed.
   In a git repo it only looks at what changed against `HEAD`, anti-cheat included, and it honors
   the baseline: the agent does not start fixing code it did not touch. If kerbo fails, the hook
   does not block.
+- **Daemon** (`kerbo daemon start`, `status` and `stop`): one process per user and machine, with
+  the cache in memory, that `kerbo check` and the hook hand their work to, so several agent
+  sessions on the same machine do not start from scratch on every edit. It only listens on
+  `127.0.0.1`, with a token kept in the cache folder, and stops itself after 30 idle minutes. If
+  it is not running, or it belongs to another kerbo version, every command runs on its own as
+  always, with the same output.
 - **MCP server** (`kerbo mcp`, over stdio) with three tools: `kerbo_check` (folders, `diff` and
   languages; returns the output for agents), `kerbo_fix` (the same as `kerbo fix`, with folders,
   rules, languages and `dry_run`; returns the patch and the summary) and `kerbo_explain`. In Claude Code:

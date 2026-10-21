@@ -62,6 +62,14 @@ impl Catalog for Spanish {
             Text::AboutLsp => {
                 "Servidor LSP por stdio: los problemas en el editor mientras escribís (IntelliJ, VS Code, Neovim)"
             }
+            Text::AboutDaemon => {
+                "Un proceso por máquina al que check y el hook le pasan el trabajo, con la caché en memoria"
+            }
+            Text::AboutDaemonStart => {
+                "Arranca el demonio en segundo plano (se apaga solo tras 30 minutos sin uso)"
+            }
+            Text::AboutDaemonStop => "Apaga el demonio",
+            Text::AboutDaemonStatus => "Dice si el demonio está corriendo",
             Text::HelpRule => "La regla, por ejemplo cognitive-complexity",
             Text::HelpConfig => "Usa esta configuración en vez de buscar kerbo.toml",
             Text::HelpPaths => "Archivos o carpetas a analizar",
@@ -272,6 +280,10 @@ impl Catalog for Spanish {
             Problem::ExpectedRuleLimit(text) => format!("se esperaba regla=valor y llegó `{text}`"),
             Problem::NotANonNegativeInteger(text) => format!("`{text}` no es un número entero no negativo"),
             Problem::ReadEvent(detail) => format!("no se pudo leer el evento: {detail}"),
+            Problem::DaemonUnavailable(detail) => format!("no se pudo arrancar el demonio: {detail}"),
+            Problem::DaemonWithoutDirectory => {
+                "no hay directorio de caché para el demonio (definí KERBO_CACHE_DIR)".to_owned()
+            }
             Problem::InvalidEvent(detail) => format!("el evento no es JSON válido: {detail}"),
             Problem::ReadRequest(detail) => format!("no se pudo leer el pedido: {detail}"),
             Problem::InvalidRequest => "el pedido no es JSON válido".to_owned(),
@@ -296,6 +308,17 @@ impl Catalog for Spanish {
                 reason,
             } => fixes::suppressed(path, *line, *rule, reason),
             Notice::Fix(notice) => fixes::notice(notice),
+            Notice::DaemonStarted { pid, port } => {
+                format!("demonio arrancado (proceso {pid}, puerto {port})")
+            }
+            Notice::DaemonAlreadyRunning { pid, port } => {
+                format!("el demonio ya estaba corriendo (proceso {pid}, puerto {port})")
+            }
+            Notice::DaemonRunning { pid, port } => {
+                format!("el demonio está corriendo (proceso {pid}, puerto {port})")
+            }
+            Notice::DaemonStopped => "demonio apagado".to_owned(),
+            Notice::DaemonNotRunning => "el demonio no está corriendo".to_owned(),
             Notice::BaselineSaved { count, path } => {
                 let saved = counted(*count, "problema guardado", "problemas guardados");
                 format!("{saved} en {path}")

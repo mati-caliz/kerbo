@@ -62,6 +62,14 @@ impl Catalog for English {
             Text::AboutLsp => {
                 "LSP server over stdio: the problems in your editor while you type (IntelliJ, VS Code, Neovim)"
             }
+            Text::AboutDaemon => {
+                "One process per machine that check and the hook hand their work to, with the cache in memory"
+            }
+            Text::AboutDaemonStart => {
+                "Starts the daemon in the background (it stops itself after 30 idle minutes)"
+            }
+            Text::AboutDaemonStop => "Stops the daemon",
+            Text::AboutDaemonStatus => "Tells whether the daemon is running",
             Text::HelpRule => "The rule, for example cognitive-complexity",
             Text::HelpConfig => "Use this configuration instead of looking for kerbo.toml",
             Text::HelpPaths => "Files or folders to analyze",
@@ -274,6 +282,10 @@ impl Catalog for English {
             Problem::ExpectedRuleLimit(text) => format!("expected rule=value and got `{text}`"),
             Problem::NotANonNegativeInteger(text) => format!("`{text}` is not a non-negative integer"),
             Problem::ReadEvent(detail) => format!("could not read the event: {detail}"),
+            Problem::DaemonUnavailable(detail) => format!("could not start the daemon: {detail}"),
+            Problem::DaemonWithoutDirectory => {
+                "there is no cache directory for the daemon (set KERBO_CACHE_DIR)".to_owned()
+            }
             Problem::InvalidEvent(detail) => format!("the event is not valid JSON: {detail}"),
             Problem::ReadRequest(detail) => format!("could not read the request: {detail}"),
             Problem::InvalidRequest => "the request is not valid JSON".to_owned(),
@@ -298,6 +310,15 @@ impl Catalog for English {
                 reason,
             } => fixes::suppressed(path, *line, *rule, reason),
             Notice::Fix(notice) => fixes::notice(notice),
+            Notice::DaemonStarted { pid, port } => format!("daemon started (process {pid}, port {port})"),
+            Notice::DaemonAlreadyRunning { pid, port } => {
+                format!("the daemon was already running (process {pid}, port {port})")
+            }
+            Notice::DaemonRunning { pid, port } => {
+                format!("the daemon is running (process {pid}, port {port})")
+            }
+            Notice::DaemonStopped => "daemon stopped".to_owned(),
+            Notice::DaemonNotRunning => "the daemon is not running".to_owned(),
             Notice::OsvDatabaseSaved {
                 ecosystem,
                 advisories,

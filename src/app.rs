@@ -4,8 +4,9 @@ use std::time::Instant;
 
 use crate::baseline::{BASELINE_FILE, Baseline};
 use crate::cache::AnalysisCache;
-use crate::cli::{CheckArgs, Command, ScanArgs};
+use crate::cli::{CheckArgs, Command, DaemonAction, ScanArgs};
 use crate::config::Config;
+use crate::daemon;
 use crate::diff::ChangedLines;
 use crate::guard::{GuardRequest, add_guarded, inspect};
 use crate::i18n::{Lang, LangPreference, Notice, Problem, Summary};
@@ -44,6 +45,7 @@ pub fn run(
         Command::Mcp => (mcp::serve(directory, lang, terminal), EXIT_FAILURE),
         Command::OsvDownload { ecosystems } => (download_osv(ecosystems, lang, terminal), EXIT_FAILURE),
         Command::Lsp => (lsp::serve(lang, terminal), EXIT_FAILURE),
+        Command::Daemon { action } => (daemon_action(*action, lang, terminal), EXIT_FAILURE),
     };
     result.unwrap_or_else(|problem| {
         let _written = writeln!(terminal.log, "kerbo: {}", lang.problem(&problem));
@@ -189,6 +191,22 @@ fn download_osv(ecosystems: &[Ecosystem], lang: Lang, terminal: &mut Terminal<'_
     for notice in download(ecosystems, &Curl::default(), None)? {
         writeln!(terminal.log, "kerbo: {}", lang.notice(&notice)).map_err(|error| write_error(&error))?;
     }
+    Ok(EXIT_CLEAN)
+}
+
+fn daemon_action(action: DaemonAction, lang: Lang, terminal: &mut Terminal<'_>) -> Result<u8, Problem> {
+    let directory = daemon::endpoint_directory().ok_or(Problem::DaemonWithoutDirectory)?;
+    let notice = match action {
+        DaemonAction::Start => daemon::start(&directory)?,
+        DaemonAction::Stop => daemon::stop(&directory),
+        DaemonAction::Status => daemon::status(&directory),
+        DaemonAction::Run => {
+            daemon::serve(&directory, daemon::default_lifetime())
+                .map_err(|error| Problem::DaemonUnavailable(error.to_string()))?;
+            return Ok(EXIT_CLEAN);
+        }
+    };
+    writeln!(terminal.log, "kerbo: {}", lang.notice(&notice)).map_err(|error| write_error(&error))?;
     Ok(EXIT_CLEAN)
 }
 

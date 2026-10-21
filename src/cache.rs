@@ -11,7 +11,7 @@ mod store;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::hash::{Hash, Hasher};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::UNIX_EPOCH;
@@ -38,6 +38,13 @@ pub struct AnalysisSubject<'subject> {
 
 pub fn cache_root() -> Option<PathBuf> {
     location::default_directory()
+}
+
+pub fn runtime_identity() -> u64 {
+    let mut hasher = DefaultHasher::new();
+    build_salt().hash(&mut hasher);
+    budget::max_bytes(None).hash(&mut hasher);
+    hasher.finish()
 }
 
 type OpenCaches = Mutex<HashMap<(PathBuf, usize), Arc<AnalysisCache>>>;

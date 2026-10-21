@@ -72,8 +72,8 @@ del usuario (`~/.cache/kerbo`, `~/Library/Caches/kerbo` o `%LOCALAPPDATA%\kerbo`
 `KERBO_CACHE_DIR`), se comparte entre proyectos y clones, ocupa como mucho 256 MB (otro tope con
 `max_megabytes` en la sección `[cache]` de `kerbo.toml`, o con `KERBO_CACHE_MAX_MB`, que manda
 sobre el archivo) y se descarta sola cuando cambia el binario o la configuración que afecta a un
-archivo. Dos corridas a la vez no se pisan: antes de escribir, cada una relee lo que dejó la otra.
-Si se rompe, se ignora.
+archivo. Dos corridas a la vez no se pisan: cada parte de la caché se escribe con un lock del
+sistema y releyendo lo que dejó la otra. Si se rompe, se ignora.
 
 Los mensajes salen en español o en inglés. Manda `--lang en` (o `es`), después `lang` en
 `kerbo.toml` y después el locale del sistema (`LC_ALL`, `LC_MESSAGES`, `LANG`); sin nada de eso,
@@ -159,6 +159,12 @@ suprimido en el código (`inSource`), con su motivo, y GitHub lo muestra como de
 
   En un repo git sólo mira lo que cambió respecto de `HEAD`, antitrampa incluida, y respeta la línea
   de base: el agente no se pone a arreglar código que no tocó. Si kerbo falla, el hook no bloquea.
+- **Demonio** (`kerbo daemon start`, `status` y `stop`): un proceso por usuario y máquina, con la
+  caché en memoria, al que `kerbo check` y el hook le pasan el trabajo. Así varias sesiones de
+  agentes en la misma máquina no arrancan todo de cero en cada edición. Escucha sólo en
+  `127.0.0.1`, con un token que queda en la carpeta de caché, y se apaga solo después de 30
+  minutos sin uso. Si no está corriendo, o es de otra versión de kerbo, cada comando corre solo
+  como siempre, y la salida es la misma.
 - **Servidor MCP** (`kerbo mcp`, por stdio) con tres herramientas: `kerbo_check` (carpetas, `diff`
   y lenguajes; devuelve la salida para agentes), `kerbo_fix` (lo mismo que `kerbo fix`, con
   carpetas, reglas, lenguajes y `dry_run`; devuelve el parche y el resumen) y `kerbo_explain`. En Claude Code:

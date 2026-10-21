@@ -1,5 +1,5 @@
 use clap::ValueEnum;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::rules::RuleId;
 
@@ -19,7 +19,7 @@ const ENGLISH_LOCALE_PREFIX: &str = "en";
 const LANG_FLAG: &str = "--lang";
 const FLAG_VALUE_SEPARATOR: &str = "=";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum, Deserialize, Serialize)]
 pub enum Lang {
     #[default]
     #[value(name = "es")]

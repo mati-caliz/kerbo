@@ -6,7 +6,7 @@ use crate::rules::RuleId;
 
 const LANGS: [Lang; 2] = [Lang::Spanish, Lang::English];
 
-const TEXTS: [Text; 37] = [
+const TEXTS: [Text; 41] = [
     Text::WhyLabel,
     Text::FixLabel,
     Text::ExampleLabel,
@@ -25,6 +25,10 @@ const TEXTS: [Text; 37] = [
     Text::AboutHook,
     Text::AboutMcp,
     Text::AboutLsp,
+    Text::AboutDaemon,
+    Text::AboutDaemonStart,
+    Text::AboutDaemonStop,
+    Text::AboutDaemonStatus,
     Text::AboutFix,
     Text::HelpFixRule,
     Text::HelpDryRun,
@@ -164,6 +168,8 @@ fn problems() -> Vec<Problem> {
         Problem::ExpectedRuleLimit("nope".to_owned()),
         Problem::NotANonNegativeInteger("-1".to_owned()),
         Problem::ReadEvent(detail()),
+        Problem::DaemonUnavailable(detail()),
+        Problem::DaemonWithoutDirectory,
         Problem::InvalidEvent(detail()),
         Problem::ReadRequest(detail()),
         Problem::InvalidRequest,
@@ -224,6 +230,11 @@ fn notices() -> Vec<Notice> {
             reason: "la imagen fija las versiones".to_owned(),
         },
         Notice::Fix(FixNotice::Applied { count: 3, files: 1 }),
+        Notice::DaemonStarted { pid: 7, port: 4000 },
+        Notice::DaemonAlreadyRunning { pid: 7, port: 4000 },
+        Notice::DaemonRunning { pid: 7, port: 4000 },
+        Notice::DaemonStopped,
+        Notice::DaemonNotRunning,
         Notice::Fix(FixNotice::Previewed { count: 1, files: 2 }),
         Notice::Fix(FixNotice::Withheld {
             path: "A.java".to_owned(),

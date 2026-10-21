@@ -17,6 +17,10 @@ const EXPLAIN_COMMAND: &str = "explain";
 const HOOK_COMMAND: &str = "hook";
 const MCP_COMMAND: &str = "mcp";
 const LSP_COMMAND: &str = "lsp";
+const DAEMON_COMMAND: &str = "daemon";
+const DAEMON_START_COMMAND: &str = "start";
+const DAEMON_STOP_COMMAND: &str = "stop";
+const DAEMON_STATUS_COMMAND: &str = "status";
 const FIX_COMMAND: &str = "fix";
 const RULES_ARGUMENT: &str = "rules";
 const DRY_RUN_ARGUMENT: &str = "dry_run";
@@ -60,6 +64,19 @@ pub enum Command {
         ecosystems: Vec<Ecosystem>,
     },
     Lsp,
+    Daemon {
+        #[command(subcommand)]
+        action: DaemonAction,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Subcommand)]
+pub enum DaemonAction {
+    Start,
+    Stop,
+    Status,
+    #[command(hide = true)]
+    Run,
 }
 
 impl Command {
@@ -69,7 +86,9 @@ impl Command {
             Self::Baseline(arguments) => arguments.config.as_deref(),
             Self::Hook(arguments) => arguments.config.as_deref(),
             Self::Fix(arguments) => arguments.config.as_deref(),
-            Self::Explain { .. } | Self::Mcp | Self::Lsp | Self::OsvDownload { .. } => None,
+            Self::Explain { .. } | Self::Mcp | Self::Lsp | Self::Daemon { .. } | Self::OsvDownload { .. } => {
+                None
+            }
         }
     }
 }
@@ -174,6 +193,21 @@ pub fn command(lang: Lang) -> clap::Command {
         })
         .mut_subcommand(MCP_COMMAND, |mcp| mcp.about(lang.text(Text::AboutMcp)))
         .mut_subcommand(LSP_COMMAND, |lsp| lsp.about(lang.text(Text::AboutLsp)))
+        .mut_subcommand(DAEMON_COMMAND, |daemon| daemon_command(daemon, lang))
+}
+
+fn daemon_command(command: clap::Command, lang: Lang) -> clap::Command {
+    command
+        .about(lang.text(Text::AboutDaemon))
+        .mut_subcommand(DAEMON_START_COMMAND, |start| {
+            start.about(lang.text(Text::AboutDaemonStart))
+        })
+        .mut_subcommand(DAEMON_STOP_COMMAND, |stop| {
+            stop.about(lang.text(Text::AboutDaemonStop))
+        })
+        .mut_subcommand(DAEMON_STATUS_COMMAND, |status| {
+            status.about(lang.text(Text::AboutDaemonStatus))
+        })
 }
 
 fn scan_command(command: clap::Command, lang: Lang) -> clap::Command {
