@@ -58,11 +58,6 @@ fn unknown_ignored_rules(source: &str) -> Vec<Violation> {
         .collect()
 }
 
-pub fn snippet_violations(source: &str, first_line: usize) -> Vec<Violation> {
-    let tokens = tokenize(source, first_line);
-    migration_violations(&statements(&tokens))
-}
-
 fn migration_violations(statements: &[&[Token]]) -> Vec<Violation> {
     let mut migration = Migration {
         created_tables: HashSet::new(),

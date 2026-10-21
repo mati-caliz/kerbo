@@ -1,26 +1,43 @@
 mod calls;
 mod dialects;
+mod operations;
+mod render;
+mod script;
+mod tables;
 
 use std::collections::{HashMap, HashSet};
 
 use tree_sitter::Node;
 
 use super::Violation;
-use crate::rules::{MigrationRule, RuleId};
 use crate::syntax::{named_children, one_based};
 use calls::{Call, string_value};
+use operations::{Context, Target, string_or_binding};
+use render::Constants;
+use script::{Origin, Script};
 
 const ALEMBIC_MARKERS: &[&str] = &["from alembic import", "import alembic"];
 const UPGRADE: &str = "upgrade";
 const OPERATIONS: &str = "op";
 const BATCH: &str = "batch_alter_table";
+const AUTOCOMMIT: &str = "autocommit_block";
 const EXECUTE: &str = "execute";
+const TEXT_FUNCTION: &str = "text";
+const DOWN_REVISION: &str = "down_revision";
+const NONE: &str = "none";
+const FUNCTION_DEFINITION: &str = "function_definition";
+const WITH_CLAUSE: &str = "with_clause";
+const ASSIGNMENT: &str = "assignment";
+const LITERAL_SEQUENCES: &[&str] = &["list", "tuple"];
 
-#[derive(Debug, Default)]
-struct Upgrade {
+struct Walker<'tree> {
+    source: &'tree [u8],
+    helpers: HashMap<&'tree str, Node<'tree>>,
+    constants: Constants<'tree>,
+    active_helpers: HashSet<&'tree str>,
     batches: HashMap<String, String>,
-    created_tables: HashSet<String>,
-    violations: Vec<Violation>,
+    bindings: Vec<HashMap<String, String>>,
+    script: Script,
 }
 
 pub fn violations(root: Node<'_>, source: &[u8]) -> Vec<Violation> {
@@ -28,171 +45,286 @@ pub fn violations(root: Node<'_>, source: &[u8]) -> Vec<Violation> {
     if !ALEMBIC_MARKERS.iter().any(|marker| text.contains(marker)) {
         return Vec::new();
     }
-    let mut upgrade = Upgrade::default();
-    let functions = named_children(root)
+    let functions: HashMap<&str, Node<'_>> = named_children(root)
         .into_iter()
-        .filter(|node| node.kind() == "function_definition")
-        .filter(|node| {
-            node.child_by_field_name("name")
-                .and_then(|name| name.utf8_text(source).ok())
-                == Some(UPGRADE)
-        });
-    for function in functions {
-        let mut pending = vec![function];
-        while let Some(node) = pending.pop() {
-            upgrade.visit(node, source);
-            pending.extend(dialects::postgres_children(node, source).into_iter().rev());
-        }
+        .filter(|node| node.kind() == FUNCTION_DEFINITION)
+        .filter_map(|node| Some((node.child_by_field_name("name")?.utf8_text(source).ok()?, node)))
+        .collect();
+    let Some(upgrade) = functions.get(UPGRADE).copied() else {
+        return Vec::new();
+    };
+    let mut walker = Walker {
+        source,
+        helpers: functions,
+        constants: module_constants(root, source),
+        active_helpers: HashSet::from([UPGRADE]),
+        batches: HashMap::new(),
+        bindings: Vec::new(),
+        script: Script::new(),
+    };
+    if let Some(body) = upgrade.child_by_field_name("body") {
+        walker.walk(body);
     }
-    upgrade.violations
+    walker.script.violations(is_first_revision(root, source))
 }
 
-impl Upgrade {
-    fn visit(&mut self, node: Node<'_>, source: &[u8]) {
-        if node.kind() == "with_item" {
-            self.remember_batch(node, source);
-        } else if let Some(call) = Call::parse(node, source) {
-            self.call(&call, source);
+fn module_constants<'tree>(root: Node<'tree>, source: &'tree [u8]) -> Constants<'tree> {
+    named_children(root)
+        .into_iter()
+        .filter_map(|statement| named_children(statement).into_iter().next())
+        .filter(|assignment| assignment.kind() == ASSIGNMENT)
+        .filter_map(|assignment| {
+            let left = assignment
+                .child_by_field_name("left")
+                .filter(|left| left.kind() == "identifier")?;
+            Some((
+                left.utf8_text(source).ok()?,
+                assignment.child_by_field_name("right")?,
+            ))
+        })
+        .collect()
+}
+
+fn is_first_revision(root: Node<'_>, source: &[u8]) -> bool {
+    named_children(root)
+        .into_iter()
+        .filter_map(|statement| named_children(statement).into_iter().next())
+        .filter(|assignment| assignment.kind() == ASSIGNMENT)
+        .find(|assignment| {
+            assignment
+                .child_by_field_name("left")
+                .and_then(|left| left.utf8_text(source).ok())
+                == Some(DOWN_REVISION)
+        })
+        .and_then(|assignment| assignment.child_by_field_name("right"))
+        .is_some_and(|right| right.kind() == NONE)
+}
+
+impl<'tree> Walker<'tree> {
+    fn lookup(&self, name: &str) -> Option<String> {
+        self.bindings
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(name).cloned())
+    }
+
+    fn value(&self, node: Node<'_>) -> Option<String> {
+        string_or_binding(node, self.source, &|name| {
+            self.lookup(name).or_else(|| {
+                self.constants
+                    .get(name)
+                    .and_then(|constant| string_value(*constant, self.source))
+            })
+        })
+    }
+
+    fn walk(&mut self, node: Node<'tree>) {
+        match node.kind() {
+            "with_statement" => self.with_statement(node),
+            "try_statement" => {
+                if let Some(body) = node.child_by_field_name("body") {
+                    self.walk(body);
+                }
+            }
+            "assignment" => self.remember_assignment(node),
+            "for_statement" if self.unrolled(node) => {}
+            "call" => self.call(node),
+            _ => self.walk_children(node),
         }
     }
 
-    fn remember_batch(&mut self, item: Node<'_>, source: &[u8]) {
-        let Some(pattern) = item
-            .child_by_field_name("value")
-            .filter(|value| value.kind() == "as_pattern")
+    fn walk_children(&mut self, node: Node<'tree>) {
+        for child in dialects::postgres_children(node, self.source) {
+            self.walk(child);
+            if dialects::returns_for_postgres(child, self.source) {
+                return;
+            }
+        }
+    }
+
+    fn with_statement(&mut self, node: Node<'tree>) {
+        let items: Vec<Node<'tree>> = named_children(node)
+            .into_iter()
+            .filter(|child| child.kind() == WITH_CLAUSE)
+            .flat_map(named_children)
+            .collect();
+        let mut autocommit = false;
+        for item in &items {
+            let value = item.child_by_field_name("value");
+            let target = value.filter(|value| value.kind() == "as_pattern");
+            let called = target
+                .and_then(|pattern| {
+                    named_children(pattern)
+                        .into_iter()
+                        .find_map(|child| Call::parse(child, self.source))
+                })
+                .or_else(|| value.and_then(|value| Call::parse(value, self.source)));
+            match called {
+                Some(call) if call.method == AUTOCOMMIT => autocommit = true,
+                Some(call) if call.receiver == OPERATIONS && call.method == BATCH => {
+                    self.remember_batch(&call, target);
+                }
+                Some(_) | None => {}
+            }
+        }
+        if autocommit {
+            self.script.leave_transaction();
+        }
+        if let Some(body) = node.child_by_field_name("body") {
+            self.walk(body);
+        }
+        if autocommit {
+            self.script.enter_transaction();
+        }
+    }
+
+    fn remember_batch(&mut self, call: &Call<'_>, pattern: Option<Node<'_>>) {
+        let alias = pattern
+            .and_then(|pattern| pattern.child_by_field_name("alias"))
+            .and_then(|alias| alias.utf8_text(self.source).ok());
+        if let Some(alias) = alias {
+            let table = call
+                .positional(0)
+                .and_then(|node| self.value(node))
+                .unwrap_or_default();
+            self.batches.insert(alias.to_owned(), table);
+        }
+    }
+
+    fn unrolled(&mut self, node: Node<'tree>) -> bool {
+        let variable = node
+            .child_by_field_name("left")
+            .filter(|left| left.kind() == "identifier")
+            .and_then(|left| left.utf8_text(self.source).ok());
+        let items = node
+            .child_by_field_name("right")
+            .map(|right| self.constant_or_itself(right))
+            .filter(|right| LITERAL_SEQUENCES.contains(&right.kind()))
+            .map(named_children);
+        let (Some(variable), Some(items), Some(body)) = (variable, items, node.child_by_field_name("body"))
         else {
+            return false;
+        };
+        let values: Option<Vec<String>> = items.iter().map(|item| self.value(*item)).collect();
+        let Some(values) = values else {
+            return false;
+        };
+        for value in values {
+            self.bindings.push(HashMap::from([(variable.to_owned(), value)]));
+            self.walk(body);
+            self.bindings.pop();
+        }
+        true
+    }
+
+    fn remember_assignment(&mut self, node: Node<'tree>) {
+        let left = node
+            .child_by_field_name("left")
+            .filter(|left| left.kind() == "identifier")
+            .and_then(|left| left.utf8_text(self.source).ok());
+        if let (Some(name), Some(right)) = (left, node.child_by_field_name("right")) {
+            self.constants.insert(name, right);
+        }
+        self.walk_children(node);
+    }
+
+    fn constant_or_itself(&self, node: Node<'tree>) -> Node<'tree> {
+        if node.kind() != "identifier" {
+            return node;
+        }
+        node.utf8_text(self.source)
+            .ok()
+            .and_then(|name| self.constants.get(name))
+            .copied()
+            .unwrap_or(node)
+    }
+
+    fn call(&mut self, node: Node<'tree>) {
+        let Some(call) = Call::parse(node, self.source) else {
             return;
         };
-        let call = named_children(pattern)
-            .into_iter()
-            .find_map(|child| Call::parse(child, source))
-            .filter(|call| call.receiver == OPERATIONS && call.method == BATCH);
-        let alias = pattern
-            .child_by_field_name("alias")
-            .and_then(|alias| alias.utf8_text(source).ok());
-        if let (Some(call), Some(alias)) = (call, alias) {
-            let table = call.positional(0).and_then(|node| string_value(node, source));
-            self.batches.insert(alias.to_owned(), table.unwrap_or_default());
-        }
-    }
-
-    fn report(&mut self, rule: MigrationRule, call: &Call<'_>, subject: String) {
-        self.violations.push(Violation {
-            rule: RuleId::Migration(rule),
-            line: call.line,
-            column: call.column,
-            subject,
-            fix: None,
-        });
-    }
-
-    fn call(&mut self, call: &Call<'_>, source: &[u8]) {
         if call.method == EXECUTE {
-            self.execute(call, source);
+            self.execute(&call);
             return;
         }
         let batch_table = self.batches.get(call.receiver).cloned();
-        if call.receiver != OPERATIONS && batch_table.is_none() {
+        if call.receiver == OPERATIONS || batch_table.is_some() {
+            let target = Target {
+                batch_table: batch_table.as_deref(),
+            };
+            let origin = Origin::Call {
+                line: call.line,
+                column: call.column,
+            };
+            let value = |argument: Node<'_>| self.value(argument);
+            let context = Context {
+                value: &value,
+                constants: &self.constants,
+            };
+            for statement in operations::statements(&call, target, &context) {
+                self.script.push(&statement, origin);
+            }
             return;
         }
-        let offset = usize::from(batch_table.is_none());
-        let table = batch_table.or_else(|| call.text_argument(0, "table_name"));
-        let table = table.unwrap_or_default();
-        match call.method {
-            "create_table" => {
-                self.created_tables
-                    .insert(call.text_argument(0, "table_name").unwrap_or_default());
-            }
-            "create_index" => self.create_index(call, offset),
-            "drop_index" if !call.keyword_is_true("postgresql_concurrently") => {
-                let name = call.text_argument(0, "index_name").unwrap_or_default();
-                self.report(MigrationRule::RequireConcurrentIndexDeletion, call, name);
-            }
-            "add_column" => self.add_column(call, offset, source),
-            "alter_column" => self.alter_column(call, offset),
-            "drop_column" => {
-                let column = call.text_argument(offset, "column_name").unwrap_or_default();
-                self.report(MigrationRule::BanDropColumn, call, column);
-            }
-            "drop_table" => self.report(MigrationRule::BanDropTable, call, table),
-            "rename_table" => self.report(MigrationRule::RenamingTable, call, table),
-            _ => {}
+        if call.receiver.is_empty() && self.inline_helper(&call) {
+            return;
+        }
+        for child in named_children(node) {
+            self.walk(child);
         }
     }
 
-    fn create_index(&mut self, call: &Call<'_>, offset: usize) {
-        if call.keyword_is_true("postgresql_concurrently") {
-            return;
-        }
-        let table = self.table_of(call, offset, 1);
-        self.unless_created(call, table);
-    }
-
-    fn add_column(&mut self, call: &Call<'_>, offset: usize, source: &[u8]) {
-        let Some(column) = call.positional(offset).and_then(|node| Call::parse(node, source)) else {
-            return;
+    fn inline_helper(&mut self, call: &Call<'tree>) -> bool {
+        let Some(helper) = self.helpers.get(call.method).copied() else {
+            return false;
         };
-        let nullable = column.keyword("nullable").map(|value| value.kind());
-        let primary = column.keyword_is_true("primary_key");
-        let required = nullable == Some("false") || (primary && nullable != Some("true"));
-        let generated = column
-            .all_positional()
-            .iter()
-            .filter_map(|argument| Call::parse(*argument, source))
-            .any(|argument| argument.method == "Computed" || argument.method == "Identity");
-        if required && column.keyword("server_default").is_none() && !generated {
-            let name = column.text_argument(0, "name").unwrap_or_default();
-            self.report(MigrationRule::AddingRequiredField, call, name);
+        if !self.active_helpers.insert(call.method) {
+            return false;
         }
-        if column.keyword_is_true("index") {
-            let table = self.table_of(call, offset, 0);
-            self.unless_created(call, table);
+        let parameters = helper
+            .child_by_field_name("parameters")
+            .map(named_children)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|parameter| parameter.utf8_text(self.source).ok())
+            .map(|parameter| {
+                parameter
+                    .split([':', '='])
+                    .next()
+                    .unwrap_or_default()
+                    .trim()
+                    .to_owned()
+            });
+        let bound: HashMap<String, String> = parameters
+            .zip(call.all_positional())
+            .filter_map(|(parameter, argument)| Some((parameter, self.value(argument)?)))
+            .collect();
+        self.bindings.push(bound);
+        if let Some(body) = helper.child_by_field_name("body") {
+            self.walk(body);
         }
+        self.bindings.pop();
+        self.active_helpers.remove(call.method);
+        true
     }
 
-    fn table_of(&self, call: &Call<'_>, offset: usize, position: usize) -> String {
-        let table = if offset == 0 {
-            self.batches.get(call.receiver).cloned()
-        } else {
-            call.text_argument(position, "table_name")
-        };
-        table.unwrap_or_default()
-    }
-
-    fn unless_created(&mut self, call: &Call<'_>, table: String) {
-        if !self.created_tables.contains(&table) {
-            self.report(MigrationRule::RequireConcurrentIndexCreation, call, table);
-        }
-    }
-
-    fn alter_column(&mut self, call: &Call<'_>, offset: usize) {
-        let column = call.text_argument(offset, "column_name").unwrap_or_default();
-        if call
-            .keyword("nullable")
-            .is_some_and(|value| value.kind() == "false")
-        {
-            self.report(MigrationRule::AddingNotNullableField, call, column.clone());
-        }
-        if call.keyword("type_").is_some() {
-            self.report(MigrationRule::ChangingColumnType, call, column.clone());
-        }
-        if call.keyword("new_column_name").is_some() {
-            self.report(MigrationRule::RenamingColumn, call, column);
-        }
-    }
-
-    fn execute(&mut self, call: &Call<'_>, source: &[u8]) {
+    fn execute(&mut self, call: &Call<'_>) {
         let Some(statement) = call.positional(0) else {
             return;
         };
-        let literal = Call::parse(statement, source)
-            .filter(|inner| inner.method == "text")
+        let literal = Call::parse(statement, self.source)
+            .filter(|inner| inner.method == TEXT_FUNCTION)
             .and_then(|inner| inner.positional(0))
             .unwrap_or(statement);
-        if let Some(sql) = string_value(literal, source) {
+        if let Some(sql) = self.value(literal) {
             let first_line = one_based(literal.start_position().row);
-            self.violations
-                .extend(super::sql::snippet_violations(&sql, first_line));
+            self.script.push(
+                &sql,
+                Origin::Execute {
+                    first_line,
+                    script_line: 0,
+                },
+            );
         }
     }
 }

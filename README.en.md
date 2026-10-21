@@ -443,9 +443,13 @@ files.
 **Migrations.** Migrations are the `.sql` files inside a `migrations`, `migration` or `drizzle`
 folder (Prisma, drizzle, sqlx, golang-migrate) and the ones named like Flyway
 (`V3__add_index.sql`, `R__views.sql`); other `.sql` files (seeds, dumps) are left alone. For
-Alembic, kerbo reads the `upgrade()` of each revision: `op.*` and `batch_op.*` calls map to the
-rule the SQL they generate would trigger, the SQL in `op.execute(...)` is analyzed like any
-migration, and branches for other dialects (`if dialect == "mysql"`) are skipped. The rules are
+Alembic, kerbo reads the `upgrade()` of each revision: every `op.*` and `batch_op.*` becomes the
+SQL Alembic would generate for Postgres (SQLAlchemy types, `server_default`, foreign keys, the
+integer primary key as `SERIAL`), together with the SQL in `op.execute(...)`, and all of it goes
+through the same rules as a `.sql` file, reported at the call's line. `for` loops over lists,
+helper functions in the same file and module constants are followed, `autocommit_block()` leaves
+the transaction, and branches for other dialects (`if dialect == "mysql"`) and `except` blocks are
+skipped. The rules are
 [squawk](https://squawk.sh)'s, with its names and criteria, assuming like `--assume-in-transaction`
 that each file runs in a transaction (Prisma, drizzle, Flyway and Alembic do on Postgres): an index
 on a table created in the same migration is not flagged.
@@ -476,8 +480,11 @@ It is squawk 2.70's whole default set except `prefer-repack`, which squawk only 
 Postgres 19. `recommended` turns off the type preferences (`prefer-*` and `ban-char-field`) and
 `minimal` also the timeouts. Parity, against squawk 2.70 with `--assume-in-transaction`: all 9,612
 of squawk's reports, none extra, in 1,858 migrations from lobe-chat (drizzle), documenso,
-trigger.dev and cal.com (Prisma), conductor (Flyway) and awesome-compose. In Alembic, for now,
-only the first nine run.
+trigger.dev and cal.com (Prisma), conductor (Flyway) and awesome-compose. In Alembic, against squawk
+on the SQL Alembic itself generates in offline mode (300 revisions from airflow, superset, mlflow
+and redash; the other 349 import the application or query the database and cannot be converted
+without running it): 297 identical by rule and count, none with fewer reports, and two with extra
+reports on paths offline mode does not take (`is_offline_mode()` and a `try` that breaks offline).
 
 **Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` and `*.Dockerfile`, against
 [hadolint](https://github.com/hadolint/hadolint): every DL rule hadolint ships turned on (59),

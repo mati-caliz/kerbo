@@ -135,6 +135,11 @@ fn scans_migrations_dockerfiles_and_compose_files_through_the_cache() {
     };
     let expected = vec![
         ("alembic/versions/1_drop.py".to_owned(), "ban-drop-table"),
+        ("alembic/versions/1_drop.py".to_owned(), "require-lock-timeout"),
+        (
+            "alembic/versions/1_drop.py".to_owned(),
+            "require-statement-timeout",
+        ),
         ("api/Dockerfile".to_owned(), "dl3006"),
         ("compose.yaml".to_owned(), "compose-memory-limit"),
         ("compose.yaml".to_owned(), "compose-cpu-limit"),

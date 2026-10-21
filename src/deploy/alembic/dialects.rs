@@ -21,8 +21,8 @@ fn dialect_of(condition: Node<'_>, source: &[u8]) -> Dialect {
     let postgres = text.contains(POSTGRES);
     let other = OTHER_DIALECTS.iter().any(|dialect| text.contains(dialect));
     match (negated, postgres, other) {
-        (false, true, false) => Dialect::Postgres,
-        (false, false, true) => Dialect::Other,
+        (false, true, false) | (true, false, true) => Dialect::Postgres,
+        (false, false, true) | (true, true, false) => Dialect::Other,
         _ => Dialect::Unknown,
     }
 }
@@ -51,4 +51,16 @@ pub fn postgres_children<'tree>(node: Node<'tree>, source: &[u8]) -> Vec<Node<'t
         })
         .map(|(_, child)| child)
         .collect()
+}
+
+pub fn returns_for_postgres(node: Node<'_>, source: &[u8]) -> bool {
+    node.kind() == "if_statement"
+        && node
+            .child_by_field_name(CONDITION)
+            .is_some_and(|condition| dialect_of(condition, source) == Dialect::Postgres)
+        && node.child_by_field_name(CONSEQUENCE).is_some_and(|block| {
+            crate::syntax::named_children(block)
+                .iter()
+                .any(|statement| statement.kind() == "return_statement")
+        })
 }

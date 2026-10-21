@@ -903,7 +903,7 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     - Una regla de kerbo o una allowlist propia de secretos en `kerbo.toml`, además de las
       excepciones por ruta, y un `kerbo explain` por cada tipo de secreto.
 
-### 12. Migraciones y contenedores (hecho en main)
+### 12. Migraciones y contenedores (cerrada)
 
 - **Migraciones peligrosas** en drizzle, Prisma, Flyway y Alembic (hecho): las nueve reglas de
   squawk que cubren lo que bloquea o rompe en Postgres, con sus nombres y su criterio
@@ -968,7 +968,7 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   contenido como una lista más del análisis de cada archivo (versión de formato 3, la siguiente
   a la de las reglas de Java). Textos en español e inglés en `src/i18n/*/deploy.rs` y
   `src/i18n/*/dockerfile.rs`, con `kerbo explain` para cada regla.
-- Pendientes:
+- Lo que quedaba para cerrarla, todo hecho o movido de etapa:
   - Los renombres que el código desplegado todavía usa pasaron a la etapa 9 (piden el índice del
     proyecto y el esquema del ORM), y las migraciones de Django y Rails, a la etapa 14.
   - El resto de squawk (hecho, 2026-10-21): las 40 reglas que squawk 2.70 trae prendidas y kerbo
@@ -1003,10 +1003,25 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
       aparecen en el corpus están fijadas con la salida de squawk en `src/deploy/sql/fixtures/`.
     - `recommended` apaga las de preferencia de tipos (`prefer-*` y `ban-char-field`) y
       `minimal`, también los timeouts.
-  - Alembic: traducir `op.*` a las 40 reglas nuevas (hoy sólo corren las nueve primeras: los
-    fragmentos de `op.execute(...)` no pasan por las reglas de nivel archivo), expandir los `for` sobre listas literales para contar una vez por tabla, seguir las
-    funciones auxiliares que llaman a `op` desde fuera de `upgrade()`, y medir paridad sobre las
-    401 revisiones que el modo offline no convierte (habría que levantar cada aplicación).
+  - Alembic con todas las reglas (hecho, 2026-10-21): cada `op.*` y `batch_op.*` se convierte en
+    el SQL que Alembic generaría para Postgres (calibrado contra Alembic 1.13 en modo offline:
+    tipos de SQLAlchemy, `server_default`, `SERIAL` para la clave primaria entera única, el
+    `CREATE TYPE` de los `Enum` de `create_table`, las claves foráneas y los índices de
+    `add_column` como sentencias aparte) dentro del mismo marco de transacción que arma Alembic
+    (`BEGIN`, `COMMIT`/`BEGIN` alrededor de `autocommit_block()` y la actualización de
+    `alembic_version`), y el script pasa por las mismas 49 reglas que un `.sql`; lo que cae en el
+    marco se descarta y el resto vuelve a la línea de la llamada. Se expanden los `for` sobre listas
+    literales o constantes del módulo, se siguen las funciones auxiliares del mismo archivo, las
+    constantes y variables locales (tipos y columnas) y los f-strings con constantes; se saltean
+    los `except`, las ramas de otro dialecto (también `not isinstance(..., SQLiteDialect)`) y lo que
+    sigue a un `return` de la rama de Postgres.
+    - Paridad contra squawk 2.70 sobre el SQL que genera Alembic en modo offline, por revisión, regla
+      y cantidad, descontando lo que cae en el marco: 300 revisiones de airflow, superset, mlflow y
+      redash, 297 idénticas y ninguna con avisos de menos. Las dos con avisos de más toman caminos
+      que el modo offline no recorre (`is_offline_mode()`, y un `drop_constraint(None)` que en
+      offline corta el `try`); la restante tiene SQL que squawk no parsea. Las otras 349 revisiones
+      importan la aplicación o consultan la base y no se convierten sin levantarla: el límite es de
+      la medición, la conversión de kerbo no depende de eso.
   - Las reglas de hadolint que faltaban (hecho, 2026-10-21): DL3001, DL3010, DL3011, DL3028,
     DL3030, DL3033 a DL3038, DL3040, DL3041, DL3043, DL3044, DL3046, DL3048 (que no depende de la
     configuración, aunque el README la agrupaba con DL3049 a DL3058), DL3060, DL3063, DL3065 y

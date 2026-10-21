@@ -438,9 +438,12 @@ Dockerfile y los archivos de docker compose.
 **Migraciones.** Son migraciones los `.sql` dentro de una carpeta `migrations`, `migration` o
 `drizzle` (Prisma, drizzle, sqlx, golang-migrate) y los que siguen el nombre de Flyway
 (`V3__agrega_indice.sql`, `R__vistas.sql`); el resto de los `.sql` (semillas, dumps) no se mira.
-En Alembic se lee el `upgrade()` de cada revisión: las llamadas `op.*` y `batch_op.*` se traducen
-a la regla que marcaría el SQL que generan, el SQL de `op.execute(...)` se analiza como cualquier
-migración y las ramas de otro dialecto (`if dialect == "mysql"`) se saltean. Las reglas son las de
+En Alembic se lee el `upgrade()` de cada revisión: cada `op.*` y `batch_op.*` se convierte en el
+SQL que Alembic generaría para Postgres (tipos de SQLAlchemy, `server_default`, claves foráneas, la
+clave primaria entera como `SERIAL`), junto con el de `op.execute(...)`, y todo pasa por las mismas
+reglas que un `.sql`, con el aviso en la línea de la llamada. Se siguen los `for` sobre listas, las
+funciones auxiliares del mismo archivo y las constantes del módulo, `autocommit_block()` sale de la
+transacción, y las ramas de otro dialecto (`if dialect == "mysql"`) y los `except` se saltean. Las reglas son las de
 [squawk](https://squawk.sh), con sus nombres y su criterio, suponiendo como él con
 `--assume-in-transaction` que cada archivo corre en una transacción (así lo hacen Prisma,
 drizzle, Flyway y Alembic en Postgres): un índice sobre una tabla creada en la misma migración no
@@ -472,8 +475,12 @@ Es el conjunto por defecto de squawk 2.70 entero, salvo `prefer-repack`, que squ
 Postgres 19. `recommended` apaga las de preferencia de tipos (`prefer-*` y `ban-char-field`) y
 `minimal`, también los timeouts. Paridad, contra squawk 2.70 con `--assume-in-transaction`: los
 9.612 avisos de squawk, ninguno de más, en 1.858 migraciones de lobe-chat (drizzle), documenso,
-trigger.dev y cal.com (Prisma), conductor (Flyway) y awesome-compose. En Alembic, por ahora, sólo
-corren las nueve primeras.
+trigger.dev y cal.com (Prisma), conductor (Flyway) y awesome-compose. En Alembic, contra squawk sobre
+el SQL que genera el propio Alembic en modo offline (300 revisiones de airflow, superset, mlflow y
+redash; las otras 349 importan la aplicación o consultan la base y no se pueden convertir sin
+levantarla): 297 idénticas por regla y cantidad, ninguna con avisos de menos, y dos con avisos de
+más en caminos que el modo offline no recorre (`is_offline_mode()` y un `try` que en offline se
+corta).
 
 **Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` y `*.Dockerfile`, contra
 [hadolint](https://github.com/hadolint/hadolint): todas las reglas DL que hadolint trae prendidas
