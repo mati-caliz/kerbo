@@ -794,10 +794,22 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Faltan campos, constructores y clases sin usar: piden distinguir lectura de escritura y las
     tablas de JPA, Jackson y la inyección (un campo `@Autowired` o `@Column` se usa aunque nadie lo
     lea en el código).
-- Lo que sigue en el índice: resolver tipos donde se pueda sin compilar (la clase de una variable
-  local, un campo o un parámetro declarado; las llamadas sin calificar van a la propia clase o a
-  las que la encierran), para recuperar los faltantes, y la jerarquía (`extends`/`implements`)
-  para "todas las implementaciones". Después `unused` (3.919) con las tablas de frameworks.
+- Tipos de los receptores y jerarquía (hecho, 2026-10-21): `src/lint/java_receivers.rs` resuelve
+  sin compilar el tipo donde empieza a buscarse cada llamada (una variable, parámetro o campo
+  declarado en el archivo con un solo tipo; `Clase.metodo()`; `metodo()` y `this.metodo()` en las
+  clases que la encierran, contando una anónima como el tipo que crea), y el resumen guarda los
+  padres de cada tipo. Una llamada va a un método si su clase es el tipo del receptor o uno de sus
+  padres; las de receptor desconocido (cadenas, lambdas sin tipos, `import static`, variables de
+  tipo genérico) siguen yendo a todos. Dos métodos iguales ya no se descartan por estar en
+  cualquier parte del proyecto, sólo si están en la misma clase o en clases emparentadas; si hay
+  otros iguales sin relación, hace falta al menos una llamada que se sepa que va a éste.
+  - Paridad contra Qodana, sin avisos de más: `SameParameterValue` 217 coincidencias y 5
+    faltantes (antes 215 y 7), `UnusedReturnValue` 15 y 4 (antes 13 y 6), `unused-method` 19
+    (antes 13).
+  - En una librería, lo público y lo protegido es API: `unused-return-value` y
+    `same-parameter-value` no lo miran (commons-lang marcaba 16 retornos de API pública).
+- Lo que sigue en el índice: "todas las implementaciones devuelven lo mismo" con la jerarquía, y
+  campos, constructores y clases sin usar con las tablas de JPA, Jackson y la inyección.
 
 ### 10. Go, Python, TypeScript y shell completos
 

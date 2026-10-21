@@ -312,3 +312,22 @@ fn unused_methods_skip_what_frameworks_call_and_public_api_outside_applications(
     let library = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
     assert_eq!(unused_methods(&library), ["Orders.java:10", "Orders.java:11"]);
 }
+
+#[test]
+fn a_typed_receiver_tells_twin_methods_apart() {
+    let tree = TempTree::new("scan-typed-receivers");
+    tree.write(
+        "Shelf.java",
+        "package shop;\n\nclass Shelf {\n    int count() { return 1; }\n}\n",
+    );
+    tree.write(
+        "Box.java",
+        "package shop;\n\nclass Box {\n    int count() { return 2; }\n    int size() { return 3; }\n}\n",
+    );
+    tree.write(
+        "Store.java",
+        "package shop;\n\nclass Store {\n    int run(java.util.List<Box> boxes) {\n        Shelf shelf = new Shelf();\n        Box box = new Box();\n        boxes.forEach(item -> item.size());\n        return shelf.count();\n    }\n}\n",
+    );
+    let outcome = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
+    assert_eq!(unused_methods(&outcome), ["Box.java:4"]);
+}

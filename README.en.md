@@ -345,9 +345,13 @@ From IntelliJ's inspections, kerbo does:
   (`@SpringBootApplication`, `@QuarkusMain`, `@MicronautApplication`): in a library it is its API.
 
 The ones that look at the whole project only run when the analysis covers it (`kerbo check` at the
-root): over a folder or a single file, calls would be missing. Without types, kerbo cannot tell
-which of two methods with the same name and number of parameters a call goes to, nor what a
-reference (`this::method`) does: there it flags nothing.
+root): over a folder or a single file, calls would be missing. Without compiling, kerbo resolves a
+call's receiver when it can be read: `repo.find()` with `Repository repo` declared in the file,
+`Type.method()`, or `method()` from inside a class (with what it inherits through `extends` and
+`implements`). A call chain, an untyped lambda or a `static import` stay unknown and count for
+every candidate; with two equal methods in the same class or in related classes nothing is
+flagged. In a library (without `@SpringBootApplication` or similar), public and protected code
+is API and who calls it is not checked.
 
 In Rust, kerbo measures only what clippy measures (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` and `excessive_nesting`), and the cognitive complexity is clippy's, not

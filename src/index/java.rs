@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use crate::lint::java_calls::{Arity, Body, Call, Returns, TYPE_DECLARATIONS, Visibility, extract};
 use crate::lint::java_constants::{Constant, declared_constants};
 use crate::lint::java_owner::Owner;
+use crate::lint::java_receivers::Receiver;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::JavaRule;
 use crate::syntax::descendants;
@@ -44,6 +45,7 @@ pub struct Declaration {
 pub struct CallSite {
     pub name: String,
     pub is_constructor: bool,
+    pub receiver: Receiver,
     pub arguments: Vec<Option<String>>,
     pub result_used: bool,
 }
@@ -58,6 +60,7 @@ pub struct JavaSummary {
     pub package: String,
     pub constants: Vec<Constant>,
     pub mentioned: Vec<String>,
+    pub hierarchy: Vec<(String, Vec<String>)>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -114,6 +117,7 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.referenced.extend(extracted.referenced);
         summary.types.extend(extracted.types);
         summary.mentioned.extend(extracted.mentioned);
+        summary.hierarchy.extend(extracted.hierarchy);
         summary
             .constants
             .extend(declared_constants(&descendants(top_level), source));
@@ -125,6 +129,7 @@ fn call_site(call: Call) -> CallSite {
     CallSite {
         name: call.name,
         is_constructor: call.is_constructor,
+        receiver: call.receiver,
         arguments: call.arguments,
         result_used: call.result_used,
     }

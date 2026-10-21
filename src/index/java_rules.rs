@@ -1,130 +1,11 @@
-use std::collections::{HashMap, HashSet};
-
 use super::java::{CallSite, Declaration, JavaSummary, lint_at};
+use super::java_project::{IndexedSummary, Project, key_of};
 use super::java_unused::{Usage, unused_method};
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body, Returns, Visibility};
 use crate::rules::JavaRule;
 
 const STRING_QUOTE: char = '"';
-const QUALIFIER_SEPARATOR: char = '.';
-
-type Key<'summary> = (bool, &'summary str, usize);
-
-// Desde dónde se ve una constante: su visibilidad, su paquete y si está en los tests.
-type Reach<'summary> = (Visibility, &'summary str, bool);
-
-// Lo que se sabe del proyecto entero: cuántas veces se declara cada método o constructor (por
-// nombre y cantidad de parámetros), quién lo llama y qué nombres se usan como referencia.
-struct Project<'summary> {
-    declared: HashMap<Key<'summary>, usize>,
-    calls: HashMap<Key<'summary>, Vec<&'summary CallSite>>,
-    referenced: HashSet<&'summary str>,
-    overriding: HashSet<Key<'summary>>,
-    constants: HashMap<(&'summary str, &'summary str), Vec<Reach<'summary>>>,
-}
-
-// Un archivo del índice: su resumen y si es de tests (el código de producción no ve lo de los
-// tests).
-pub struct IndexedSummary<'summary> {
-    pub summary: &'summary JavaSummary,
-    pub in_tests: bool,
-}
-
-const fn key_of(declaration: &Declaration) -> Key<'_> {
-    (
-        declaration.is_constructor,
-        declaration.name.as_str(),
-        declaration.parameters.len(),
-    )
-}
-
-impl<'summary> Project<'summary> {
-    fn new(files: &[IndexedSummary<'summary>]) -> Self {
-        let mut project = Self {
-            declared: HashMap::new(),
-            calls: HashMap::new(),
-            referenced: HashSet::new(),
-            overriding: HashSet::new(),
-            constants: HashMap::new(),
-        };
-        for file in files {
-            project.add(file);
-        }
-        project
-    }
-
-    fn add(&mut self, file: &IndexedSummary<'summary>) {
-        let summary = file.summary;
-        for constant in &summary.constants {
-            self.constants
-                .entry((constant.owner.as_str(), constant.name.as_str()))
-                .or_default()
-                .push((constant.visibility, summary.package.as_str(), file.in_tests));
-        }
-        for declaration in &summary.declarations {
-            *self.declared.entry(key_of(declaration)).or_default() += 1;
-        }
-        self.overriding.extend(
-            summary
-                .declarations
-                .iter()
-                .filter(|declaration| declaration.overrides)
-                .map(key_of),
-        );
-        for call in &summary.calls {
-            self.calls
-                .entry((call.is_constructor, call.name.as_str(), call.arguments.len()))
-                .or_default()
-                .push(call);
-        }
-        self.referenced
-            .extend(summary.referenced.iter().map(String::as_str));
-    }
-
-    // Sin tipos no se sabe a cuál de dos métodos con el mismo nombre y aridad va una llamada, ni si
-    // una referencia a método lo usa con otros valores: en la duda, no se razona sobre él.
-    fn is_traceable(&self, declaration: &'summary Declaration) -> bool {
-        self.declared.get(&key_of(declaration)) == Some(&1)
-            && !declaration.overrides
-            && (declaration.is_constructor || !self.referenced.contains(declaration.name.as_str()))
-    }
-
-    // Si ningún método con el mismo nombre y aridad dice @Override, ninguno redefine a éste.
-    fn is_overridden(&self, declaration: &'summary Declaration) -> bool {
-        self.overriding.contains(&key_of(declaration))
-    }
-
-    // IntelliJ marca un valor sólo si se puede llevar adentro del método: un literal, una constante
-    // de una clase del mismo archivo, una pública (o de afuera del proyecto), o una de paquete del
-    // mismo paquete que no esté en los tests si el método no lo está.
-    fn is_movable_into(&self, value: &str, file: &IndexedSummary<'_>) -> bool {
-        let Some((owner, name)) = value
-            .split_once(QUALIFIER_SEPARATOR)
-            .filter(|(owner, _)| owner.starts_with(|first: char| first.is_ascii_uppercase()))
-        else {
-            return true;
-        };
-        if file.summary.types.iter().any(|known| known == owner) {
-            return true;
-        }
-        self.constants.get(&(owner, name)).is_none_or(|declared| {
-            declared
-                .iter()
-                .any(|(visibility, package, in_tests)| match visibility {
-                    Visibility::Public => true,
-                    Visibility::Private => false,
-                    Visibility::Package | Visibility::Protected => {
-                        *package == file.summary.package && (file.in_tests || !in_tests)
-                    }
-                })
-        })
-    }
-
-    fn calls_to(&self, declaration: &'summary Declaration) -> &[&'summary CallSite] {
-        self.calls.get(&key_of(declaration)).map_or(&[], Vec::as_slice)
-    }
-}
 
 // Las inspecciones de IntelliJ que miran el proyecto entero, por archivo. Sólo valen si el
 // análisis ve todo el proyecto: una llamada que falta cambia la respuesta.
@@ -139,10 +20,13 @@ pub fn project_lints(files: &[IndexedSummary<'_>]) -> Vec<Vec<LintFinding>> {
                 .declarations
                 .iter()
                 .flat_map(|declaration| {
-                    let mut found = same_parameter_values(&project, file, declaration);
-                    found.extend(unused_return_value(&project, declaration));
+                    let mut found = Vec::new();
+                    if usage.sees_callers_of(declaration.visibility) {
+                        found.extend(same_parameter_values(&project, file, declaration));
+                        found.extend(unused_return_value(&project, declaration));
+                    }
                     found.extend(same_return_value(&project, summary, declaration));
-                    found.extend(unused_method(declaration, file, &usage));
+                    found.extend(unused_method(&project, declaration, file, &usage));
                     found
                 })
                 .collect()
@@ -174,7 +58,8 @@ fn same_parameter_values<'summary>(
         .iter()
         .enumerate()
         .filter_map(|(index, parameter)| {
-            let value = shared_argument(calls, index).filter(|value| project.is_movable_into(value, file))?;
+            let value =
+                shared_argument(&calls, index).filter(|value| project.is_movable_into(value, file))?;
             Some(lint_at(
                 JavaRule::SameParameterValue,
                 &parameter.position,

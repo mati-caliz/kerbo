@@ -3,6 +3,7 @@ use crate::index::java::{CallSite, Declaration, JavaSummary, Parameter, Position
 use crate::lint::java_calls::{Arity, Body, Returns, Visibility};
 use crate::lint::java_constants::Constant;
 use crate::lint::java_owner::{Owner, OwnerKind};
+use crate::lint::java_receivers::Receiver;
 
 const ABSENT: u64 = 0;
 const PRESENT: u64 = 1;
@@ -21,6 +22,9 @@ const OWNER_ENUM: u64 = 2;
 const OWNER_RECORD: u64 = 3;
 const OWNER_ANNOTATION: u64 = 4;
 const OWNER_LOCAL: u64 = 5;
+const RECEIVER_UNKNOWN: u64 = 0;
+const RECEIVER_TYPE: u64 = 1;
+const RECEIVER_SCOPE: u64 = 2;
 
 pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     let Some(summary) = summary else {
@@ -32,6 +36,7 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     writer.list(&summary.calls, |writer, call| {
         writer.text(&call.name);
         write_flag(writer, call.is_constructor);
+        write_receiver(writer, &call.receiver);
         writer.list(&call.arguments, |writer, argument| {
             write_optional_text(writer, argument.as_deref());
         });
@@ -41,6 +46,10 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     writer.list(&summary.types, |writer, name| writer.text(name));
     writer.text(&summary.package);
     writer.list(&summary.mentioned, |writer, name| writer.text(name));
+    writer.list(&summary.hierarchy, |writer, (name, supertypes)| {
+        writer.text(name);
+        writer.list(supertypes, |writer, supertype| writer.text(supertype));
+    });
     writer.list(&summary.constants, |writer, constant| {
         writer.text(&constant.owner);
         writer.text(&constant.name);
@@ -58,6 +67,7 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
             Ok(CallSite {
                 name: reader.text()?,
                 is_constructor: read_flag(reader)?,
+                receiver: read_receiver(reader)?,
                 arguments: reader.list(read_optional_text)?,
                 result_used: read_flag(reader)?,
             })
@@ -66,6 +76,7 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         types: reader.list(Reader::text)?,
         package: reader.text()?,
         mentioned: reader.list(Reader::text)?,
+        hierarchy: reader.list(|reader| Ok((reader.text()?, reader.list(Reader::text)?)))?,
         constants: reader.list(|reader| {
             Ok(Constant {
                 owner: reader.text()?,
@@ -106,6 +117,7 @@ fn write_declaration(writer: &mut Writer, declaration: &Declaration) {
         OwnerKind::Annotation => OWNER_ANNOTATION,
         OwnerKind::Local => OWNER_LOCAL,
     });
+    writer.text(&declaration.owner.name);
     writer.list(&declaration.owner.annotations, |writer, name| writer.text(name));
 }
 
@@ -150,6 +162,7 @@ fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
                 OWNER_LOCAL => OwnerKind::Local,
                 _ => return Err(Corrupt),
             },
+            name: reader.text()?,
             annotations: reader.list(Reader::text)?,
         },
     })
@@ -170,6 +183,29 @@ fn read_visibility(reader: &mut Reader<'_>) -> Result<Visibility, Corrupt> {
         PACKAGE => Ok(Visibility::Package),
         PROTECTED => Ok(Visibility::Protected),
         PUBLIC => Ok(Visibility::Public),
+        _ => Err(Corrupt),
+    }
+}
+
+fn write_receiver(writer: &mut Writer, receiver: &Receiver) {
+    match receiver {
+        Receiver::Unknown => writer.number(RECEIVER_UNKNOWN),
+        Receiver::Type(name) => {
+            writer.number(RECEIVER_TYPE);
+            writer.text(name);
+        }
+        Receiver::Scope(enclosing) => {
+            writer.number(RECEIVER_SCOPE);
+            writer.list(enclosing, |writer, name| writer.text(name));
+        }
+    }
+}
+
+fn read_receiver(reader: &mut Reader<'_>) -> Result<Receiver, Corrupt> {
+    match reader.number()? {
+        RECEIVER_UNKNOWN => Ok(Receiver::Unknown),
+        RECEIVER_TYPE => Ok(Receiver::Type(reader.text()?)),
+        RECEIVER_SCOPE => Ok(Receiver::Scope(reader.list(Reader::text)?)),
         _ => Err(Corrupt),
     }
 }

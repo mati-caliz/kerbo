@@ -5,6 +5,7 @@ use tree_sitter::Node;
 use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, PRIVATE, children, modifiers, text};
 use super::java_constants::{Constants, constant_value, constants_in, literal_value};
 use super::java_owner::{Owner, annotation_names, mentioned_name, owner_of};
+use super::java_receivers::{Receiver, StaticImports, simple_type_name, supertypes, variable_types};
 use super::java_switch::{rule_bodies, yields_value};
 use crate::syntax::{descendants, named_children};
 
@@ -94,6 +95,7 @@ pub struct Callable<'tree> {
 pub struct Call {
     pub name: String,
     pub is_constructor: bool,
+    pub receiver: Receiver,
     pub arguments: Vec<Option<String>>,
     pub result_used: bool,
 }
@@ -104,6 +106,7 @@ pub struct Extracted<'tree> {
     pub referenced: Vec<String>,
     pub types: Vec<String>,
     pub mentioned: Vec<String>,
+    pub hierarchy: Vec<(String, Vec<String>)>,
 }
 
 // Lo que declara y lo que llama una clase de nivel superior, con sus clases anidadas.
@@ -118,12 +121,18 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
         referenced: Vec::new(),
         types: Vec::new(),
         mentioned: Vec::new(),
+        hierarchy: Vec::new(),
     };
+    let variables = variable_types(&nodes, source);
+    let imported = StaticImports::of(top_level, source);
     for &node in &nodes {
         if TYPE_DECLARATIONS.contains(&node.kind())
             && let Some(name) = node.child_by_field_name(NAME_FIELD)
         {
             extracted.types.push(text(name, source).to_owned());
+            extracted
+                .hierarchy
+                .push((text(name, source).to_owned(), supertypes(node, source)));
         }
         match node.kind() {
             METHOD | CONSTRUCTOR => extracted.callables.extend(callable(node, source)),
@@ -136,9 +145,17 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
                 discarded.extend(named_children(node).first().map(Node::id));
             }
             INVOCATION | CREATION | EXPLICIT_CONSTRUCTOR | ENUM_CONSTANT => {
-                extracted
-                    .calls
-                    .extend(call(node, source, &constants, !discarded.contains(&node.id())));
+                let receiver = || imported.receiver(node, source, &variables);
+                extracted.calls.extend(
+                    call(node, source, &constants, !discarded.contains(&node.id())).map(|found| Call {
+                        receiver: if node.kind() == INVOCATION {
+                            receiver()
+                        } else {
+                            Receiver::Unknown
+                        },
+                        ..found
+                    }),
+                );
             }
             STRING_LITERAL => extracted.mentioned.extend(mentioned_name(node, source)),
             METHOD_REFERENCE => extracted.referenced.extend(
@@ -310,7 +327,7 @@ fn call(node: Node<'_>, source: &[u8], constants: &Constants, result_used: bool)
             false,
         ),
         CREATION => (
-            simple_type_name(node.child_by_field_name(TYPE_FIELD)?, source),
+            simple_type_name(text(node.child_by_field_name(TYPE_FIELD)?, source)),
             true,
         ),
         _ => (enclosing_type_name(node, source)?, true),
@@ -328,20 +345,10 @@ fn call(node: Node<'_>, source: &[u8], constants: &Constants, result_used: bool)
     Some(Call {
         name,
         is_constructor,
+        receiver: Receiver::Unknown,
         arguments,
         result_used,
     })
-}
-
-fn simple_type_name(written: Node<'_>, source: &[u8]) -> String {
-    let full = text(written, source);
-    let without_arguments = full.split('<').next().unwrap_or(full);
-    without_arguments
-        .rsplit(QUALIFIER_SEPARATOR)
-        .next()
-        .unwrap_or(without_arguments)
-        .trim()
-        .to_owned()
 }
 
 // `this(...)` y las constantes de un enum llaman a un constructor de la clase que los contiene;

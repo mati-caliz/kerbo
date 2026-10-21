@@ -1,7 +1,5 @@
-use std::collections::HashSet;
-
 use super::java::{Declaration, lint_at};
-use super::java_rules::IndexedSummary;
+use super::java_project::{IndexedSummary, Project};
 use crate::lint::LintFinding;
 use crate::lint::java_calls::Visibility;
 use crate::lint::java_owner::OwnerKind;
@@ -88,56 +86,43 @@ const JUNIT3_TEST_PREFIX: &str = "test";
 // las librerías también traen runners de consola.
 const APPLICATION_ANNOTATIONS: &[&str] = &["SpringBootApplication", "QuarkusMain", "MicronautApplication"];
 
-// Qué nombres usa el proyecto (llamadas, referencias a métodos y textos que nombran un método) y
-// si es una aplicación: en una librería, lo público es su API y no se espera que se use adentro.
-pub struct Usage<'summary> {
-    names: HashSet<&'summary str>,
+// Si el proyecto es una aplicación: en una librería, lo público es su API y no se espera que se use adentro.
+pub struct Usage {
     is_application: bool,
 }
 
-impl<'summary> Usage<'summary> {
-    pub fn new(files: &[IndexedSummary<'summary>]) -> Self {
-        let mut names = HashSet::new();
-        let mut is_application = false;
-        for file in files {
-            let summary = file.summary;
-            names.extend(
-                summary
-                    .calls
+impl Usage {
+    // En una librería, lo público y lo protegido es API: quien lo usa (o lo redefine) está afuera.
+    pub const fn sees_callers_of(&self, visibility: Visibility) -> bool {
+        self.is_application || matches!(visibility, Visibility::Private | Visibility::Package)
+    }
+
+    pub fn new(files: &[IndexedSummary<'_>]) -> Self {
+        let is_application = files.iter().any(|file| {
+            file.summary.declarations.iter().any(|declaration| {
+                declaration
+                    .owner
+                    .annotations
                     .iter()
-                    .filter(|call| !call.is_constructor)
-                    .map(|call| call.name.as_str()),
-            );
-            names.extend(summary.referenced.iter().map(String::as_str));
-            names.extend(summary.mentioned.iter().map(String::as_str));
-            is_application = is_application
-                || summary.declarations.iter().any(|declaration| {
-                    declaration
-                        .owner
-                        .annotations
-                        .iter()
-                        .any(|annotation| APPLICATION_ANNOTATIONS.contains(&annotation.as_str()))
-                });
-        }
-        Self {
-            names,
-            is_application,
-        }
+                    .any(|annotation| APPLICATION_ANNOTATIONS.contains(&annotation.as_str()))
+            })
+        });
+        Self { is_application }
     }
 }
 
 // Un método que nada del proyecto nombra y que ningún framework conocido llama. Lo público y lo
 // protegido sólo en una aplicación.
 pub fn unused_method(
+    project: &Project<'_>,
     declaration: &Declaration,
     file: &IndexedSummary<'_>,
-    usage: &Usage<'_>,
+    usage: &Usage,
 ) -> Option<LintFinding> {
-    let exposed = matches!(declaration.visibility, Visibility::Public | Visibility::Protected);
     let unused = !declaration.is_constructor
         && !declaration.overrides
-        && !usage.names.contains(declaration.name.as_str())
-        && (usage.is_application || !exposed)
+        && !project.is_named(declaration)
+        && usage.sees_callers_of(declaration.visibility)
         && !matches!(declaration.owner.kind, OwnerKind::Local | OwnerKind::Annotation)
         && declaration
             .annotations

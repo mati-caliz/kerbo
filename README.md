@@ -341,9 +341,13 @@ De las inspecciones de IntelliJ, kerbo hace:
   `@MicronautApplication`): en una librería es su API.
 
 Las que miran el proyecto entero sólo corren cuando el análisis lo abarca (`kerbo check` en la
-raíz): sobre una carpeta o un archivo suelto faltarían llamadas. Sin tipos, kerbo no sabe a cuál
-de dos métodos con el mismo nombre y la misma cantidad de parámetros va una llamada, ni qué hace
-una referencia (`this::metodo`): ahí no marca nada.
+raíz): sobre una carpeta o un archivo suelto faltarían llamadas. Sin compilar, kerbo resuelve el
+receptor de una llamada cuando se puede leer: `repo.buscar()` con `Repositorio repo` declarado en
+el archivo, `Clase.metodo()`, o `metodo()` desde adentro de una clase (con lo que hereda por
+`extends` e `implements`). Una cadena de llamadas, una lambda sin tipos o un `import static`
+quedan como desconocidos y cuentan para todos; con dos métodos iguales en la misma clase o en
+clases emparentadas no marca nada. En una librería (sin `@SpringBootApplication` o similar), lo
+público y lo protegido es API y no se revisa quién lo llama.
 
 En Rust, kerbo mide sólo lo que mide clippy (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` y `excessive_nesting`), y la complejidad cognitiva es la de clippy, no la de

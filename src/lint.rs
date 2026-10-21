@@ -13,6 +13,7 @@ mod java_hidden;
 mod java_order;
 pub mod java_owner;
 mod java_padding;
+pub mod java_receivers;
 mod java_same_value;
 mod java_shapes;
 mod java_spacing;

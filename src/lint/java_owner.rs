@@ -37,6 +37,7 @@ pub enum OwnerKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Owner {
     pub kind: OwnerKind,
+    pub name: String,
     pub annotations: Vec<String>,
 }
 
@@ -47,6 +48,7 @@ pub fn owner_of(member: Node<'_>, source: &[u8]) -> Owner {
     }
     let local = Owner {
         kind: OwnerKind::Local,
+        name: String::new(),
         annotations: Vec::new(),
     };
     let Some(declaration) = container else {
@@ -68,6 +70,10 @@ pub fn owner_of(member: Node<'_>, source: &[u8]) -> Owner {
     }
     Owner {
         kind,
+        name: declaration
+            .child_by_field_name(NAME_FIELD)
+            .map(|name| text(name, source).to_owned())
+            .unwrap_or_default(),
         annotations: annotation_names(declaration, source),
     }
 }
