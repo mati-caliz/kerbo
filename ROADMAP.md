@@ -321,9 +321,10 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 - Mensajes, README y sitio en inglés además de español (hecho: `--lang`, `lang` en `kerbo.toml`
   o el locale del sistema, con español por defecto; `README.en.md` y el sitio en `/en/`).
 - Lo que faltaba del inglés:
-  - El deploy del sitio copiaba sólo `index.html`, `install.sh` y `llms.txt`: `styles.css`,
-    `copy.js`, `install.ps1` y `en/` daban 404 (comprobado el 2026-10-21). El deploy vive en el
-    servidor, fuera del repo, y tiene que publicar la carpeta `site/` entera.
+  - El deploy del sitio (hecho, 2026-10-21): publicaba una copia local vieja del repo, así que
+    `en/`, `styles.css`, `copy.js` e `install.ps1` daban 404. Ahora un script del servidor (en el
+    repo de infraestructura) saca `site/` de `origin/main` y la sincroniza entera, y nginx sirve
+    `install.sh` e `install.ps1` como `text/plain; charset=utf-8`.
   - Plurales en español (hecho: el resumen, la línea de base, el hook y el aviso de tests
     borrados dicen "1 archivo", "1 problema" y "1 desvío").
   - El error "tree-sitter no devolvió un árbol" y el nombre de las funciones sin nombre (hecho:
