@@ -3,7 +3,7 @@ use std::mem;
 
 use tree_sitter::Node;
 
-use super::{CpdToken, Suppression, SuppressionState, image_hash, suppression};
+use super::{CpdToken, Suppression, SuppressionState, image_hash, suppression, token_line};
 use crate::syntax::one_based;
 
 const ATOMIC_KINDS: &[&str] = &["string_literal", "character_literal"];
@@ -104,8 +104,8 @@ pub fn tokens(root: Node<'_>, source: &[u8]) -> Vec<CpdToken> {
         })
         .map(|lexeme| CpdToken {
             image: image_hash(&lexeme.text),
-            line: lexeme.line,
-            end_line: lexeme.end_line,
+            line: token_line(lexeme.line),
+            end_line: token_line(lexeme.end_line),
         })
         .collect()
 }

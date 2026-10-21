@@ -219,3 +219,46 @@ def upgrade():
     }
     assert!(!found.contains(&(MigrationRule::AddingFieldWithDefault, 10)));
 }
+
+const CREATED_TABLES: &str = r#"from alembic import op
+import sqlalchemy as sa
+
+revision = "c"
+down_revision = "b"
+
+
+def upgrade():
+    op.create_table(
+        "orders",
+        sa.Column("id", sa.Integer()),
+        sa.Column("status", sa.Enum("open", "it's closed", name="order_status")),
+        sa.Column("code", sa.String(20), index=True, unique=True),
+        sa.Column("user_id", sa.BigInteger()),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("code", "user_id"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
+        sa.CheckConstraint("user_id > 0"),
+    )
+    op.create_table(
+        "pairs",
+        sa.Column("left_id", sa.Integer(), primary_key=True),
+        sa.Column("right_id", sa.Integer(), primary_key=True),
+    )
+"#;
+
+#[test]
+fn renders_created_tables_with_their_keys_enums_constraints_and_indexes() {
+    let found = all_found(CREATED_TABLES);
+    assert!(found.contains(&(MigrationRule::PreferIdentity, 9)), "{found:?}");
+    assert!(
+        found.contains(&(MigrationRule::PreferBigintOverInt, 20)),
+        "{found:?}"
+    );
+    assert!(!found.contains(&(MigrationRule::PreferIdentity, 20)), "{found:?}");
+    assert!(
+        !found
+            .iter()
+            .any(|(rule, _)| *rule == MigrationRule::RequireConcurrentIndexCreation),
+        "{found:?}"
+    );
+}

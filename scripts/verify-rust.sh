@@ -47,7 +47,7 @@ readonly LINT_FLAGS="
   -D single_use_lifetimes -D redundant_lifetimes -D trivial_casts -D trivial_numeric_casts
 "
 
-crate_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+crate_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && { pwd -W 2>/dev/null || pwd; })"
 recipe="FROM ${RUST_IMAGE}
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/* \\
  && rustup component add clippy rustfmt llvm-tools

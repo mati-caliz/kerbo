@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use std::iter;
 
 use super::collector::{Match, MatchCollector};
 use super::{CpdToken, FNV_OFFSET, fnv};
@@ -10,12 +11,11 @@ const JAVA_LOAD_NUMERATOR: usize = 3;
 const JAVA_LOAD_DENOMINATOR: usize = 4;
 const JAVA_SPREAD_SHIFT: u32 = 16;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 struct Position {
-    file: usize,
-    line: usize,
-    end_line: usize,
-    image: u64,
+    file: u32,
+    line: u32,
+    end_line: u32,
 }
 
 #[derive(Debug)]
@@ -28,29 +28,46 @@ pub struct MarkSpan {
 #[derive(Debug)]
 pub struct Pool {
     code: Vec<u32>,
-    positions: Vec<Option<Position>>,
+    positions: Vec<Position>,
+    images: Vec<u64>,
 }
 
 impl Pool {
     pub fn new(files: Vec<Vec<CpdToken>>) -> Self {
+        let total = files.iter().map(|tokens| tokens.len().saturating_add(1)).sum();
         let mut identifiers: HashMap<u64, u32> = HashMap::new();
-        let mut code = Vec::new();
-        let mut positions = Vec::new();
-        for (file, tokens) in files.into_iter().enumerate() {
-            for token in tokens {
-                let next = u32::try_from(identifiers.len()).map_or(u32::MAX, |count| count.saturating_add(1));
-                code.push(*identifiers.entry(token.image).or_insert(next));
-                positions.push(Some(Position {
-                    file,
-                    line: token.line,
-                    end_line: token.end_line,
-                    image: token.image,
-                }));
-            }
-            code.push(END_OF_FILE);
-            positions.push(None);
+        let mut images = vec![0];
+        let mut code = Vec::with_capacity(total);
+        let mut positions = Vec::with_capacity(total);
+        let placed = files.into_iter().enumerate().flat_map(|(file, tokens)| {
+            let file = u32::try_from(file).unwrap_or(u32::MAX);
+            tokens
+                .into_iter()
+                .map(move |token| Some((file, token)))
+                .chain(iter::once(None))
+        });
+        for slot in placed {
+            let Some((file, token)) = slot else {
+                code.push(END_OF_FILE);
+                positions.push(Position::default());
+                continue;
+            };
+            let identifier = *identifiers.entry(token.image).or_insert_with(|| {
+                images.push(token.image);
+                u32::try_from(images.len().saturating_sub(1)).unwrap_or(u32::MAX)
+            });
+            code.push(identifier);
+            positions.push(Position {
+                file,
+                line: token.line,
+                end_line: token.end_line,
+            });
         }
-        Self { code, positions }
+        Self {
+            code,
+            positions,
+            images,
+        }
     }
 
     pub fn matches(&self, tile: usize) -> Vec<Match> {
@@ -62,25 +79,29 @@ impl Pool {
     }
 
     pub fn span(&self, mark: usize, tokens: usize) -> Option<MarkSpan> {
-        let first = self.positions.get(mark).copied().flatten()?;
-        let last = self
-            .positions
-            .get(mark.saturating_add(tokens).saturating_sub(1))
-            .copied()
-            .flatten()?;
+        let first = self.position(mark)?;
+        let last = self.position(mark.saturating_add(tokens).saturating_sub(1))?;
         Some(MarkSpan {
-            file: first.file,
-            line: first.line,
-            end_line: last.end_line,
+            file: usize::try_from(first.file).ok()?,
+            line: usize::try_from(first.line).ok()?,
+            end_line: usize::try_from(last.end_line).ok()?,
         })
+    }
+
+    fn position(&self, index: usize) -> Option<Position> {
+        self.code
+            .get(index)
+            .filter(|&&identifier| identifier != END_OF_FILE)
+            .and_then(|_| self.positions.get(index).copied())
     }
 
     pub fn content_hash(&self, mark: Option<usize>, tokens: usize) -> u64 {
         let images = mark
             .into_iter()
             .flat_map(|first| first..first.saturating_add(tokens))
-            .filter_map(|index| self.positions.get(index).copied().flatten())
-            .map(|position| position.image);
+            .filter_map(|index| self.code.get(index))
+            .filter(|&&identifier| identifier != END_OF_FILE)
+            .filter_map(|&identifier| self.images.get(usize::try_from(identifier).ok()?).copied());
         fnv(FNV_OFFSET, images)
     }
 
@@ -90,12 +111,15 @@ impl Pool {
         let chunks = hashed.chunk_by(|left, right| left.0 == right.0);
         let distinct = chunks.clone().count();
         let capacity = java_hash_map_capacity(self.code.len(), distinct);
-        let mut groups: Vec<(usize, Reverse<usize>, Vec<usize>)> = chunks
+        let mut groups: Vec<(usize, Reverse<u32>, Vec<usize>)> = chunks
             .filter(|chunk| chunk.len() > 1)
             .filter_map(|chunk| {
                 let &(hash, _) = chunk.first()?;
                 let &(_, first_inserted) = chunk.last()?;
-                let marks = chunk.iter().map(|&(_, index)| index).collect();
+                let marks = chunk
+                    .iter()
+                    .filter_map(|&(_, index)| usize::try_from(index).ok())
+                    .collect();
                 Some((java_bucket(hash, capacity), Reverse(first_inserted), marks))
             })
             .collect();
@@ -122,7 +146,7 @@ fn java_bucket(hash: i32, capacity: usize) -> usize {
 
 // Calca MatchAlgorithm.hash() de CPD, con su aritmética de int de 32 bits: los grupos son los tokens
 // con el mismo hash, colisiones incluidas, y las colisiones cambian qué pares se descartan después.
-fn rolling_hashes(code: &[u32], tile: usize) -> Vec<(i32, usize)> {
+fn rolling_hashes(code: &[u32], tile: usize) -> Vec<(i32, u32)> {
     let last_power = (0..tile).fold(1_i32, |power, _| power.wrapping_mul(HASH_BASE));
     let identifier = |index: usize| {
         code.get(index)
@@ -139,7 +163,7 @@ fn rolling_hashes(code: &[u32], tile: usize) -> Vec<(i32, usize)> {
                 .wrapping_mul(last_hash)
                 .wrapping_add(identifier(index))
                 .wrapping_sub(last_power.wrapping_mul(leaving));
-            hashed.push((last_hash, index));
+            hashed.push((last_hash, u32::try_from(index).unwrap_or(u32::MAX)));
             continue;
         }
         last_hash = 0;

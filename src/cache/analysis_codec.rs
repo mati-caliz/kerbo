@@ -134,8 +134,8 @@ fn write_units(writer: &mut Writer, units: Option<&DuplicateUnits>) {
             writer.number(TOKEN_UNITS);
             writer.list(tokens, |writer, token| {
                 writer.fixed(token.image);
-                writer.size(token.line);
-                writer.size(token.end_line);
+                writer.number(u64::from(token.line));
+                writer.number(u64::from(token.end_line));
             });
         }
         Some(DuplicateUnits::Syntax(nodes)) => {
@@ -155,8 +155,8 @@ fn read_units(reader: &mut Reader<'_>) -> Result<Option<DuplicateUnits>, Corrupt
         TOKEN_UNITS => DuplicateUnits::Tokens(reader.list(|reader| {
             Ok(CpdToken {
                 image: reader.fixed()?,
-                line: reader.size()?,
-                end_line: reader.size()?,
+                line: u32::try_from(reader.number()?).map_err(|_| Corrupt)?,
+                end_line: u32::try_from(reader.number()?).map_err(|_| Corrupt)?,
             })
         })?),
         SYNTAX_UNITS => DuplicateUnits::Syntax(reader.list(read_syntax_node)?),

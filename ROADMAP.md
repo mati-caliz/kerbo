@@ -272,6 +272,10 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     macros tarda hasta el doble que antes. En la caché por contenido, la clave de un archivo de
     Rust suma una huella del texto de todo el crate y de la ruta del archivo en él.
   - Pendientes del expansor:
+    - El hook y el editor no usan la caché en disco. El editor guarda las definiciones en
+      memoria, pero el hook arranca un proceso por edición y vuelve a leer el crate entero.
+      Guardar la huella del crate y las definiciones de cada archivo como otro tipo de entrada
+      en el mismo almacén (o resolverlo con el demonio de la fase 7).
     - Bajar el costo: un crate con muchas macros tarda hasta el doble (winnow, de unos 110 a
       200 ms; serde_json, de 85 a 160 ms) y un archivo suelto suma unos 8 ms; casi todo es
       expandir.
@@ -370,13 +374,23 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
 - Pendientes de la caché:
   - Dos procesos que escriben el mismo archivo de la caché a la vez (hecho: antes de escribir un
     shard se relee el del disco y se combinan las entradas sanas, con la marca de uso más nueva).
-    Queda una ventana chica entre releer y renombrar; cerrarla del todo pide un lock o el demonio.
+    Releer, combinar y renombrar va adentro de un lock exclusivo del sistema operativo sobre un
+    archivo `.lock` por shard (`File::lock`: `flock` en Unix, `LockFileEx` en Windows), así que
+    no queda ventana; si el proceso muere, el sistema lo suelta solo.
   - El tope configurable (hecho: `max_megabytes` en `[cache]` de `kerbo.toml` y
     `KERBO_CACHE_MAX_MB`, que manda; 256 MB de fábrica). La caché es una por usuario y la comparten
-    los proyectos, así que el tope que vale es el del último que escribe.
-  - El hook y el editor todavía no la usan; la necesitan cuando llegue el expansor de macros.
-  - La memoria en caliente de Guava (202 MB) es casi toda tokens de CPD recombinados enteros:
-    guardar la huella de cada archivo y recombinar sólo los grupos que tocan lo que cambió.
+    los proyectos, así que el tope que vale es el del último que escribe: es a propósito, porque
+    un tope por proyecto obligaría a llevar la cuenta de qué entrada es de quién, y la misma
+    entrada sirve a todos los clones.
+  - La memoria en caliente de Guava (hecho, 2026-10-21). Era casi toda tokens de CPD
+    recombinados enteros. Recombinar sólo los grupos que tocan lo que cambió no da lo mismo que
+    CPD: recorre los grupos en el orden de un `HashMap` de Java cuya capacidad sale del total de
+    tokens, y ese orden decide qué coincidencia queda cuando dos se pisan. Lo que sí se achicó es
+    cada token: la línea en 32 bits, y en el pool la posición en 12 bytes (antes un `Option` de
+    cuatro campos de 64 bits), la imagen una sola vez por texto distinto y el índice del hash en
+    32 bits; de unos 84 bytes por token a unos 40. En Guava, con el mismo reporte, el pico del
+    contenedor en caliente baja de 253 a 204 MB y en frío de 362 a 319 MB (los dos incluyen la
+    caché de páginas de leer el repo).
 - Perfilar la corrida en frío de VS Code (hecho, 2026-10-20, con el VS Code de ese día: 15.407
   archivos y 203 MB de código). Pesaban las funciones repetidas de TypeScript
   (no-identical-functions): cada función se comparaba con todas las anteriores y en cada
@@ -391,10 +405,15 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   archivos de texto con LF, y el README dice que desde Git Bash se corre con
   `MSYS_NO_PATHCONV=1`, porque el script se copia de afuera y no se edita). Un checkout hecho
   antes del `.gitattributes` conserva los CRLF hasta `git rm --cached -r . && git reset --hard`.
-  Pendiente: con `MSYS_NO_PATHCONV=1`, `pwd` devuelve `/c/Users/...` y Docker Desktop a veces
-  monta `/src` vacío según la carpeta; con `pwd -W` anda siempre. Como `verify-rust.sh` viene del
-  estándar (`quality/sync.sh`), el arreglo va allá y no en este repo.
-- Una sola pasada por función para todas las métricas, en lugar de una por métrica.
+  Con `MSYS_NO_PATHCONV=1`, `pwd` devolvía `/c/Users/...` y Docker Desktop a veces montaba `/src`
+  vacío según la carpeta: el estándar (`quality/rust/verify-rust.sh` y `quality/go/verify-go.sh`)
+  ahora monta con `pwd -W` cuando existe (Git Bash) y con `pwd` en el resto (hecho, 2026-10-21).
+- Una sola pasada por función para todas las métricas (medido y descartado, 2026-10-21). En Go,
+  sin caché y en 4 núcleos, apagar todas las métricas por función baja la CPU de 74 a 65 s en la
+  biblioteca estándar, de 30 a 27 s en consul y de 5,2 a 4,8 s en hugo, y el tiempo real casi no
+  se mueve: lo domina leer y parsear. Juntar las pasadas ahorraría como mucho la mitad de ese
+  10 %, y obliga a fundir ciclomática y cognitiva, que están ajustadas una por una contra cada
+  herramienta de referencia.
 - Un demonio por máquina, con los árboles y la caché en memoria, compartido por el hook, el
   servidor MCP, el LSP y `kerbo check`: varias sesiones de agentes en el mismo repo no repiten el
   trabajo, y el hook responde sin arrancar un proceso por edición.

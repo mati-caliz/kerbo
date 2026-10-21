@@ -1,5 +1,5 @@
 use super::python_letters::is_letter;
-use super::{CpdToken, SuppressionState, image_hash, suppression};
+use super::{CpdToken, SuppressionState, image_hash, suppression, token_line};
 
 const BYTE_ORDER_MARK: char = '\u{feff}';
 const FORM_FEED: char = '\u{c}';
@@ -135,12 +135,13 @@ impl Lexer {
         }
         self.found.push(CpdToken {
             image: image_hash(&image),
-            line: self.lines.get(start).copied().unwrap_or(1),
-            end_line: self
-                .lines
-                .get(self.position.saturating_sub(1))
-                .copied()
-                .unwrap_or(1),
+            line: token_line(self.lines.get(start).copied().unwrap_or(1)),
+            end_line: token_line(
+                self.lines
+                    .get(self.position.saturating_sub(1))
+                    .copied()
+                    .unwrap_or(1),
+            ),
         });
         Some(())
     }

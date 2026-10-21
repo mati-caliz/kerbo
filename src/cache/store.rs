@@ -1,4 +1,4 @@
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::Mutex;
@@ -12,6 +12,7 @@ use super::shard::{Entry, Shard};
 const SHARD_COUNT: usize = 256;
 const SHARD_EXTENSION: &str = "bin";
 const TEMPORARY_EXTENSION: &str = "tmp";
+const LOCK_EXTENSION: &str = "lock";
 const STAMP_REFRESH: Duration = Duration::from_hours(24);
 const SIZE_PREFIX: usize = size_of::<u32>();
 const MAX_ENTRY_BYTES: usize = 256 * 1024 * 1024;
@@ -20,7 +21,6 @@ const MAX_ENTRY_BYTES: usize = 256 * 1024 * 1024;
 pub struct Store {
     directory: PathBuf,
     shard_budget: usize,
-    now: u64,
     shards: Vec<Mutex<Option<Shard>>>,
 }
 
@@ -29,14 +29,12 @@ impl Store {
         Self {
             directory,
             shard_budget: max_bytes / SHARD_COUNT,
-            now: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map_or(0, |elapsed| elapsed.as_secs()),
             shards: (0..SHARD_COUNT).map(|_| Mutex::new(None)).collect(),
         }
     }
 
     pub fn get(&self, key: CacheKey) -> Option<Vec<u8>> {
+        let now = now();
         let compressed = self.with_shard(key, |shard| {
             let entry = shard.entries.get_mut(&key)?;
             if !entry.is_intact() {
@@ -44,8 +42,8 @@ impl Store {
                 shard.dirty = true;
                 return None;
             }
-            if self.now.saturating_sub(entry.stamp) > STAMP_REFRESH.as_secs() {
-                entry.stamp = self.now;
+            if now.saturating_sub(entry.stamp) > STAMP_REFRESH.as_secs() {
+                entry.stamp = now;
                 shard.dirty = true;
             }
             Some(entry.data.clone())
@@ -57,7 +55,7 @@ impl Store {
         if bytes.len() > MAX_ENTRY_BYTES {
             return;
         }
-        let entry = Entry::new(self.now, compress(bytes));
+        let entry = Entry::new(now(), compress(bytes));
         self.with_shard(key, |shard| {
             shard.entries.insert(key, entry);
             shard.dirty = true;
@@ -65,31 +63,38 @@ impl Store {
     }
 
     pub fn persist(&self) {
-        let pending: Vec<(usize, Vec<u8>)> = self
+        let dirty: Vec<usize> = self
             .shards
-            .par_iter()
+            .iter()
             .enumerate()
-            .filter_map(|(index, slot)| {
-                let bytes = slot
-                    .lock()
-                    .ok()?
-                    .as_mut()
-                    .filter(|shard| shard.dirty)
-                    .map(|shard| {
-                        shard.absorb(self.load(index));
-                        shard.evict_to(self.shard_budget);
-                        shard.dirty = false;
-                        shard.serialize()
-                    })?;
-                Some((index, bytes))
+            .filter(|(_, slot)| {
+                slot.lock()
+                    .is_ok_and(|guard| guard.as_ref().is_some_and(|shard| shard.dirty))
             })
+            .map(|(index, _)| index)
             .collect();
-        if pending.is_empty() || fs::create_dir_all(&self.directory).is_err() {
+        if dirty.is_empty() || fs::create_dir_all(&self.directory).is_err() {
             return;
         }
-        pending
-            .par_iter()
-            .for_each(|(index, bytes)| write_atomically(&self.shard_path(*index), bytes));
+        dirty.par_iter().for_each(|index| self.persist_shard(*index));
+    }
+
+    fn persist_shard(&self, index: usize) {
+        let Some(slot) = self.shards.get(index) else {
+            return;
+        };
+        let Ok(mut guard) = slot.lock() else {
+            return;
+        };
+        let Some(shard) = guard.as_mut() else {
+            return;
+        };
+        let held = lock_shard(&self.shard_path(index));
+        shard.absorb(self.load(index));
+        shard.evict_to(self.shard_budget);
+        shard.dirty = false;
+        write_atomically(&self.shard_path(index), &shard.serialize());
+        drop(held);
     }
 
     fn with_shard<Outcome>(
@@ -115,6 +120,23 @@ impl Store {
     fn shard_path(&self, index: usize) -> PathBuf {
         self.directory.join(format!("{index:02x}.{SHARD_EXTENSION}"))
     }
+}
+
+fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs())
+}
+
+fn lock_shard(shard: &Path) -> Option<File> {
+    let lock = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(shard.with_extension(LOCK_EXTENSION))
+        .ok()?;
+    lock.lock().ok()?;
+    Some(lock)
 }
 
 fn write_atomically(path: &Path, bytes: &[u8]) {

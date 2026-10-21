@@ -17,6 +17,8 @@ use crate::rules::RuleId;
 use crate::scan::{ScanOutcome, ScanRequest, scan};
 use crate::test_support::TempTree;
 
+const SHARD_EXTENSION: &str = "bin";
+const CONCURRENT_WRITERS: u128 = 16;
 const SMALL_DUPLICATE_LIMIT: usize = 5;
 const TINY_BUDGET: usize = 100;
 const OLD_STAMP: u64 = 10;
@@ -103,6 +105,10 @@ fn shard_files(directory: &Path) -> Vec<PathBuf> {
         |entries| {
             entries
                 .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+                .filter(|path| {
+                    path.extension()
+                        .is_some_and(|extension| extension == SHARD_EXTENSION)
+                })
                 .collect()
         },
     )
@@ -243,6 +249,26 @@ fn two_processes_writing_the_same_shard_keep_both_entries() {
 }
 
 #[test]
+fn concurrent_writers_never_lose_each_others_entries() {
+    let tree = TempTree::new("cache-lock");
+    let keys: Vec<CacheKey> = (0..CONCURRENT_WRITERS)
+        .map(|writer| CacheKey::from_bits(writer << 8))
+        .collect();
+    assert!(keys.iter().all(|key| key.shard() == keys[0].shard()));
+    std::thread::scope(|scope| {
+        for key in &keys {
+            scope.spawn(|| {
+                let store = Store::new(tree.path().to_path_buf(), DEFAULT_MAX_BYTES);
+                store.put(*key, &key.shard().to_le_bytes());
+                store.persist();
+            });
+        }
+    });
+    let reopened = Store::new(tree.path().to_path_buf(), DEFAULT_MAX_BYTES);
+    assert!(keys.iter().all(|key| reopened.get(*key).is_some()));
+}
+
+#[test]
 fn the_size_cap_comes_from_the_variable_then_the_config_then_the_default() {
     let megabytes = |count: usize| count * 1024 * 1024;
     assert_eq!(budget::resolve(Some("64".into()), Some(32)), megabytes(64));
@@ -347,5 +373,7 @@ fn caller_is_too_complex(outcome: &ScanOutcome) -> bool {
 #[test]
 fn the_default_directory_lives_under_the_user_cache() {
     assert!(location::default_directory().is_some());
-    assert!(AnalysisCache::open_default(None).is_some());
+    let first = AnalysisCache::shared(None).expect("hay caché por defecto");
+    let second = AnalysisCache::shared(None).expect("hay caché por defecto");
+    assert!(std::sync::Arc::ptr_eq(&first, &second));
 }

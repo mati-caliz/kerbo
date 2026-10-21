@@ -8,10 +8,12 @@ mod secret_codec;
 mod shard;
 mod store;
 
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::UNIX_EPOCH;
 
 pub use key::CacheKey;
@@ -38,6 +40,10 @@ pub fn cache_root() -> Option<PathBuf> {
     location::default_directory()
 }
 
+type OpenCaches = Mutex<HashMap<(PathBuf, usize), Arc<AnalysisCache>>>;
+
+static OPEN_CACHES: OnceLock<OpenCaches> = OnceLock::new();
+
 #[derive(Debug)]
 pub struct AnalysisCache {
     store: Store,
@@ -45,9 +51,18 @@ pub struct AnalysisCache {
 }
 
 impl AnalysisCache {
-    pub fn open_default(configured_megabytes: Option<usize>) -> Option<Self> {
+    pub fn shared(configured_megabytes: Option<usize>) -> Option<Arc<Self>> {
         let max_bytes = budget::max_bytes(configured_megabytes);
-        location::default_directory().map(|directory| Self::open(directory.join(FORMAT_DIRECTORY), max_bytes))
+        let directory = location::default_directory()?.join(FORMAT_DIRECTORY);
+        let cache = Arc::clone(
+            OPEN_CACHES
+                .get_or_init(OpenCaches::default)
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .entry((directory.clone(), max_bytes))
+                .or_insert_with(|| Arc::new(Self::open(directory, max_bytes))),
+        );
+        Some(cache)
     }
 
     pub fn open(directory: PathBuf, max_bytes: usize) -> Self {

@@ -201,14 +201,14 @@ fn scan_with(arguments: &ScanArgs, config: &Config) -> ScanOutcome {
     let cache = if arguments.no_cache {
         None
     } else {
-        AnalysisCache::open_default(config.cache_max_megabytes())
+        AnalysisCache::shared(config.cache_max_megabytes())
     };
     scan(&ScanRequest {
         roots: &arguments.paths,
         stacks: &arguments.languages,
         overrides: &arguments.overrides,
         config,
-        cache: cache.as_ref(),
+        cache: cache.as_deref(),
     })
 }
 

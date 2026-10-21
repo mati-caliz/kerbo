@@ -31,8 +31,8 @@ const SUPPRESSION_ON: &str = "CPD-ON";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CpdToken {
     pub image: u64,
-    pub line: usize,
-    pub end_line: usize,
+    pub line: u32,
+    pub end_line: u32,
 }
 
 #[derive(Debug)]
@@ -241,6 +241,10 @@ fn report(identities: &[(FileIdentity, usize)], groups: &[CloneGroup], unit: Blo
         }
     }
     diagnostics
+}
+
+fn token_line(line: usize) -> u32 {
+    u32::try_from(line).unwrap_or(u32::MAX)
 }
 
 fn image_hash(text: &str) -> u64 {
