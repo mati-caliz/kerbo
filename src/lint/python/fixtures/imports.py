@@ -1,0 +1,125 @@
+"""Imports con y sin uso."""
+from __future__ import annotations
+import os
+import os
+import sys as sys
+from alias import same as same
+import package.module.leaf
+import package.module.other
+import repeated.sub
+import repeated.sub
+from grouped import (
+    first,
+    second as renamed,
+)
+import one, two
+from star import *
+from typing import TYPE_CHECKING, overload, TypeAlias, Literal
+import typing as typing_alias
+if TYPE_CHECKING:
+    import only_for_types
+try:
+    import json
+except ImportError:
+    import simplejson as json
+try:
+    import optional
+except ImportError:
+    optional = None
+__version__ = "1"
+import after_dunder
+import deleted_module
+del deleted_module
+sys.path.insert(0, "x")
+import after_path
+os.environ["X"] = "1"
+import after_environ
+with context():
+    import inside_with
+import shadowed_by_class
+import shadowed_by_function
+import shadowed_by_assignment
+shadowed_by_assignment = 1
+
+
+def shadowed_by_function():
+    pass
+
+
+class shadowed_by_class:
+    import class_level_import
+
+    def method(self):
+        import method_level_import
+
+    def same(self):
+        pass
+
+    def same(self):
+        pass
+
+
+for loop_shadow in []:
+    pass
+import loop_shadow
+import loop_import
+for loop_import in []:
+    pass
+
+
+def function_scope():
+    import os
+    import used_inside
+    collections_local = used_inside
+    return collections_local
+
+
+import collections
+
+
+def shadows_module():
+    collections = 1
+    return collections
+
+
+import exported
+import also_exported
+import extended
+__all__ = ["exported", "undefined_export"]
+__all__ += ["also_exported"]
+__all__.extend(["extended"])
+import annotation_only
+import string_annotation_only
+
+
+def annotated(argument: annotation_only.Type) -> "string_annotation_only.Type":
+    pass
+
+
+@overload
+def overloaded(value: int) -> int: ...
+@overload
+def overloaded(value: str) -> str: ...
+def overloaded(value):
+    return value
+
+
+@typing_alias.overload
+def aliased_overload(value: int) -> int: ...
+def aliased_overload(value):
+    return value
+
+
+import used_by_alias
+Alias: TypeAlias = "used_by_alias.Type"
+literal: Literal["not_a_name"] = "not_a_name"
+print(package.module, repeated, first, renamed, one, two, json, optional)
+print(star_name, os, typing_alias, shadowed_by_function, shadowed_by_class, loop_shadow)
+import noqa_blanket  # noqa
+import noqa_code  # noqa: F401
+import noqa_other  # noqa: E501
+import noqa_invalid  # NOQA: detect if installed
+from multiline import (  # noqa: F401
+    hidden_by_statement,
+)
+from __future__ import print_function

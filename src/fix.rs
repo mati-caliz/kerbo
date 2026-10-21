@@ -52,10 +52,23 @@ impl Fix {
             end,
             replacement: replacement.to_owned(),
         }];
+        Self::from_edits(source, edits)
+    }
+
+    pub fn from_edits(source: &[u8], edits: Vec<TextEdit>) -> Self {
         Self {
             hunk: hunk::unified(source, &edits).unwrap_or_default(),
             edits,
         }
+    }
+
+    pub fn replace(node: Node<'_>, text: &str, source: &[u8]) -> Self {
+        Self::single(
+            source,
+            TextPoint::from_point(node.start_position()),
+            TextPoint::from_point(node.end_position()),
+            text,
+        )
     }
 
     pub fn insert_before(node: Node<'_>, text: &str, source: &[u8]) -> Self {

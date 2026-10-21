@@ -1,6 +1,7 @@
 use tree_sitter::Parser;
 
 use super::{LintFinding, LintKind, find_lints};
+use crate::analysis::SourceUnit;
 use crate::fix::apply;
 use crate::language::Language;
 use crate::limits::{Limits, Preset};
@@ -49,13 +50,22 @@ fn strict() -> Limits {
     Preset::Strict.limits(Language::Java, false)
 }
 
+fn unit(source: &str) -> SourceUnit<'_> {
+    SourceUnit {
+        language: Language::Java,
+        source: source.as_bytes(),
+        path: None,
+        crate_macros: None,
+    }
+}
+
 fn lints(source: &str, limits: Limits) -> Vec<LintFinding> {
     let mut parser = Parser::new();
     parser
         .set_language(&Language::Java.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("el archivo se parsea");
-    find_lints(tree.root_node(), source.as_bytes(), LintStyle::Checkstyle, limits)
+    find_lints(tree.root_node(), unit(source), LintStyle::Checkstyle, limits)
 }
 
 fn rendered(findings: &[LintFinding]) -> Vec<String> {
@@ -152,11 +162,6 @@ fn respects_each_rule_switch_and_other_languages() {
         .set_language(&Language::Java.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("el archivo se parsea");
-    let unmeasured = find_lints(
-        tree.root_node(),
-        source.as_bytes(),
-        LintStyle::Unmeasured,
-        strict(),
-    );
+    let unmeasured = find_lints(tree.root_node(), unit(source), LintStyle::Unmeasured, strict());
     assert_eq!(unmeasured, Vec::new());
 }

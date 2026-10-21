@@ -1,0 +1,143 @@
+mod ast;
+mod builtins;
+mod comparisons;
+mod compound;
+mod dicts;
+mod escapes;
+mod flow;
+mod formats;
+mod fstrings;
+mod names;
+mod noqa;
+mod semantic;
+mod statements;
+
+use std::path::Path;
+
+use tree_sitter::{Node, Point};
+
+use super::{LintFinding, LintKind, finding_at};
+use crate::fix::Fix;
+use crate::limits::{Limits, Preset};
+use crate::rules::{PythonRule, RuleId};
+use crate::syntax::descendants;
+
+const PACKAGE_INIT_STEM: &str = "__init__";
+const STUB_EXTENSION: &str = "pyi";
+const MINIMAL_OFF: [PythonRule; 15] = [
+    PythonRule::E401,
+    PythonRule::E402,
+    PythonRule::E701,
+    PythonRule::E702,
+    PythonRule::E703,
+    PythonRule::E711,
+    PythonRule::E712,
+    PythonRule::E713,
+    PythonRule::E714,
+    PythonRule::E721,
+    PythonRule::E722,
+    PythonRule::E731,
+    PythonRule::E741,
+    PythonRule::E742,
+    PythonRule::E743,
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FileKind {
+    pub package_init: bool,
+    pub stub: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Report {
+    pub rule: PythonRule,
+    pub start: Point,
+    pub subject: String,
+    pub fix: Option<Fix>,
+    pub statement_row: Option<usize>,
+}
+
+impl Report {
+    pub fn at(rule: PythonRule, node: Node<'_>, subject: &str) -> Self {
+        Self::at_point(rule, node.start_position(), subject)
+    }
+
+    pub fn at_point(rule: PythonRule, start: Point, subject: &str) -> Self {
+        Self {
+            rule,
+            start,
+            subject: subject.to_owned(),
+            fix: None,
+            statement_row: None,
+        }
+    }
+
+    pub fn with_fix(mut self, fix: Option<Fix>) -> Self {
+        self.fix = fix;
+        self
+    }
+
+    pub const fn with_statement_row(mut self, row: usize) -> Self {
+        self.statement_row = Some(row);
+        self
+    }
+}
+
+pub fn relaxed_by(preset: Preset) -> Vec<RuleId> {
+    let relaxed: &[PythonRule] = match preset {
+        Preset::Strict | Preset::Recommended => &[],
+        Preset::Minimal => &MINIMAL_OFF,
+    };
+    relaxed.iter().copied().map(RuleId::Python).collect()
+}
+
+pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Path>) -> Vec<LintFinding> {
+    let enabled = |rule: PythonRule| limits.get(RuleId::Python(rule)).is_some();
+    if !PythonRule::ALL.into_iter().any(enabled) {
+        return Vec::new();
+    }
+    let file = file_kind(path);
+    let nodes = descendants(root);
+    let mut reports = if root.has_error() {
+        Vec::new()
+    } else {
+        semantic::reports(root, source, file)
+    };
+    reports.extend(compound::reports(root, source));
+    reports.extend(statements::reports(&nodes, source));
+    reports.extend(flow::reports(&nodes));
+    reports.extend(names::reports(&nodes, source));
+    reports.extend(comparisons::reports(&nodes, source));
+    reports.extend(fstrings::reports(&nodes, source));
+    reports.extend(formats::reports(&nodes, source));
+    reports.extend(dicts::reports(&nodes, source));
+    let suppressions = noqa::Suppressions::new(root, source);
+    let mut found: Vec<LintFinding> = reports
+        .into_iter()
+        .filter(|report| enabled(report.rule) && !suppressions.silences(report))
+        .map(|report| {
+            finding_at(
+                LintKind::Python(report.rule),
+                report.start,
+                &report.subject,
+                report.fix,
+            )
+        })
+        .collect();
+    found.sort_by_key(|finding| (finding.line, finding.column));
+    found
+}
+
+fn file_kind(path: Option<&Path>) -> FileKind {
+    FileKind {
+        package_init: path
+            .and_then(Path::file_stem)
+            .is_some_and(|stem| stem == PACKAGE_INIT_STEM),
+        stub: path
+            .and_then(Path::extension)
+            .is_some_and(|extension| extension == STUB_EXTENSION),
+    }
+}
+
+#[cfg(test)]
+mod tests;

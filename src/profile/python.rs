@@ -101,7 +101,7 @@ pub static PYTHON: Profile = Profile {
     short_names: ShortNameStyle::Ruff,
     duplicates: DuplicateStyle::CpdPython,
     commented_code: CommentedCodeStyle::Eradicate,
-    lints: LintStyle::Unmeasured,
+    lints: LintStyle::Ruff,
     comments: &["comment"],
     literals: &["string"],
     function_length_skips_iife: false,

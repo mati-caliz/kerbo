@@ -291,6 +291,37 @@ over the already expanded code, so `for`, `while`, every `?` and every `.await`,
 kerbo does not expand macros: it mimics the standard library's and `log`'s, and for the rest it
 counts only the arguments; a crate's own macro that hides an `if` is the difference that remains.
 
+### Python against ruff
+
+In Python, kerbo implements ruff's classic rule set (`E4`, `E7`, `E9` and `F`: pyflakes and the
+pycodestyle errors) under ruff's own codes, lowercase: `kerbo explain f401`, `--max f841=0` or
+`f401 = "off"` in `kerbo.toml`. It honors `# noqa`, `# noqa: F401` and `# ruff: noqa` like ruff
+(in multi-line strings and `\` continuations the `noqa` goes on the last line). `minimal` keeps
+only the `F` rules.
+
+| Rules | What they flag |
+|---|---|
+| `f401` | unused imports (fixed automatically, except in `__init__.py`) |
+| `f811`, `f402` | redefinitions of something never used and `for` variables that shadow an import |
+| `f821`, `f405`, `f822`, `f823` | undefined names (with module, class, function and comprehension scopes, quoted annotations and `from __future__ import annotations`), names that may come from an `import *`, names in `__all__` and locals used before assignment |
+| `f841`, `f842` | local variables assigned or annotated and never used (an `except` `as` is fixed automatically) |
+| `f403`, `f404`, `f406` | `import *`, a late `from __future__` and `import *` outside the module level |
+| `f501`–`f509`, `f521`–`f525` | `%` and `.format()` formats that do not match their arguments |
+| `f541` | f-strings without placeholders (fixed automatically) |
+| `f601`, `f602` | repeated dictionary keys |
+| `f631`, `f632`, `f633`, `f634` | `assert` and `if` on a tuple, `is` against a literal (fixed automatically) and `print >>` |
+| `f701`, `f702`, `f704`, `f706`, `f707`, `f722`, `f901` | misplaced `break`, `continue`, `yield`, `await` and `return`, `except:` before other handlers, quoted annotations that do not parse and `raise NotImplemented` (fixed automatically) |
+| `e401`, `e402` | several modules in one `import` and imports after other code |
+| `e701`, `e702`, `e703` | several statements on one line (the trailing `;` is fixed automatically) |
+| `e711`, `e712`, `e713`, `e714`, `e721` | `== None`, `== True`, `not x in y`, `not x is y` (fixed automatically) and type comparisons with `==` |
+| `e722`, `e731`, `e741`, `e742`, `e743` | bare `except:`, assigned lambdas and the names `l`, `I` and `O` |
+
+Parity, against ruff 0.17 with `--select E4,E7,E9,F`: zero differences by file, line, column and
+rule on django, fastapi, requests, flask, pydantic, sqlalchemy, ipython, ansible, sympy and the
+CPython standard library (about 11,000 files and 15,900 findings). The only ones left are in files
+tree-sitter-python cannot parse (there kerbo skips the scope rules) and E902, which is a read error
+rather than a rule.
+
 ### Secrets and vulnerable dependencies
 
 `committed-secret` checks every committed file, not just code, with the 222 rules of gitleaks'

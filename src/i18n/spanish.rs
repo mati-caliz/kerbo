@@ -10,6 +10,7 @@ mod explanations;
 mod fixes;
 
 const ANONYMOUS_FUNCTION: &str = "(anónima)";
+mod python;
 mod security;
 
 #[derive(Debug)]
@@ -109,6 +110,7 @@ impl Catalog for Spanish {
             RuleId::Compose(rule) => deploy::compose(rule).description,
             RuleId::CommittedSecret => security::COMMITTED_SECRET_DESCRIPTION,
             RuleId::VulnerableDependency => security::VULNERABLE_DEPENDENCY_DESCRIPTION,
+            RuleId::Python(rule) => python::python(rule).description,
         }
     }
 
@@ -200,6 +202,7 @@ impl Catalog for Spanish {
             LintKind::FinalClass => {
                 format!("La clase `{subject}` debería ser final: no se puede heredar desde afuera")
             }
+            LintKind::Python(rule) => with_subject(python::python(rule).description, subject),
         }
     }
 

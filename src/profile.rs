@@ -153,6 +153,7 @@ pub enum ShortNameStyle {
 pub enum LintStyle {
     Unmeasured,
     Checkstyle,
+    Ruff,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

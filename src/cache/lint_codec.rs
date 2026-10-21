@@ -1,6 +1,7 @@
 use super::codec::{Corrupt, Reader, Writer};
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::{ImportRedundancy, LintFinding, LintKind};
+use crate::rules::PythonRule;
 
 const UNUSED_IMPORT: u64 = 0;
 const JAVA_LANG_IMPORT: u64 = 1;
@@ -10,6 +11,7 @@ const STAR_IMPORT: u64 = 4;
 const REDUNDANT_MODIFIER: u64 = 5;
 const FINAL_PARAMETER: u64 = 6;
 const FINAL_CLASS: u64 = 7;
+const PYTHON: u64 = 8;
 const NO_FIX: u64 = 0;
 const WITH_FIX: u64 = 1;
 
@@ -55,10 +57,18 @@ fn write_kind(writer: &mut Writer, kind: LintKind) {
         LintKind::RedundantModifier => REDUNDANT_MODIFIER,
         LintKind::FinalParameter => FINAL_PARAMETER,
         LintKind::FinalClass => FINAL_CLASS,
+        LintKind::Python(_) => PYTHON,
     };
     writer.number(code);
-    if let LintKind::RedundantImport(ImportRedundancy::Duplicate { first_line }) = kind {
-        writer.size(first_line);
+    match kind {
+        LintKind::RedundantImport(ImportRedundancy::Duplicate { first_line }) => writer.size(first_line),
+        LintKind::Python(rule) => writer.size(rule.position()),
+        LintKind::UnusedImport
+        | LintKind::RedundantImport(ImportRedundancy::JavaLang | ImportRedundancy::SamePackage)
+        | LintKind::StarImport
+        | LintKind::RedundantModifier
+        | LintKind::FinalParameter
+        | LintKind::FinalClass => {}
     }
 }
 
@@ -74,6 +84,7 @@ fn read_kind(reader: &mut Reader<'_>) -> Result<LintKind, Corrupt> {
         REDUNDANT_MODIFIER => LintKind::RedundantModifier,
         FINAL_PARAMETER => LintKind::FinalParameter,
         FINAL_CLASS => LintKind::FinalClass,
+        PYTHON => LintKind::Python(*PythonRule::ALL.get(reader.size()?).ok_or(Corrupt)?),
         _ => return Err(Corrupt),
     })
 }

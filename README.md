@@ -286,6 +286,37 @@ del propio crate se expanden como rustc, leyendo las definiciones de todos sus a
 biblioteca estándar y las de `log` se imitan, y de las de otras dependencias se cuentan sólo los
 argumentos.
 
+### Python contra ruff
+
+En Python, kerbo hace las reglas del conjunto clásico de ruff (`E4`, `E7`, `E9` y `F`: pyflakes y
+los errores de pycodestyle) con el mismo código que ruff, en minúscula: `kerbo explain f401`,
+`--max f841=0` o `f401 = "off"` en `kerbo.toml`. Respeta `# noqa`, `# noqa: F401` y
+`# ruff: noqa` como ruff (en strings de varias líneas y líneas continuadas con `\`, el `noqa` va
+en la última). `minimal` deja sólo las `F`.
+
+| Reglas | Qué marca |
+|---|---|
+| `f401` | imports sin usar (se arregla solo, salvo en `__init__.py`) |
+| `f811`, `f402` | redefiniciones de algo nunca usado y variables de un `for` que pisan un import |
+| `f821`, `f405`, `f822`, `f823` | nombres no definidos (con los alcances de módulo, clase, función y comprensión, las anotaciones entre comillas y `from __future__ import annotations`), los que pueden venir de un `import *`, los de `__all__` y los locales usados antes de asignarse |
+| `f841`, `f842` | variables locales asignadas o anotadas y nunca usadas (el `as` de un `except` se arregla solo) |
+| `f403`, `f404`, `f406` | `import *`, `from __future__` tarde y `import *` fuera del módulo |
+| `f501`–`f509`, `f521`–`f525` | formatos con `%` y `.format()` que no cierran con sus argumentos |
+| `f541` | f-strings sin reemplazos (se arregla solo) |
+| `f601`, `f602` | claves repetidas en un diccionario |
+| `f631`, `f632`, `f633`, `f634` | `assert` e `if` sobre una tupla, `is` contra un literal (se arregla solo) y `print >>` |
+| `f701`, `f702`, `f704`, `f706`, `f707`, `f722`, `f901` | `break`, `continue`, `yield`, `await` y `return` fuera de lugar, `except:` antes de otros, anotaciones entre comillas que no compilan y `raise NotImplemented` (se arregla solo) |
+| `e401`, `e402` | varios módulos en un `import` e imports después de otro código |
+| `e701`, `e702`, `e703` | varias sentencias en una línea (el `;` final se arregla solo) |
+| `e711`, `e712`, `e713`, `e714`, `e721` | `== None`, `== True`, `not x in y`, `not x is y` (se arreglan solos) y comparaciones de tipos con `==` |
+| `e722`, `e731`, `e741`, `e742`, `e743` | `except:` pelado, lambdas asignadas y nombres `l`, `I` y `O` |
+
+Paridad, contra ruff 0.17 con `--select E4,E7,E9,F`: cero diferencias por archivo, línea, columna y
+regla en django, fastapi, requests, flask, pydantic, sqlalchemy, ipython, ansible, sympy y la
+biblioteca estándar de CPython (unos 11.000 archivos y 15.900 avisos). Las únicas que quedan son
+las de archivos que tree-sitter-python no parsea (ahí kerbo no corre las reglas de alcance) y E902,
+que es un error de lectura y no una regla.
+
 ### Secretos y dependencias vulnerables
 
 `committed-secret` revisa todos los archivos versionados, no sólo el código, con las 222 reglas de

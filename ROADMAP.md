@@ -542,6 +542,68 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
 ### 10. Go, Python, TypeScript y shell completos
 
 - Cada lenguaje contra su herramienta (golangci-lint, ruff, ESLint), regla por regla.
+- Python contra ruff (empezada, 2026-10-21): las 55 reglas del conjunto clásico de ruff (`E4`,
+  `E7`, `E9` y `F`, el que pide la tarea; ruff 0.17 cambió su conjunto por defecto por uno mucho más
+  grande, con `B`, `PL`, `UP`, `RUF` y otros) salvo E902, F407, F621 y F622, con el mismo código en
+  minúscula como nombre de regla (`f401`, `e711`), en una familia propia (`PythonRule`).
+  - Frecuencia medida sobre los diez repos de abajo, de mayor a menor: F405 4.167, F821 2.194,
+    E402 1.799, E741 1.451, F841 1.361, E701 1.283, E712 1.031, E731 684, F401 627, E722 255,
+    E721 220, E702 208, F541 176, E711 99, E401 98, F403 97, E713 86, F811 79, F601 53, E703 47,
+    E742 35, F402 30, F822 22, F507 22 y el resto con menos de 20.
+  - Motor de alcances propio sobre tree-sitter, calcado del modelo semántico de ruff: alcances de
+    módulo, clase, función, lambda, comprensión y tipo (PEP 695); cuerpos de funciones y lambdas
+    diferidos al final del módulo; anotaciones entre comillas parseadas aparte con la posición
+    exacta adentro del string (o la del string si tiene escapes o está concatenado), y anotaciones
+    diferidas con `from __future__ import annotations` y en los `.pyi`; `typing.cast`, `TypeVar`,
+    `NewType`, `NamedTuple`, `TypedDict`, `TypeForm`, `Literal`, `Annotated` y `TypeAlias`
+    resueltos por nombre calificado; ramas de `if`, `try`, `match` y `with` para no marcar
+    redefiniciones en caminos excluyentes.
+  - Arreglos mecánicos con el `Fix` de siempre (salen como parche en `--format agent`, acción
+    rápida del LSP y en `kerbo fix`): F401 (el import entero, el nombre de una lista o `pass` si el
+    bloque queda vacío; no en `__init__.py` ni con otra sentencia en la línea), F541, E703, E711,
+    E712, E713, E714, F632, F901 y el `as` sin usar de un `except` (F841).
+  - `# noqa`, `# noqa: CÓDIGOS` y `# ruff: noqa`/`# flake8: noqa` como ruff: en un string de varias
+    líneas o una línea continuada con `\` el `noqa` va en la última; F401 también mira la primera
+    línea del import; `# noqa:` sin códigos válidos no silencia nada.
+  - Paridad: cero diferencias por archivo, línea, columna, regla y cantidad contra ruff 0.17.1
+    (`--isolated --select E4,E7,E9,F`) en requests, fastapi, flask, django, pydantic, sqlalchemy,
+    ipython, ansible, sympy y `Lib/` de CPython: 15.916 avisos en unos 11.200 archivos. Lo que queda,
+    explicado:
+    - 82 archivos de CPython usan `lazy import` (PEP 810, de 3.15) y quedan fuera de la medición:
+      tree-sitter-python 0.25 no lo conoce.
+    - En los archivos donde tree-sitter devuelve errores no corren las reglas que dependen de los
+      alcances (un árbol roto da falsos positivos, que rompen un gate): en CPython son
+      `test_compile.py` (un `dedent` adentro de paréntesis) y `test_patma.py`, 103 avisos que ruff
+      sí da. Las reglas locales (E70x, comparaciones, f-strings) corren igual.
+    - E902 (5 avisos) es un error de lectura de ruff con archivos que no están en UTF-8, no una
+      regla.
+  - Lo que no se ve a simple vista quedó en `src/lint/python/fixtures/`, cada archivo con la salida
+    de ruff al lado: los builtins de 3.11 (sin `PythonFinalizationError`), `__class__` sólo en
+    métodos y `__module__`/`__qualname__` sólo en el cuerpo de la clase; la anotación sin valor que
+    deja el nombre sin definir en una función pero no en una clase; el `del` condicional (adentro de
+    un `if`, `while`, `match` o un `except`); el `global` de una función que define el nombre en el
+    módulo cuando se lee la `def`, no cuando corre; los parámetros que se ligan recién al analizar
+    el cuerpo (y por eso redefinen un import posterior); las variables de una comprensión dentro de
+    un `for` que cuentan como variables del loop; las redefiniciones entre alcances que no miran las
+    clases; la resolución de las anotaciones entre comillas que prueba primero el módulo; el
+    `@overload` resuelto por nombre calificado (un `typing` reexportado no vale), y F507, que cuenta
+    como un solo valor cualquier literal que no sea una tupla.
+  - Las columnas cuentan bytes, como el resto de las reglas; ruff cuenta caracteres (la medición
+    convierte).
+- Pendientes de Python contra ruff:
+  - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
+    no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.
+  - El resto del conjunto por defecto de ruff 0.17 (`B`, `PL`, `UP`, `RUF`, `SIM`, `C4`, `PYI`,
+    `FURB`, `PERF`, `ASYNC`, `S`, `TRY`, `PT`, `LOG`, `YTT`…), sin medir todavía la frecuencia.
+  - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
+    gramática lo sume.
+  - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece
+    como suprimido con su motivo.
+  - `short-name` de Python marca los mismos `l`, `O` e `I` que `e741`: hoy salen los dos.
+  - Arreglos que ruff tiene y kerbo todavía no: E401 (partir el import), F811 (borrar la definición
+    pisada), F504/F522/F523 (sacar los argumentos de más) y E731 (pasar la lambda a `def`).
+  - El arnés de esta paridad (ruff en JSON contra kerbo en JSON con la conversión de columnas)
+    quedó fuera del repo, como los anteriores.
 - Shell contra ShellCheck.
 - Código muerto entre archivos: exports que nadie importa y dependencias declaradas que nadie
   usa, con paridad contra knip, vulture y depcheck donde las haya.

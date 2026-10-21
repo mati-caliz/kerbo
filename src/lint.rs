@@ -3,15 +3,17 @@ mod final_parameters;
 mod imports;
 mod java;
 mod modifiers;
+mod python;
 mod recovered;
 mod references;
 
 use tree_sitter::{Node, Point};
 
+use crate::analysis::SourceUnit;
 use crate::fix::Fix;
 use crate::limits::Limits;
 use crate::profile::LintStyle;
-use crate::rules::RuleId;
+use crate::rules::{PythonRule, RuleId};
 use crate::syntax::one_based;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,6 +31,7 @@ pub enum LintKind {
     RedundantModifier,
     FinalParameter,
     FinalClass,
+    Python(PythonRule),
 }
 
 impl LintKind {
@@ -40,6 +43,7 @@ impl LintKind {
             Self::RedundantModifier => RuleId::RedundantModifier,
             Self::FinalParameter => RuleId::FinalParameter,
             Self::FinalClass => RuleId::FinalClass,
+            Self::Python(rule) => RuleId::Python(rule),
         }
     }
 }
@@ -62,8 +66,23 @@ pub const LINT_RULES: [RuleId; 6] = [
     RuleId::FinalClass,
 ];
 
-pub fn find_lints(root: Node<'_>, source: &[u8], style: LintStyle, limits: Limits) -> Vec<LintFinding> {
-    if style == LintStyle::Unmeasured || LINT_RULES.iter().all(|&rule| limits.get(rule).is_none()) {
+pub use python::relaxed_by as python_relaxed_by;
+
+pub fn find_lints(
+    root: Node<'_>,
+    unit: SourceUnit<'_>,
+    style: LintStyle,
+    limits: Limits,
+) -> Vec<LintFinding> {
+    match style {
+        LintStyle::Unmeasured => Vec::new(),
+        LintStyle::Checkstyle => java_lints(root, unit.source, limits),
+        LintStyle::Ruff => python::findings(root, unit.source, limits, unit.path),
+    }
+}
+
+fn java_lints(root: Node<'_>, source: &[u8], limits: Limits) -> Vec<LintFinding> {
+    if LINT_RULES.iter().all(|&rule| limits.get(rule).is_none()) {
         return Vec::new();
     }
     let mut findings = imports::reported(root, source);

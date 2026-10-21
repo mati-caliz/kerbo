@@ -118,7 +118,7 @@ pub fn analyze_unit(
         } else {
             Vec::new()
         },
-        lints: find_lints(root, source, profile.lints, limits),
+        lints: find_lints(root, unit, profile.lints, limits),
         duplicate_units: limits
             .get(RuleId::DuplicateCode)
             .and_then(|limit| duplicate_units(root, source, profile.duplicates, limit)),

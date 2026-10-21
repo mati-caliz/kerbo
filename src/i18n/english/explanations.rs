@@ -103,7 +103,7 @@ const FINAL_CLASS: Explanation = Explanation {
     example: "class Dates { private Dates() {} } becomes final class Dates { private Dates() {} }.",
 };
 
-pub const fn explanation(rule: RuleId) -> Explanation {
+pub fn explanation(rule: RuleId) -> Explanation {
     match rule {
         RuleId::FileLength => FILE_LENGTH,
         RuleId::FunctionLength => FUNCTION_LENGTH,
@@ -130,5 +130,6 @@ pub const fn explanation(rule: RuleId) -> Explanation {
         RuleId::Migration(rule) => super::deploy::migration(rule).explanation,
         RuleId::Dockerfile(rule) => super::dockerfile::dockerfile(rule).explanation,
         RuleId::Compose(rule) => super::deploy::compose(rule).explanation,
+        RuleId::Python(rule) => super::python::python(rule).explanation,
     }
 }

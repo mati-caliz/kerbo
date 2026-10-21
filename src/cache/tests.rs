@@ -27,6 +27,7 @@ const JAVA_LINTS: &str = "package a;\nimport java.lang.String;\nimport a.Same;\n
 const GO_SOURCE: &str = "package sample\n\nfunc Many(a, b, c, d, e int) int {\n\tif a > b {\n\t\treturn c\n\t}\n\treturn d + e\n}\n";
 const PYTHON_SOURCE: &str =
     "def build(first, second, third, fourth, fifth, sixth, seventh):\n    # x = 1\n    return first * 42\n";
+const PYTHON_LINTS: &str = "import os\nimport sys\nprint(f\"hola\", sys)\nif sys == None: pass\n";
 const RUST_BRANCHES: usize = 40;
 const RUST_MANIFEST: &str = "[package]\nname = \"sample\"\nversion = \"0.1.0\"\n";
 const RUST_CALLER_PATH: &str = "src/caller.rs";
@@ -145,6 +146,7 @@ fn every_kind_of_analysis_decodes_to_the_same_value() {
         (Language::Java, JAVA_LINTS.to_owned()),
         (Language::Go, GO_SOURCE.to_owned()),
         (Language::Python, PYTHON_SOURCE.to_owned()),
+        (Language::Python, PYTHON_LINTS.to_owned()),
         (Language::TypeScript, TYPESCRIPT_SOURCE.to_owned()),
         (Language::Rust, "fn main() {\n    let total = 1;\n}\n".to_owned()),
     ];

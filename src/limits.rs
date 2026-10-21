@@ -6,19 +6,23 @@ use serde::Deserialize;
 use crate::deploy;
 use crate::i18n::Problem;
 use crate::language::Language;
+use crate::lint::python_relaxed_by;
 use crate::rules::RuleId;
+
+const BITS_PER_WORD: usize = 64;
+const FAMILY_WORDS: usize = (RuleId::ALL.len() - RuleId::CODE_RULES.len()).div_ceil(BITS_PER_WORD);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
     values: [Option<u32>; RuleId::CODE_RULES.len()],
-    silenced_families: u64,
+    silenced_families: [u64; FAMILY_WORDS],
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Self {
             values: [None; RuleId::CODE_RULES.len()],
-            silenced_families: ALL_FAMILIES_SILENCED,
+            silenced_families: [ALL_FAMILIES_SILENCED; FAMILY_WORDS],
         }
     }
 }
@@ -108,7 +112,7 @@ impl Limits {
     fn with_metrics([file, function, cyclomatic, cognitive, parameters]: [Option<usize>; 5]) -> Self {
         let mut limits = Self {
             values: [ALWAYS_REPORTED; RuleId::CODE_RULES.len()],
-            silenced_families: NO_FAMILY_SILENCED,
+            silenced_families: [NO_FAMILY_SILENCED; FAMILY_WORDS],
         };
         let metrics = [
             (RuleId::FileLength, file),
@@ -132,17 +136,22 @@ impl Limits {
                     .flatten()
                     .and_then(|value| usize::try_from(value).ok())
             },
-            |bit| (self.silenced_families & bit == 0).then_some(FAMILY_LIMIT),
+            |(word, bit)| {
+                let silenced = self
+                    .silenced_families
+                    .get(word)
+                    .is_none_or(|bits| bits & bit != 0);
+                (!silenced).then_some(FAMILY_LIMIT)
+            },
         )
     }
 
     pub fn with_rule(mut self, rule: RuleId, max: Option<usize>) -> Self {
-        if let Some(bit) = family_bit(rule) {
-            self.silenced_families = if max.is_some() {
-                self.silenced_families & !bit
-            } else {
-                self.silenced_families | bit
-            };
+        if let Some((word, bit)) = family_bit(rule) {
+            let silenced = bit * u64::from(max.is_none());
+            if let Some(bits) = self.silenced_families.get_mut(word) {
+                *bits = (*bits & !bit) | silenced;
+            }
         } else if let Some(slot) = self.values.get_mut(rule.index()) {
             *slot = max.map(|value| u32::try_from(value).unwrap_or(u32::MAX));
         }
@@ -154,9 +163,10 @@ impl Limits {
     }
 }
 
-fn family_bit(rule: RuleId) -> Option<u64> {
+fn family_bit(rule: RuleId) -> Option<(usize, u64)> {
     let offset = rule.index().checked_sub(RuleId::CODE_RULES.len())?;
-    1_u64.checked_shl(u32::try_from(offset).ok()?)
+    let shift = u32::try_from(offset % BITS_PER_WORD).ok()?;
+    Some((offset / BITS_PER_WORD, 1_u64.checked_shl(shift)?))
 }
 
 impl Preset {
@@ -189,6 +199,7 @@ impl Preset {
             .iter()
             .filter(|&&rule| rule != RuleId::SuppressionAdded)
             .chain(&deploy::relaxed_by(self))
+            .chain(&python_relaxed_by(self))
             .fold(base, |limits, &rule| limits.with_rule(rule, None));
         if !is_test {
             return base;

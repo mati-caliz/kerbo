@@ -8,6 +8,7 @@ mod deploy;
 mod dockerfile;
 mod explanations;
 mod fixes;
+mod python;
 mod security;
 
 const ANONYMOUS_FUNCTION: &str = "(anonymous)";
@@ -111,6 +112,7 @@ impl Catalog for English {
             RuleId::Compose(rule) => deploy::compose(rule).description,
             RuleId::CommittedSecret => security::COMMITTED_SECRET_DESCRIPTION,
             RuleId::VulnerableDependency => security::VULNERABLE_DEPENDENCY_DESCRIPTION,
+            RuleId::Python(rule) => python::python(rule).description,
         }
     }
 
@@ -202,6 +204,7 @@ impl Catalog for English {
             LintKind::FinalClass => {
                 format!("The class `{subject}` should be final: it cannot be extended from outside")
             }
+            LintKind::Python(rule) => with_subject(python::python(rule).description, subject),
         }
     }
 

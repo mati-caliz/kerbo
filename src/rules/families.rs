@@ -83,20 +83,80 @@ rule_family!(DockerfileRule {
     Dl4006 => "dl4006",
 });
 
+rule_family!(PythonRule {
+    F401 => "f401",
+    F402 => "f402",
+    F403 => "f403",
+    F404 => "f404",
+    F405 => "f405",
+    F406 => "f406",
+    F501 => "f501",
+    F502 => "f502",
+    F503 => "f503",
+    F504 => "f504",
+    F505 => "f505",
+    F506 => "f506",
+    F507 => "f507",
+    F508 => "f508",
+    F509 => "f509",
+    F521 => "f521",
+    F522 => "f522",
+    F523 => "f523",
+    F524 => "f524",
+    F525 => "f525",
+    F541 => "f541",
+    F601 => "f601",
+    F602 => "f602",
+    F631 => "f631",
+    F632 => "f632",
+    F633 => "f633",
+    F634 => "f634",
+    F701 => "f701",
+    F702 => "f702",
+    F704 => "f704",
+    F706 => "f706",
+    F707 => "f707",
+    F722 => "f722",
+    F811 => "f811",
+    F821 => "f821",
+    F822 => "f822",
+    F823 => "f823",
+    F841 => "f841",
+    F842 => "f842",
+    F901 => "f901",
+    E401 => "e401",
+    E402 => "e402",
+    E701 => "e701",
+    E702 => "e702",
+    E703 => "e703",
+    E711 => "e711",
+    E712 => "e712",
+    E713 => "e713",
+    E714 => "e714",
+    E721 => "e721",
+    E722 => "e722",
+    E731 => "e731",
+    E741 => "e741",
+    E742 => "e742",
+    E743 => "e743",
+});
+
 rule_family!(ComposeRule {
     MemoryLimit => "compose-memory-limit",
     HealthcheckStartPeriod => "compose-healthcheck-start-period",
     HealthcheckInterval => "compose-healthcheck-interval",
 });
 
-pub const FAMILY_RULES: usize = MigrationRule::ALL.len() + DockerfileRule::ALL.len() + ComposeRule::ALL.len();
+pub const FAMILY_RULES: usize =
+    MigrationRule::ALL.len() + DockerfileRule::ALL.len() + ComposeRule::ALL.len() + PythonRule::ALL.len();
 
 pub const fn with_families<const CODE: usize, const TOTAL: usize>(code: [RuleId; CODE]) -> [RuleId; TOTAL] {
     let mut all = [RuleId::FileLength; TOTAL];
     let free = copy_rules(&mut all, &code);
     let free = wrap_migrations(free, &MigrationRule::ALL);
     let free = wrap_dockerfile(free, &DockerfileRule::ALL);
-    wrap_compose(free, &ComposeRule::ALL);
+    let free = wrap_compose(free, &ComposeRule::ALL);
+    wrap_python(free, &PythonRule::ALL);
     all
 }
 
@@ -146,6 +206,16 @@ const fn wrap_compose<'slots>(slots: &'slots mut [RuleId], rules: &[ComposeRule]
     }
 }
 
+const fn wrap_python<'slots>(slots: &'slots mut [RuleId], rules: &[PythonRule]) -> &'slots mut [RuleId] {
+    match (slots, rules) {
+        ([slot, free @ ..], [rule, others @ ..]) => {
+            *slot = RuleId::Python(*rule);
+            wrap_python(free, others)
+        }
+        (free, _) => free,
+    }
+}
+
 pub fn migration_index(rule: MigrationRule, code_rules: usize) -> usize {
     code_rules.saturating_add(rule.position())
 }
@@ -160,6 +230,14 @@ pub fn compose_index(rule: ComposeRule, code_rules: usize) -> usize {
     code_rules
         .saturating_add(MigrationRule::ALL.len())
         .saturating_add(DockerfileRule::ALL.len())
+        .saturating_add(rule.position())
+}
+
+pub fn python_index(rule: PythonRule, code_rules: usize) -> usize {
+    code_rules
+        .saturating_add(MigrationRule::ALL.len())
+        .saturating_add(DockerfileRule::ALL.len())
+        .saturating_add(ComposeRule::ALL.len())
         .saturating_add(rule.position())
 }
 
