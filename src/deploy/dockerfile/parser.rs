@@ -25,6 +25,9 @@ pub enum Keyword {
     Healthcheck,
     Shell,
     Maintainer,
+    Expose,
+    Onbuild,
+    Label,
     Other,
 }
 
@@ -44,6 +47,9 @@ impl Keyword {
             "HEALTHCHECK" => Self::Healthcheck,
             "SHELL" => Self::Shell,
             "MAINTAINER" => Self::Maintainer,
+            "EXPOSE" => Self::Expose,
+            "ONBUILD" => Self::Onbuild,
+            "LABEL" => Self::Label,
             _ => Self::Other,
         }
     }

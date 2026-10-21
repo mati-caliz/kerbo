@@ -134,6 +134,9 @@ fn plain(instruction: &Instruction, declared_arguments: &[String], findings: &mu
         | Keyword::Cmd
         | Keyword::Entrypoint
         | Keyword::Shell
+        | Keyword::Expose
+        | Keyword::Onbuild
+        | Keyword::Label
         | Keyword::Other => {}
     }
 }
@@ -156,7 +159,7 @@ fn base_image(image: &BaseImage, line: usize, findings: &mut Findings) {
     }
 }
 
-fn paths(instruction: &Instruction) -> Vec<String> {
+pub(super) fn paths(instruction: &Instruction) -> Vec<String> {
     instruction.exec_form().unwrap_or_else(|| {
         instruction
             .arguments
@@ -253,6 +256,9 @@ fn sensitive_names(instruction: &Instruction, findings: &mut Findings) {
         | Keyword::Healthcheck
         | Keyword::Shell
         | Keyword::Maintainer
+        | Keyword::Expose
+        | Keyword::Onbuild
+        | Keyword::Label
         | Keyword::Other => return,
     };
     let sensitive = names.iter().find(|name| {

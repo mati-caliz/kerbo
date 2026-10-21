@@ -480,13 +480,15 @@ trigger.dev and cal.com (Prisma), conductor (Flyway) and awesome-compose. In Ale
 only the first nine run.
 
 **Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` and `*.Dockerfile`, against
-[hadolint](https://github.com/hadolint/hadolint): the 38 most common DL rules, named by their code
-(`kerbo explain DL3008`). The shell of each `RUN` goes through an in-house parser that splits
-commands like ShellCheck. Left out are the ShellCheck rules (`SC*`), the ones hadolint ships
-turned off or tied to its configuration (DL1001, DL3026 and DL3048 to DL3058) and DL3001, DL3010,
-DL3011, DL3028, DL3030, DL3033 to DL3041, DL3043, DL3044, DL3046, DL3060, DL3063, DL3065 and
-DL4005. `recommended` turns off hadolint's `info` level and `minimal` keeps only its `error`
-level.
+[hadolint](https://github.com/hadolint/hadolint): every DL rule hadolint ships turned on (59),
+named by their code (`kerbo explain DL3008`). The shell of each `RUN` goes through an in-house
+parser that splits commands like ShellCheck. Left out are the ShellCheck rules (`SC*`), which come
+with stage 10, and the ones hadolint ships turned off or only runs with its configuration (DL1001,
+DL3026, DL3049 to DL3058). `.hadolint.yaml` is not read: a rule is turned off in `kerbo.toml`, with
+its reason. `recommended` turns off hadolint's `info` level and `minimal` keeps only its `error`
+level. Parity, against hadolint 2.15.1 with its default configuration: all 408 of hadolint's
+reports, none extra, in 169 Dockerfiles from awesome-compose, docker-stacks, airflow, superset,
+mlflow, nextcloud/docker, mastodon, sentry self-hosted, grafana and redash.
 
 **docker compose.** `compose.yaml`, `docker-compose.yml` and their variants
 (`docker-compose.prod.yml`), with anchors and `<<:` resolved. There is no reference tool: the

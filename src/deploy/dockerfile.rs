@@ -1,7 +1,10 @@
+mod commands;
+mod declarations;
 mod image;
 mod instructions;
 mod packages;
 mod parser;
+mod rpm;
 pub mod severity;
 mod shell;
 mod stages;
@@ -56,6 +59,9 @@ pub fn violations(source: &str) -> Vec<Violation> {
     instructions::check(&steps, &mut findings);
     packages::check(&steps, &mut findings);
     stages::check(&steps, &mut findings);
+    commands::check(&steps, &mut findings);
+    declarations::check(&steps, &mut findings);
+    rpm::check(&steps, &mut findings);
     let mut violations = findings.violations;
     violations.sort_by_key(|violation| violation.line);
     violations

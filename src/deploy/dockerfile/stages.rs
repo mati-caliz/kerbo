@@ -78,6 +78,9 @@ fn structure(instructions: &[&Instruction], findings: &mut Findings) {
             | Keyword::Arg
             | Keyword::Shell
             | Keyword::Maintainer
+            | Keyword::Expose
+            | Keyword::Onbuild
+            | Keyword::Label
             | Keyword::Other => {}
         }
     }
@@ -147,6 +150,9 @@ fn last_root_users(instructions: &[&Instruction], findings: &mut Findings) {
             | Keyword::Healthcheck
             | Keyword::Shell
             | Keyword::Maintainer
+            | Keyword::Expose
+            | Keyword::Onbuild
+            | Keyword::Label
             | Keyword::Other => {}
         }
     }
@@ -209,6 +215,9 @@ fn relative_copies(instructions: &[&Instruction], findings: &mut Findings) {
             | Keyword::Healthcheck
             | Keyword::Shell
             | Keyword::Maintainer
+            | Keyword::Expose
+            | Keyword::Onbuild
+            | Keyword::Label
             | Keyword::Other => {}
         }
     }

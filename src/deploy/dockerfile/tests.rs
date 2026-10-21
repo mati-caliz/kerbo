@@ -125,6 +125,7 @@ fn matches_hadolint_on_instruction_and_package_rules() {
             (30, "DL3064"),
             (31, "DL3064"),
             (32, "DL3032"),
+            (32, "DL3033"),
             (34, "DL3062"),
             (35, "DL3059"),
             (36, "DL3002"),
@@ -147,6 +148,7 @@ fn matches_hadolint_on_stage_aware_rules() {
             (14, "DL3045"),
             (20, "DL3008"),
             (20, "DL3015"),
+            (21, "DL3046"),
             (21, "DL3059"),
             (22, "DL3014"),
             (22, "DL3008"),
@@ -170,4 +172,19 @@ fn reports_unpinned_packages_as_the_subject() {
         .map(|violation| violation.subject)
         .collect();
     assert_eq!(subjects, vec!["curl bash".to_owned()]);
+}
+
+#[test]
+fn the_fixture_matches_hadolint() {
+    let mut found: Vec<String> = violations(include_str!("fixtures/rules.Dockerfile"))
+        .into_iter()
+        .map(|violation| format!("{} {}", violation.line, violation.rule.as_str().to_uppercase()))
+        .collect();
+    found.sort();
+    let mut expected: Vec<String> = include_str!("fixtures/rules.hadolint")
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    expected.sort();
+    assert_eq!(found, expected);
 }

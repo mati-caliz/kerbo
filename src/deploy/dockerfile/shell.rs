@@ -141,6 +141,15 @@ impl Command {
             .any(|(_, found)| flags.contains(&found.as_str()))
     }
 
+    pub fn flag_arguments(&self, flag: &str) -> Vec<&str> {
+        self.flags()
+            .into_iter()
+            .filter(|(_, found)| found == flag)
+            .filter_map(|(index, _)| self.arguments.get(index.saturating_add(1)))
+            .map(String::as_str)
+            .collect()
+    }
+
     pub fn arguments_without_flags(&self) -> Vec<&str> {
         let flagged: Vec<usize> = self.flags().into_iter().map(|(index, _)| index).collect();
         self.arguments

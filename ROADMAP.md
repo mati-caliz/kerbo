@@ -1007,8 +1007,18 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     fragmentos de `op.execute(...)` no pasan por las reglas de nivel archivo), expandir los `for` sobre listas literales para contar una vez por tabla, seguir las
     funciones auxiliares que llaman a `op` desde fuera de `upgrade()`, y medir paridad sobre las
     401 revisiones que el modo offline no convierte (habría que levantar cada aplicación).
-  - Las reglas de hadolint que faltan (sobre todo DL3046, DL3033 y DL4005) y las de ShellCheck
-    sobre el shell de cada `RUN`, que es la etapa 10.
+  - Las reglas de hadolint que faltaban (hecho, 2026-10-21): DL3001, DL3010, DL3011, DL3028,
+    DL3030, DL3033 a DL3038, DL3040, DL3041, DL3043, DL3044, DL3046, DL3048 (que no depende de la
+    configuración, aunque el README la agrupaba con DL3049 a DL3058), DL3060, DL3063, DL3065 y
+    DL4005, portadas del código de hadolint con sus rarezas: DL3010 sólo reporta los archivos
+    copiados y descomprimidos en la última etapa (un `FROM` descarta lo anterior), DL3060 sólo
+    en la última etapa o en una que otra usa de base, y DL3033/DL3041 heredan las variables `ENV`
+    de la etapa base. Quedan afuera las que hadolint trae apagadas o sólo corren con su
+    configuración (DL1001, DL3026, DL3049 a DL3058); `.hadolint.yaml` no se lee, a propósito: las
+    excepciones van en `kerbo.toml` con motivo. Paridad contra hadolint 2.15.1 (configuración por
+    defecto, pragmas respetados): 408 de 408 avisos en 169 Dockerfiles de los mismos diez repos;
+    lo que el corpus no ejercita está fijado con la salida de hadolint en
+    `src/deploy/dockerfile/fixtures/`. ShellCheck sobre el shell de cada `RUN` es de la etapa 10.
   - Los Dockerfile y compose en carpetas ocultas (hecho: el recorrido entra a `.github/` y
     `.devcontainer/`, para todos los lenguajes, y sigue salteando el resto de lo oculto, como
     `.git/`, `.venv/` o `.next/`, y los archivos ocultos). La lista es corta a propósito: sumar

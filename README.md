@@ -476,12 +476,15 @@ trigger.dev y cal.com (Prisma), conductor (Flyway) y awesome-compose. En Alembic
 corren las nueve primeras.
 
 **Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` y `*.Dockerfile`, contra
-[hadolint](https://github.com/hadolint/hadolint): las 38 reglas DL más comunes, con su código como
-nombre (`kerbo explain DL3008`). El shell de cada `RUN` se lee con un parser propio que separa los
-comandos como ShellCheck. Quedan afuera las reglas de ShellCheck (`SC*`), las que hadolint trae
-apagadas o atadas a su configuración (DL1001, DL3026 y DL3048 a DL3058) y DL3001, DL3010, DL3011,
-DL3028, DL3030, DL3033 a DL3041, DL3043, DL3044, DL3046, DL3060, DL3063, DL3065 y DL4005. `recommended` apaga las de nivel `info` de hadolint y `minimal` deja sólo las de nivel
-`error`.
+[hadolint](https://github.com/hadolint/hadolint): todas las reglas DL que hadolint trae prendidas
+(59), con su código como nombre (`kerbo explain DL3008`). El shell de cada `RUN` se lee con un
+parser propio que separa los comandos como ShellCheck. Quedan afuera las reglas de ShellCheck
+(`SC*`), que van con la etapa 10, y las que hadolint trae apagadas o sólo corren con su
+configuración (DL1001, DL3026, DL3049 a DL3058). `.hadolint.yaml` no se lee: una regla se apaga en
+`kerbo.toml`, con su motivo. `recommended` apaga las de nivel `info` de hadolint y `minimal` deja
+sólo las de nivel `error`. Paridad, contra hadolint 2.15.1 con su configuración por defecto: los
+408 avisos de hadolint, ninguno de más, en 169 Dockerfiles de awesome-compose, docker-stacks,
+airflow, superset, mlflow, nextcloud/docker, mastodon, sentry self-hosted, grafana y redash.
 
 **docker compose.** `compose.yaml`, `docker-compose.yml` y sus variantes (`docker-compose.prod.yml`),
 con anclas y `<<:` resueltos. No hay herramienta de referencia: el criterio es propio.
