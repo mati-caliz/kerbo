@@ -9,7 +9,9 @@ use super::client::{Forwarded, Invocation, ask, deliver, forward};
 use super::endpoint::Endpoint;
 use super::protocol::{Envelope, Request, Response, receive, send};
 use super::server::{Lifetime, serve};
-use super::{IDLE_TIMEOUT, default_lifetime, endpoint_directory, start_with, status, stop};
+use super::{
+    IDLE_TIMEOUT, default_lifetime, endpoint_directory, ensure_running_with, start_with, status, stop,
+};
 use crate::app::{Terminal, run};
 use crate::cli::{self, Cli};
 use crate::i18n::{Lang, LangPreference, Notice, Problem};
@@ -247,4 +249,51 @@ fn the_real_daemon_lives_in_the_user_cache_and_matches_this_binary() {
     let lifetime = default_lifetime();
     assert_eq!(lifetime.idle_timeout, IDLE_TIMEOUT);
     assert_eq!(lifetime.identity, crate::cache::runtime_identity());
+}
+
+#[test]
+fn the_hook_launches_a_daemon_only_when_none_of_this_binary_answers() {
+    let tree = TempTree::new("daemon-ensure");
+    let endpoint = tree.path().join("endpoint");
+    let mut launches = 0;
+    let mut server = None;
+    ensure_running_with(&endpoint, IDENTITY, || {
+        launches += 1;
+        server = Some(start_server(&endpoint, LONG_IDLE));
+        Ok(())
+    });
+    ensure_running_with(&endpoint, IDENTITY, || {
+        launches += 1;
+        Ok(())
+    });
+    assert_eq!(launches, 1);
+    ensure_running_with(&endpoint, IDENTITY + 1, || {
+        launches += 1;
+        Ok(())
+    });
+    assert_eq!(launches, 2);
+    server
+        .expect("se lanzó")
+        .join()
+        .expect("el demonio viejo termina");
+    assert_eq!(status(&endpoint), Notice::DaemonNotRunning);
+}
+
+#[test]
+fn a_second_daemon_on_the_same_folder_leaves_at_once() {
+    let tree = TempTree::new("daemon-single");
+    let endpoint = tree.path().join("endpoint");
+    let server = start_server(&endpoint, LONG_IDLE);
+    let published = Endpoint::read(&endpoint);
+    serve(
+        &endpoint,
+        Lifetime {
+            idle_timeout: LONG_IDLE,
+            identity: IDENTITY,
+        },
+    )
+    .expect("el segundo se va sin error");
+    assert_eq!(Endpoint::read(&endpoint), published);
+    stop(&endpoint);
+    server.join().expect("el demonio termina");
 }

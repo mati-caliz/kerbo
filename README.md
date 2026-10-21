@@ -161,10 +161,11 @@ suprimido en el código (`inSource`), con su motivo, y GitHub lo muestra como de
   de base: el agente no se pone a arreglar código que no tocó. Si kerbo falla, el hook no bloquea.
 - **Demonio** (`kerbo daemon start`, `status` y `stop`): un proceso por usuario y máquina, con la
   caché en memoria, al que `kerbo check` y el hook le pasan el trabajo. Así varias sesiones de
-  agentes en la misma máquina no arrancan todo de cero en cada edición. Escucha sólo en
-  `127.0.0.1`, con un token que queda en la carpeta de caché, y se apaga solo después de 30
-  minutos sin uso. Si no está corriendo, o es de otra versión de kerbo, cada comando corre solo
-  como siempre, y la salida es la misma.
+  agentes en la misma máquina no arrancan todo de cero en cada edición. El hook lo arranca solo la
+  primera vez. Atiende en paralelo los pedidos del mismo repo; los de otro repo esperan su turno.
+  Escucha sólo en `127.0.0.1`, con un token que queda en la carpeta de caché, y se apaga solo
+  después de 30 minutos sin uso. Si no está corriendo, o es de otra versión de kerbo, cada comando
+  corre solo como siempre, y la salida es la misma. `KERBO_DAEMON=off` lo deja afuera.
 - **Servidor MCP** (`kerbo mcp`, por stdio) con tres herramientas: `kerbo_check` (carpetas, `diff`
   y lenguajes; devuelve la salida para agentes), `kerbo_fix` (lo mismo que `kerbo fix`, con
   carpetas, reglas, lenguajes y `dry_run`; devuelve el parche y el resumen) y `kerbo_explain`. En Claude Code:

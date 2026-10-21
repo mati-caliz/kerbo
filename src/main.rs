@@ -35,6 +35,7 @@ use std::process::ExitCode;
 
 use crate::app::{EXIT_FAILURE, Terminal, configured_lang, run};
 use crate::cache::runtime_identity;
+use crate::cli::Command;
 use crate::daemon::{Forwarded, Invocation, deliver, forward};
 use crate::i18n::{Lang, LangPreference, Problem};
 
@@ -71,9 +72,10 @@ fn main() -> ExitCode {
 
 fn dispatch(invocation: &Invocation<'_>, exact_arguments: bool) -> u8 {
     let mut stdin = io::stdin().lock();
-    let forwarded = daemon::endpoint_directory()
-        .filter(|_| exact_arguments)
-        .map(|endpoint| forward(&endpoint, runtime_identity(), invocation, &mut stdin));
+    let endpoint = daemon::endpoint_directory().filter(|_| exact_arguments && daemon::enabled());
+    let forwarded = endpoint
+        .as_deref()
+        .map(|directory| forward(directory, runtime_identity(), invocation, &mut stdin));
     let replayed = match forwarded {
         Some(Forwarded::Done(finished)) => {
             let delivered = deliver(&finished, &mut io::stdout().lock(), &mut io::stderr().lock());
@@ -86,10 +88,14 @@ fn dispatch(invocation: &Invocation<'_>, exact_arguments: bool) -> u8 {
         Some(Forwarded::Local { input }) => input,
         None => None,
     };
-    replayed.map_or_else(
+    let status = replayed.map_or_else(
         || run_here(invocation, &mut stdin),
         |input| run_here(invocation, &mut Cursor::new(input)),
-    )
+    );
+    if let Some(directory) = endpoint.filter(|_| matches!(invocation.command, Command::Hook(_))) {
+        daemon::ensure_running(&directory, runtime_identity());
+    }
+    status
 }
 
 fn run_here(invocation: &Invocation<'_>, input: &mut dyn io::Read) -> u8 {

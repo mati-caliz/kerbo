@@ -166,10 +166,11 @@ dismissed.
   does not block.
 - **Daemon** (`kerbo daemon start`, `status` and `stop`): one process per user and machine, with
   the cache in memory, that `kerbo check` and the hook hand their work to, so several agent
-  sessions on the same machine do not start from scratch on every edit. It only listens on
-  `127.0.0.1`, with a token kept in the cache folder, and stops itself after 30 idle minutes. If
-  it is not running, or it belongs to another kerbo version, every command runs on its own as
-  always, with the same output.
+  sessions on the same machine do not start from scratch on every edit. The hook starts it the
+  first time. Requests from the same repo run in parallel; those from another repo wait their
+  turn. It only listens on `127.0.0.1`, with a token kept in the cache folder, and stops itself
+  after 30 idle minutes. If it is not running, or it belongs to another kerbo version, every
+  command runs on its own as always, with the same output. `KERBO_DAEMON=off` leaves it out.
 - **MCP server** (`kerbo mcp`, over stdio) with three tools: `kerbo_check` (folders, `diff` and
   languages; returns the output for agents), `kerbo_fix` (the same as `kerbo fix`, with folders,
   rules, languages and `dry_run`; returns the patch and the summary) and `kerbo_explain`. In Claude Code:

@@ -146,11 +146,18 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
       lo confirma o lo revierte.
     - Medir con el tokenizador de los Claude actuales (por la API de conteo de tokens) cuando el
       arnés la use de todos modos.
-- **El demonio para agentes** (pendiente; el demonio en sí se hizo en la fase 7):
-  - Que el hook lo arranque solo la primera vez, en lugar de pedir `kerbo daemon start`.
-  - Atender pedidos en paralelo: hoy va de a uno porque cambia el directorio del proceso, y un
-    `check` largo hace esperar al hook. Pide pasar el directorio a todo lo que hoy resuelve rutas
-    relativas.
+- **El demonio para agentes** (hecho, 2026-10-21; el demonio en sí es de la fase 7):
+  - El hook lo arranca solo: si nadie de este binario responde, corre el pedido en su proceso y
+    después lanza `kerbo daemon run` desacoplado (si responde uno de otro binario, primero lo
+    apaga). Un lock exclusivo sobre `daemon.lock` deja uno solo por carpeta de caché: si dos
+    hooks lo lanzan a la vez, el segundo se va enseguida. `KERBO_DAEMON=off` lo deja afuera, y
+    los tests de integración lo usan.
+  - Atiende cada conexión en su hilo. Como el proceso tiene un solo directorio actual, los
+    pedidos del mismo directorio corren en paralelo y los de otro esperan a que se vacíe (un
+    `check` largo en un repo hace esperar al hook de otro repo, no al del mismo). Pasar el
+    directorio a todo lo que hoy resuelve rutas relativas (escaneo, configuración, línea de
+    base, git) sacaría también esa espera; no vale el cambio mientras cada sesión trabaje en un
+    solo repo.
 - **Cuánto gasta un agente de punta a punta** (pendiente). La velocidad de kerbo ya está medida;
   falta medir lo que paga quien lo usa con un agente: correr el gate, leer la salida, arreglar y
   volver a correr hasta que pase.

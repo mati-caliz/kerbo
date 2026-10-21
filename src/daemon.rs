@@ -2,6 +2,7 @@ mod client;
 mod endpoint;
 mod protocol;
 mod server;
+mod workspace;
 
 use std::env;
 use std::io;
@@ -22,6 +23,8 @@ const STARTUP_POLL: Duration = Duration::from_millis(50);
 const STARTUP_ATTEMPTS: usize = 100;
 const DAEMON_COMMAND: &str = "daemon";
 const RUN_ACTION: &str = "run";
+const SWITCH_VARIABLE: &str = "KERBO_DAEMON";
+const SWITCHED_OFF: &str = "off";
 #[cfg(windows)]
 const DETACHED_PROCESS: u32 = 0x0000_0008;
 #[cfg(windows)]
@@ -53,6 +56,25 @@ pub fn stop(directory: &Path) -> Notice {
         Some((_, Response::Stopping)) => Notice::DaemonStopped,
         Some(_) | None => Notice::DaemonNotRunning,
     }
+}
+
+pub fn enabled() -> bool {
+    env::var_os(SWITCH_VARIABLE).is_none_or(|value| value != SWITCHED_OFF)
+}
+
+pub fn ensure_running(directory: &Path, identity: u64) {
+    ensure_running_with(directory, identity, spawn_detached);
+}
+
+fn ensure_running_with(directory: &Path, identity: u64, launch: impl FnOnce() -> io::Result<()>) {
+    match client::ask(directory, Request::Status) {
+        Some((endpoint, Response::Running { .. })) if endpoint.identity == identity => return,
+        Some((_, Response::Running { .. })) => {
+            stop(directory);
+        }
+        Some(_) | None => {}
+    }
+    let _launched = launch();
 }
 
 pub fn start(directory: &Path) -> Result<Notice, Problem> {
