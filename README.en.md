@@ -335,6 +335,14 @@ From IntelliJ's inspections, kerbo does:
   public code).
 - `UnusedReturnValue` (`unused-return-value`): a method that returns something no call uses.
 - `SameReturnValue` (`same-return-value`): every `return` gives back the same literal.
+- `unused` for methods (`unused-method`): no call, reference (`::name`) or string (`"name"`, as in
+  `@MethodSource`) in the project names it, and no known framework calls it. Frameworks are data
+  tables in `src/index/java_unused.rs`: a method with an annotation outside the list of passive
+  ones (`@Transactional`, `@Deprecated`, `@Nullable`…) counts as used (so `@GetMapping`, `@Bean`,
+  `@PrePersist`, `@Test`, `@JsonCreator` or a custom annotation do), as do the methods of a
+  MapStruct `@Mapper` or an `@Aspect`, accessors (`get`/`is`/`set`, used by Jackson and JPA) and
+  the ones the JDK calls by name. Public and protected code is only flagged in an application
+  (`@SpringBootApplication`, `@QuarkusMain`, `@MicronautApplication`): in a library it is its API.
 
 The ones that look at the whole project only run when the analysis covers it (`kerbo check` at the
 root): over a folder or a single file, calls would be missing. Without types, kerbo cannot tell

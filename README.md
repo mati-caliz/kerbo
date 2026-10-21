@@ -330,6 +330,15 @@ De las inspecciones de IntelliJ, kerbo hace:
   público).
 - `UnusedReturnValue` (`unused-return-value`): un método que devuelve algo que ninguna llamada usa.
 - `SameReturnValue` (`same-return-value`): todos los `return` devuelven el mismo literal.
+- `unused` para métodos (`unused-method`): ninguna llamada, referencia (`::nombre`) ni texto
+  (`"nombre"`, como en `@MethodSource`) del proyecto lo nombra, y ningún framework conocido lo
+  llama. Los frameworks son tablas de datos en `src/index/java_unused.rs`: un método con una
+  anotación que no está en la lista de las pasivas (`@Transactional`, `@Deprecated`, `@Nullable`…)
+  se da por usado (así entran `@GetMapping`, `@Bean`, `@PrePersist`, `@Test`, `@JsonCreator` o
+  una anotación propia), igual que los de un `@Mapper` de MapStruct o un `@Aspect`, los accessors
+  (`get`/`is`/`set`, que usan Jackson y JPA) y los que llama el JDK por nombre. Lo público y lo
+  protegido sólo se marca en una aplicación (`@SpringBootApplication`, `@QuarkusMain`,
+  `@MicronautApplication`): en una librería es su API.
 
 Las que miran el proyecto entero sólo corren cuando el análisis lo abarca (`kerbo check` en la
 raíz): sobre una carpeta o un archivo suelto faltarían llamadas. Sin tipos, kerbo no sabe a cuál

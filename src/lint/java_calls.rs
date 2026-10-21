@@ -4,6 +4,8 @@ use tree_sitter::Node;
 
 use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, PRIVATE, children, modifiers, text};
 use super::java_constants::{Constants, constant_value, constants_in, literal_value};
+use super::java_owner::{Owner, annotation_names, mentioned_name, owner_of};
+use super::java_switch::{rule_bodies, yields_value};
 use crate::syntax::{descendants, named_children};
 
 pub const TYPE_DECLARATIONS: &[&str] = &[
@@ -26,20 +28,7 @@ const EXPLICIT_CONSTRUCTOR: &str = "explicit_constructor_invocation";
 const METHOD_REFERENCE: &str = "method_reference";
 const EXPRESSION_STATEMENT: &str = "expression_statement";
 const SWITCH: &str = "switch_expression";
-const SWITCH_RULE: &str = "switch_rule";
-const STATEMENT_PARENTS: &[&str] = &[
-    "block",
-    "constructor_body",
-    "switch_block_statement_group",
-    "labeled_statement",
-    "switch_rule",
-    "if_statement",
-    "while_statement",
-    "for_statement",
-    "enhanced_for_statement",
-    "do_statement",
-    EXPRESSION_STATEMENT,
-];
+const STRING_LITERAL: &str = "string_literal";
 const RETURN: &str = "return_statement";
 const RETURN_BOUNDARIES: &[&str] = &["lambda_expression", "class_body"];
 const VOID: &str = "void_type";
@@ -96,6 +85,8 @@ pub struct Callable<'tree> {
     pub body: Body,
     pub arity: Arity,
     pub returns: Returns,
+    pub annotations: Vec<String>,
+    pub owner: Owner,
 }
 
 // Una llamada: el nombre, por cada argumento el valor constante como lo muestra IntelliJ (o nada
@@ -112,6 +103,7 @@ pub struct Extracted<'tree> {
     pub calls: Vec<Call>,
     pub referenced: Vec<String>,
     pub types: Vec<String>,
+    pub mentioned: Vec<String>,
 }
 
 // Lo que declara y lo que llama una clase de nivel superior, con sus clases anidadas.
@@ -125,6 +117,7 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
         calls: Vec::new(),
         referenced: Vec::new(),
         types: Vec::new(),
+        mentioned: Vec::new(),
     };
     for &node in &nodes {
         if TYPE_DECLARATIONS.contains(&node.kind())
@@ -147,6 +140,7 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
                     .calls
                     .extend(call(node, source, &constants, !discarded.contains(&node.id())));
             }
+            STRING_LITERAL => extracted.mentioned.extend(mentioned_name(node, source)),
             METHOD_REFERENCE => extracted.referenced.extend(
                 named_children(node)
                     .last()
@@ -192,6 +186,8 @@ fn callable<'tree>(declaration: Node<'tree>, source: &[u8]) -> Option<Callable<'
         } else {
             returned(declaration, source)
         },
+        annotations: annotation_names(declaration, source),
+        owner: owner_of(declaration, source),
     })
 }
 
@@ -219,6 +215,8 @@ fn implicit_enum_constructor<'tree>(declaration: Node<'tree>, source: &[u8]) -> 
         body: Body::Abstract,
         arity: Arity::Fixed,
         returns: Returns::Nothing,
+        annotations: Vec::new(),
+        owner: owner_of(declaration, source),
     })
 }
 
@@ -303,27 +301,6 @@ fn returned(method: Node<'_>, source: &[u8]) -> Returns {
         }
         _ => Returns::Varied,
     }
-}
-
-// Un switch que es una expresión (asignado, devuelto, pasado) usa lo que da cada `case X -> ...`;
-// uno escrito como sentencia lo tira.
-fn yields_value(switch: Node<'_>) -> bool {
-    switch
-        .parent()
-        .is_some_and(|parent| !STATEMENT_PARENTS.contains(&parent.kind()))
-}
-
-fn rule_bodies(switch: Node<'_>) -> Vec<usize> {
-    switch
-        .child_by_field_name(BODY_FIELD)
-        .map(named_children)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|rule| rule.kind() == SWITCH_RULE)
-        .flat_map(named_children)
-        .filter(|body| body.kind() == EXPRESSION_STATEMENT)
-        .map(|body| body.id())
-        .collect()
 }
 
 fn call(node: Node<'_>, source: &[u8], constants: &Constants, result_used: bool) -> Option<Call> {

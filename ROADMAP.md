@@ -776,6 +776,24 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     que piden resolver tipos.
   - Costo en Guava, proyecto entero: 10,3 s y ~430 MB sin caché (unos 55 MB más), 0,73 s con
     caché (la pasada del índice corre igual: es barata).
+- `unused` para métodos (hecho, 2026-10-21): `unused-method`. El `unused` de Qodana Community es
+  alcanzabilidad desde los puntos de entrada sin conocer Spring: de sus 3.919 avisos, en métodos
+  728 llevan anotaciones de framework y 231 son accessors, y los campos "sin usar" o "nunca
+  asignados" son de JPA o inyectados. kerbo da por usado lo que nombra cualquier llamada,
+  referencia o texto del proyecto, y tiene los frameworks como tablas de datos: las anotaciones
+  pasivas (con cualquier otra el método se da por llamado por un framework), los tipos cuyos
+  métodos llama el framework (`@Mapper`, `@Aspect`, endpoints), los accessors y los nombres que
+  llama el JDK. Lo público y protegido sólo en una aplicación (`@SpringBootApplication` y
+  similares): junit4 trae `main` en sus runners y no por eso es una aplicación.
+  - Paridad: como Qodana marca de más, la meta es que todo lo de kerbo esté también en Qodana. En
+    los tres servicios, 13 avisos, todos coinciden. Lo que falta son consultas de repositorios y
+    helpers de tests cuyo nombre se usa en otra clase: piden resolver tipos.
+  - En Guava, commons-lang y junit4 (librerías: sólo lo no público): 50, 3 y 45 avisos, los
+    revisados son helpers sin uso o métodos que se buscan por reflexión recorriendo todos los de
+    la clase (que IntelliJ también marca).
+  - Faltan campos, constructores y clases sin usar: piden distinguir lectura de escritura y las
+    tablas de JPA, Jackson y la inyección (un campo `@Autowired` o `@Column` se usa aunque nadie lo
+    lea en el código).
 - Lo que sigue en el índice: resolver tipos donde se pueda sin compilar (la clase de una variable
   local, un campo o un parámetro declarado; las llamadas sin calificar van a la propia clase o a
   las que la encierran), para recuperar los faltantes, y la jerarquía (`extends`/`implements`)

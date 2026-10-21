@@ -285,3 +285,30 @@ fn project_rules_cross_files_only_when_the_whole_project_is_analyzed() {
         "un archivo suelto no ve las llamadas"
     );
 }
+
+const APPLICATION: &str = "package shop;\n\n@SpringBootApplication\nclass App {\n    public static void main(String[] args) { new Orders().placed(); }\n}\n";
+const ORDERS: &str = "package shop;\n\nclass Orders {\n    public int placed() { return helper(); }\n    public int forgotten() { return 1; }\n    @GetMapping(\"/orders\")\n    public int list() { return 2; }\n    public int getTotal() { return 3; }\n    private int helper() { return 4; }\n    private int leftover() { return 5; }\n    static Object source() { return \"byName\"; }\n    private int byName() { return 6; }\n}\n";
+
+fn unused_methods(outcome: &ScanOutcome) -> Vec<String> {
+    outcome
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.rule.as_str() == "unused-method")
+        .map(|diagnostic| format!("{}:{}", diagnostic.relative_path, diagnostic.line))
+        .collect()
+}
+
+#[test]
+fn unused_methods_skip_what_frameworks_call_and_public_api_outside_applications() {
+    let tree = TempTree::new("scan-unused-methods");
+    tree.write("App.java", APPLICATION);
+    tree.write("Orders.java", ORDERS);
+    let application = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
+    assert_eq!(
+        unused_methods(&application),
+        ["Orders.java:5", "Orders.java:10", "Orders.java:11"]
+    );
+    tree.write("App.java", &APPLICATION.replace("@SpringBootApplication\n", ""));
+    let library = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
+    assert_eq!(unused_methods(&library), ["Orders.java:10", "Orders.java:11"]);
+}

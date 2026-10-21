@@ -2,6 +2,7 @@ use super::codec::{Corrupt, Reader, Writer};
 use crate::index::java::{CallSite, Declaration, JavaSummary, Parameter, Position};
 use crate::lint::java_calls::{Arity, Body, Returns, Visibility};
 use crate::lint::java_constants::Constant;
+use crate::lint::java_owner::{Owner, OwnerKind};
 
 const ABSENT: u64 = 0;
 const PRESENT: u64 = 1;
@@ -14,6 +15,12 @@ const PUBLIC: u64 = 3;
 const RETURNS_NOTHING: u64 = 0;
 const RETURNS_ALWAYS: u64 = 1;
 const RETURNS_VARIED: u64 = 2;
+const OWNER_CLASS: u64 = 0;
+const OWNER_INTERFACE: u64 = 1;
+const OWNER_ENUM: u64 = 2;
+const OWNER_RECORD: u64 = 3;
+const OWNER_ANNOTATION: u64 = 4;
+const OWNER_LOCAL: u64 = 5;
 
 pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     let Some(summary) = summary else {
@@ -33,6 +40,7 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     writer.list(&summary.referenced, |writer, name| writer.text(name));
     writer.list(&summary.types, |writer, name| writer.text(name));
     writer.text(&summary.package);
+    writer.list(&summary.mentioned, |writer, name| writer.text(name));
     writer.list(&summary.constants, |writer, constant| {
         writer.text(&constant.owner);
         writer.text(&constant.name);
@@ -57,6 +65,7 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         referenced: reader.list(Reader::text)?,
         types: reader.list(Reader::text)?,
         package: reader.text()?,
+        mentioned: reader.list(Reader::text)?,
         constants: reader.list(|reader| {
             Ok(Constant {
                 owner: reader.text()?,
@@ -88,6 +97,16 @@ fn write_declaration(writer: &mut Writer, declaration: &Declaration) {
         writer.text(&parameter.name);
         write_position(writer, &parameter.position);
     });
+    writer.list(&declaration.annotations, |writer, name| writer.text(name));
+    writer.number(match declaration.owner.kind {
+        OwnerKind::Class => OWNER_CLASS,
+        OwnerKind::Interface => OWNER_INTERFACE,
+        OwnerKind::Enum => OWNER_ENUM,
+        OwnerKind::Record => OWNER_RECORD,
+        OwnerKind::Annotation => OWNER_ANNOTATION,
+        OwnerKind::Local => OWNER_LOCAL,
+    });
+    writer.list(&declaration.owner.annotations, |writer, name| writer.text(name));
 }
 
 fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
@@ -120,6 +139,19 @@ fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
                 position: read_position(reader)?,
             })
         })?,
+        annotations: reader.list(Reader::text)?,
+        owner: Owner {
+            kind: match reader.number()? {
+                OWNER_CLASS => OwnerKind::Class,
+                OWNER_INTERFACE => OwnerKind::Interface,
+                OWNER_ENUM => OwnerKind::Enum,
+                OWNER_RECORD => OwnerKind::Record,
+                OWNER_ANNOTATION => OwnerKind::Annotation,
+                OWNER_LOCAL => OwnerKind::Local,
+                _ => return Err(Corrupt),
+            },
+            annotations: reader.list(Reader::text)?,
+        },
     })
 }
 

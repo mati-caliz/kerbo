@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use super::java::{CallSite, Declaration, JavaSummary, lint_at};
+use super::java_unused::{Usage, unused_method};
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body, Returns, Visibility};
 use crate::rules::JavaRule;
@@ -129,6 +130,7 @@ impl<'summary> Project<'summary> {
 // análisis ve todo el proyecto: una llamada que falta cambia la respuesta.
 pub fn project_lints(files: &[IndexedSummary<'_>]) -> Vec<Vec<LintFinding>> {
     let project = Project::new(files);
+    let usage = Usage::new(files);
     files
         .iter()
         .map(|file| {
@@ -140,6 +142,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>]) -> Vec<Vec<LintFinding>> {
                     let mut found = same_parameter_values(&project, file, declaration);
                     found.extend(unused_return_value(&project, declaration));
                     found.extend(same_return_value(&project, summary, declaration));
+                    found.extend(unused_method(declaration, file, &usage));
                     found
                 })
                 .collect()

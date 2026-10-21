@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use crate::lint::java_calls::{Arity, Body, Call, Returns, TYPE_DECLARATIONS, Visibility, extract};
 use crate::lint::java_constants::{Constant, declared_constants};
+use crate::lint::java_owner::Owner;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::JavaRule;
 use crate::syntax::descendants;
@@ -35,6 +36,8 @@ pub struct Declaration {
     pub arity: Arity,
     pub returns: Returns,
     pub parameters: Vec<Parameter>,
+    pub annotations: Vec<String>,
+    pub owner: Owner,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,6 +57,7 @@ pub struct JavaSummary {
     pub types: Vec<String>,
     pub package: String,
     pub constants: Vec<Constant>,
+    pub mentioned: Vec<String>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -94,6 +98,8 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
                     body: callable.body,
                     arity: callable.arity,
                     returns: callable.returns,
+                    annotations: callable.annotations,
+                    owner: callable.owner,
                     parameters: callable
                         .parameters
                         .iter()
@@ -107,6 +113,7 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.calls.extend(extracted.calls.into_iter().map(call_site));
         summary.referenced.extend(extracted.referenced);
         summary.types.extend(extracted.types);
+        summary.mentioned.extend(extracted.mentioned);
         summary
             .constants
             .extend(declared_constants(&descendants(top_level), source));

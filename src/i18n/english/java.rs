@@ -266,6 +266,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "If every return gives back the same constant, the method decides nothing; sometimes it is a forgotten case. Like IntelliJ's SameReturnValue.",
         "boolean enabled() { if (x) return true; return true; } becomes the constant true.",
     ),
+    RuleText::new(
+        "Method nobody uses",
+        "delete it, or call it where it is needed",
+        "No call, reference or string in the project names it, and no known framework invokes it (Spring, JPA, JUnit, Jackson or MapStruct annotations, accessors, JDK methods). Dead code that still has to be read and maintained. Like IntelliJ's unused, without the framework noise.",
+        "A repository query findByCode(String code) that nobody calls is deleted.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

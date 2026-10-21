@@ -44,6 +44,7 @@ rule_family!(JavaRule {
     SameParameterValue => "same-parameter-value",
     UnusedReturnValue => "unused-return-value",
     SameReturnValue => "same-return-value",
+    UnusedMethod => "unused-method",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {
