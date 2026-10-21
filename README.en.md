@@ -311,8 +311,13 @@ Checkstyle expands them to 8 and reports a different number.
 
 From the rest of `sun_checks.xml`, kerbo does the names (`TypeName`, `MethodName`, `ConstantName`,
 `StaticVariableName`, `MemberName` and `ParameterName`, with the same rule names in kebab case:
-`type-name`, `method-name`...), `UpperEll` (`upper-ell`, fixed automatically) and `EmptyStatement`
-(`empty-statement`). They follow Checkstyle where it is not obvious: `MethodName` skips what carries
+`type-name`, `method-name`...), `UpperEll` (`upper-ell`, fixed automatically), `EmptyStatement`
+(`empty-statement`), `ModifierOrder`, `ArrayTypeStyle`, `MultipleVariableDeclarations`,
+`InterfaceIsType`, `MissingSwitchDefault`, `NeedBraces`, `EmptyBlock`, `AvoidNestedBlocks`,
+`InnerAssignment`, `SimplifyBooleanExpression`, `EqualsHashCode`, `HideUtilityClassConstructor`,
+`TodoComment`, `IllegalImport`, `FileTabCharacter`, trailing spaces (`trailing-spaces`, the
+`RegexpSingleline` in `sun_checks`) and `NewlineAtEndOfFile`; the last two are fixed
+automatically. They follow Checkstyle where it is not obvious: `MethodName` skips what carries
 `@Override` and flags the method named like its class; an interface field is a constant;
 `serialVersionUID` is left out; the patterns are ASCII, so an `ñ` in a name is flagged. `minimal`
 does not ask for them.

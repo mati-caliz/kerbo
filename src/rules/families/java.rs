@@ -9,6 +9,23 @@ rule_family!(JavaRule {
     ParameterName => "parameter-name",
     UpperEll => "upper-ell",
     EmptyStatement => "empty-statement",
+    ModifierOrder => "modifier-order",
+    ArrayTypeStyle => "array-type-style",
+    MultipleVariableDeclarations => "multiple-variable-declarations",
+    InterfaceIsType => "interface-is-type",
+    MissingSwitchDefault => "missing-switch-default",
+    NeedBraces => "need-braces",
+    EmptyBlock => "empty-block",
+    AvoidNestedBlocks => "avoid-nested-blocks",
+    InnerAssignment => "inner-assignment",
+    SimplifyBooleanExpression => "simplify-boolean-expression",
+    EqualsHashCode => "equals-hash-code",
+    HideUtilityClassConstructor => "hide-utility-class-constructor",
+    TodoComment => "todo-comment",
+    IllegalImport => "illegal-import",
+    FileTabCharacter => "file-tab-character",
+    TrailingSpaces => "trailing-spaces",
+    NewlineAtEndOfFile => "newline-at-end-of-file",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {

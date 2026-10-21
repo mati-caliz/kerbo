@@ -1,0 +1,26 @@
+1:1 newline-at-end-of-file 
+3:1 illegal-import 
+7:11 modifier-order static
+9:12 modifier-order @Deprecated
+10:5 multiple-variable-declarations 
+11:5 multiple-variable-declarations 
+11:24 array-type-style 
+12:19 array-type-style 
+15:9 missing-switch-default 
+19:9 need-braces 
+20:19 empty-block 
+20:23 need-braces 
+21:9 need-braces 
+23:9 avoid-nested-blocks 
+25:16 inner-assignment 
+26:29 simplify-boolean-expression 
+27:23 simplify-boolean-expression 
+28:13 empty-block 
+29:11 todo-comment 
+30:11 todo-comment 
+31:1 trailing-spaces 
+31:1 file-tab-character 
+34:5 equals-hash-code 
+37:1 interface-is-type 
+39:1 hide-utility-class-constructor 
+44:5 equals-hash-code 

@@ -578,9 +578,23 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   `minimal` las apaga. Lo fijado en `src/lint/fixtures/Names.java`: `MethodName` saltea
   `@Override` y marca el método con el nombre de la clase; un campo de interfaz es constante;
   `serialVersionUID` no; los patrones son ASCII.
+- Segunda tanda (2026-10-21): `ModifierOrder`, `ArrayTypeStyle`, `MultipleVariableDeclarations`,
+  `InterfaceIsType`, `MissingSwitchDefault`, `NeedBraces`, `EmptyBlock`, `AvoidNestedBlocks`,
+  `InnerAssignment`, `SimplifyBooleanExpression`, `EqualsHashCode`, `HideUtilityClassConstructor`,
+  `TodoComment`, `IllegalImport`, `FileTabCharacter`, los espacios al final (`RegexpSingleline`) y
+  `NewlineAtEndOfFile` (las dos últimas con arreglo). Cero diferencias sobre los tres repos en las
+  31 reglas de forma (unos 53.000 avisos). Lo que hubo que calcar, fijado en
+  `src/lint/fixtures/Shapes.java`: una anotación después de los modificadores vale si va sobre el
+  tipo (variables, parámetros, constructores y métodos que devuelven algo), y un comentario entre
+  los modificadores no cuenta; `EmptyBlock` no mira el `catch`; `MissingSwitchDefault` no cuenta
+  el `default` de un switch anidado y saltea los que usan patrones o `case null`; `InnerAssignment`
+  acepta el idioma del `while` también combinado con `&&` o `||`; `SimplifyBooleanExpression` marca
+  un ternario sólo si las dos ramas son literales; `EqualsHashCode` mira cualquier cuerpo de clase
+  y no cuenta un `hashCode` abstracto; `HideUtilityClassConstructor` descarta las clases que
+  heredan, las abstractas y las anidadas static, cuenta los campos de instancia y toma como público
+  el constructor de paquete; `TodoComment` marca dos columnas después del inicio del comentario.
 - Pendientes de las reglas de forma, por frecuencia en `sun_checks.xml` entero sobre los mismos
-  cuatro repos (sin contar las que ya hace kerbo; los nombres, `UpperEll` y `EmptyStatement` ya
-  están):
+  cuatro repos (sin contar las que ya hace kerbo; las de las dos tandas de arriba ya están):
   - `Indentation` (696.473) y `LineLength` (228.941): son de formato y van con la etapa 13; sin
     medirlas contra el formateador del proyecto marcarían casi todo Guava, que usa
     google-java-format.

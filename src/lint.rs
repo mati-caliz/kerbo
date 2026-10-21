@@ -4,7 +4,10 @@ mod final_parameters;
 mod go;
 mod imports;
 mod java;
+mod java_flow;
+mod java_shapes;
 mod java_style;
+mod java_text;
 mod modifiers;
 mod python;
 mod recovered;
@@ -135,6 +138,9 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: Limits) -> Vec<LintFinding>
     findings.extend(final_parameters::reported(root, source));
     findings.extend(final_class::reported(root, source));
     findings.extend(java_style::reported(root, source));
+    findings.extend(java_shapes::reported(root, source));
+    findings.extend(java_flow::reported(root, source));
+    findings.extend(java_text::reported(root, source));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
     findings.sort_by_key(|finding| (finding.line, finding.column));
     findings

@@ -305,8 +305,13 @@ las reglas: con tabs, Checkstyle las expande a 8 y da otro número.
 
 Del resto de `sun_checks.xml`, kerbo hace los nombres (`TypeName`, `MethodName`, `ConstantName`,
 `StaticVariableName`, `MemberName` y `ParameterName`, con los mismos nombres de regla en kebab:
-`type-name`, `method-name`...), `UpperEll` (`upper-ell`, se arregla solo) y `EmptyStatement`
-(`empty-statement`). Siguen a Checkstyle en lo que no se ve: `MethodName` no mira lo que lleva
+`type-name`, `method-name`...), `UpperEll` (`upper-ell`, se arregla solo), `EmptyStatement`
+(`empty-statement`), `ModifierOrder`, `ArrayTypeStyle`, `MultipleVariableDeclarations`,
+`InterfaceIsType`, `MissingSwitchDefault`, `NeedBraces`, `EmptyBlock`, `AvoidNestedBlocks`,
+`InnerAssignment`, `SimplifyBooleanExpression`, `EqualsHashCode`, `HideUtilityClassConstructor`,
+`TodoComment`, `IllegalImport`, `FileTabCharacter`, los espacios al final de línea
+(`trailing-spaces`, el `RegexpSingleline` de `sun_checks`) y `NewlineAtEndOfFile`; los dos
+últimos se arreglan solos. Siguen a Checkstyle en lo que no se ve: `MethodName` no mira lo que lleva
 `@Override` y marca el método que se llama como su clase; un campo de interfaz es una constante;
 `serialVersionUID` queda afuera; los patrones son ASCII, así que una `ñ` en un nombre se marca.
 `minimal` no las pide.

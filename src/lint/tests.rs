@@ -2,11 +2,22 @@ use tree_sitter::Parser;
 
 use super::{LINT_RULES, LintFinding, LintKind, find_lints};
 use crate::analysis::SourceUnit;
-use crate::fix::apply;
+use crate::fix::{apply, compatible, edits_of};
 use crate::language::Language;
 use crate::limits::{Limits, Preset};
 use crate::profile::LintStyle;
-use crate::rules::RuleId;
+use crate::rules::{JavaRule, RuleId};
+
+const FIRST_JAVA_RULES: [JavaRule; 8] = [
+    JavaRule::TypeName,
+    JavaRule::MethodName,
+    JavaRule::ConstantName,
+    JavaRule::StaticVariableName,
+    JavaRule::MemberName,
+    JavaRule::ParameterName,
+    JavaRule::UpperEll,
+    JavaRule::EmptyStatement,
+];
 
 const FIXTURES: [(&str, &str, &str); 7] = [
     (
@@ -143,7 +154,10 @@ fn star_imports_have_no_mechanical_fix() {
 #[test]
 fn columns_count_bytes_where_checkstyle_expands_tabs() {
     let source = "class A {\n\tvoid m(int value) {}\n}\n";
-    let found = lints(source, strict());
+    let found: Vec<LintFinding> = lints(source, strict())
+        .into_iter()
+        .filter(|finding| LINT_RULES.contains(&finding.kind.rule()))
+        .collect();
     assert_eq!(rendered(&found), ["2:9 final-parameter value"]);
     assert_eq!(
         found[0].column, 9,
@@ -175,7 +189,9 @@ fn respects_each_rule_switch_and_other_languages() {
 fn names_literals_and_empty_statements_match_checkstyle() {
     let source = include_str!("fixtures/Names.java");
     assert_eq!(
-        rendered_where(&lints(source, strict()), |rule| matches!(rule, RuleId::Java(_))),
+        rendered_where(&lints(source, strict()), |rule| {
+            matches!(rule, RuleId::Java(java) if FIRST_JAVA_RULES.contains(&java))
+        }),
         expected(include_str!("fixtures/Names.checkstyle")),
         "Names.java contra Checkstyle 14.3"
     );
@@ -192,5 +208,26 @@ fn names_literals_and_empty_statements_match_checkstyle() {
             .iter()
             .all(|finding| !matches!(finding.kind.rule(), RuleId::Java(_))),
         "minimal no pide estilo de nombres"
+    );
+}
+
+#[test]
+fn declarations_flow_and_text_match_checkstyle() {
+    let source = include_str!("fixtures/Shapes.java");
+    assert_eq!(
+        rendered_where(&lints(source, strict()), |rule| matches!(rule, RuleId::Java(_))),
+        expected(include_str!("fixtures/Shapes.checkstyle")),
+        "Shapes.java contra Checkstyle 14.3"
+    );
+    let found = lints(source, strict());
+    let chosen = compatible(found.iter().filter_map(|finding| finding.fix.as_ref()));
+    let fixed = apply(&edits_of(&chosen), source).expect("los arreglos caen en el archivo");
+    assert!(
+        fixed.ends_with("}\n"),
+        "el arreglo agrega el salto final: {fixed}"
+    );
+    assert!(
+        fixed.contains("\tint tabbed = 1;\n"),
+        "y saca los espacios del final: {fixed}"
     );
 }

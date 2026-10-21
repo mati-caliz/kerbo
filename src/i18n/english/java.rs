@@ -56,6 +56,108 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "A stray ; does nothing, and after a for, a while or an if it leaves the next block outside the loop or the condition.",
         "for (int i = 0; i < n; i++); { add(i); } becomes for (int i = 0; i < n; i++) { add(i); }.",
     ),
+    RuleText::new(
+        "Modifier out of the JLS order, or an annotation after the modifiers",
+        "order the modifiers as the JLS does and put annotations first",
+        "The JLS order (public, protected, private, abstract, default, static, final...) is what everyone expects to read; an annotation among the modifiers gets lost.",
+        "final static public int X becomes public static final int X.",
+    ),
+    RuleText::new(
+        "C-style array brackets, after the name",
+        "put the brackets on the type",
+        "In Java the array is part of the type: String[] args reads straight; String args[] is the C way.",
+        "String args[] becomes String[] args.",
+    ),
+    RuleText::new(
+        "Several variables in one statement or on the same line",
+        "declare it in its own statement and on its own line",
+        "One variable per declaration reads and documents on its own, and hides no different array type between commas.",
+        "int a, b; becomes int a; and int b; on two lines.",
+    ),
+    RuleText::new(
+        "Interface that only has constants",
+        "move the constants to a final class or an enum",
+        "An interface describes a type; using it to gather constants pushes them into the namespace of every implementer.",
+        "interface Limits { int MAX = 10; } becomes final class Limits { static final int MAX = 10; }.",
+    ),
+    RuleText::new(
+        "switch without a default",
+        "add a default, even if only to fail",
+        "Without a default, a new value goes through silently. Switches with patterns or case null are left out: there the compiler already demands full coverage.",
+        "switch (state) { case OPEN: ... } gains default: throw new IllegalStateException(...).",
+    ),
+    RuleText::new(
+        "if, else, for, while or do without braces",
+        "put the body between braces",
+        "Without braces, the second line someone adds stays outside the if or the loop even if it is indented.",
+        "if (full) empty(); becomes if (full) { empty(); }.",
+    ),
+    RuleText::new(
+        "Empty block in an if, a loop, a try, a finally or a switch",
+        "fill in the block or remove it",
+        "A block without statements is usually missing code; a comment alone is not enough. catch is left out: another rule looks at it.",
+        "if (full) { } is removed, or filled in.",
+    ),
+    RuleText::new(
+        "Stray block inside another",
+        "remove the block or extract it into a method",
+        "A stray block only narrows a variable's scope: if that is needed, it is a named method.",
+        "{ int partial = compute(); use(partial); } becomes usePartial();.",
+    ),
+    RuleText::new(
+        "Assignment inside another expression",
+        "do the assignment in its own statement",
+        "An assignment hidden in a condition or an argument reads like a comparison. The idiom while ((line = read()) != null) is accepted.",
+        "if ((total = sum()) > 0) becomes total = sum(); if (total > 0).",
+    ),
+    RuleText::new(
+        "Boolean expression with an extra true or false",
+        "use the condition directly",
+        "Comparing with true or negating a literal adds nothing and reads worse.",
+        "if (active == true) becomes if (active).",
+    ),
+    RuleText::new(
+        "equals without hashCode, or hashCode without equals",
+        "define both",
+        "Two equal objects must return the same hashCode: defining only one silently breaks HashMap and HashSet.",
+        "A class with equals(Object) gains hashCode() over the same fields.",
+    ),
+    RuleText::new(
+        "Utility class (static only) with a public or implicit constructor",
+        "add a private constructor",
+        "If a class only has static methods and fields, instantiating it makes no sense: a private constructor prevents it.",
+        "final class Texts { static String clean(...) } gains private Texts() {}.",
+    ),
+    RuleText::new(
+        "Comment with TODO:",
+        "do it now or move it to an issue",
+        "A TODO: in the code has no owner and no date; an issue does.",
+        "// TODO: validate is removed and an issue remains.",
+    ),
+    RuleText::new(
+        "Import of an internal JDK package (sun.*)",
+        "use the equivalent public API",
+        "sun.* packages are not API: they change or disappear between Java versions.",
+        "import sun.misc.BASE64Encoder; becomes import java.util.Base64;.",
+    ),
+    RuleText::new(
+        "File with tabs (the first one is flagged)",
+        "replace the tabs with spaces",
+        "Every editor shows a tab with a different width, and the indentation falls apart.",
+        "A tab at the start of the line becomes four spaces.",
+    ),
+    RuleText::new(
+        "Line with trailing spaces",
+        "remove the trailing spaces",
+        "Trailing spaces are invisible and pollute every diff that touches them.",
+        "return x;␣␣ becomes return x;.",
+    ),
+    RuleText::new(
+        "File without a newline at the end",
+        "end the file with a newline",
+        "Without the final newline, many tools do not treat the last line as a line, and every change shows it modified.",
+        "A \\n is added at the end.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {
