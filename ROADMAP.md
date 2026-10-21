@@ -280,7 +280,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     máquina de 8 GB compartida no terminaba.
 
   Sumar Qodana al arnés de paridad cuando una regla de Java coincida con una inspección quedó en
-  la etapa 8, con esas reglas.
+  la etapa 8 y de ahí pasó a la 15.
 
 ### 5. Más reglas universales y Rust (cerrada: las reglas en 0.6, Rust en main)
 
@@ -525,7 +525,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   con el mismo reporte. Lo que queda es arrancar el proceso cliente (unos 13 ms). Lo que falta
   del demonio quedó en la fase 3.
 
-### 8. Java sintáctico (empezada)
+### 8. Java sintáctico (cerrada)
 
 - Las reglas de forma de Checkstyle y PMD, con paridad medida. Es el hueco más grande: no hay un
   linter rápido de Java.
@@ -608,21 +608,48 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   árbol de arriba hacia abajo: subir al padre en tree-sitter es caro. Velocidad en Guava (3.275
   archivos, 4 CPU, archivos dentro del contenedor): kerbo entero 10,7 s y ~350 MB sin caché,
   0,7 s con caché; Checkstyle con sólo las reglas de forma, 34,9 s y ~1,3 GB.
-- Pendientes de las reglas de forma, por frecuencia en `sun_checks.xml` entero sobre los mismos
-  cuatro repos (sin contar las que ya hace kerbo; las de las tres tandas de arriba ya están):
+- Cuarta tanda, espacios y llaves (2026-10-21): `WhitespaceAround`, `WhitespaceAfter`,
+  `NoWhitespaceBefore`, `NoWhitespaceAfter`, `GenericWhitespace`, `MethodParamPad`,
+  `EmptyForIteratorPad`, `LeftCurly`, `RightCurly` y `OperatorWrap`. Sobre los tres repos, 8.672
+  avisos y una sola diferencia: `ClassUtilsOssFuzzTest` de commons-lang tiene bytes NUL dentro de
+  un texto, tree-sitter corta el literal ahí y toma un `+` de adentro como operador. Como en los
+  repos casi no aparecen `RightCurly`, `WhitespaceAfter` ni `NoWhitespaceBefore`,
+  `src/lint/fixtures/Spacing.java` junta los casos y coincide con Checkstyle en sus 59 avisos.
+  Los siete de espacios traen arreglo (agregar o sacar el blanco en la misma línea); las llaves y
+  `OperatorWrap` no, porque piden reacomodar líneas: eso es del formateador de la etapa 13. Lo
+  calcado:
+  - `WhitespaceAround` con las opciones de `sun_checks` no perdona bloques vacíos (`{}` se marca
+    dos veces); un `}` seguido de `)`, `,`, `;` o `.` y un `return` sin valor no piden blanco
+    después; la llave de un bloque de inicialización pegada a la de su clase (`{{`, `}}`) tampoco.
+    Los dos puntos de un ternario y de un `assert` sí, los de un for mejorado no.
+  - `NoWhitespaceBefore` no permite cortes de línea: una coma o un `;` al principio de una línea
+    también se marcan, salvo el `;` que cierra una parte vacía de un `for`.
+  - `NoWhitespaceAfter` mira en el `[` de un arreglo o un índice el blanco entre lo anterior y él,
+    y en un inicializador de arreglo la llave que abre.
+  - `GenericWhitespace` pide blanco antes del `<` sólo en los parámetros de tipo de un método o
+    constructor; después del último `>` acepta blanco, `)`, `,`, `[`, `.`, `:` o `;`, y en una
+    llamada (`Foo.<T>bar()`, `new Foo<T>()`) nada en blanco; uno anidado admite un solo blanco y
+    sólo antes de un `&`.
+  - `EmptyForIteratorPad` marca lo primero que sigue al blanco, no el blanco.
+  - `LeftCurly` mira que no haya código después de la llave sólo en los bloques (no en los
+    cuerpos de los tipos ni del switch), y no mira los bloques sueltos ni los de inicialización.
+  - `RightCurly` ubica la sentencia anterior a la llave por su `;` si es una expresión o una
+    declaración (en el árbol de Checkstyle el `;` va aparte) y por su principio si no.
+  - `OperatorWrap` no cuenta los paréntesis que envuelven un operando.
+  - Lo que tree-sitter no pudo parsear (un ERROR) no se mira, salvo el `...` con una anotación
+    antes, que tree-sitter deja en tres puntos sueltos y se reconoce para `NoWhitespaceBefore`.
+  - Velocidad en Guava con las diez (mismas condiciones que la tanda anterior): 8,9 s y ~375 MB
+    sin caché, 0,55 s con caché; Checkstyle con todas las reglas de forma, 31,5 s y ~1,5 GB. Las
+    reglas de espacios recorren las hojas del árbol una vez, con el padre anotado al bajar.
+- Pasan a la etapa 15 la paridad contra PMD y Qodana, las reglas de Javadoc y las inspecciones de
+  la API nueva; `Indentation` y `LineLength` van con el formateo de la etapa 13.
+- Las reglas de forma que no entran, por frecuencia en `sun_checks.xml` entero sobre los mismos
+  cuatro repos (todas las demás ya están):
   - `Indentation` (696.473) y `LineLength` (228.941): son de formato y van con la etapa 13; sin
     medirlas contra el formateador del proyecto marcarían casi todo Guava, que usa
     google-java-format.
-  - Javadoc: `JavadocVariable` (29.407), `MissingJavadocMethod` (27.721), `JavadocMethod`
-    (19.370), `JavadocType` (1.921), `JavadocPackage` (1.508), `InvalidJavadocPosition` (13).
-    Piden leer el Javadoc como árbol; tree-sitter lo deja como un comentario.
-  - Cuarta tanda, espacios y llaves (todas con arreglo mecánico): `WhitespaceAround` (6.533),
-    `NoWhitespaceAfter` (2.325), `RightCurly` (2.116), `OperatorWrap` (145) y las de menos de 70
-    (`NoWhitespaceBefore`, `EmptyForIteratorPad`, `LeftCurly`, `MethodParamPad`,
-    `GenericWhitespace`, `WhitespaceAfter`).
-  - La misma paridad contra PMD para quien usa el quickstart en vez de Checkstyle:
-    `UnnecessaryImport` resuelve tipos con el classpath y no va a coincidir sin las firmas de la
-    etapa 9; `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal`, sí.
+  - Javadoc (`JavadocVariable`, `MissingJavadocMethod`, `JavadocMethod`, `JavadocType`,
+    `JavadocPackage`, `InvalidJavadocPosition`): pasan a la etapa 15.
   - `kerbo fix` (hecho, 2026-10-20): aplica de una vez todos los arreglos que no se pisan, en el
     CLI, en el servidor MCP (`kerbo_fix`) y como acción `source.fixAll.kerbo` del LSP. Genérico
     sobre el `Fix`: lo que agreguen las reglas de Python, TypeScript o shell con arreglo entra sin
@@ -656,15 +683,10 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     - `--since <referencia>` arregla sólo los problemas de las líneas que cambiaron, como
       `check --diff`; las vueltas siguientes se limitan a esos mismos problemas (por su huella).
       No se llama `--diff` porque ese es el alias de `--dry-run`, como en ruff.
-  - Sumar Qodana al arnés de paridad para las reglas que coinciden con una inspección (imports
-    sin usar y modificadores redundantes).
   - El arnés de esta paridad (hecho, 2026-10-21): `run_java_shape.sh`, `checkstyle.shape.xml` y
     `shape_compare.py` en `ideas/kerbo/parity`, que compara por archivo, línea, columna y regla y
     pasa las columnas de Checkstyle a bytes. Una regla nueva se suma con una entrada en
     `SHAPE_RULES`. Sobre commons-lang, junit4 y Guava: cero diferencias en 41.400 avisos.
-- Primero, por lo que más aparece en Qodana: la API nueva que reemplaza a la vieja
-  (`getFirst()`, `List.of`, `Math.clamp`, bloques de texto) y las redundancias (valor por defecto
-  repetido en una anotación, escapes Unicode de más).
 
 ### 9. Inspecciones de IntelliJ propias y flujo de datos sin compilar
 
@@ -1239,3 +1261,21 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   de Rails (`add_index` sin `algorithm: :concurrently`, `remove_column`, `change_column`), con
   strong_migrations como referencia de Rails. Rails pide sumar una gramática de Ruby. Viene de la
   etapa 12.
+
+### 15. Java: Javadoc, paridad con PMD y Qodana, y la API nueva
+
+Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_checks.xml`.
+
+- Las reglas de Javadoc de `sun_checks.xml`, por frecuencia sobre Guava, spring-boot,
+  commons-lang y junit4: `JavadocVariable` (29.407), `MissingJavadocMethod` (27.721),
+  `JavadocMethod` (19.370), `JavadocType` (1.921), `JavadocPackage` (1.508),
+  `InvalidJavadocPosition` (13). Piden leer el Javadoc como árbol; tree-sitter lo deja como un
+  comentario.
+- La misma paridad contra PMD para quien usa el quickstart en vez de Checkstyle:
+  `UnnecessaryImport` resuelve tipos con el classpath y no va a coincidir sin las firmas de la
+  etapa 9; `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal`, sí.
+- Sumar Qodana al arnés de paridad para las reglas que coinciden con una inspección (imports sin
+  usar y modificadores redundantes).
+- Por lo que más aparece en Qodana: la API nueva que reemplaza a la vieja (`getFirst()`,
+  `List.of`, `Math.clamp`, bloques de texto) y las redundancias (valor por defecto repetido en una
+  anotación, escapes Unicode de más).

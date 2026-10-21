@@ -16,7 +16,7 @@ use crate::scan::check_text;
 use crate::test_support::TempTree;
 
 const GREETER: &str = "import java.util.List;\nimport java.util.Map;\n\nclass Greeter {\n    void greet(String name) {\n        System.out.println(name);\n    }\n}\n";
-const SINGLETON: &str = "class Single {\n    private Single() {}\n\n    final void run(final int times) {\n        run(times);\n    }\n}\n";
+const SINGLETON: &str = "class Single {\n    private Single() { }\n\n    final void run(final int times) {\n        run(times);\n    }\n}\n";
 
 fn project(name: &str, file: &str, contents: &str) -> TempTree {
     let tree = TempTree::new(name);
@@ -60,7 +60,7 @@ fn writes_every_compatible_fix_and_follows_the_ones_that_appear_after() {
     let outcome = fix_files(&request(&tree, &[], true), tree.path()).expect("se analiza");
     assert_eq!(
         read(&tree, "Single.java"),
-        "final class Single {\n    private Single() {}\n\n    void run(final int times) {\n        run(times);\n    }\n}\n"
+        "final class Single {\n    private Single() { }\n\n    void run(final int times) {\n        run(times);\n    }\n}\n"
     );
     assert_eq!(outcome.files.first().map(|file| file.applied), Some(2));
     assert!(outcome.withheld().next().is_none());

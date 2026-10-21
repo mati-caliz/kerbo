@@ -328,7 +328,7 @@ fn the_hook_and_the_mcp_server_follow_the_language() {
 #[test]
 fn mcp_server_fixes_or_previews_the_mechanical_fixes() {
     let tree = TempTree::new("mcp-fix");
-    let original = "import java.util.List;\nfinal class Cart {}\n";
+    let original = "import java.util.List;\nfinal class Cart { }\n";
     tree.write("Cart.java", original);
     let requests = [
         r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"kerbo_fix","arguments":{"dry_run":true}}}"#,
@@ -354,7 +354,7 @@ fn mcp_server_fixes_or_previews_the_mechanical_fixes() {
     assert_eq!(responses[1]["result"]["isError"], true);
     assert!(text(2).ends_with("1 arreglo aplicado en 1 archivo"));
     let fixed = std::fs::read_to_string(tree.path().join("Cart.java")).expect("se lee");
-    assert_eq!(fixed, "final class Cart {}\n");
+    assert_eq!(fixed, "final class Cart { }\n");
 }
 
 #[test]

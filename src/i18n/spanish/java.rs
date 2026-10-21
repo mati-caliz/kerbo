@@ -188,6 +188,66 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Una variable local, aunque sea final, no es una constante: va en camelCase (^([a-z][a-zA-Z0-9]*|_)$). También los recursos de un try.",
         "final int Total = sumar(); se vuelve final int total = sumar();.",
     ),
+    RuleText::new(
+        "Operador, llave o palabra de control sin blanco alrededor",
+        "separalo con un espacio de cada lado",
+        "Un operador pegado a sus operandos, o un if( o }else, se lee como una sola palabra. Las llaves vacías también: {} se escribe { }.",
+        "if(a==b){ se vuelve if (a == b) {.",
+    ),
+    RuleText::new(
+        "Coma, punto y coma, cast o palabra de control sin blanco después",
+        "agregá un espacio después",
+        "Sin el espacio, f(a,b) o (int)x se leen pegados.",
+        "f(a,b) se vuelve f(a, b).",
+    ),
+    RuleText::new(
+        "Blanco antes de una coma, un punto y coma, ... o un ++/-- de después",
+        "pegalo a lo que tiene antes",
+        "Ese blanco separa al signo de lo que cierra; tampoco va al principio de una línea.",
+        "f(a , b) ; se vuelve f(a, b);.",
+    ),
+    RuleText::new(
+        "Blanco después de @, un punto, un signo unario, ++/-- de antes o la llave de un arreglo, o antes de un [",
+        "sacá el blanco",
+        "Esos signos van pegados a lo que afectan: ! listo, a. b o x [0] parecen otra cosa.",
+        "! listo se vuelve !listo.",
+    ),
+    RuleText::new(
+        "Blanco de más o de menos alrededor de < o > de un genérico",
+        "pegá los signos al tipo",
+        "List <String> o Map< K, V > no siguen la forma de Java; entre un modificador y los parámetros de tipo de un método sí va un espacio.",
+        "List <String> se vuelve List<String>.",
+    ),
+    RuleText::new(
+        "Blanco entre el nombre de un método y su paréntesis",
+        "pegá el paréntesis al nombre",
+        "f (x) parece una expresión entre paréntesis; el paréntesis tampoco empieza una línea.",
+        "f (x) se vuelve f(x).",
+    ),
+    RuleText::new(
+        "Blanco después del último ; de un for sin avance",
+        "cerrá el paréntesis pegado",
+        "En un for sin avance, el blanco entre el ; y el ) no separa nada.",
+        "for (;; ) se vuelve for (;;).",
+    ),
+    RuleText::new(
+        "Llave que abre en una línea propia, o con código después en la misma",
+        "subila al final de la línea anterior y empezá el bloque abajo",
+        "La llave cierra la línea que abre el bloque; el contenido va en las siguientes.",
+        "void f()\n{ hacer(); } se vuelve void f() {\n    hacer();\n}.",
+    ),
+    RuleText::new(
+        "Llave que cierra fuera de lugar en un if, else, try, catch o finally",
+        "ponela en su propia línea, y en la misma que el else, catch o finally que sigue",
+        "} else { y } catch ( en una línea marcan que el bloque sigue; una llave que cierra después de una sentencia la esconde.",
+        "}\nelse { se vuelve } else {.",
+    ),
+    RuleText::new(
+        "Operador al final de la línea",
+        "pasalo al principio de la línea siguiente",
+        "Con el operador adelante, cada línea dice cómo se suma a la anterior sin leer hasta el final.",
+        "a +\n b se vuelve a\n + b.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

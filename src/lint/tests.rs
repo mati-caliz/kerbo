@@ -15,6 +15,18 @@ const DESIGN_JAVA_RULES: [JavaRule; 5] = [
     JavaRule::DeclarationOrder,
     JavaRule::LocalFinalVariableName,
 ];
+const SPACING_JAVA_RULES: [JavaRule; 10] = [
+    JavaRule::WhitespaceAround,
+    JavaRule::WhitespaceAfter,
+    JavaRule::NoWhitespaceBefore,
+    JavaRule::NoWhitespaceAfter,
+    JavaRule::GenericWhitespace,
+    JavaRule::MethodParamPad,
+    JavaRule::EmptyForIteratorPad,
+    JavaRule::LeftCurly,
+    JavaRule::RightCurly,
+    JavaRule::OperatorWrap,
+];
 const FIRST_JAVA_RULES: [JavaRule; 8] = [
     JavaRule::TypeName,
     JavaRule::MethodName,
@@ -177,7 +189,7 @@ fn columns_count_bytes_where_checkstyle_expands_tabs() {
 
 #[test]
 fn respects_each_rule_switch_and_other_languages() {
-    let source = "import a.B;\nclass A { void m(int value) {} }\n";
+    let source = "import a.B;\nclass A { void m(int value) { } }\n";
     let without_final = strict().with_rule(RuleId::FinalParameter, None);
     assert_eq!(rendered(&lints(source, without_final)), ["1:8 unused-import a.B"]);
     let everything_off = LINT_RULES
@@ -226,7 +238,8 @@ fn declarations_flow_and_text_match_checkstyle() {
     let source = include_str!("fixtures/Shapes.java");
     assert_eq!(
         rendered_where(&lints(source, strict()), |rule| {
-            matches!(rule, RuleId::Java(java) if !DESIGN_JAVA_RULES.contains(&java))
+            matches!(rule, RuleId::Java(java)
+                if !DESIGN_JAVA_RULES.contains(&java) && !SPACING_JAVA_RULES.contains(&java))
         }),
         expected(include_str!("fixtures/Shapes.checkstyle")),
         "Shapes.java contra Checkstyle 14.3"
@@ -254,4 +267,41 @@ fn design_rules_match_checkstyle() {
         expected(include_str!("fixtures/Design.checkstyle")),
         "Design.java contra Checkstyle 14.3"
     );
+}
+
+fn is_spacing_rule(rule: RuleId) -> bool {
+    matches!(rule, RuleId::Java(java) if SPACING_JAVA_RULES.contains(&java))
+}
+
+#[test]
+fn spacing_rules_match_checkstyle() {
+    let source = include_str!("fixtures/Spacing.java");
+    assert_eq!(
+        rendered_where(&lints(source, strict()), is_spacing_rule),
+        expected(include_str!("fixtures/Spacing.checkstyle")),
+        "Spacing.java contra Checkstyle 14.3"
+    );
+}
+
+#[test]
+fn every_spacing_fix_removes_its_own_problem() {
+    let source = include_str!("fixtures/Spacing.java");
+    let before = lints(source, strict());
+    let same_rule = |findings: &[LintFinding], finding: &LintFinding| {
+        findings
+            .iter()
+            .filter(|other| other.kind.rule() == finding.kind.rule())
+            .count()
+    };
+    for finding in before
+        .iter()
+        .filter(|finding| is_spacing_rule(finding.kind.rule()))
+    {
+        let Some(fix) = &finding.fix else { continue };
+        let fixed = apply(&fix.edits, source).expect("el arreglo cae dentro del archivo");
+        assert!(
+            same_rule(&lints(&fixed, strict()), finding) < same_rule(&before, finding),
+            "el arreglo de {finding:?} no lo resuelve"
+        );
+    }
 }

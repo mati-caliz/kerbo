@@ -142,7 +142,7 @@ fn offers_the_mechanical_fix_as_a_quick_fix() {
     tree.write("Cart.java", "");
     let uri = format!("file://{}", path.to_str().expect("UTF-8").replace(' ', "%20"));
     let text =
-        "import java.util.List;\nfinal class Cart {\n  void añadir(final int ñandú, int count) {}\n}\n";
+        "import java.util.List;\nfinal class Cart {\n  void añadir(final int ñandú, int count) { }\n}\n";
     let range = json!({ "start": { "line": 0, "character": 0 }, "end": { "line": 2, "character": 0 } });
     let messages = [
         json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {} }),
@@ -169,7 +169,7 @@ fn offers_the_mechanical_fix_as_a_quick_fix() {
     assert_eq!(
         whole[0]["newText"],
         "final class Cart {
-  void añadir(final int ñandú, final int count) {}
+  void añadir(final int ñandú, final int count) { }
 }
 ",
         "todas las vueltas, en una sola edición sobre el documento entero"
@@ -200,7 +200,7 @@ fn answers_only_the_diagnostics_and_kinds_the_editor_asks_for() {
     let tree = TempTree::new("lsp-context");
     let path = tree.path().join("Cart.java");
     let uri = format!("file://{}", path.to_str().expect("UTF-8").replace(' ', "%20"));
-    let text = "import java.util.List;\nfinal class Cart {\n  void add(int count) {}\n}\n";
+    let text = "import java.util.List;\nfinal class Cart {\n  void add(int count) { }\n}\n";
     let whole = json!({ "start": { "line": 0, "character": 0 }, "end": { "line": 3, "character": 0 } });
     let reported = json!([
         { "range": { "start": { "line": 2, "character": 2 }, "end": { "line": 2, "character": 9 } }, "source": "kerbo", "code": "final-parameter" },

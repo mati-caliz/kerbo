@@ -77,7 +77,7 @@ fn walks_the_listed_hidden_folders_and_skips_the_rest() {
 #[test]
 fn accepts_several_roots_and_single_files() {
     let tree = TempTree::new("scan-roots");
-    tree.write("one/A.java", "class A { void f() {} }\n");
+    tree.write("one/A.java", "class A { void f() { } }\n");
     tree.write("two.go", "package two\n");
     let outcome = scan_tree(
         tree.path(),

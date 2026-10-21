@@ -31,6 +31,16 @@ rule_family!(JavaRule {
     VisibilityModifier => "visibility-modifier",
     DeclarationOrder => "declaration-order",
     LocalFinalVariableName => "local-final-variable-name",
+    WhitespaceAround => "whitespace-around",
+    WhitespaceAfter => "whitespace-after",
+    NoWhitespaceBefore => "no-whitespace-before",
+    NoWhitespaceAfter => "no-whitespace-after",
+    GenericWhitespace => "generic-whitespace",
+    MethodParamPad => "method-param-pad",
+    EmptyForIteratorPad => "empty-for-iterator-pad",
+    LeftCurly => "left-curly",
+    RightCurly => "right-curly",
+    OperatorWrap => "operator-wrap",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {

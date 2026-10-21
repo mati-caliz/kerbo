@@ -317,11 +317,15 @@ From the rest of `sun_checks.xml`, kerbo does the names (`TypeName`, `MethodName
 `InnerAssignment`, `SimplifyBooleanExpression`, `EqualsHashCode`, `HideUtilityClassConstructor`,
 `TodoComment`, `IllegalImport`, `FileTabCharacter`, trailing spaces (`trailing-spaces`, the
 `RegexpSingleline` in `sun_checks`), `NewlineAtEndOfFile`, `DesignForExtension`, `HiddenField`,
-`VisibilityModifier`, `DeclarationOrder` and `LocalFinalVariableName`; trailing spaces and
-`NewlineAtEndOfFile` are fixed automatically. They follow Checkstyle where it is not obvious: `MethodName` skips what carries
-`@Override` and flags the method named like its class; an interface field is a constant;
-`serialVersionUID` is left out; the patterns are ASCII, so an `ñ` in a name is flagged. `minimal`
-does not ask for them.
+`VisibilityModifier`, `DeclarationOrder`, `LocalFinalVariableName` and the whitespace and brace
+ones: `WhitespaceAround`, `WhitespaceAfter`, `NoWhitespaceBefore`, `NoWhitespaceAfter`,
+`GenericWhitespace`, `MethodParamPad`, `EmptyForIteratorPad`, `LeftCurly`, `RightCurly` and
+`OperatorWrap`. Trailing spaces, `NewlineAtEndOfFile` and the whitespace ones are fixed
+automatically (not the braces nor `OperatorWrap`, which need lines rearranged). They follow
+Checkstyle where it is not obvious: `MethodName` skips what carries `@Override` and flags the
+method named like its class; an interface field is a constant; `serialVersionUID` is left out;
+the patterns are ASCII, so an `ñ` in a name is flagged; `WhitespaceAround` also flags empty braces
+written together (`{}`), as `sun_checks` does. `minimal` does not ask for them.
 
 In Rust, kerbo measures only what clippy measures (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` and `excessive_nesting`), and the cognitive complexity is clippy's, not

@@ -188,6 +188,66 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "A local variable, even if final, is not a constant: it goes in camelCase (^([a-z][a-zA-Z0-9]*|_)$). So do try resources.",
         "final int Total = sum(); becomes final int total = sum();.",
     ),
+    RuleText::new(
+        "Operator, brace or control keyword without whitespace around it",
+        "separate it with a space on each side",
+        "An operator stuck to its operands, or an if( or }else, reads as a single word. Empty braces too: {} is written { }.",
+        "if(a==b){ becomes if (a == b) {.",
+    ),
+    RuleText::new(
+        "Comma, semicolon, cast or control keyword without whitespace after it",
+        "add a space after it",
+        "Without the space, f(a,b) or (int)x read glued together.",
+        "f(a,b) becomes f(a, b).",
+    ),
+    RuleText::new(
+        "Whitespace before a comma, a semicolon, ... or a postfix ++/--",
+        "attach it to what comes before",
+        "That whitespace separates the sign from what it closes; it does not start a line either.",
+        "f(a , b) ; becomes f(a, b);.",
+    ),
+    RuleText::new(
+        "Whitespace after @, a dot, a unary sign, a prefix ++/-- or an array brace, or before a [",
+        "remove the whitespace",
+        "Those signs stick to what they affect: ! ready, a. b or x [0] look like something else.",
+        "! ready becomes !ready.",
+    ),
+    RuleText::new(
+        "Missing or extra whitespace around the < or > of a generic",
+        "attach the signs to the type",
+        "List <String> or Map< K, V > do not follow Java's shape; between a modifier and a method's type parameters a space does go.",
+        "List <String> becomes List<String>.",
+    ),
+    RuleText::new(
+        "Whitespace between a method name and its parenthesis",
+        "attach the parenthesis to the name",
+        "f (x) looks like a parenthesized expression; the parenthesis does not start a line either.",
+        "f (x) becomes f(x).",
+    ),
+    RuleText::new(
+        "Whitespace after the last ; of a for without update",
+        "close the parenthesis right after it",
+        "In a for without update, the whitespace between ; and ) separates nothing.",
+        "for (;; ) becomes for (;;).",
+    ),
+    RuleText::new(
+        "Opening brace on its own line, or with code after it on the same one",
+        "move it to the end of the previous line and start the block below",
+        "The brace ends the line that opens the block; the content goes on the following ones.",
+        "void f()\n{ work(); } becomes void f() {\n    work();\n}.",
+    ),
+    RuleText::new(
+        "Misplaced closing brace in an if, else, try, catch or finally",
+        "put it on its own line, and on the same one as the following else, catch or finally",
+        "} else { and } catch ( on one line show that the block goes on; a closing brace after a statement hides it.",
+        "}\nelse { becomes } else {.",
+    ),
+    RuleText::new(
+        "Operator at the end of the line",
+        "move it to the start of the next line",
+        "With the operator first, each line says how it joins the previous one without reading to the end.",
+        "a +\n b becomes a\n + b.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

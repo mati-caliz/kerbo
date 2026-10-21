@@ -311,11 +311,16 @@ Del resto de `sun_checks.xml`, kerbo hace los nombres (`TypeName`, `MethodName`,
 `InnerAssignment`, `SimplifyBooleanExpression`, `EqualsHashCode`, `HideUtilityClassConstructor`,
 `TodoComment`, `IllegalImport`, `FileTabCharacter`, los espacios al final de línea
 (`trailing-spaces`, el `RegexpSingleline` de `sun_checks`), `NewlineAtEndOfFile`,
-`DesignForExtension`, `HiddenField`, `VisibilityModifier`, `DeclarationOrder` y
-`LocalFinalVariableName`; los espacios al final y `NewlineAtEndOfFile` se arreglan solos. Siguen a Checkstyle en lo que no se ve: `MethodName` no mira lo que lleva
+`DesignForExtension`, `HiddenField`, `VisibilityModifier`, `DeclarationOrder`,
+`LocalFinalVariableName` y los de espacios y llaves: `WhitespaceAround`, `WhitespaceAfter`,
+`NoWhitespaceBefore`, `NoWhitespaceAfter`, `GenericWhitespace`, `MethodParamPad`,
+`EmptyForIteratorPad`, `LeftCurly`, `RightCurly` y `OperatorWrap`. Se arreglan solos los espacios
+al final, `NewlineAtEndOfFile` y los de espacios (no las llaves ni `OperatorWrap`, que piden
+reacomodar líneas). Siguen a Checkstyle en lo que no se ve: `MethodName` no mira lo que lleva
 `@Override` y marca el método que se llama como su clase; un campo de interfaz es una constante;
-`serialVersionUID` queda afuera; los patrones son ASCII, así que una `ñ` en un nombre se marca.
-`minimal` no las pide.
+`serialVersionUID` queda afuera; los patrones son ASCII, así que una `ñ` en un nombre se marca;
+`WhitespaceAround` también marca las llaves vacías pegadas (`{}`), como `sun_checks`. `minimal`
+no las pide.
 
 En Rust, kerbo mide sólo lo que mide clippy (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` y `excessive_nesting`), y la complejidad cognitiva es la de clippy, no la de
