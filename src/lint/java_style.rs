@@ -7,7 +7,7 @@ use super::{LintFinding, LintKind, finding};
 use crate::fix::Fix;
 use crate::limits::Preset;
 use crate::rules::{JavaRule, RuleId};
-use crate::syntax::{descendants, named_children};
+use crate::syntax::named_children;
 
 const FIELD: &str = "field_declaration";
 const INTERFACE_FIELD: &str = "constant_declaration";
@@ -31,12 +31,13 @@ const STATEMENT_LISTS: &[&str] = &["block", "constructor_body", "switch_block_st
 const BODY_FIELDS: &[&str] = &["body", "consequence", "alternative"];
 const WORD_SEPARATOR: char = '_';
 
-pub fn reported(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
+pub fn reported(nodes: &[Node<'_>], source: &[u8]) -> Vec<LintFinding> {
     let mut findings = Vec::new();
-    for node in descendants(root) {
+    for &node in nodes {
         let kind = node.kind();
         if TYPE_DECLARATIONS.contains(&kind) {
             findings.extend(named(node, source, JavaRule::TypeName, is_pascal_case));
+            findings.extend(methods_named_like(node, source));
         } else if kind == METHOD {
             findings.extend(method_name(node, source));
             findings.extend(parameter_names(node, source));
@@ -46,9 +47,12 @@ pub fn reported(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
             findings.extend(field_names(node, source));
         } else if INTEGER_LITERALS.contains(&kind) {
             findings.extend(lowercase_ell(node, source));
-        } else if kind == SEMICOLON && is_empty_statement(node) {
-            findings.push(finding(LintKind::Java(JavaRule::EmptyStatement), node, "", None));
         }
+        findings.extend(
+            empty_statements(node)
+                .into_iter()
+                .map(|semicolon| finding(LintKind::Java(JavaRule::EmptyStatement), semicolon, "", None)),
+        );
     }
     findings
 }
@@ -59,16 +63,34 @@ fn named(node: Node<'_>, source: &[u8], rule: JavaRule, accepts: fn(&str) -> boo
     (!accepts(written)).then(|| finding(LintKind::Java(rule), name, written, None))
 }
 
-// MethodName no mira lo que lleva @Override, y marca además el método que se llama como su clase.
+// MethodName no mira lo que lleva @Override, y marca además el método que se llama como su clase
+// (eso se mira desde la clase: subir al padre en tree-sitter es caro).
 fn method_name(method: Node<'_>, source: &[u8]) -> Option<LintFinding> {
     if overrides(method, source) {
         return None;
     }
     let name = method.child_by_field_name(NAME_FIELD)?;
     let written = text(name, source);
-    let like_class = enclosing_type_name(method, source) == Some(written);
-    (like_class || !is_camel_case(written))
-        .then(|| finding(LintKind::Java(JavaRule::MethodName), name, written, None))
+    (!is_camel_case(written)).then(|| finding(LintKind::Java(JavaRule::MethodName), name, written, None))
+}
+
+fn methods_named_like(declaration: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
+    let Some(type_name) = declaration
+        .child_by_field_name(NAME_FIELD)
+        .map(|name| text(name, source))
+    else {
+        return Vec::new();
+    };
+    declaration
+        .child_by_field_name("body")
+        .map(named_children)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|member| member.kind() == METHOD && !overrides(*member, source))
+        .filter_map(|method| method.child_by_field_name(NAME_FIELD))
+        .filter(|name| text(*name, source) == type_name && is_camel_case(type_name))
+        .map(|name| finding(LintKind::Java(JavaRule::MethodName), name, type_name, None))
+        .collect()
 }
 
 fn overrides(method: Node<'_>, source: &[u8]) -> bool {
@@ -80,16 +102,6 @@ fn overrides(method: Node<'_>, source: &[u8]) -> bool {
                     .is_some_and(|name| OVERRIDE_NAMES.contains(&text(name, source)))
         })
     })
-}
-
-fn enclosing_type_name<'source>(method: Node<'_>, source: &'source [u8]) -> Option<&'source str> {
-    let body = method.parent()?;
-    let declaration = body.parent()?;
-    TYPE_DECLARATIONS
-        .contains(&declaration.kind())
-        .then(|| declaration.child_by_field_name(NAME_FIELD))
-        .flatten()
-        .map(|name| text(name, source))
 }
 
 fn parameter_names(callable: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
@@ -155,17 +167,21 @@ fn lowercase_ell(literal: Node<'_>, source: &[u8]) -> Option<LintFinding> {
     ))
 }
 
-fn is_empty_statement(semicolon: Node<'_>) -> bool {
-    if semicolon.is_named() {
-        return false;
+// Un `;` suelto en una lista de sentencias o como cuerpo de un if, un for o un while. Se busca
+// desde el contenedor: subir al padre en tree-sitter es caro.
+fn empty_statements(container: Node<'_>) -> Vec<Node<'_>> {
+    let is_semicolon = |node: &Node<'_>| node.kind() == SEMICOLON && !node.is_named();
+    if STATEMENT_LISTS.contains(&container.kind()) {
+        return super::java::children(container)
+            .into_iter()
+            .filter(is_semicolon)
+            .collect();
     }
-    let Some(parent) = semicolon.parent() else {
-        return false;
-    };
-    STATEMENT_LISTS.contains(&parent.kind())
-        || BODY_FIELDS
-            .iter()
-            .any(|field| parent.child_by_field_name(field) == Some(semicolon))
+    BODY_FIELDS
+        .iter()
+        .filter_map(|field| container.child_by_field_name(field))
+        .filter(is_semicolon)
+        .collect()
 }
 
 fn is_pascal_case(name: &str) -> bool {

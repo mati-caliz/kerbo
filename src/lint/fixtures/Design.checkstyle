@@ -1,0 +1,26 @@
+6:16 visibility-modifier open
+7:19 visibility-modifier shared
+8:9 visibility-modifier packaged
+10:5 declaration-order 
+11:5 declaration-order 
+11:22 visibility-modifier frozen
+12:5 declaration-order 
+12:23 visibility-modifier global
+13:5 declaration-order 
+14:5 declaration-order 
+14:17 visibility-modifier serialPersistent
+16:23 hidden-field count
+20:5 declaration-order 
+22:5 design-for-extension 
+22:30 hidden-field count
+26:5 design-for-extension 
+26:28 hidden-field open
+27:19 local-final-variable-name Total
+29:13 hidden-field count
+33:5 design-for-extension 
+66:9 design-for-extension 
+73:5 declaration-order 
+73:16 visibility-modifier field2
+75:14 design-for-extension 
+78:5 design-for-extension 
+83:5 declaration-order 

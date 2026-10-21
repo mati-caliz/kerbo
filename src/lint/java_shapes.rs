@@ -6,7 +6,7 @@ use super::java::{
 };
 use super::{LintFinding, LintKind, finding};
 use crate::rules::JavaRule;
-use crate::syntax::{descendants, named_children};
+use crate::syntax::named_children;
 
 const IMPORT: &str = "import_declaration";
 const ILLEGAL_PACKAGE: &str = "sun";
@@ -49,6 +49,7 @@ const METHOD_CONTAINERS: &[&str] = &["class_body", "enum_body_declarations"];
 const DECLARATOR: &str = "variable_declarator";
 const DECLARATOR_FIELD: &str = "declarator";
 const FOR: &str = "for_statement";
+const LOCAL: &str = "local_variable_declaration";
 const INTERFACE_BODY: &str = "interface_body";
 const INTERFACE_FIELD: &str = "constant_declaration";
 const EQUALS: &str = "equals";
@@ -58,9 +59,10 @@ const SUPERCLASS_FIELD: &str = "superclass";
 const BODY_FIELD: &str = "body";
 const FIELD: &str = "field_declaration";
 
-pub fn reported(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
+pub fn reported(nodes: &[Node<'_>], source: &[u8]) -> Vec<LintFinding> {
     let mut findings = Vec::new();
-    for node in descendants(root) {
+    let mut for_initializers: Vec<usize> = Vec::new();
+    for &node in nodes {
         let kind = node.kind();
         if kind == IMPORT && is_illegal_import(node, source) {
             findings.push(finding(LintKind::Java(JavaRule::IllegalImport), node, "", None));
@@ -69,9 +71,18 @@ pub fn reported(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
             findings.extend(modifier_out_of_order(node, source));
         }
         findings.extend(c_style_brackets(node));
-        if DECLARATIONS.contains(&kind) {
-            findings.extend(multiple_declarations(node));
+        if kind == FOR {
+            for_initializers.extend(
+                named_children(node)
+                    .into_iter()
+                    .filter(|child| child.kind() == LOCAL)
+                    .map(|child| child.id()),
+            );
         }
+        if DECLARATIONS.contains(&kind) && !for_initializers.contains(&node.id()) {
+            findings.extend(comma_separated(node));
+        }
+        findings.extend(declarations_on_one_line(node));
         if kind == INTERFACE && only_constants(node) {
             findings.push(finding(LintKind::Java(JavaRule::InterfaceIsType), node, "", None));
         }
@@ -168,24 +179,14 @@ fn c_style_brackets(node: Node<'_>) -> Option<LintFinding> {
     ))
 }
 
-// Dos variables separadas por coma (salvo en el inicio de un `for`), o dos declaraciones que
-// arrancan en la misma línea: Checkstyle marca la primera en las dos.
-fn multiple_declarations(declaration: Node<'_>) -> Option<LintFinding> {
+// Dos variables separadas por coma (salvo en el inicio de un `for`): Checkstyle marca la declaración.
+fn comma_separated(declaration: Node<'_>) -> Option<LintFinding> {
     let mut cursor = declaration.walk();
     let declarators = declaration
         .children_by_field_name(DECLARATOR_FIELD, &mut cursor)
         .filter(|child| child.kind() == DECLARATOR)
         .count();
-    let in_for_init = declaration.parent().is_some_and(|parent| parent.kind() == FOR);
-    let comma_separated = declarators > 1 && !in_for_init;
-    let mut next = declaration.next_named_sibling();
-    while let Some(comment) = next.filter(|sibling| COMMENTS.contains(&sibling.kind())) {
-        next = comment.next_named_sibling();
-    }
-    let next_on_same_line = next.is_some_and(|next| {
-        DECLARATIONS.contains(&next.kind()) && next.start_position().row == declaration.start_position().row
-    });
-    (comma_separated || next_on_same_line).then(|| {
+    (declarators > 1).then(|| {
         finding(
             LintKind::Java(JavaRule::MultipleVariableDeclarations),
             declaration,
@@ -193,6 +194,33 @@ fn multiple_declarations(declaration: Node<'_>) -> Option<LintFinding> {
             None,
         )
     })
+}
+
+// Dos declaraciones seguidas (sin contar comentarios) que arrancan en la misma línea: se marca la
+// primera. Se mira desde el contenedor: pedir el hermano siguiente en tree-sitter es caro.
+fn declarations_on_one_line(container: Node<'_>) -> Vec<LintFinding> {
+    let members: Vec<Node<'_>> = named_children(container)
+        .into_iter()
+        .filter(|child| !COMMENTS.contains(&child.kind()))
+        .collect();
+    members
+        .windows(2)
+        .filter_map(|pair| match pair {
+            [current, next]
+                if DECLARATIONS.contains(&current.kind())
+                    && DECLARATIONS.contains(&next.kind())
+                    && current.start_position().row == next.start_position().row =>
+            {
+                Some(finding(
+                    LintKind::Java(JavaRule::MultipleVariableDeclarations),
+                    *current,
+                    "",
+                    None,
+                ))
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 fn only_constants(interface: Node<'_>) -> bool {

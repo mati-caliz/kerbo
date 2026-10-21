@@ -1,8 +1,10 @@
+use std::collections::HashSet;
+
 use tree_sitter::Node;
 
 use super::{LintFinding, LintKind, finding};
 use crate::rules::JavaRule;
-use crate::syntax::{descendants, named_children};
+use crate::syntax::named_children;
 
 const BLOCK: &str = "block";
 const STATEMENT_LISTS: &[&str] = &[
@@ -57,9 +59,11 @@ const NEGATION: &str = "!";
 const QUESTION_MARK: &str = "?";
 const LOGICAL_OPERATORS: &[&str] = &["&&", "||"];
 
-pub fn reported(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
+pub fn reported(nodes: &[Node<'_>], source: &[u8]) -> Vec<LintFinding> {
     let mut findings = Vec::new();
-    for node in descendants(root) {
+    let mut allowed_assignments: HashSet<usize> = HashSet::new();
+    for &node in nodes {
+        allowed_assignments.extend(allowed_inside(node).into_iter().map(|assignment| assignment.id()));
         let kind = node.kind();
         if kind == IF || LOOPS.contains(&kind) {
             findings.extend(missing_braces(node));
@@ -72,10 +76,8 @@ pub fn reported(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
                 None,
             ));
         }
-        if kind == BLOCK || kind == SWITCH_BLOCK {
-            findings.extend(block_findings(node));
-        }
-        if kind == ASSIGNMENT && !is_allowed_assignment(node) {
+        findings.extend(block_findings(node));
+        if kind == ASSIGNMENT && !allowed_assignments.contains(&node.id()) {
             let operator = node.child_by_field_name(OPERATOR_FIELD).unwrap_or(node);
             findings.push(finding(
                 LintKind::Java(JavaRule::InnerAssignment),
@@ -140,71 +142,101 @@ fn has_default(switch: Node<'_>) -> bool {
     })
 }
 
-fn block_findings(block: Node<'_>) -> Vec<LintFinding> {
+// Los bloques se miran desde su dueño: un bloque suelto en una lista de sentencias, y uno vacío como
+// cuerpo de un if, un bucle, un try, un finally, un bloque static o de inicialización, o un switch.
+// Subir al padre en tree-sitter es caro.
+fn block_findings(owner: Node<'_>) -> Vec<LintFinding> {
+    let kind = owner.kind();
+    let blocks: Vec<Node<'_>> = named_children(owner)
+        .into_iter()
+        .filter(|child| child.kind() == BLOCK)
+        .collect();
     let mut findings = Vec::new();
-    let Some(parent) = block.parent() else {
-        return findings;
-    };
-    if block.kind() == BLOCK
-        && STATEMENT_LISTS.contains(&parent.kind())
-        && parent.kind() != "labeled_statement"
-    {
-        findings.push(finding(
-            LintKind::Java(JavaRule::AvoidNestedBlocks),
-            block,
-            "",
-            None,
-        ));
+    if STATEMENT_LISTS.contains(&kind) && kind != "labeled_statement" {
+        findings.extend(
+            blocks
+                .iter()
+                .map(|block| finding(LintKind::Java(JavaRule::AvoidNestedBlocks), *block, "", None)),
+        );
     }
-    let owned = (block.kind() == SWITCH_BLOCK && parent.kind() == SWITCH && is_statement(parent))
-        || (block.kind() == BLOCK && EMPTY_BLOCK_OWNERS.contains(&parent.kind()));
-    let empty = named_children(block)
-        .iter()
-        .all(|child| COMMENTS.contains(&child.kind()));
-    if owned && empty {
-        findings.push(finding(LintKind::Java(JavaRule::EmptyBlock), block, "", None));
+    let is_empty = |block: &Node<'_>| {
+        named_children(*block)
+            .iter()
+            .all(|child| COMMENTS.contains(&child.kind()))
+    };
+    if EMPTY_BLOCK_OWNERS.contains(&kind) {
+        findings.extend(
+            blocks
+                .iter()
+                .filter(|block| is_empty(block))
+                .map(|block| finding(LintKind::Java(JavaRule::EmptyBlock), *block, "", None)),
+        );
+    }
+    if kind == SWITCH
+        && is_statement(owner)
+        && let Some(body) = owner
+            .child_by_field_name("body")
+            .filter(|body| body.kind() == SWITCH_BLOCK && is_empty(body))
+    {
+        findings.push(finding(LintKind::Java(JavaRule::EmptyBlock), body, "", None));
     }
     findings
 }
 
 // Una asignación vale como sentencia, en el inicio o el avance de un `for`, como cuerpo de una
-// lambda o en un recurso, y en el idioma `while ((linea = leer()) != null)`.
-fn is_allowed_assignment(assignment: Node<'_>) -> bool {
-    let Some(parent) = assignment.parent() else {
-        return true;
-    };
-    if ALLOWED_ASSIGNMENT_PARENTS.contains(&parent.kind()) {
-        return true;
+// lambda o en un recurso, y en el idioma `while ((linea = leer()) != null)`, también combinado con
+// `&&` o `||`. Se marcan desde el contenedor, que el recorrido visita antes que la asignación.
+fn allowed_inside(container: Node<'_>) -> Vec<Node<'_>> {
+    let kind = container.kind();
+    if ALLOWED_ASSIGNMENT_PARENTS.contains(&kind) {
+        return named_children(container)
+            .into_iter()
+            .filter(|child| child.kind() == ASSIGNMENT)
+            .collect();
     }
-    let in_for_header = parent.kind() == "for_statement"
-        && [INIT_FIELD, UPDATE_FIELD].iter().any(|field| {
-            let mut cursor = parent.walk();
-            parent
-                .children_by_field_name(field, &mut cursor)
-                .any(|child| child == assignment)
-        });
-    in_for_header || is_in_loop_condition_idiom(assignment)
+    let mut allowed = Vec::new();
+    if kind == "for_statement" {
+        for field in [INIT_FIELD, UPDATE_FIELD] {
+            let mut cursor = container.walk();
+            allowed.extend(
+                container
+                    .children_by_field_name(field, &mut cursor)
+                    .filter(|child| child.kind() == ASSIGNMENT),
+            );
+        }
+    }
+    if CONDITION_LOOPS.contains(&kind)
+        && let Some(condition) = container.child_by_field_name(CONDITION_FIELD)
+    {
+        allowed.extend(compared_assignments(condition));
+    }
+    allowed
 }
 
-fn is_in_loop_condition_idiom(assignment: Node<'_>) -> bool {
-    let Some(comparison) = skip_parentheses_up(assignment).filter(|node| {
-        node.kind() == BINARY
-            && node
-                .child_by_field_name(OPERATOR_FIELD)
-                .is_some_and(|operator| COMPARISONS.contains(&operator.kind()))
-    }) else {
-        return false;
-    };
-    let mut owner = comparison.parent();
-    while let Some(node) = owner.filter(|node| node.kind() == PARENTHESIZED || is_logical(*node)) {
-        owner = node.parent();
+fn compared_assignments(condition: Node<'_>) -> Vec<Node<'_>> {
+    let mut found = Vec::new();
+    let mut pending = vec![condition];
+    while let Some(node) = pending.pop() {
+        if node.kind() == PARENTHESIZED || is_logical(node) {
+            pending.extend(named_children(node));
+        } else if is_comparison(node) {
+            found.extend(
+                ["left", "right"]
+                    .iter()
+                    .filter_map(|field| node.child_by_field_name(field))
+                    .filter_map(skip_parentheses_down)
+                    .filter(|operand| operand.kind() == ASSIGNMENT),
+            );
+        }
     }
-    owner.is_some_and(|loop_statement| {
-        CONDITION_LOOPS.contains(&loop_statement.kind())
-            && loop_statement
-                .child_by_field_name(CONDITION_FIELD)
-                .is_some_and(|condition| condition.byte_range().contains(&comparison.start_byte()))
-    })
+    found
+}
+
+fn is_comparison(node: Node<'_>) -> bool {
+    node.kind() == BINARY
+        && node
+            .child_by_field_name(OPERATOR_FIELD)
+            .is_some_and(|operator| COMPARISONS.contains(&operator.kind()))
 }
 
 fn is_logical(node: Node<'_>) -> bool {
@@ -214,10 +246,10 @@ fn is_logical(node: Node<'_>) -> bool {
             .is_some_and(|operator| LOGICAL_OPERATORS.contains(&operator.kind()))
 }
 
-fn skip_parentheses_up(node: Node<'_>) -> Option<Node<'_>> {
-    let mut current = node.parent()?;
+fn skip_parentheses_down(node: Node<'_>) -> Option<Node<'_>> {
+    let mut current = node;
     while current.kind() == PARENTHESIZED {
-        current = current.parent()?;
+        current = named_children(current).into_iter().next()?;
     }
     Some(current)
 }

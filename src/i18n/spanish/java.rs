@@ -158,6 +158,36 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Sin el salto final, la última línea no es una línea para muchas herramientas, y cada cambio la muestra modificada.",
         "Se agrega \\n al final.",
     ),
+    RuleText::new(
+        "Método que se puede sobrescribir sin Javadoc que diga cómo",
+        "hacé la clase o el método final, o documentá cómo extenderlo",
+        "En una clase que se puede heredar, un método público o protegido con cuerpo es un punto de extensión: sin Javadoc, quien lo sobrescribe no sabe qué tiene que conservar.",
+        "public void guardar() { ... } se vuelve public final void guardar() { ... }, o lleva Javadoc.",
+    ),
+    RuleText::new(
+        "Variable o parámetro que tapa un campo",
+        "cambiale el nombre",
+        "Con el mismo nombre que un campo, un this que falta cambia en silencio qué se lee o se escribe.",
+        "void setTotal(int total) { this.total = total; } se vuelve void setTotal(int value) { total = value; }.",
+    ),
+    RuleText::new(
+        "Campo que no es privado",
+        "hacelo privado y exponelo con métodos",
+        "Un campo visible es parte de la API: cualquiera lo cambia sin pasar por la clase, que ya no puede validar ni cambiar cómo lo guarda. Las constantes static final quedan afuera.",
+        "public int total; se vuelve private int total; con int total() { return total; }.",
+    ),
+    RuleText::new(
+        "Declaración fuera del orden: variables static, de instancia, constructores y métodos",
+        "movela a su lugar",
+        "Con un orden fijo (y las variables de pública a privada) se encuentra cada cosa sin buscarla.",
+        "Un campo static después de los de instancia sube al principio de la clase.",
+    ),
+    RuleText::new(
+        "Variable local final con un nombre que no es camelCase",
+        "nombrala con minúscula inicial, letras y números",
+        "Una variable local, aunque sea final, no es una constante: va en camelCase (^([a-z][a-zA-Z0-9]*|_)$). También los recursos de un try.",
+        "final int Total = sumar(); se vuelve final int total = sumar();.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

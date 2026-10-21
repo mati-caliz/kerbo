@@ -8,6 +8,13 @@ use crate::limits::{Limits, Preset};
 use crate::profile::LintStyle;
 use crate::rules::{JavaRule, RuleId};
 
+const DESIGN_JAVA_RULES: [JavaRule; 5] = [
+    JavaRule::DesignForExtension,
+    JavaRule::HiddenField,
+    JavaRule::VisibilityModifier,
+    JavaRule::DeclarationOrder,
+    JavaRule::LocalFinalVariableName,
+];
 const FIRST_JAVA_RULES: [JavaRule; 8] = [
     JavaRule::TypeName,
     JavaRule::MethodName,
@@ -142,7 +149,10 @@ fn every_fix_leaves_the_file_without_that_problem() {
 #[test]
 fn star_imports_have_no_mechanical_fix() {
     let source = "import java.util.*;\nclass A { List<String> names; }\n";
-    let found = lints(source, strict());
+    let found: Vec<LintFinding> = lints(source, strict())
+        .into_iter()
+        .filter(|finding| LINT_RULES.contains(&finding.kind.rule()))
+        .collect();
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].kind, LintKind::StarImport);
     assert_eq!(
@@ -215,7 +225,9 @@ fn names_literals_and_empty_statements_match_checkstyle() {
 fn declarations_flow_and_text_match_checkstyle() {
     let source = include_str!("fixtures/Shapes.java");
     assert_eq!(
-        rendered_where(&lints(source, strict()), |rule| matches!(rule, RuleId::Java(_))),
+        rendered_where(&lints(source, strict()), |rule| {
+            matches!(rule, RuleId::Java(java) if !DESIGN_JAVA_RULES.contains(&java))
+        }),
         expected(include_str!("fixtures/Shapes.checkstyle")),
         "Shapes.java contra Checkstyle 14.3"
     );
@@ -229,5 +241,17 @@ fn declarations_flow_and_text_match_checkstyle() {
     assert!(
         fixed.contains("\tint tabbed = 1;\n"),
         "y saca los espacios del final: {fixed}"
+    );
+}
+
+#[test]
+fn design_rules_match_checkstyle() {
+    let source = include_str!("fixtures/Design.java");
+    assert_eq!(
+        rendered_where(&lints(source, strict()), |rule| {
+            matches!(rule, RuleId::Java(java) if DESIGN_JAVA_RULES.contains(&java))
+        }),
+        expected(include_str!("fixtures/Design.checkstyle")),
+        "Design.java contra Checkstyle 14.3"
     );
 }

@@ -158,6 +158,36 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Without the final newline, many tools do not treat the last line as a line, and every change shows it modified.",
         "A \\n is added at the end.",
     ),
+    RuleText::new(
+        "Overridable method without Javadoc saying how",
+        "make the class or the method final, or document how to extend it",
+        "In a class that can be subclassed, a public or protected method with a body is an extension point: without Javadoc, whoever overrides it does not know what to keep.",
+        "public void save() { ... } becomes public final void save() { ... }, or gets Javadoc.",
+    ),
+    RuleText::new(
+        "Variable or parameter that hides a field",
+        "rename it",
+        "With the same name as a field, a missing this silently changes what is read or written.",
+        "void setTotal(int total) { this.total = total; } becomes void setTotal(int value) { total = value; }.",
+    ),
+    RuleText::new(
+        "Field that is not private",
+        "make it private and expose it through methods",
+        "A visible field is part of the API: anyone changes it without going through the class, which can no longer validate it or change how it stores it. static final constants are left out.",
+        "public int total; becomes private int total; with int total() { return total; }.",
+    ),
+    RuleText::new(
+        "Declaration out of order: static variables, instance variables, constructors and methods",
+        "move it to its place",
+        "With a fixed order (and variables from public to private) everything is found without searching.",
+        "A static field after the instance ones moves to the top of the class.",
+    ),
+    RuleText::new(
+        "Local final variable whose name is not camelCase",
+        "name it with a lowercase initial, letters and digits",
+        "A local variable, even if final, is not a constant: it goes in camelCase (^([a-z][a-zA-Z0-9]*|_)$). So do try resources.",
+        "final int Total = sum(); becomes final int total = sum();.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

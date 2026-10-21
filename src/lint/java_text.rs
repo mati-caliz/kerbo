@@ -3,7 +3,6 @@ use tree_sitter::{Node, Point};
 use super::{LintFinding, LintKind, finding_at};
 use crate::fix::Fix;
 use crate::rules::JavaRule;
-use crate::syntax::descendants;
 
 const LINE_FEED: u8 = b'\n';
 const CARRIAGE_RETURN: u8 = b'\r';
@@ -17,9 +16,10 @@ const LINE_ONLY_COLUMN: usize = 0;
 
 // Lo que Checkstyle mira sobre el texto y no sobre el árbol: un comentario con `TODO:`, el primer
 // tab del archivo, los espacios al final de cada línea y el salto de línea final.
-pub fn reported(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
-    let mut findings: Vec<LintFinding> = descendants(root)
-        .into_iter()
+pub fn reported(nodes: &[Node<'_>], source: &[u8]) -> Vec<LintFinding> {
+    let mut findings: Vec<LintFinding> = nodes
+        .iter()
+        .copied()
         .filter(|node| COMMENTS.contains(&node.kind()))
         .filter_map(|comment| todo(comment, source))
         .collect();

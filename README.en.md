@@ -316,8 +316,9 @@ From the rest of `sun_checks.xml`, kerbo does the names (`TypeName`, `MethodName
 `InterfaceIsType`, `MissingSwitchDefault`, `NeedBraces`, `EmptyBlock`, `AvoidNestedBlocks`,
 `InnerAssignment`, `SimplifyBooleanExpression`, `EqualsHashCode`, `HideUtilityClassConstructor`,
 `TodoComment`, `IllegalImport`, `FileTabCharacter`, trailing spaces (`trailing-spaces`, the
-`RegexpSingleline` in `sun_checks`) and `NewlineAtEndOfFile`; the last two are fixed
-automatically. They follow Checkstyle where it is not obvious: `MethodName` skips what carries
+`RegexpSingleline` in `sun_checks`), `NewlineAtEndOfFile`, `DesignForExtension`, `HiddenField`,
+`VisibilityModifier`, `DeclarationOrder` and `LocalFinalVariableName`; trailing spaces and
+`NewlineAtEndOfFile` are fixed automatically. They follow Checkstyle where it is not obvious: `MethodName` skips what carries
 `@Override` and flags the method named like its class; an interface field is a constant;
 `serialVersionUID` is left out; the patterns are ASCII, so an `ñ` in a name is flagged. `minimal`
 does not ask for them.

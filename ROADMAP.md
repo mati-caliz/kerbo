@@ -593,27 +593,33 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   y no cuenta un `hashCode` abstracto; `HideUtilityClassConstructor` descarta las clases que
   heredan, las abstractas y las anidadas static, cuenta los campos de instancia y toma como público
   el constructor de paquete; `TodoComment` marca dos columnas después del inicio del comentario.
+- Tercera tanda (2026-10-21): `DesignForExtension`, `HiddenField`, `VisibilityModifier`,
+  `DeclarationOrder` y `LocalFinalVariableName`. Cero diferencias sobre los tres repos (unos 30.000
+  avisos; 18.378 son `DesignForExtension` en Guava). Lo calcado, fijado en
+  `src/lint/fixtures/Design.java`: `DesignForExtension` mira la visibilidad de las clases y no la
+  del método, encuentra el Javadoc aunque haya comentarios en el medio pero no lo ve en un método
+  sin modificadores que arranca con `<T>`, y a un método sin modificadores lo ubica en el tipo de
+  retorno (el último punto de un nombre calificado); `HiddenField` toma como static las interfaces
+  y los records pero no los enums, y en una clase anónima el contexto lo da el campo o bloque que
+  la contiene; `VisibilityModifier` acepta `@Rule` y compañía si están importadas o son del mismo
+  paquete; `DeclarationOrder` corre también en interfaces (un campo sin `static` cuenta como de
+  instancia), no marca la visibilidad de un campo cuyo valor usa uno anterior o a sí mismo, y una
+  visibilidad fuera de orden no cambia la esperada. Las cinco reglas se calculan recorriendo el
+  árbol de arriba hacia abajo: subir al padre en tree-sitter es caro. Velocidad en Guava (3.275
+  archivos, 4 CPU, archivos dentro del contenedor): kerbo entero 10,7 s y ~350 MB sin caché,
+  0,7 s con caché; Checkstyle con sólo las reglas de forma, 34,9 s y ~1,3 GB.
 - Pendientes de las reglas de forma, por frecuencia en `sun_checks.xml` entero sobre los mismos
-  cuatro repos (sin contar las que ya hace kerbo; las de las dos tandas de arriba ya están):
+  cuatro repos (sin contar las que ya hace kerbo; las de las tres tandas de arriba ya están):
   - `Indentation` (696.473) y `LineLength` (228.941): son de formato y van con la etapa 13; sin
     medirlas contra el formateador del proyecto marcarían casi todo Guava, que usa
     google-java-format.
   - Javadoc: `JavadocVariable` (29.407), `MissingJavadocMethod` (27.721), `JavadocMethod`
     (19.370), `JavadocType` (1.921), `JavadocPackage` (1.508), `InvalidJavadocPosition` (13).
     Piden leer el Javadoc como árbol; tree-sitter lo deja como un comentario.
-  - `DesignForExtension` (26.914), `HiddenField` (12.474), `MethodName` (9.239),
-    `FileTabCharacter` (7.717, arreglo mecánico), `WhitespaceAround` (6.533, mecánico),
-    `DeclarationOrder` (4.672), `VisibilityModifier` (3.637), `NoWhitespaceAfter` (2.325,
-    mecánico), `RightCurly` (2.116, mecánico), `ConstantName` (929), `RegexpSingleline` (518, los
-    espacios al final de línea; mecánico), `HideUtilityClassConstructor` (311, mecánico: un
-    constructor privado), `TodoComment` (209), `NewlineAtEndOfFile` (179, mecánico),
-    `InnerAssignment` (177), `OperatorWrap` (145, mecánico), `AvoidNestedBlocks` (136),
-    `MissingSwitchDefault` (104), `NeedBraces` (76, mecánico), `EqualsHashCode` (73) y el resto
-    con menos de 70 (`StaticVariableName`, `NoWhitespaceBefore`, `EmptyForIteratorPad`,
-    `LeftCurly`, `TypeName`, `EmptyBlock`, `MethodParamPad`, `LocalFinalVariableName`,
-    `ModifierOrder`, `IllegalImport`, `MultipleVariableDeclarations`, `MemberName`,
-    `GenericWhitespace`, `InterfaceIsType`, `EmptyStatement`, `UpperEll`, `ParameterName`,
-    `WhitespaceAfter`, `SimplifyBooleanExpression`, `ArrayTypeStyle`).
+  - Cuarta tanda, espacios y llaves (todas con arreglo mecánico): `WhitespaceAround` (6.533),
+    `NoWhitespaceAfter` (2.325), `RightCurly` (2.116), `OperatorWrap` (145) y las de menos de 70
+    (`NoWhitespaceBefore`, `EmptyForIteratorPad`, `LeftCurly`, `MethodParamPad`,
+    `GenericWhitespace`, `WhitespaceAfter`).
   - La misma paridad contra PMD para quien usa el quickstart en vez de Checkstyle:
     `UnnecessaryImport` resuelve tipos con el classpath y no va a coincidir sin las firmas de la
     etapa 9; `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal`, sí.

@@ -26,6 +26,11 @@ rule_family!(JavaRule {
     FileTabCharacter => "file-tab-character",
     TrailingSpaces => "trailing-spaces",
     NewlineAtEndOfFile => "newline-at-end-of-file",
+    DesignForExtension => "design-for-extension",
+    HiddenField => "hidden-field",
+    VisibilityModifier => "visibility-modifier",
+    DeclarationOrder => "declaration-order",
+    LocalFinalVariableName => "local-final-variable-name",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {
