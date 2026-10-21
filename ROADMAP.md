@@ -687,7 +687,63 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     del compilador.
   - El arnés de esta paridad (ESLint con un `eslint.config.mjs` de sólo estas reglas, kerbo en JSON
     y la conversión de columnas) quedó fuera del repo, como los anteriores.
-- Shell contra ShellCheck.
+- Shell contra ShellCheck (empezada, 2026-10-21): `.sh`, `.bash` y los archivos sin extensión con
+  shebang de `sh`, `bash`, `dash` o busybox (también por `env`), con tree-sitter-bash 0.25.1
+  (MIT). Las 22 reglas más frecuentes de ShellCheck, con el código en minúscula como nombre
+  (`sc2086`) en una familia propia (`ShellRule`, en `src/rules/families/shell.rs`): SC2004, SC2005, SC2006, SC2015, SC2016, SC2034, SC2046, SC2059,
+  SC2064, SC2068, SC2069, SC2086, SC2116, SC2148, SC2155, SC2162, SC2164, SC2166, SC2181, SC2206,
+  SC2207 y SC2223. `kerbo explain SC2086` acepta el código en mayúsculas.
+  - La severidad es la de ShellCheck: el preset recomendado deja afuera las de estilo y el mínimo,
+    también las informativas.
+  - Las partes de ShellCheck que deciden si avisa, portadas de su código: si una expansión está
+    libre de comillas, si una palabra es nombre de comando o condición, las opciones de cada
+    comando al estilo GNU, BSD o genérico, el dialecto (shebang, `# shellcheck shell=`, extensión) y
+    el flujo de datos: un grafo de control con estados que se juntan en ramas, loops, `case` con
+    `;&` y `;;&`, subshells y pipelines (con la rareza de que cualquier `set -o` prende `lastpipe`),
+    funciones llamadas con su marco de variables locales, la caché de llamadas por dependencias
+    como ShellCheck, y el valor de cada variable como vacío, limpio o con espacios para SC2086
+    (también los enteros de `declare -i`, `let`, `(( ))`, `read`, `mapfile`, `printf -v` y
+    `wait -p`). SC2034 sale sin flujo, como en ShellCheck, y los arreglos asociativos no cuentan
+    sus índices como aritmética.
+  - Arreglos mecánicos con el `Fix` de siempre (`--format agent`, LSP y `kerbo fix`): comillas en
+    SC2086, `$(…)` en vez de backticks en SC2006, `-r` en SC2162 y `|| exit` en SC2164. Las
+    violaciones de deploy y de shell guardan su arreglo en la caché (formato 7).
+  - `# shellcheck disable=` con el alcance real de ShellCheck, en el registro de
+    `src/suppressions.rs` (así lo silenciado entra en la antitrampa con su motivo): antes del primer
+    comando vale para el archivo entero, antes de un comando compuesto para todo el bloque, al
+    final de una línea no vale, y antes de `elif`, `else` o un caso de `case` tampoco. Acepta
+    `SC2086`, `2086`, rangos (`SC2000-SC2099`), `all` y varias claves `disable=` en el mismo
+    comentario.
+  - Paridad contra ShellCheck 0.11.0 (`koalaman/shellcheck-alpine`) en 1.752 scripts de
+    kubernetes (`hack/`, `cluster/`, `build/`, `test/`), moby (`hack/`, `contrib/`), nvm, rustup,
+    ohmyzsh, docker-install, acme.sh, bash-it, dokku, neofetch y los scripts de kerbo: 1.680
+    avisos, cero diferencias por archivo, línea, columna y regla. Sacando todas las directivas
+    `# shellcheck` de esos mismos archivos (para medir las reglas sin que nadie las haya
+    silenciado): 3.215 avisos de ShellCheck, 3.210 de kerbo, ninguno de más. kerbo tarda 1,5 s en
+    todo el corpus; ShellCheck tarda 18 s sólo en `nvm.sh`.
+  - Lo que no se ve a simple vista quedó en `src/shell/fixtures/flow.sh`, con la salida de
+    ShellCheck al lado, y en los tests de `src/shell/tests.rs`.
+  - tree-sitter-bash tiene dos errores que cambian lo que se lee:
+    - En `$A/$B/V` deja un `$` suelto. Antes de analizar, las expansiones pegadas a un separador
+      se reescriben como `${NOMBRE}`, se vuelve a parsear y las posiciones, los arreglos y los
+      textos vuelven al original.
+    - Un comentario entre líneas continuadas con `\` se come el resto del comando ("líneas
+      tragadas"). Esos archivos se saltean enteros, como los que tienen nodos de error.
+- Pendientes de Shell contra ShellCheck:
+  - 55 archivos del corpus (260 avisos de ShellCheck, 375 sin directivas) quedan afuera porque
+    tree-sitter-bash no los parsea o se traga líneas; entre ellos el `acme.sh` principal.
+  - Sin directivas faltan 5 avisos: 3 SC2034 en `dnsapi/dns_ali.sh`, `deploy/ali_cdn.sh` y
+    `deploy/ali_dcdn.sh` de acme.sh (el `$` suelto que la reparación no alcanza, y el archivo se
+    saltea), y 2 SC2086 en `nvm.sh` (líneas 5037 y 5202, `EXIT_CODE=$?; return $EXIT_CODE`) sin
+    explicar todavía.
+  - El resto de las reglas de ShellCheck: SC1090/SC1091 (`source`, que tampoco se sigue), SC2154,
+    SC2329, SC2031, los SC3xxx de `sh` y las demás, sin medir todavía la frecuencia.
+  - ShellCheck sobre el shell de cada `RUN` de los Dockerfile.
+  - `.shellcheckrc` no se lee.
+  - Las columnas cuentan bytes, como el resto de las reglas; ShellCheck cuenta caracteres (la
+    medición convierte).
+  - El arnés de esta paridad (ShellCheck en `json1` contra kerbo en JSON) quedó fuera del repo, como
+    los anteriores.
 - Código muerto entre archivos: exports que nadie importa y dependencias declaradas que nadie
   usa, con paridad contra knip, vulture y depcheck donde las haya.
 
@@ -886,11 +942,9 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     - Para que la antitrampa corra en SQL y Dockerfile, `suppression-added` queda prendida en
       esos lenguajes (el resto de las reglas de código siguen sin medirse ahí).
   - Pendientes de las supresiones en el código:
-    - `squawk-ignore-file` sin reglas (todas) y `# shellcheck disable=all` no se reconocen: haría
-      falta saber qué familia de reglas es de cada herramienta.
-    - ShellCheck: una directiva antes de un comando compuesto vale para todo el bloque y una antes
-      del primer comando, para el archivo entero; hoy vale para la línea siguiente. Lo cierra quien
-      sume las reglas `SC*`.
+    - `squawk-ignore-file` sin reglas (todas) no se reconoce: haría falta saber qué familia de
+      reglas es de cada herramienta. `# shellcheck disable=all` y el alcance real de las
+      directivas de ShellCheck quedaron hechos con las reglas `SC*`.
     - squawk asocia el comentario a la sentencia siguiente; kerbo, a la línea siguiente: un
       `ALTER TABLE` partido en varias líneas con la violación más abajo no queda cubierto.
     - SARIF no los manda como `suppressions` (`kind: inSource`, con `justification`); GitHub los

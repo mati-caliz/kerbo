@@ -9,6 +9,7 @@ use std::path::{Component, Path};
 use tree_sitter::{Node, Parser};
 
 use crate::analysis::ParseFailed;
+use crate::fix::Fix;
 use crate::i18n::Message;
 use crate::language::Language;
 use crate::limits::{Limits, Preset};
@@ -37,6 +38,7 @@ pub struct Violation {
     pub line: usize,
     pub column: usize,
     pub subject: String,
+    pub fix: Option<Fix>,
 }
 
 pub fn detect(path: &Path) -> Option<Language> {
@@ -110,7 +112,8 @@ pub fn analyze(
         | Language::TypeScript
         | Language::Tsx
         | Language::JavaScript
-        | Language::Rust => None,
+        | Language::Rust
+        | Language::Shell => None,
     }
 }
 
@@ -171,7 +174,7 @@ pub fn violation_diagnostics<'analysis>(
                 ),
                 relative_path: file.relative.clone(),
                 absolute_path: file.absolute.clone(),
-                fix: None,
+                fix: violation.fix.clone(),
             }
         })
 }

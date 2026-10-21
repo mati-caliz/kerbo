@@ -17,6 +17,7 @@ use crate::metrics::nesting::{NestingFinding, find_deep_nesting};
 use crate::metrics::{FunctionMetrics, measure_clippy_functions, measure_functions};
 use crate::profile::MetricsStyle;
 use crate::rules::RuleId;
+use crate::shell;
 
 #[derive(Debug)]
 pub struct FileAnalysis {
@@ -80,7 +81,9 @@ pub fn analyze_unit(
     limits: Limits,
 ) -> Result<FileAnalysis, ParseFailed> {
     let SourceUnit { language, source, .. } = unit;
-    if let Some(violations) = deploy::analyze(parser, language, source) {
+    if let Some(violations) =
+        deploy::analyze(parser, language, source).or_else(|| shell::analyze(parser, unit))
+    {
         return violations.map(FileAnalysis::of_violations);
     }
     let profile = language.profile().ok_or(ParseFailed)?;

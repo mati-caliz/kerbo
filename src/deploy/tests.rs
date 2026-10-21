@@ -24,6 +24,7 @@ fn violation(rule: RuleId, subject: &str) -> Violation {
         line: 3,
         column: 1,
         subject: subject.to_owned(),
+        fix: None,
     }
 }
 

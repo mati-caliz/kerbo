@@ -52,6 +52,7 @@ impl Migration {
             line: token.line,
             column: token.column,
             subject,
+            fix: None,
         });
     }
 

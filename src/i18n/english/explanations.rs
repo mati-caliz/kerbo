@@ -132,5 +132,6 @@ pub fn explanation(rule: RuleId) -> Explanation {
         RuleId::Compose(rule) => super::deploy::compose(rule).explanation,
         RuleId::Python(rule) => super::python::python(rule).explanation,
         RuleId::Eslint(rule) => super::eslint::eslint(rule).explanation,
+        RuleId::Shell(rule) => super::shell::shell(rule).explanation,
     }
 }

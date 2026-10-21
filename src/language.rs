@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::deploy;
 use crate::profile::{self, Profile};
+use crate::shell;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -19,6 +20,7 @@ pub enum Language {
     Sql,
     Dockerfile,
     Compose,
+    Shell,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -31,6 +33,7 @@ pub enum Stack {
     Rust,
     Sql,
     Docker,
+    Shell,
 }
 
 impl Language {
@@ -43,11 +46,14 @@ impl Language {
             Self::Rust => Stack::Rust,
             Self::Sql => Stack::Sql,
             Self::Dockerfile | Self::Compose => Stack::Docker,
+            Self::Shell => Stack::Shell,
         }
     }
 
     pub fn from_path(path: &Path) -> Option<Self> {
-        deploy::detect(path).or_else(|| Self::from_extension(path))
+        deploy::detect(path)
+            .or_else(|| Self::from_extension(path))
+            .or_else(|| shell::detect(path))
     }
 
     fn from_extension(path: &Path) -> Option<Self> {
@@ -73,6 +79,7 @@ impl Language {
             Self::JavaScript => tree_sitter_javascript::LANGUAGE,
             Self::Rust => tree_sitter_rust::LANGUAGE,
             Self::Compose => tree_sitter_yaml::LANGUAGE,
+            Self::Shell => tree_sitter_bash::LANGUAGE,
             Self::Sql | Self::Dockerfile => return None,
         };
         Some(grammar.into())
@@ -107,7 +114,7 @@ impl Language {
             Self::Java => Some(&profile::JAVA),
             Self::TypeScript | Self::Tsx | Self::JavaScript => Some(&profile::ECMASCRIPT),
             Self::Rust => Some(&profile::RUST),
-            Self::Sql | Self::Dockerfile | Self::Compose => None,
+            Self::Sql | Self::Dockerfile | Self::Compose | Self::Shell => None,
         }
     }
 }

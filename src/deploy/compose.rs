@@ -45,6 +45,7 @@ fn violation(rule: ComposeRule, line: usize, subject: &str) -> Violation {
         line,
         column: FIRST_COLUMN,
         subject: subject.to_owned(),
+        fix: None,
     }
 }
 

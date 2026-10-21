@@ -1,13 +1,18 @@
+use std::collections::HashMap;
+
 use crate::rules::Diagnostic;
+use crate::shell::{self, Coverage};
 
 const CODE_SEPARATOR: char = ',';
 const REASON_LEADERS: &[char] = &[' ', '\t', '#', '-', ':', '—'];
 const FIRST_LINE: usize = 1;
+const REPEATED_SHELL_DISABLE: &str = "disable=";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
     NextLine,
     File,
+    ShellStatement,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,7 +46,7 @@ pub const SYNTAXES: [Syntax; 5] = [
     Syntax {
         comment: "#",
         marker: "shellcheck disable=",
-        scope: Scope::NextLine,
+        scope: Scope::ShellStatement,
     },
 ];
 
@@ -53,6 +58,7 @@ pub struct Directive {
     pub codes: Vec<String>,
     pub reason: String,
     pub covered_line: Option<usize>,
+    pub last_covered_line: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -66,12 +72,28 @@ impl Directive {
         let in_scope = match self.scope {
             Scope::File => true,
             Scope::NextLine => self.covered_line == Some(diagnostic.line),
+            Scope::ShellStatement => self
+                .covered_line
+                .zip(self.last_covered_line)
+                .is_some_and(|(first, last)| (first..=last).contains(&diagnostic.line)),
         };
         in_scope
-            && self
-                .codes
-                .iter()
-                .any(|code| diagnostic.rule.as_str().eq_ignore_ascii_case(code))
+            && self.codes.iter().any(|code| {
+                diagnostic.rule.as_str().eq_ignore_ascii_case(code)
+                    || (self.scope == Scope::ShellStatement && shell::disables(code, diagnostic.rule))
+            })
+    }
+
+    const fn with_shell_coverage(mut self, coverage: Option<Coverage>) -> Self {
+        match coverage {
+            Some(Coverage::File) => self.scope = Scope::File,
+            Some(Coverage::Lines(first, last)) => {
+                self.covered_line = Some(first);
+                self.last_covered_line = Some(last);
+            }
+            None => self.covered_line = None,
+        }
+        self
     }
 }
 
@@ -80,20 +102,27 @@ pub fn directives(source: &str) -> Vec<Directive> {
         return Vec::new();
     }
     let lines: Vec<&str> = source.lines().collect();
+    let mut shell_coverage: Option<HashMap<usize, Coverage>> = None;
     let mut found = Vec::new();
     for (index, text) in lines.iter().enumerate() {
         let Some((syntax, rest)) = directive_syntax(text) else {
             continue;
         };
-        let (codes, reason) = codes_and_reason(rest);
+        let (mut codes, reason) = codes_and_reason(rest);
+        if syntax.scope == Scope::ShellStatement {
+            for repeated in rest.split(REPEATED_SHELL_DISABLE).skip(1) {
+                codes.extend(codes_and_reason(repeated).0);
+            }
+        }
         let covered_line = lines
             .iter()
             .enumerate()
             .skip(index.saturating_add(1))
             .find(|(_, later)| !is_blank_or_comment(later, syntax.comment))
             .map(|(later, _)| later.saturating_add(FIRST_LINE));
-        found.push(Directive {
-            line: index.saturating_add(FIRST_LINE),
+        let line = index.saturating_add(FIRST_LINE);
+        let directive = Directive {
+            line,
             text: text
                 .trim_start()
                 .strip_prefix(syntax.comment)
@@ -104,7 +133,14 @@ pub fn directives(source: &str) -> Vec<Directive> {
             codes,
             reason,
             covered_line,
-        });
+            last_covered_line: covered_line,
+        };
+        if syntax.scope == Scope::ShellStatement {
+            let coverage = shell_coverage.get_or_insert_with(|| shell::directive_coverage(source));
+            found.push(directive.with_shell_coverage(coverage.get(&line).copied()));
+        } else {
+            found.push(directive);
+        }
     }
     found
 }

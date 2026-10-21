@@ -27,7 +27,8 @@ pub fn relaxed_by(preset: Preset, language: Language) -> Vec<RuleId> {
         | Language::Rust
         | Language::Sql
         | Language::Dockerfile
-        | Language::Compose => &[],
+        | Language::Compose
+        | Language::Shell => &[],
     };
     let by_preset: &[&[EslintRule]] = match preset {
         Preset::Strict => &[],

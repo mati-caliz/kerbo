@@ -257,7 +257,8 @@ fn marker_message(rule: RuleId, marker: &Marker) -> Message {
         | RuleId::CommittedSecret
         | RuleId::VulnerableDependency
         | RuleId::Python(_)
-        | RuleId::Eslint(_) => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
+        | RuleId::Eslint(_)
+        | RuleId::Shell(_) => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
     }
 }
 

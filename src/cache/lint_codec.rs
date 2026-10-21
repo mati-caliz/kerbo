@@ -22,7 +22,21 @@ pub fn write_lint(writer: &mut Writer, finding: &LintFinding) {
     writer.size(finding.line);
     writer.size(finding.column);
     writer.text(&finding.subject);
-    match &finding.fix {
+    write_fix(writer, finding.fix.as_ref());
+}
+
+pub fn read_lint(reader: &mut Reader<'_>) -> Result<LintFinding, Corrupt> {
+    Ok(LintFinding {
+        kind: read_kind(reader)?,
+        line: reader.size()?,
+        column: reader.size()?,
+        subject: reader.text()?,
+        fix: read_fix(reader)?,
+    })
+}
+
+pub fn write_fix(writer: &mut Writer, fix: Option<&Fix>) {
+    match fix {
         None => writer.number(NO_FIX),
         Some(fix) => {
             writer.number(WITH_FIX);
@@ -32,21 +46,15 @@ pub fn write_lint(writer: &mut Writer, finding: &LintFinding) {
     }
 }
 
-pub fn read_lint(reader: &mut Reader<'_>) -> Result<LintFinding, Corrupt> {
-    Ok(LintFinding {
-        kind: read_kind(reader)?,
-        line: reader.size()?,
-        column: reader.size()?,
-        subject: reader.text()?,
-        fix: match reader.number()? {
-            NO_FIX => None,
-            WITH_FIX => Some(Fix {
-                edits: reader.list(read_edit)?,
-                hunk: reader.text()?,
-            }),
-            _ => return Err(Corrupt),
-        },
-    })
+pub fn read_fix(reader: &mut Reader<'_>) -> Result<Option<Fix>, Corrupt> {
+    match reader.number()? {
+        NO_FIX => Ok(None),
+        WITH_FIX => Ok(Some(Fix {
+            edits: reader.list(read_edit)?,
+            hunk: reader.text()?,
+        })),
+        _ => Err(Corrupt),
+    }
 }
 
 fn write_kind(writer: &mut Writer, kind: LintKind) {

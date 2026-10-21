@@ -82,6 +82,7 @@ impl Upgrade {
             line: call.line,
             column: call.column,
             subject,
+            fix: None,
         });
     }
 

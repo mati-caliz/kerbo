@@ -9,6 +9,7 @@ mod dockerfile;
 mod eslint;
 mod explanations;
 mod fixes;
+mod shell;
 
 const ANONYMOUS_FUNCTION: &str = "(anónima)";
 mod python;
@@ -113,6 +114,7 @@ impl Catalog for Spanish {
             RuleId::VulnerableDependency => security::VULNERABLE_DEPENDENCY_DESCRIPTION,
             RuleId::Python(rule) => python::python(rule).description,
             RuleId::Eslint(rule) => eslint::eslint(rule).description,
+            RuleId::Shell(rule) => shell::shell(rule).description,
         }
     }
 

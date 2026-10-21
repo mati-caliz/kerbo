@@ -22,6 +22,7 @@ mod report;
 mod rules;
 mod scan;
 mod secrets;
+mod shell;
 mod suppressions;
 mod syntax;
 #[cfg(test)]

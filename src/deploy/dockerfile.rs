@@ -39,6 +39,7 @@ impl Findings {
             line,
             column: FIRST_COLUMN,
             subject: subject.into(),
+            fix: None,
         });
     }
 }

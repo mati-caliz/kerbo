@@ -8,6 +8,7 @@ use crate::i18n::Problem;
 use crate::language::Language;
 use crate::lint::{eslint_relaxed_by, python_relaxed_by};
 use crate::rules::RuleId;
+use crate::shell;
 
 const BITS_PER_WORD: usize = 64;
 const FAMILY_WORDS: usize = (RuleId::ALL.len() - RuleId::CODE_RULES.len()).div_ceil(BITS_PER_WORD);
@@ -61,6 +62,27 @@ const RUST_UNMEASURED: &[RuleId] = &[
     RuleId::DuplicateCode,
     RuleId::CommentedCode,
 ];
+const SHELL_UNMEASURED: &[RuleId] = &[
+    RuleId::FileLength,
+    RuleId::FunctionLength,
+    RuleId::CyclomaticComplexity,
+    RuleId::CognitiveComplexity,
+    RuleId::ParameterCount,
+    RuleId::TestDisabled,
+    RuleId::TestRemoved,
+    RuleId::TypeEscape,
+    RuleId::NestingDepth,
+    RuleId::MagicNumber,
+    RuleId::ShortName,
+    RuleId::DuplicateCode,
+    RuleId::CommentedCode,
+    RuleId::UnusedImport,
+    RuleId::RedundantImport,
+    RuleId::StarImport,
+    RuleId::RedundantModifier,
+    RuleId::FinalParameter,
+    RuleId::FinalClass,
+];
 const RECOMMENDED_OFF: &[RuleId] = &[RuleId::FinalParameter];
 const MINIMAL_OFF: &[RuleId] = &[
     RuleId::MagicNumber,
@@ -100,7 +122,8 @@ impl DuplicateLimits {
             | Language::Rust
             | Language::Sql
             | Language::Dockerfile
-            | Language::Compose => self.tokens,
+            | Language::Compose
+            | Language::Shell => self.tokens,
             Language::TypeScript | Language::Tsx | Language::JavaScript => self.lines,
         }
     }
@@ -201,6 +224,7 @@ impl Preset {
             .chain(&deploy::relaxed_by(self))
             .chain(&python_relaxed_by(self))
             .chain(&eslint_relaxed_by(self, language))
+            .chain(&shell::relaxed_by(self))
             .fold(base, |limits, &rule| limits.with_rule(rule, None));
         if !is_test {
             return base;
@@ -218,7 +242,8 @@ impl Preset {
             | Language::Rust
             | Language::Sql
             | Language::Dockerfile
-            | Language::Compose => base,
+            | Language::Compose
+            | Language::Shell => base,
         }
     }
 }
@@ -230,7 +255,7 @@ const fn strict(language: Language) -> [Option<usize>; 5] {
         Language::Java => JAVA_STRICT,
         Language::TypeScript | Language::Tsx | Language::JavaScript => ECMASCRIPT_STRICT,
         Language::Rust => RUST_STRICT,
-        Language::Sql | Language::Dockerfile | Language::Compose => UNMEASURED_STRICT,
+        Language::Sql | Language::Dockerfile | Language::Compose | Language::Shell => UNMEASURED_STRICT,
     }
 }
 
@@ -238,6 +263,7 @@ const fn unmeasured(language: Language) -> &'static [RuleId] {
     match language {
         Language::Rust => RUST_UNMEASURED,
         Language::Sql | Language::Dockerfile | Language::Compose => &RuleId::CODE_RULES,
+        Language::Shell => SHELL_UNMEASURED,
         Language::Go
         | Language::Python
         | Language::Java

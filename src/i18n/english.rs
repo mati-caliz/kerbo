@@ -11,6 +11,7 @@ mod explanations;
 mod fixes;
 mod python;
 mod security;
+mod shell;
 
 const ANONYMOUS_FUNCTION: &str = "(anonymous)";
 
@@ -115,6 +116,7 @@ impl Catalog for English {
             RuleId::VulnerableDependency => security::VULNERABLE_DEPENDENCY_DESCRIPTION,
             RuleId::Python(rule) => python::python(rule).description,
             RuleId::Eslint(rule) => eslint::eslint(rule).description,
+            RuleId::Shell(rule) => shell::shell(rule).description,
         }
     }
 

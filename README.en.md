@@ -5,8 +5,8 @@
 Code quality analyzer for **Java, TypeScript/JavaScript, Python, Go and Rust** in a single
 binary. It applies the same rules to every language, in seconds and with a few megabytes of
 memory, and counts exactly like the tool you already use for each one (ESLint, ruff, Checkstyle
-and PMD, golangci-lint, clippy). It also checks Postgres migrations like squawk, Dockerfiles like
-hadolint and docker compose files.
+and PMD, golangci-lint, clippy). It also checks shell scripts like ShellCheck, Postgres
+migrations like squawk, Dockerfiles like hadolint and docker compose files.
 
 ```console
 $ kerbo check --lang en
@@ -351,6 +351,34 @@ and rule in next.js, react, VS Code, zod and express (42,488 problems in about 3
 problems are missing, all from files tree-sitter does not understand (`in`/`out` variance,
 `let as`, `export type *`, escapes in template types) or from `.js` files with type arguments in
 calls, which TypeScript reads as comparisons.
+
+### Shell against ShellCheck
+
+`.sh` and `.bash` files and extensionless files with an `sh`, `bash`, `dash` or busybox shebang
+are checked against [ShellCheck](https://www.shellcheck.net/), with its code as the rule name,
+lowercase: `kerbo explain SC2086`, `--max sc2086=0` or `sc2034 = "off"` in `kerbo.toml`. These are
+the 22 rules that show up most; severity is ShellCheck's, `recommended` turns off the style ones
+and `minimal` the informational ones too. The universal rules in the table above do not run on
+shell, except for the anti-cheat.
+
+| Rules | What it flags |
+|---|---|
+| `sc2086` | unquoted expansions that may split or glob, following each variable's value through branches, loops and functions like ShellCheck (fixes itself) |
+| `sc2046`, `sc2206`, `sc2207`, `sc2068` | unquoted `$(…)` and `${arr[@]}`, and arrays built from words that split |
+| `sc2006`, `sc2005`, `sc2116` | backticks (fixes itself), `echo $(cmd)` and `$(echo …)` |
+| `sc2034` | variables assigned and never used |
+| `sc2155` | `local x=$(cmd)`, which hides the exit code |
+| `sc2162`, `sc2164` | `read` without `-r` and `cd` without `\|\| exit` (both fix themselves) |
+| `sc2004`, `sc2181`, `sc2015`, `sc2166` | needless `$` in arithmetic, `[ $? -ne 0 ]`, `a && b \|\| c` and `-a`/`-o` inside `[ ]` |
+| `sc2016`, `sc2059`, `sc2064`, `sc2069`, `sc2223` | expansions in single quotes, variables in a `printf` format, `trap` with double quotes, redirections in the wrong order and unquoted `: ${x:=…}` |
+| `sc2148` | a script with no shebang and no `# shellcheck shell=` |
+
+`# shellcheck disable=` works as in ShellCheck: before the first command, for the whole file;
+before a compound command, for the whole block; it accepts ranges (`SC2000-SC2099`) and `all`.
+
+Parity, against ShellCheck 0.11: zero differences by file, line, column and rule on 1,752 scripts
+from kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku and others (1,680 findings).
+Files tree-sitter-bash cannot parse are skipped.
 
 ### Secrets and vulnerable dependencies
 

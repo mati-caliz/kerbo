@@ -148,14 +148,17 @@ rule_family!(ComposeRule {
 });
 
 mod eslint;
+mod shell;
 
 pub use eslint::{EslintRule, eslint_index};
+pub use shell::{ShellRule, shell_index};
 
 pub const FAMILY_RULES: usize = MigrationRule::ALL.len()
     + DockerfileRule::ALL.len()
     + ComposeRule::ALL.len()
     + PythonRule::ALL.len()
-    + EslintRule::ALL.len();
+    + EslintRule::ALL.len()
+    + ShellRule::ALL.len();
 
 pub const fn with_families<const CODE: usize, const TOTAL: usize>(code: [RuleId; CODE]) -> [RuleId; TOTAL] {
     let mut all = [RuleId::FileLength; TOTAL];
@@ -164,7 +167,8 @@ pub const fn with_families<const CODE: usize, const TOTAL: usize>(code: [RuleId;
     let free = wrap_dockerfile(free, &DockerfileRule::ALL);
     let free = wrap_compose(free, &ComposeRule::ALL);
     let free = wrap_python(free, &PythonRule::ALL);
-    eslint::wrap_eslint(free, &EslintRule::ALL);
+    let free = eslint::wrap_eslint(free, &EslintRule::ALL);
+    shell::wrap_shell(free, &ShellRule::ALL);
     all
 }
 

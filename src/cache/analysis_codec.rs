@@ -1,5 +1,5 @@
 use super::codec::{Corrupt, Reader, Writer};
-use super::lint_codec::{read_lint, write_lint};
+use super::lint_codec::{read_fix, read_lint, write_fix, write_lint};
 use crate::analysis::FileAnalysis;
 use crate::deploy::Violation;
 use crate::duplicates::{CpdToken, DuplicateUnits, RepeatedBlock, RepeatedKind, SyntaxNode};
@@ -42,6 +42,7 @@ pub fn encode(analysis: &FileAnalysis) -> Vec<u8> {
         writer.text(found.rule.as_str());
         write_position(writer, found.line, found.column);
         writer.text(&found.subject);
+        write_fix(writer, found.fix.as_ref());
     });
     writer.into_bytes()
 }
@@ -87,6 +88,7 @@ pub fn decode(bytes: &[u8]) -> Result<FileAnalysis, Corrupt> {
                 line: reader.size()?,
                 column: reader.size()?,
                 subject: reader.text()?,
+                fix: read_fix(reader)?,
             })
         })?,
     };

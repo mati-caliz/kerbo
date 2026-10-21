@@ -15,6 +15,7 @@ use crate::language::{Language, Stack};
 use crate::limits::{LimitOverride, Limits};
 use crate::macro_rules::MacroIndex;
 use crate::rules::{Diagnostic, FileIdentity, RuleId, evaluate};
+use crate::shell;
 use crate::suppressions::{Suppressed, split};
 
 mod walk;
@@ -305,7 +306,8 @@ fn check_file(
     let crate_macros = macros.crate_of(language, &file.identity.absolute);
     let context = crate_macros
         .as_ref()
-        .map(|crate_macros| crate_macros.analysis_context(&file.identity.absolute));
+        .map(|crate_macros| crate_macros.analysis_context(&file.identity.absolute))
+        .or_else(|| shell::analysis_context(language, &file.identity.absolute));
     let subject = AnalysisSubject {
         language,
         source: &source,

@@ -5,8 +5,9 @@ Español · [English](README.en.md)
 Analizador de calidad de código para **Java, TypeScript/JavaScript, Python, Go y Rust** en un solo
 binario. Aplica las mismas reglas en todos los lenguajes, en segundos y con pocos megas de
 memoria, y cuenta igual que la herramienta que ya usás en cada uno (ESLint, ruff, Checkstyle y
-PMD, golangci-lint, clippy). También revisa las migraciones de Postgres como squawk, los
-Dockerfile como hadolint y los archivos de docker compose.
+PMD, golangci-lint, clippy). También revisa los scripts de shell como ShellCheck, las
+migraciones de Postgres como squawk, los Dockerfile como hadolint y los archivos de docker
+compose.
 
 ```console
 $ kerbo check
@@ -346,6 +347,34 @@ línea, columna y regla en next.js, react, VS Code, zod y express (42.488 avisos
 archivos). Faltan 587 avisos, todos de archivos que tree-sitter no entiende (varianza `in`/`out`,
 `let as`, `export type *`, escapes en tipos de template) o de `.js` con argumentos de tipo en
 llamadas, que TypeScript lee como comparaciones.
+
+### Shell contra ShellCheck
+
+Los `.sh`, los `.bash` y los archivos sin extensión con shebang de `sh`, `bash`, `dash` o busybox
+se revisan contra [ShellCheck](https://www.shellcheck.net/), con su código como nombre y en
+minúscula: `kerbo explain SC2086`, `--max sc2086=0` o `sc2034 = "off"` en `kerbo.toml`. Son las 22
+reglas que más aparecen; la severidad es la de ShellCheck, `recommended` apaga las de estilo y
+`minimal`, también las informativas. Las reglas universales de la tabla de arriba no corren en
+shell, salvo la antitrampa.
+
+| Reglas | Qué marca |
+|---|---|
+| `sc2086` | expansiones sin comillas que pueden partirse o expandir comodines, con el valor de cada variable seguido por ramas, loops y funciones como ShellCheck (se arregla solo) |
+| `sc2046`, `sc2206`, `sc2207`, `sc2068` | `$(…)` y `${arr[@]}` sin comillas, y arreglos armados con palabras que se parten |
+| `sc2006`, `sc2005`, `sc2116` | backticks (se arregla solo), `echo $(cmd)` y `$(echo …)` |
+| `sc2034` | variables asignadas y nunca usadas |
+| `sc2155` | `local x=$(cmd)`, que esconde el código de salida |
+| `sc2162`, `sc2164` | `read` sin `-r` y `cd` sin `\|\| exit` (los dos se arreglan solos) |
+| `sc2004`, `sc2181`, `sc2015`, `sc2166` | `$` de más en aritmética, `[ $? -ne 0 ]`, `a && b \|\| c` y `-a`/`-o` en `[ ]` |
+| `sc2016`, `sc2059`, `sc2064`, `sc2069`, `sc2223` | expansiones entre comillas simples, variables en el formato de `printf`, `trap` con comillas dobles, redirecciones al revés y `: ${x:=…}` sin comillas |
+| `sc2148` | un script sin shebang ni `# shellcheck shell=` |
+
+`# shellcheck disable=` vale como en ShellCheck: antes del primer comando, para el archivo entero;
+antes de un comando compuesto, para todo el bloque; acepta rangos (`SC2000-SC2099`) y `all`.
+
+Paridad, contra ShellCheck 0.11: cero diferencias por archivo, línea, columna y regla en 1.752
+scripts de kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku y otros (1.680 avisos).
+Los archivos que tree-sitter-bash no parsea se saltean.
 
 ### Secretos y dependencias vulnerables
 
