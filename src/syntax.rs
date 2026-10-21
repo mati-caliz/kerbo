@@ -8,6 +8,7 @@ use std::sync::LazyLock;
 use regex::bytes::Regex;
 use tree_sitter::{Node, Parser, Tree};
 
+use crate::language::Language;
 use crate::profile::{Kinds, Profile};
 
 pub const ANONYMOUS_FUNCTION_IDENTITY: &str = "(anónima)";
@@ -138,6 +139,24 @@ pub fn parse_snippet(language: SnippetLanguage, text: &str) -> Option<Tree> {
             | SnippetLanguage::Tsx => parser.parse(text, None),
         }
     })
+}
+
+// Cuántos nodos de error o faltantes deja el parser: `kerbo fix` no acepta una vuelta que los aumenta.
+pub fn syntax_errors(language: Language, text: &[u8]) -> Option<usize> {
+    let mut parser = Parser::new();
+    parser.set_language(&language.grammar()?).ok()?;
+    let parsed = if language == Language::Rust {
+        rust_parse_text(text)
+    } else {
+        Cow::Borrowed(text)
+    };
+    let tree = parser.parse(&*parsed, None)?;
+    Some(
+        descendants(tree.root_node())
+            .iter()
+            .filter(|node| node.is_error() || node.is_missing())
+            .count(),
+    )
 }
 
 // tree-sitter-rust lee `str![...]` (la macro de snapbox) como un índice sobre el tipo `str` con un

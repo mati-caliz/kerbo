@@ -24,6 +24,7 @@ const DAEMON_STATUS_COMMAND: &str = "status";
 const FIX_COMMAND: &str = "fix";
 const RULES_ARGUMENT: &str = "rules";
 const DRY_RUN_ARGUMENT: &str = "dry_run";
+const SINCE_ARGUMENT: &str = "since";
 const LANG_ARGUMENT: &str = "lang";
 const RULE_ARGUMENT: &str = "rule";
 const CONFIG_ARGUMENT: &str = "config";
@@ -111,6 +112,8 @@ pub struct FixArgs {
     pub config: Option<PathBuf>,
     #[arg(long, visible_alias = "diff")]
     pub dry_run: bool,
+    #[arg(long)]
+    pub since: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -231,6 +234,10 @@ fn fix_command(command: clap::Command, lang: Lang) -> clap::Command {
                 .value_parser(localized_parser::<RuleId>(lang))
         })
         .mut_arg(DRY_RUN_ARGUMENT, |arg| arg.help(lang.text(Text::HelpDryRun)))
+        .mut_arg(SINCE_ARGUMENT, |arg| {
+            arg.help(lang.text(Text::HelpSince))
+                .value_name(lang.text(Text::ValueReference))
+        })
 }
 
 fn config_argument(command: clap::Command, lang: Lang) -> clap::Command {

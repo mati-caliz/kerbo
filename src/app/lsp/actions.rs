@@ -1,8 +1,12 @@
 use serde_json::{Map, Value, json};
 
+use std::path::Path;
+
+use super::super::fixing::{Fixer, converge};
 use super::{diagnose, path_from_uri, to_lsp, utf16_column};
-use crate::fix::{TextEdit, TextPoint, compatible, edits_of};
+use crate::fix::{TextEdit, TextPoint};
 use crate::i18n::{Lang, Text};
+use crate::language::Language;
 use crate::rules::Diagnostic;
 
 pub const QUICK_FIX: &str = "quickfix";
@@ -10,6 +14,7 @@ pub const FIX_ALL: &str = "source.fixAll";
 const FIX_ALL_KERBO: &str = "source.fixAll.kerbo";
 const KIND_SEPARATOR: char = '.';
 const SOURCE: &str = "kerbo";
+const LINE_FEED: char = '\n';
 
 struct Request<'request> {
     first: usize,
@@ -99,7 +104,12 @@ pub fn code_actions(uri: &str, text: &str, params: Option<&Value>, lang: Lang) -
         );
     }
     if request.wants(FIX_ALL_KERBO) {
-        actions.extend(fix_all(uri, &diagnostics, &lines, lang));
+        let document = Document {
+            uri,
+            path: &path,
+            text,
+        };
+        actions.extend(fix_all(&document, diagnostics, lang));
     }
     Value::Array(actions)
 }
@@ -115,20 +125,40 @@ fn quick_fix(uri: &str, diagnostic: &Diagnostic, lines: &[&str], lang: Lang) -> 
     }))
 }
 
-fn fix_all(uri: &str, diagnostics: &[Diagnostic], lines: &[&str], lang: Lang) -> Option<Value> {
-    let chosen = compatible(
-        diagnostics
-            .iter()
-            .filter_map(|diagnostic| diagnostic.fix.as_ref()),
-    );
-    if chosen.is_empty() {
-        return None;
-    }
+struct Document<'document> {
+    uri: &'document str,
+    path: &'document Path,
+    text: &'document str,
+}
+
+// Las mismas vueltas que `kerbo fix`, con el texto del editor: como el protocolo pide ediciones
+// sobre el texto original, se manda una sola que reemplaza el documento entero por el arreglado.
+fn fix_all(document: &Document<'_>, diagnostics: Vec<Diagnostic>, lang: Lang) -> Option<Value> {
+    let analyze = |text: &str| Some(diagnose(document.path, text));
+    let accepts = |diagnostic: &Diagnostic| diagnostic.fix.is_some();
+    let fixer = Fixer {
+        language: Language::from_path(document.path),
+        analyze: &analyze,
+        accepts: &accepts,
+    };
+    let converged = converge(&fixer, document.text, diagnostics)?;
+    let replacement = json!({
+        "range": { "start": { "line": 0, "character": 0 }, "end": document_end(document.text) },
+        "newText": converged.text,
+    });
+    let mut changes = Map::new();
+    changes.insert(document.uri.to_owned(), Value::Array(vec![replacement]));
     Some(json!({
         "title": format!("{SOURCE}: {}", lang.text(Text::FixAllTitle)),
         "kind": FIX_ALL_KERBO,
-        "edit": workspace_edit(uri, &edits_of(&chosen), lines),
+        "edit": { "changes": changes },
     }))
+}
+
+fn document_end(text: &str) -> Value {
+    let last_line = text.split(LINE_FEED).count().saturating_sub(1);
+    let last = text.rsplit(LINE_FEED).next().unwrap_or_default();
+    json!({ "line": last_line, "character": utf16_column(last, last.len()) })
 }
 
 fn workspace_edit(uri: &str, edits: &[TextEdit], lines: &[&str]) -> Value {

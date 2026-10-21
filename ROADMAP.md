@@ -615,19 +615,23 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     las acciones rápidas de los de kerbo con el mismo código y la misma línea; si no, las de las
     líneas pedidas. `context.only` filtra por tipo de acción (jerárquico: `source` incluye
     `source.fixAll.kerbo`).
-  - Pendientes de `kerbo fix`:
-    - El "arreglar todo" del LSP hace una sola vuelta (el protocolo pide ediciones sobre el texto
-      original); lo que destapa se ofrece en la siguiente.
-    - No detecta un arreglo que rompe la sintaxis: tree-sitter se recupera y el análisis sigue.
-      Comparar los nodos `ERROR` de antes y después es barato y cerraría el hueco.
-    - El parche no lleva contexto y muestra las líneas sin el `\r` final: en un archivo con CRLF
-      `git apply` no lo aplica tal cual.
-    - `--diff <referencia>` como en `check` (arreglar sólo lo que toca el cambio) no existe:
-      `--diff` es el alias de `--dry-run`.
+  - Lo que le faltaba a `kerbo fix` (hecho, 2026-10-21):
+    - El "arreglar todo" del LSP hace las mismas vueltas que el CLI sobre el texto del editor y
+      manda una sola edición que reemplaza el documento: el protocolo pide ediciones sobre el
+      texto original, y así lo que destapa una vuelta entra sin pedirlo de nuevo.
+    - Una vuelta que deja más nodos de error o faltantes de tree-sitter que el texto original no
+      se acepta (el análisis se recupera y no lo notaría).
+    - El parche conserva el `\r` de cada línea y marca `\ No newline at end of file`, así
+      `git apply --unidiff-zero` lo aplica también con CRLF. Sigue sin contexto, a propósito.
+    - `--since <referencia>` arregla sólo los problemas de las líneas que cambiaron, como
+      `check --diff`; las vueltas siguientes se limitan a esos mismos problemas (por su huella).
+      No se llama `--diff` porque ese es el alias de `--dry-run`, como en ruff.
   - Sumar Qodana al arnés de paridad para las reglas que coinciden con una inspección (imports
     sin usar y modificadores redundantes).
-  - El arnés de esta paridad (correr Checkstyle con los seis chequeos, kerbo en JSON y comparar
-    con la conversión de tabs) quedó fuera del repo, como los anteriores: falta sumarlo.
+  - El arnés de esta paridad (hecho, 2026-10-21): `run_java_shape.sh`, `checkstyle.shape.xml` y
+    `shape_compare.py` en `ideas/kerbo/parity`, que compara por archivo, línea, columna y regla y
+    pasa las columnas de Checkstyle a bytes. Una regla nueva se suma con una entrada en
+    `SHAPE_RULES`. Sobre commons-lang, junit4 y Guava: cero diferencias en 41.400 avisos.
 - Primero, por lo que más aparece en Qodana: la API nueva que reemplaza a la vieja
   (`getFirst()`, `List.of`, `Math.clamp`, bloques de texto) y las redundancias (valor por defecto
   repetido en una anotación, escapes Unicode de más).

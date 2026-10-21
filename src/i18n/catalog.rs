@@ -55,6 +55,7 @@ pub enum Text {
     AboutFix,
     HelpFixRule,
     HelpDryRun,
+    HelpSince,
     FixAllTitle,
     HelpRule,
     HelpConfig,

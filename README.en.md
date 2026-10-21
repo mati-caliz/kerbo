@@ -94,9 +94,10 @@ half written.
 
 `--rule` (can be repeated) limits the fixes to those rules and the paths, to those folders or
 files. `--dry-run` (or `--diff`) writes nothing and shows the patch as a unified diff without
-context (`git apply --unidiff-zero`). It exits with `0` if everything was written, `1` if some file
-was not written because the fix left something new and `2` if something could not be read or
-written.
+context (`git apply --unidiff-zero`, also with CRLF). `--since <reference>` fixes only the problems
+on lines changed since that git reference. A round of fixes that leaves new syntax errors is not
+accepted. It exits with `0` if everything was written, `1` if some file was not written because the
+fix left something new and `2` if something could not be read or written.
 
 ### Adopting it in an existing repo
 

@@ -46,6 +46,9 @@ impl Catalog for Spanish {
             }
             Text::HelpFixRule => "Sólo los arreglos de esta regla (se puede repetir)",
             Text::HelpDryRun => "Muestra el parche sin escribir los archivos",
+            Text::HelpSince => {
+                "Arregla sólo los problemas de las líneas que cambiaron desde esa referencia de git"
+            }
             Text::FixAllTitle => "arreglar todo lo mecánico del archivo",
             Text::AboutKerbo => "Analizador de calidad multi-lenguaje",
             Text::AboutCheck => "Analiza los archivos y lista los problemas",

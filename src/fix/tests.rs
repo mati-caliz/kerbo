@@ -127,3 +127,17 @@ fn falls_back_to_one_hunk_when_everything_changes() {
     assert!(patch.contains("@@ -1,1200 +1,1200 @@"));
     assert_eq!(patch.matches("@@ ").count(), 1);
 }
+
+#[test]
+fn the_patch_keeps_carriage_returns_and_marks_a_missing_final_newline() {
+    let patch = file_patch("A.java", "import a.B;\r\nclass A {}\r\n", "class A {}\r\n").expect("cambió");
+    assert_eq!(
+        patch,
+        "--- a/A.java\n+++ b/A.java\n@@ -1 +0,0 @@\n-import a.B;\r\n"
+    );
+    let unterminated = file_patch("A.java", "class A {}", "final class A {}").expect("cambió");
+    assert_eq!(
+        unterminated,
+        "--- a/A.java\n+++ b/A.java\n@@ -1 +1 @@\n-class A {}\n\\ No newline at end of file\n+final class A {}\n\\ No newline at end of file\n"
+    );
+}

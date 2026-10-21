@@ -1,5 +1,4 @@
 const LINE_FEED: char = '\n';
-const LINE_ENDING: [char; 2] = ['\r', '\n'];
 const MAX_EDIT_DISTANCE: usize = 1_000;
 const REMOVED: &str = "-";
 const ADDED: &str = "+";
@@ -7,6 +6,7 @@ const OLD_SIDE: &str = "--- a/";
 const NEW_SIDE: &str = "+++ b/";
 const SINGLE_LINE: usize = 1;
 const NEWLINE: &str = "\n";
+const NO_NEWLINE_AT_END: &str = "\\ No newline at end of file";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Step {
@@ -73,13 +73,17 @@ fn hunks(steps: &[Step], old: &[&str], new: &[&str]) -> Vec<String> {
     output
 }
 
+// Cada línea conserva su `\r` (en un archivo con CRLF `git apply` lo necesita) y la última sin salto
+// lleva la marca de diff, igual que `git diff`.
 fn shown(lines: &[&str], start: usize, count: usize, sign: &str) -> Vec<String> {
-    lines
-        .iter()
-        .skip(start)
-        .take(count)
-        .map(|line| [sign, line.trim_end_matches(LINE_ENDING)].concat())
-        .collect()
+    let mut output = Vec::new();
+    for line in lines.iter().skip(start).take(count) {
+        output.push([sign, line.strip_suffix(LINE_FEED).unwrap_or(line)].concat());
+        if !line.ends_with(LINE_FEED) {
+            output.push(NO_NEWLINE_AT_END.to_owned());
+        }
+    }
+    output
 }
 
 fn range(before: usize, count: usize) -> String {

@@ -1,11 +1,18 @@
 use std::fs;
 use std::path::Path;
 
-use super::{FixRequest, fix_files, write_atomically};
+use std::process::Command;
+
+use super::{FixRequest, Fixer, converge, fix_files, write_atomically};
 use crate::app::{EXIT_CLEAN, Terminal, run};
 use crate::cli::try_parse;
+use crate::config::Config;
+use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::i18n::{Lang, LangPreference};
+use crate::language::Language;
+use crate::rules::Diagnostic;
 use crate::rules::RuleId;
+use crate::scan::check_text;
 use crate::test_support::TempTree;
 
 const GREETER: &str = "import java.util.List;\nimport java.util.Map;\n\nclass Greeter {\n    void greet(String name) {\n        System.out.println(name);\n    }\n}\n";
@@ -24,6 +31,7 @@ fn request<'request>(tree: &TempTree, rules: &'request [RuleId], write: bool) ->
         rules,
         config: None,
         write,
+        since: None,
     }
 }
 
@@ -109,4 +117,76 @@ fn an_atomic_write_replaces_the_file_and_leaves_nothing_behind() {
     let entries = fs::read_dir(tree.path()).expect("se lista").count();
     assert_eq!(entries, 1);
     assert!(write_atomically(Path::new("/no/existe/a.txt"), "x").is_err());
+}
+
+fn git(tree: &TempTree, arguments: &[&str]) {
+    let status = Command::new("git")
+        .args([
+            "-c",
+            "user.name=kerbo",
+            "-c",
+            "user.email=kerbo@test",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(arguments)
+        .current_dir(tree.path())
+        .output()
+        .expect("git corre")
+        .status;
+    assert!(status.success(), "git {arguments:?}");
+}
+
+#[test]
+fn since_fixes_only_what_the_change_touches() {
+    let tree = project("fix-since", "Greeter.java", GREETER);
+    git(&tree, &["init", "-q"]);
+    git(&tree, &["add", "."]);
+    git(&tree, &["commit", "-q", "-m", "inicio"]);
+    let edited = GREETER
+        .replace("void greet(String name)", "void greet(String who)")
+        .replace("println(name)", "println(who)");
+    tree.write("Greeter.java", &edited);
+    let mut since = request(&tree, &[], true);
+    since.since = Some("HEAD");
+    fix_files(&since, tree.path()).expect("se analiza");
+    assert_eq!(
+        read(&tree, "Greeter.java"),
+        edited.replace("void greet(String who)", "void greet(final String who)"),
+        "los imports sin usar no se tocaron: no son parte del cambio"
+    );
+}
+
+#[test]
+fn a_pass_that_breaks_the_syntax_is_not_accepted() {
+    let tree = project("fix-syntax", "Broken.java", GREETER);
+    let config = Config::load(None, tree.path()).expect("sin configuración");
+    let path = tree.path().join("Broken.java");
+    let before = check_text(&path, GREETER.as_bytes(), &config).expect("se analiza");
+    let breaking: Vec<Diagnostic> = before
+        .into_iter()
+        .take(1)
+        .map(|mut diagnostic| {
+            diagnostic.fix = Some(Fix {
+                edits: vec![TextEdit {
+                    start: TextPoint { line: 8, column: 1 },
+                    end: TextPoint { line: 8, column: 2 },
+                    replacement: String::new(),
+                }],
+                hunk: String::new(),
+            });
+            diagnostic
+        })
+        .collect();
+    let analyze = |text: &str| check_text(&path, text.as_bytes(), &config);
+    let accepts = |diagnostic: &Diagnostic| diagnostic.fix.is_some();
+    let fixer = Fixer {
+        language: Language::from_path(&path),
+        analyze: &analyze,
+        accepts: &accepts,
+    };
+    assert!(
+        converge(&fixer, GREETER, breaking).is_none(),
+        "sacar la llave final rompe la clase"
+    );
 }

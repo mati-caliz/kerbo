@@ -160,11 +160,19 @@ fn offers_the_mechanical_fix_as_a_quick_fix() {
     let actions = replies[2]["result"].as_array().expect("una lista de acciones");
     assert_eq!(actions.len(), 3);
     assert_eq!(actions[2]["kind"], "source.fixAll.kerbo");
+    let whole = &actions[2]["edit"]["changes"][uri.as_str()];
+    assert_eq!(whole.as_array().map(Vec::len), Some(1));
     assert_eq!(
-        actions[2]["edit"]["changes"][uri.as_str()]
-            .as_array()
-            .map(Vec::len),
-        Some(2)
+        whole[0]["range"],
+        json!({ "start": { "line": 0, "character": 0 }, "end": { "line": 4, "character": 0 } })
+    );
+    assert_eq!(
+        whole[0]["newText"],
+        "final class Cart {
+  void añadir(final int ñandú, final int count) {}
+}
+",
+        "todas las vueltas, en una sola edición sobre el documento entero"
     );
     assert_eq!(actions[0]["kind"], "quickfix");
     assert_eq!(actions[0]["title"], "kerbo: borrá el import");

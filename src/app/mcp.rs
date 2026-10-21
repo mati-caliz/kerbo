@@ -201,6 +201,7 @@ fn run_fix(arguments: FixArguments, directory: &Path, lang: Lang) -> Result<Stri
         rules: &rules,
         config: None,
         write: !arguments.dry_run,
+        since: None,
     };
     let outcome = fix_files(&request, directory)?;
     let mut text = outcome.patch();

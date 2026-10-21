@@ -8,12 +8,14 @@ use rayon::prelude::*;
 use super::{EXIT_CLEAN, EXIT_FAILURE, EXIT_FINDINGS, Terminal, scan_with, write_error};
 use crate::cli::{FixArgs, ScanArgs};
 use crate::config::Config;
+use crate::diff::ChangedLines;
 use crate::fix::{Fix, apply, compatible, edits_of, file_patch};
 use crate::i18n::{FixNotice, Lang, Notice, Problem};
-use crate::language::Stack;
+use crate::language::{Language, Stack};
 use crate::report::{Format, render};
 use crate::rules::{Diagnostic, RuleId};
 use crate::scan::{ScanFailure, check_text};
+use crate::syntax::syntax_errors;
 
 const MAX_FIX_PASSES: usize = 10;
 const TEMPORARY_SUFFIX: &str = ".kerbo-fix.tmp";
@@ -26,6 +28,7 @@ pub struct FixRequest<'request> {
     pub rules: &'request [RuleId],
     pub config: Option<&'request Path>,
     pub write: bool,
+    pub since: Option<&'request str>,
 }
 
 #[derive(Debug)]
@@ -48,12 +51,21 @@ struct Target<'target> {
     absolute: &'target Path,
     config: &'target Config,
     rules: &'target [RuleId],
+    allowed: Option<&'target HashSet<String>>,
 }
 
-struct Converged {
-    text: String,
-    applied: usize,
-    after: Vec<Diagnostic>,
+// Cómo se arregla un texto: qué lo analiza y qué arreglos se aceptan. Lo usan `kerbo fix` y el
+// "arreglar todo" del LSP.
+pub struct Fixer<'fixer> {
+    pub language: Option<Language>,
+    pub analyze: &'fixer dyn Fn(&str) -> Option<Vec<Diagnostic>>,
+    pub accepts: &'fixer dyn Fn(&Diagnostic) -> bool,
+}
+
+pub struct Converged {
+    pub text: String,
+    pub applied: usize,
+    pub after: Vec<Diagnostic>,
 }
 
 impl FixOutcome {
@@ -113,6 +125,7 @@ pub fn run(
         rules: &arguments.rules,
         config: arguments.config.as_deref(),
         write: !arguments.dry_run,
+        since: arguments.since.as_deref(),
     };
     let outcome = fix_files(&request, directory)?;
     if arguments.dry_run {
@@ -142,19 +155,31 @@ pub fn fix_files(request: &FixRequest<'_>, directory: &Path) -> Result<FixOutcom
         no_cache: false,
     };
     let outcome = scan_with(&scan, &config);
-    let mut candidates: BTreeMap<PathBuf, String> = BTreeMap::new();
+    let changes = request
+        .since
+        .map(|reference| ChangedLines::since(reference, directory))
+        .transpose()?;
+    let mut candidates: BTreeMap<PathBuf, (String, HashSet<String>)> = BTreeMap::new();
     for diagnostic in outcome.diagnostics {
-        if wanted_fix(&diagnostic, request.rules).is_some() {
-            candidates.insert(diagnostic.absolute_path, diagnostic.relative_path);
+        let touched = changes
+            .as_ref()
+            .is_none_or(|changes| changes.touches(&diagnostic));
+        if touched && wanted_fix(&diagnostic, request.rules).is_some() {
+            candidates
+                .entry(diagnostic.absolute_path)
+                .or_insert_with(|| (diagnostic.relative_path, HashSet::new()))
+                .1
+                .insert(diagnostic.fingerprint);
         }
     }
     let results: Vec<Result<Option<FixedFile>, ScanFailure>> = candidates
         .par_iter()
-        .map(|(absolute, relative)| {
+        .map(|(absolute, (relative, touched))| {
             let target = Target {
                 absolute,
                 config: &config,
                 rules: request.rules,
+                allowed: changes.as_ref().map(|_| touched),
             };
             fix_file(&target, relative, request.write)
         })
@@ -183,7 +208,19 @@ fn fix_file(target: &Target<'_>, relative: &str, write: bool) -> Result<Option<F
     let Some(before) = check_text(target.absolute, original.as_bytes(), target.config) else {
         return Ok(None);
     };
-    let Some(converged) = converge(target, &original, before.clone()) else {
+    let analyze = |text: &str| check_text(target.absolute, text.as_bytes(), target.config);
+    let accepts = |diagnostic: &Diagnostic| {
+        wanted_fix(diagnostic, target.rules).is_some()
+            && target
+                .allowed
+                .is_none_or(|allowed| allowed.contains(&diagnostic.fingerprint))
+    };
+    let fixer = Fixer {
+        language: Language::from_path(target.absolute),
+        analyze: &analyze,
+        accepts: &accepts,
+    };
+    let Some(converged) = converge(&fixer, &original, before.clone()) else {
         return Ok(None);
     };
     let known: HashSet<&str> = before
@@ -193,7 +230,7 @@ fn fix_file(target: &Target<'_>, relative: &str, write: bool) -> Result<Option<F
     let left = converged
         .after
         .iter()
-        .filter(|diagnostic| wanted_fix(diagnostic, target.rules).is_some())
+        .filter(|diagnostic| accepts(diagnostic))
         .count();
     let introduced: Vec<Diagnostic> = converged
         .after
@@ -214,7 +251,14 @@ fn fix_file(target: &Target<'_>, relative: &str, write: bool) -> Result<Option<F
     }))
 }
 
-fn converge(target: &Target<'_>, original: &str, before: Vec<Diagnostic>) -> Option<Converged> {
+// Aplica los arreglos compatibles, vuelve a analizar y repite: lo que destapa una vuelta (una clase
+// que pasa a `final` deja de más el `final` de sus métodos) entra en la siguiente. Una vuelta que
+// deja más errores de sintaxis de los que había no se acepta: tree-sitter se recupera y el análisis
+// no lo notaría.
+pub fn converge(fixer: &Fixer<'_>, original: &str, before: Vec<Diagnostic>) -> Option<Converged> {
+    let errors_before = fixer
+        .language
+        .and_then(|language| syntax_errors(language, original.as_bytes()));
     let mut converged = Converged {
         text: original.to_owned(),
         applied: 0,
@@ -225,7 +269,8 @@ fn converge(target: &Target<'_>, original: &str, before: Vec<Diagnostic>) -> Opt
             converged
                 .after
                 .iter()
-                .filter_map(|diagnostic| wanted_fix(diagnostic, target.rules)),
+                .filter(|diagnostic| (fixer.accepts)(diagnostic))
+                .filter_map(|diagnostic| diagnostic.fix.as_ref()),
         );
         if chosen.is_empty() {
             break;
@@ -233,8 +278,20 @@ fn converge(target: &Target<'_>, original: &str, before: Vec<Diagnostic>) -> Opt
         let Some(text) = apply(&edits_of(&chosen), &converged.text) else {
             break;
         };
+        let breaks_syntax = fixer
+            .language
+            .zip(errors_before)
+            .is_some_and(|(language, errors)| {
+                syntax_errors(language, text.as_bytes()).is_some_and(|after| after > errors)
+            });
+        if breaks_syntax {
+            break;
+        }
+        let Some(after) = (fixer.analyze)(&text) else {
+            break;
+        };
         converged.applied = converged.applied.saturating_add(chosen.len());
-        converged.after = check_text(target.absolute, text.as_bytes(), target.config)?;
+        converged.after = after;
         converged.text = text;
     }
     (converged.applied > 0).then_some(converged)
