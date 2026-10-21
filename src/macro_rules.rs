@@ -1,7 +1,10 @@
 mod definition;
+mod dependencies;
 mod expansion;
 mod expressions;
+mod foreign;
 mod fragments;
+mod imports;
 mod matcher;
 mod reader;
 mod registry;
@@ -17,7 +20,8 @@ pub use registry::{CrateMacros, MacroIndex};
 pub use scope::MacroScope;
 
 const PATH_SEPARATOR: &str = "::";
-const RELATIVE_ROOTS: &[&str] = &["crate", "$crate", "self", "super"];
+const LOCAL_ROOTS: &[&str] = &["crate", "self", "super"];
+const DOLLAR_CRATE: &str = "$crate";
 const STATEMENT: &str = "expression_statement";
 const SOURCE_FILE: &str = "source_file";
 const DECLARATIONS: &str = "declaration_list";
@@ -25,14 +29,31 @@ const IMPLEMENTATION: &str = "impl_item";
 const TRAIT: &str = "trait_item";
 const TRAIT_FIELD: &str = "trait";
 
-// Sólo las macros del propio crate: una ruta que nombra otro crate (`log::debug!`) es de una
-// dependencia, y `crate::`, `self::` o `super::` siguen dentro del crate.
-fn local_name(path: &str) -> Option<&str> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MacroPath<'path> {
+    Plain(&'path str),
+    DollarCrate(&'path str),
+    Foreign { krate: &'path str, name: &'path str },
+}
+
+// `crate::`, `self::` o `super::` siguen dentro del crate; `$crate::` es el crate de donde viene la
+// definición que se está expandiendo, y una ruta que nombra otro crate (`log::debug!`) es de una
+// dependencia.
+fn macro_path(path: &str) -> Option<MacroPath<'_>> {
     let segments: Vec<&str> = path.split(PATH_SEPARATOR).map(str::trim).collect();
     match segments.as_slice() {
-        [name] => Some(name),
-        [root, .., name] if RELATIVE_ROOTS.contains(root) => Some(name),
-        _ => None,
+        [name] => Some(MacroPath::Plain(name)),
+        [root, .., name] if *root == DOLLAR_CRATE => Some(MacroPath::DollarCrate(name)),
+        [root, .., name] if LOCAL_ROOTS.contains(root) => Some(MacroPath::Plain(name)),
+        ["", krate, .., name] | [krate, .., name] => Some(MacroPath::Foreign { krate, name }),
+        [] => None,
+    }
+}
+
+fn local_name(path: &str) -> Option<&str> {
+    match macro_path(path)? {
+        MacroPath::Plain(name) | MacroPath::DollarCrate(name) => Some(name),
+        MacroPath::Foreign { .. } => None,
     }
 }
 

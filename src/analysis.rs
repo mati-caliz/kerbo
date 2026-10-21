@@ -18,6 +18,7 @@ use crate::metrics::{FunctionMetrics, measure_clippy_functions, measure_function
 use crate::profile::MetricsStyle;
 use crate::rules::RuleId;
 use crate::shell;
+use crate::syntax::rust_parse_text;
 
 #[derive(Debug)]
 pub struct FileAnalysis {
@@ -87,7 +88,12 @@ pub fn analyze_unit(
         return violations.map(FileAnalysis::of_violations);
     }
     let profile = language.profile().ok_or(ParseFailed)?;
-    let tree = parser.parse(source, None).ok_or(ParseFailed)?;
+    let tree = if language == Language::Rust {
+        parser.parse(&*rust_parse_text(source), None)
+    } else {
+        parser.parse(source, None)
+    }
+    .ok_or(ParseFailed)?;
     let root = tree.root_node();
     let line_map = LineMap::new(root, source, profile);
     let file_lines = line_map.count(0, line_map.total_rows().saturating_sub(1), profile.file_lines);

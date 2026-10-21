@@ -301,9 +301,11 @@ Sonar: arranca en 1 y suma cada `if`, cada `match` de más de un brazo y cada gu
 ya expandido, así que también suman los `for`, los `while`, cada `?` y cada `.await`, los `assert!`
 y los `matches!`. Después descuenta los `return`: todos si la función devuelve `Result`, la mitad
 si no. Los closures se miden aparte, también los que van adentro de una macro. Las `macro_rules!`
-del propio crate se expanden como rustc, leyendo las definiciones de todos sus archivos; las de la
-biblioteca estándar y las de `log` se imitan, y de las de otras dependencias se cuentan sólo los
-argumentos.
+del propio crate se expanden como rustc, leyendo las definiciones de todos sus archivos, y también
+las exportadas por las dependencias (`dep::macro!`, `use dep::macro` o `#[macro_use] extern
+crate`), leídas de la caché de cargo con la versión del `Cargo.lock` o, sin lockfile, la más nueva
+compatible con lo pedido. Las de la biblioteca estándar se imitan; de las macros procedurales se
+cuentan sólo los argumentos.
 
 ### Python contra ruff
 
@@ -531,8 +533,10 @@ se vuelve a analizar. Las reglas y los duplicados entre archivos se calculan sie
 guardado. Está partida en 256 archivos por el primer byte de la clave, cada uno con su tope y
 desalojo del menos usado; cada entrada va comprimida con LZ4 y con su suma de control, y se
 escribe a un temporal que se renombra. En Rust el resultado de un archivo depende también de las
-`macro_rules!` del crate, así que la clave suma una huella del texto de todos los archivos del
-crate y de la ruta del archivo dentro de él: cambiar una macro vuelve a analizar a quien la usa.
+`macro_rules!`, así que la clave suma una huella de los archivos del crate que definen macros, las
+traen con `#[macro_use]` o invocan una que arma funciones, de la versión de cada dependencia y de
+la ruta del archivo: cambiar una macro vuelve a analizar a quien la usa, y editar una función
+común, no.
 
 Los textos del CLI (reporte, `explain`, errores, hook, MCP y LSP) viven en un catálogo tipado en
 `src/i18n/`, uno por idioma; el compilador asegura que cada mensaje exista en los dos.

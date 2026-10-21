@@ -50,9 +50,11 @@ impl Language {
         }
     }
 
+    // La extensión de un lenguaje manda sobre el nombre: `Dockerfile.prod` es un Dockerfile, pero
+    // `dockerfile.rs` es Rust.
     pub fn from_path(path: &Path) -> Option<Self> {
-        deploy::detect(path)
-            .or_else(|| Self::from_extension(path))
+        Self::from_extension(path)
+            .or_else(|| deploy::detect(path))
             .or_else(|| shell::detect(path))
     }
 
@@ -163,6 +165,10 @@ mod tests {
             Some(Language::Dockerfile)
         );
         assert_eq!(Language::from_path(Path::new("Dockerfile.dockerignore")), None);
+        assert_eq!(
+            Language::from_path(Path::new("src/deploy/dockerfile.rs")),
+            Some(Language::Rust)
+        );
         assert_eq!(
             Language::from_path(Path::new("docker-compose.prod.yml")),
             Some(Language::Compose)

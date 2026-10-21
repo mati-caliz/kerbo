@@ -356,9 +356,25 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
       archivo.
     - El arnés de paridad contra clippy (el crate con un caso por criterio y el script que compara
       los ocho crates de terceros) quedó afuera del repo: sumarlo, como el resto de los arneses.
-  - **Macros de otros crates**: las `macro_rules!` de las dependencias, leídas de su código en la
-    caché de cargo (`~/.cargo/registry/src`) con el mismo expansor. Las macros procedurales
-    (`derive`, `#[tokio::main]`, `automod::dir!`) quedan afuera: hay que compilarlas.
+  - **Macros de otros crates** (hecho, 2026-10-21). Las `macro_rules!` exportadas por las
+    dependencias del `Cargo.toml` (normales, de desarrollo, de build y por plataforma, también las
+    de `path`), leídas de la caché de cargo con la versión del `Cargo.lock` o, sin lockfile, la
+    más nueva compatible con el requisito (`^`, como cargo). Se cargan recién cuando una invocación
+    las nombra: `dep::macro!`, `$crate::...` adentro de una macro de esa dependencia, o un nombre
+    suelto que trae `use dep::...`, `use dep::*` o `#[macro_use] extern crate dep`. Lo que arman no
+    se marca en la dependencia (clippy no reporta adentro de macros externas), pero suma a la
+    complejidad de quien la invoca. tree-sitter-rust lee `str![...]` (la macro de snapbox) como un
+    índice con un error: para parsear se le cambia el nombre por otro del mismo largo y el texto
+    original sigue mandando. Las macros procedurales (`derive`, `#[tokio::main]`,
+    `automod::dir!`) quedan afuera: hay que compilarlas.
+
+    Paridad contra clippy en los ocho crates (con el arnés de `ideas/kerbo/parity`, rutas
+    normalizadas): de 544 diferencias a 64. winnow de 402 a 18 (los `str!` de snapbox),
+    toml_parser de 36 a 0 e indexmap de 54 a 0 (`quickcheck!`). Lo que queda: serde_json, 32 por
+    un `#[cfg]` adentro de una función y 10 por un módulo que declara una macro procedural; el
+    resto, sueltas. Medir lo que ahora se expande cuesta: winnow tarda de 194 a 270 ms; los demás
+    casi no cambian. Corriendo el arnés apareció que kerbo tomaba `dockerfile.rs` por un
+    Dockerfile: ahora la extensión de un lenguaje manda sobre el nombre.
   - **`#[cfg]` evaluado**: decidir qué código compila con una plataforma y unas features
     configurables en `kerbo.toml` (por defecto, la máquina donde corre y todas las features), con
     los `cfg` que emite el `build.rs`, para sacar lo que clippy no ve, también adentro de una

@@ -306,3 +306,70 @@ macro_rules! added {{
     );
     assert_ne!(context(), with_macro, "un archivo nuevo también");
 }
+
+const HELPER: &str = "#[macro_export]
+macro_rules! branch {
+    ($flag:expr) => {
+        if $flag { 1 } else { 0 }
+    };
+}
+
+#[macro_export]
+macro_rules! nested {
+    () => {
+        $crate::branch!(true)
+    };
+}
+
+#[macro_export]
+macro_rules! str {
+    [[$data:literal]] => {
+        $crate::branch!($data.is_empty())
+    };
+}
+
+macro_rules! hidden {
+    () => {
+        if true { 1 } else { 0 }
+    };
+}
+";
+
+const APPLICATION: &str = "use helper::branch;
+use helper::str;
+
+pub fn imported(flag: bool) -> u8 {
+    branch!(flag) + branch!(flag)
+}
+
+pub fn pathed() -> u8 {
+    helper::nested!()
+}
+
+pub fn primitive_named() -> u8 {
+    str![[\"x\"]]
+}
+
+pub fn not_exported() -> u8 {
+    helper::hidden!()
+}
+";
+
+#[test]
+fn expands_the_exported_macros_of_dependencies() {
+    let tree = TempTree::new("macro-dependencies");
+    tree.write(
+        "app/Cargo.toml",
+        "[package]\nname = \"app\"\n\n[dependencies]\nhelper = { path = \"../helper\" }\n",
+    );
+    tree.write("app/src/lib.rs", APPLICATION);
+    tree.write("helper/Cargo.toml", "[package]\nname = \"helper\"\n");
+    tree.write("helper/src/lib.rs", HELPER);
+    let library = tree.path().join("app/src/lib.rs");
+    let macros = MacroIndex::for_one_scan().crate_of(Language::Rust, &library);
+    let cognitive: Vec<Option<usize>> = measure(&library, APPLICATION, macros.as_ref())
+        .iter()
+        .map(|function| function.cognitive)
+        .collect();
+    assert_eq!(cognitive, [Some(3), Some(2), Some(2), Some(1)]);
+}

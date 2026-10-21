@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tree_sitter::{Node, Tree};
 
+use super::MacroPath;
 use super::matcher::match_rule;
 use super::registry::{Context, RecordedInvocation};
 use super::scope::{ExpansionKey, MacroScope};
@@ -161,16 +162,20 @@ impl<'code> Code<'code> {
     }
 
     pub fn expand_node(&self, invocation: Node<'_>) -> Option<Rc<Expansion>> {
-        let name = super::registry::local_macro_name(invocation, self.bytes)?;
+        let path = super::registry::invocation_path(invocation, self.bytes)?;
         let arguments = super::registry::arguments_range(invocation)?;
         let context = super::context_of(invocation);
-        let expand = || self.expand(name, arguments, context);
+        let expand = || self.expand(path, arguments, context);
         self.expansion_key(arguments.0)
             .map_or_else(|| expand().map(Rc::new), |key| self.scope.remembered(key, expand))
     }
 
     pub fn expand_recorded(&self, invocation: &RecordedInvocation) -> Option<Expansion> {
-        self.expand(&invocation.name, invocation.arguments, invocation.context)
+        self.expand(
+            MacroPath::Plain(&invocation.name),
+            invocation.arguments,
+            invocation.context,
+        )
     }
 
     fn expansion_key(&self, byte: usize) -> Option<ExpansionKey> {
@@ -188,12 +193,17 @@ impl<'code> Code<'code> {
         })
     }
 
-    fn expand(&self, name: &str, (start, end): (usize, usize), context: Context) -> Option<Expansion> {
+    fn expand(
+        &self,
+        path: MacroPath<'_>,
+        (start, end): (usize, usize),
+        context: Context,
+    ) -> Option<Expansion> {
         if self.depth >= RECURSION_LIMIT {
             return None;
         }
         let at = self.origin_at(start)?;
-        let candidates = self.scope.candidates(name, at);
+        let candidates = self.scope.resolve(path, at);
         if candidates.is_empty() {
             return None;
         }

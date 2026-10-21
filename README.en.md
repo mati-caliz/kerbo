@@ -308,8 +308,11 @@ Sonar's: it starts at 1 and adds every `if`, every `match` with more than one ar
 over the already expanded code, so `for`, `while`, every `?` and every `.await`, `assert!` and
 `matches!` add up too. Then it discounts the `return`s: all of them if the function returns
 `Result`, half otherwise. Closures are measured separately, including the ones inside a macro.
-kerbo does not expand macros: it mimics the standard library's and `log`'s, and for the rest it
-counts only the arguments; a crate's own macro that hides an `if` is the difference that remains.
+The crate's own `macro_rules!` are expanded like rustc does, reading the definitions from all its
+files, and so are the ones exported by its dependencies (`dep::macro!`, `use dep::macro` or
+`#[macro_use] extern crate`), read from cargo's cache with the `Cargo.lock` version or, without a
+lockfile, the newest one compatible with the requirement. The standard library's are mimicked; for
+procedural macros only the arguments count.
 
 ### Python against ruff
 
@@ -537,8 +540,10 @@ clone is not analyzed again. Rules and cross-file duplicates are always computed
 stored. It is split into 256 files by the first byte of the key, each with its own cap and
 least-recently-used eviction; each entry is LZ4-compressed with its checksum, and it is written to
 a temporary file that is renamed. In Rust the result of a file also depends on the crate's
-`macro_rules!`, so the key adds a fingerprint of the text of every file in the crate and of the
-file's path inside it: changing a macro analyzes again whoever uses it.
+`macro_rules!`, so the key adds a fingerprint of the crate files that define macros, bring them in
+with `#[macro_use]` or invoke one that writes functions, of each dependency's version and of the
+file's path: changing a macro analyzes again whoever uses it, and editing an ordinary function
+does not.
 
 The CLI texts (report, `explain`, errors, hook, MCP and LSP) live in a typed catalog in
 `src/i18n/`, one per language; the compiler makes sure every message exists in both.

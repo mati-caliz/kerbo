@@ -9,7 +9,10 @@ use std::time::SystemTime;
 use ignore::WalkBuilder;
 use tree_sitter::Node;
 
+use super::MacroPath;
 use super::definition::Definition;
+use super::dependencies::dependencies;
+use super::foreign::DependencyMacros;
 use super::reader::{definitions_in_text, file_shares_macros, macro_use_modules};
 use crate::language::Language;
 use crate::syntax::{SnippetLanguage, descendants, parse_snippet};
@@ -56,6 +59,7 @@ pub struct CrateMacros {
     sources: Vec<SourceText>,
     definitions: HashMap<String, Vec<Arc<Definition>>>,
     macro_use: HashSet<String>,
+    dependencies: Vec<DependencyMacros>,
     invocations: OnceLock<Vec<RecordedInvocation>>,
 }
 
@@ -73,7 +77,22 @@ impl CrateMacros {
     }
 
     pub fn source_text(&self, source: usize) -> Option<&[u8]> {
-        self.sources.get(source).map(|text| text.text.as_bytes())
+        self.sources.get(source).map_or_else(
+            || self.dependency_of_source(source)?.source_text(source),
+            |text| Some(text.text.as_bytes()),
+        )
+    }
+
+    pub fn dependency_named(&self, name: &str) -> Option<&DependencyMacros> {
+        self.dependencies
+            .iter()
+            .find(|dependency| dependency.name() == name)
+    }
+
+    pub fn dependency_of_source(&self, source: usize) -> Option<&DependencyMacros> {
+        self.dependencies
+            .iter()
+            .find(|dependency| dependency.owns(source))
     }
 
     pub fn file_shares_macros(&self, path: &Path) -> bool {
@@ -167,7 +186,7 @@ fn crate_root(file: &Path) -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
-fn rust_files(root: &Path) -> Vec<PathBuf> {
+pub(super) fn rust_files(root: &Path) -> Vec<PathBuf> {
     let crate_root = root.to_path_buf();
     let mut files: Vec<PathBuf> = WalkBuilder::new(root)
         .filter_entry(move |entry| {
@@ -233,6 +252,11 @@ fn collect(root: &Path) -> CrateMacros {
         sources,
         definitions,
         macro_use,
+        dependencies: dependencies(root)
+            .into_iter()
+            .enumerate()
+            .map(|(position, dependency)| DependencyMacros::new(dependency, position))
+            .collect(),
         invocations: OnceLock::new(),
     };
     macros.content_hash = macro_text_hash(&macros);
@@ -258,6 +282,9 @@ fn macro_text_hash(macros: &CrateMacros) -> u64 {
         if shapes_others {
             text.hash(&mut hasher);
         }
+    }
+    for dependency in &macros.dependencies {
+        dependency.hash_identity(&mut hasher);
     }
     hasher.finish()
 }
@@ -331,11 +358,15 @@ fn invocations_in_source(macros: &CrateMacros, source: usize, text: &str) -> Vec
 }
 
 pub fn local_macro_name<'text>(invocation: Node<'_>, text: &'text [u8]) -> Option<&'text str> {
-    let path = invocation
-        .child_by_field_name(MACRO_FIELD)?
-        .utf8_text(text)
-        .ok()?;
-    super::local_name(path)
+    super::local_name(invocation_path_text(invocation, text)?)
+}
+
+pub fn invocation_path<'text>(invocation: Node<'_>, text: &'text [u8]) -> Option<MacroPath<'text>> {
+    super::macro_path(invocation_path_text(invocation, text)?)
+}
+
+fn invocation_path_text<'text>(invocation: Node<'_>, text: &'text [u8]) -> Option<&'text str> {
+    invocation.child_by_field_name(MACRO_FIELD)?.utf8_text(text).ok()
 }
 
 pub fn arguments_range(invocation: Node<'_>) -> Option<(usize, usize)> {

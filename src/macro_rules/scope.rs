@@ -1,11 +1,14 @@
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use super::MacroPath;
 use super::definition::Definition;
 use super::expansion::Expansion;
+use super::foreign::DependencyMacros;
+use super::imports::Imports;
 use super::reader::definitions_in_text;
 use super::registry::{CrateMacros, RecordedInvocation};
 use super::tokens::Origin;
@@ -26,6 +29,7 @@ pub struct MacroScope<'scope> {
     current_lines: Vec<usize>,
     local: Vec<Arc<Definition>>,
     expansions: RefCell<HashMap<ExpansionKey, Option<Rc<Expansion>>>>,
+    imports: OnceCell<Imports>,
 }
 
 // El índice del crate ya leyó las definiciones de este archivo: si el texto es el mismo (el editor
@@ -74,6 +78,7 @@ impl<'scope> MacroScope<'scope> {
             current_text,
             current_lines: line_starts(current_text),
             expansions: RefCell::new(HashMap::new()),
+            imports: OnceCell::new(),
         }
     }
 
@@ -115,6 +120,44 @@ impl<'scope> MacroScope<'scope> {
         let expanded = expand().map(Rc::new);
         self.expansions.borrow_mut().insert(key, expanded.clone());
         expanded
+    }
+
+    // Lo que se escribe adentro de una macro de una dependencia se busca en esa dependencia; una
+    // ruta a otro crate, en sus macros exportadas; un nombre suelto, primero en el crate y después en
+    // la dependencia que lo importa.
+    pub fn resolve(&self, path: MacroPath<'_>, at: Origin) -> Vec<&Definition> {
+        let Some(macros) = self.crate_macros.as_deref() else {
+            return match path {
+                MacroPath::Plain(name) | MacroPath::DollarCrate(name) => self.candidates(name, at),
+                MacroPath::Foreign { .. } => Vec::new(),
+            };
+        };
+        match (path, macros.dependency_of_source(at.source)) {
+            (MacroPath::Foreign { krate, name }, _) => exported(macros.dependency_named(krate), name),
+            (MacroPath::DollarCrate(name), Some(dependency)) => exported(Some(dependency), name),
+            (MacroPath::Plain(name), Some(dependency)) => dependency
+                .definitions_named(name)
+                .iter()
+                .map(Arc::as_ref)
+                .collect(),
+            (MacroPath::DollarCrate(name), None) => self.candidates(name, at),
+            (MacroPath::Plain(name), None) => {
+                let local = self.candidates(name, at);
+                if !local.is_empty() {
+                    return local;
+                }
+                self.imports()
+                    .crates_offering(name)
+                    .map(|krate| exported(macros.dependency_named(krate), name))
+                    .find(|found| !found.is_empty())
+                    .unwrap_or_default()
+            }
+        }
+    }
+
+    fn imports(&self) -> &Imports {
+        self.imports
+            .get_or_init(|| Imports::of(std::str::from_utf8(self.current_text).unwrap_or_default()))
     }
 
     // Una macro se busca por nombre como hace rustc con el alcance textual: primero la última
@@ -212,6 +255,16 @@ impl<'scope> MacroScope<'scope> {
             reaching.extend(newly);
         }
     }
+}
+
+fn exported<'macros>(dependency: Option<&'macros DependencyMacros>, name: &str) -> Vec<&'macros Definition> {
+    dependency
+        .map(|dependency| dependency.definitions_named(name))
+        .unwrap_or_default()
+        .iter()
+        .map(Arc::as_ref)
+        .filter(|definition| definition.shared)
+        .collect()
 }
 
 fn line_starts(text: &[u8]) -> Vec<usize> {

@@ -1,13 +1,19 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
+use std::sync::LazyLock;
+
+use regex::bytes::Regex;
 use tree_sitter::{Node, Parser, Tree};
 
 use crate::profile::{Kinds, Profile};
 
 pub const ANONYMOUS_FUNCTION_IDENTITY: &str = "(anónima)";
 const NAME_FIELD: &str = "name";
+const PRIMITIVE_MACRO_ALIAS: &[u8] = b"s7r$bang";
+static PRIMITIVE_MACRO: LazyLock<Option<Regex>> = LazyLock::new(|| Regex::new(r"\bstr(?P<bang>\s*!)").ok());
 const NAMING_PARENTS: &[&str] = &[
     "type_alias_declaration",
     "variable_declarator",
@@ -124,6 +130,21 @@ pub fn parse_snippet(language: SnippetLanguage, text: &str) -> Option<Tree> {
                 entry.insert(parser)
             }
         };
-        parser.parse(text, None)
+        match language {
+            SnippetLanguage::Rust => parser.parse(&*rust_parse_text(text.as_bytes()), None),
+            SnippetLanguage::Python
+            | SnippetLanguage::Go
+            | SnippetLanguage::TypeScript
+            | SnippetLanguage::Tsx => parser.parse(text, None),
+        }
+    })
+}
+
+// tree-sitter-rust lee `str![...]` (la macro de snapbox) como un índice sobre el tipo `str` con un
+// error en el medio. Para parsear se le cambia el nombre por otro identificador del mismo largo:
+// las posiciones no se mueven y el nombre se sigue leyendo del texto original.
+pub fn rust_parse_text(text: &[u8]) -> Cow<'_, [u8]> {
+    PRIMITIVE_MACRO.as_ref().map_or(Cow::Borrowed(text), |pattern| {
+        pattern.replace_all(text, PRIMITIVE_MACRO_ALIAS)
     })
 }
