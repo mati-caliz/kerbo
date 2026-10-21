@@ -24,8 +24,33 @@ pub struct MacroScope<'scope> {
     current: usize,
     current_text: &'scope [u8],
     current_lines: Vec<usize>,
-    local: Vec<Definition>,
+    local: Vec<Arc<Definition>>,
     expansions: RefCell<HashMap<ExpansionKey, Option<Rc<Expansion>>>>,
+}
+
+// El índice del crate ya leyó las definiciones de este archivo: si el texto es el mismo (el editor
+// puede tener cambios sin guardar), se reusan en vez de volver a leerlas.
+fn local_definitions(
+    crate_macros: Option<&CrateMacros>,
+    current: usize,
+    current_text: &[u8],
+    shares: bool,
+) -> Vec<Arc<Definition>> {
+    if let Some(macros) = crate_macros.filter(|macros| macros.source_text(current) == Some(current_text)) {
+        return macros
+            .all_definitions()
+            .filter(|definition| definition.origin.source == current)
+            .cloned()
+            .collect();
+    }
+    definitions_in_text(
+        std::str::from_utf8(current_text).unwrap_or_default(),
+        current,
+        shares,
+    )
+    .into_iter()
+    .map(Arc::new)
+    .collect()
 }
 
 impl<'scope> MacroScope<'scope> {
@@ -43,11 +68,7 @@ impl<'scope> MacroScope<'scope> {
             .zip(path)
             .is_none_or(|(macros, path)| macros.file_shares_macros(path));
         Self {
-            local: definitions_in_text(
-                std::str::from_utf8(current_text).unwrap_or_default(),
-                current,
-                shares,
-            ),
+            local: local_definitions(crate_macros.as_deref(), current, current_text, shares),
             crate_macros,
             current,
             current_text,
@@ -129,6 +150,7 @@ impl<'scope> MacroScope<'scope> {
             .filter(|definition| definition.origin.source != self.current);
         self.local
             .iter()
+            .map(Arc::as_ref)
             .filter(|definition| definition.name == name)
             .chain(foreign)
             .collect()
@@ -169,7 +191,7 @@ impl<'scope> MacroScope<'scope> {
             .all_definitions()
             .map(Arc::as_ref)
             .filter(|definition| definition.origin.source != self.current)
-            .chain(self.local.iter())
+            .chain(self.local.iter().map(Arc::as_ref))
             .filter(|definition| definition.shared)
             .collect();
         loop {

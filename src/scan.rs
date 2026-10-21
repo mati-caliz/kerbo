@@ -21,6 +21,7 @@ use crate::suppressions::{Suppressed, split};
 mod walk;
 
 const PATH_SEPARATOR: &str = "/";
+const SINGLE_FILE: usize = 1;
 
 #[derive(Debug)]
 pub struct ScanFailure {
@@ -88,11 +89,16 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
         });
         wanted && !request.config.is_ignored(Path::new(&file.identity.relative))
     });
-    let macros = MacroIndex::for_one_scan();
+    let this_scan = MacroIndex::for_one_scan();
+    let macros = if files.len() == SINGLE_FILE {
+        MacroIndex::shared()
+    } else {
+        &this_scan
+    };
     let results: Vec<Result<Checked, ScanFailure>> = files
         .par_iter()
         .map_init(ParserPool::default, |pool, file| {
-            check_file(pool, file, request, &macros)
+            check_file(pool, file, request, macros)
         })
         .collect();
     let mut outcome = ScanOutcome {

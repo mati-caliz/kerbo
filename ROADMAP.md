@@ -335,17 +335,22 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     macros tarda hasta el doble que antes. En la caché por contenido, la clave de un archivo de
     Rust suma una huella del texto de todo el crate y de la ruta del archivo en él.
   - Pendientes del expansor:
-    - El hook y el editor no usan la caché en disco. El editor guarda las definiciones en
-      memoria, pero el hook arranca un proceso por edición y vuelve a leer el crate entero.
-      Guardar la huella del crate y las definiciones de cada archivo como otro tipo de entrada
-      en el mismo almacén (o resolverlo con el demonio de la fase 7).
-    - Bajar el costo: un crate con muchas macros tarda hasta el doble (winnow, de unos 110 a
-      200 ms; serde_json, de 85 a 160 ms) y un archivo suelto suma unos 8 ms; casi todo es
-      expandir.
-    - La huella del crate en la clave de la caché es gruesa: cualquier cambio en un archivo del
-      crate invalida todos los demás archivos de Rust de ese crate. Afinarla a las macros que el
-      archivo usa de verdad (y a las invocaciones que arman funciones) devolvería la caché en
-      caliente en crates que se editan seguido.
+    - El hook reusa las definiciones (hecho, 2026-10-21): un escaneo de un solo archivo usa el
+      índice compartido del proceso, el mismo del editor, que se revisa por fecha y tamaño. Con
+      el demonio de la fase 7, el hook de un archivo de Rust de kerbo baja de 19 a 16 ms.
+    - El costo (hecho, 2026-10-21). Perfilado con perf: casi todo era volver a parsear con
+      tree-sitter los argumentos de cada invocación, que miran la complejidad, el anidamiento y
+      la búsqueda de closures, y otra vez desde cada argumento que contiene a una invocación
+      anidada. Ahora cada argumento se parsea una vez (por lugar y texto, así que lo guardado es
+      lo mismo que daría parsear de nuevo), sólo se buscan closures en invocaciones con un `|`, y
+      cada archivo reusa las definiciones que ya leyó el índice del crate en vez de leerlas otra
+      vez. Con el mismo reporte en siete crates: winnow de 247 a 219 ms (sin macros, 134),
+      serde_json de 167 a 137 (sin macros, 112), clap_builder de 121 a 114. Lo que queda es
+      medir el código expandido, que es lo que hace falta para la paridad.
+    - La huella del crate en la clave de la caché (hecho, 2026-10-21): la lista de archivos y el
+      texto sólo de los que tienen una definición, un `#[macro_use]` o una invocación de una macro
+      que arma funciones, que es lo único que cambia el análisis de otro archivo. Editar una
+      función común ya no invalida el resto del crate.
     - Casos sin cubrir: una función armada por una macro cuyos extremos escribió el usuario pero
       con el `fn` de la definición, y macros no compartidas que invocan funciones-macro de otro
       archivo.

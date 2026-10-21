@@ -257,3 +257,52 @@ fn the_shared_index_notices_changed_files_and_prefers_the_text_in_the_editor() {
     let measured = measure(&library, &edited, after.as_ref());
     assert_eq!(measured.first().and_then(|function| function.cognitive), Some(2));
 }
+
+#[test]
+fn the_cache_context_only_changes_with_what_reaches_other_files() {
+    let tree = crate_tree();
+    tree.write(
+        "src/plain.rs",
+        "pub fn plain() -> u8 {
+    1
+}
+",
+    );
+    let library = tree.path().join("src/lib.rs");
+    let context = || {
+        MacroIndex::for_one_scan()
+            .crate_of(Language::Rust, &library)
+            .map(|macros| macros.analysis_context(&library))
+    };
+    let original = context();
+    tree.write(
+        "src/plain.rs",
+        "pub fn plain() -> u8 {
+    2
+}
+",
+    );
+    assert_eq!(
+        context(),
+        original,
+        "una función común no toca a los demás archivos"
+    );
+    tree.write(
+        "src/macros.rs",
+        &format!(
+            "{MACROS}
+macro_rules! added {{
+    () => {{}};
+}}
+"
+        ),
+    );
+    assert_ne!(context(), original, "una macro nueva sí");
+    let with_macro = context();
+    tree.write(
+        "src/fresh.rs",
+        "pub fn fresh() {}
+",
+    );
+    assert_ne!(context(), with_macro, "un archivo nuevo también");
+}

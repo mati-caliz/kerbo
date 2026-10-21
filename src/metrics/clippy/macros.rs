@@ -1,3 +1,7 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+
 use tree_sitter::{Node, Tree};
 
 use crate::macro_rules::Code;
@@ -27,6 +31,8 @@ const ALL_ARGUMENTS: usize = usize::MAX;
 const BLOCK_START: &str = "{";
 const CONDITION_ONLY: usize = 1;
 const BOTH_SIDES: usize = 2;
+const CLOSURE_BAR: u8 = b'|';
+const PARSED_ARGUMENTS_KEPT: usize = 4096;
 const VISIBLE_ARGUMENTS: &[(&str, usize)] = &[
     ("assert", CONDITION_ONLY),
     ("assert_eq", BOTH_SIDES),
@@ -37,6 +43,12 @@ const VISIBLE_ARGUMENTS: &[(&str, usize)] = &[
     ("writeln", ALL_ARGUMENTS),
     ("format_args", ALL_ARGUMENTS),
 ];
+
+type ParsedArguments = HashMap<(usize, String), Option<Rc<Argument>>>;
+
+thread_local! {
+    static PARSED_ARGUMENTS: RefCell<ParsedArguments> = RefCell::new(HashMap::new());
+}
 
 #[derive(Debug)]
 pub(in crate::metrics) struct Argument {
@@ -61,7 +73,7 @@ impl Argument {
 pub(super) struct Expansion {
     pub added: usize,
     pub returns: usize,
-    pub arguments: Vec<Argument>,
+    pub arguments: Vec<Rc<Argument>>,
 }
 
 // Lo que suma cada macro de la biblioteca estándar una vez expandida, que es lo que mira clippy:
@@ -115,7 +127,10 @@ pub(super) fn expand(invocation: Node<'_>, code: &Code<'_>) -> Expansion {
 // lo único que excessive_nesting alcanza a ver: la condición de assert!, los dos lados de
 // assert_eq!, todo lo de vec!, write! y format_args!. debug_assert!, format! o println! envuelven
 // todo en un bloque de la expansión.
-pub(in crate::metrics) fn arguments_outside_blocks(invocation: Node<'_>, code: &Code<'_>) -> Vec<Argument> {
+pub(in crate::metrics) fn arguments_outside_blocks(
+    invocation: Node<'_>,
+    code: &Code<'_>,
+) -> Vec<Rc<Argument>> {
     let name = macro_name(invocation, code.bytes());
     let Some(&(_, visible)) = VISIBLE_ARGUMENTS.iter().find(|(known, _)| *known == name) else {
         return Vec::new();
@@ -178,15 +193,38 @@ fn argument_pieces(invocation: Node<'_>) -> Vec<Vec<Node<'_>>> {
         .collect()
 }
 
-fn parse_argument(tokens: &[Node<'_>], source: &[u8]) -> Option<Argument> {
+// La misma invocación la miran la complejidad, el anidamiento y la búsqueda de closures, y una
+// anidada se vuelve a ver desde cada argumento que la contiene: cada argumento se parsea una vez.
+// La clave es el lugar y el texto, así que lo guardado es lo mismo que daría parsear de nuevo.
+fn parse_argument(tokens: &[Node<'_>], source: &[u8]) -> Option<Rc<Argument>> {
     let start = tokens.first()?.start_byte();
     let end = tokens.last()?.end_byte();
     let text = std::str::from_utf8(source.get(start..end)?).ok()?;
+    let key = (start, text.to_owned());
+    if let Some(known) = PARSED_ARGUMENTS.with_borrow(|parsed| parsed.get(&key).cloned()) {
+        return known;
+    }
     let wrapped = format!("{WRAPPER_PREFIX}{text}{WRAPPER_SUFFIX}");
-    let tree = parse_snippet(SnippetLanguage::Rust, &wrapped)?;
-    (!tree.root_node().has_error()).then_some(Argument {
-        tree,
-        text: wrapped,
-        start,
-    })
+    let argument = parse_snippet(SnippetLanguage::Rust, &wrapped)
+        .filter(|tree| !tree.root_node().has_error())
+        .map(|tree| {
+            Rc::new(Argument {
+                tree,
+                text: wrapped,
+                start,
+            })
+        });
+    PARSED_ARGUMENTS.with_borrow_mut(|parsed| {
+        if parsed.len() >= PARSED_ARGUMENTS_KEPT {
+            parsed.clear();
+        }
+        parsed.insert(key, argument.clone());
+    });
+    argument
+}
+
+pub(in crate::metrics) fn may_hold_closures(invocation: Node<'_>, source: &[u8]) -> bool {
+    source
+        .get(invocation.start_byte()..invocation.end_byte())
+        .is_some_and(|text| text.contains(&CLOSURE_BAR))
 }

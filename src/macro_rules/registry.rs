@@ -21,6 +21,8 @@ const INVOCATION_KIND: &str = "macro_invocation";
 const MACRO_FIELD: &str = "macro";
 const TOKEN_TREE: &str = "token_tree";
 const BANG: char = '!';
+const DEFINITION_MARKER: &str = "macro_rules!";
+const MACRO_USE_MARKER: &str = "macro_use";
 
 #[derive(Debug)]
 struct SourceText {
@@ -158,15 +160,6 @@ fn relative_to<'path>(root: &Path, path: &'path Path) -> &'path Path {
     path.strip_prefix(root).unwrap_or(path)
 }
 
-fn content_hash(root: &Path, sources: &[SourceText]) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    for source in sources {
-        relative_to(root, &source.path).hash(&mut hasher);
-        source.text.hash(&mut hasher);
-    }
-    hasher.finish()
-}
-
 fn crate_root(file: &Path) -> Option<PathBuf> {
     file.ancestors()
         .skip(1)
@@ -233,15 +226,40 @@ fn collect(root: &Path) -> CrateMacros {
                 .push(Arc::new(definition));
         }
     }
-    CrateMacros {
+    let mut macros = CrateMacros {
         fingerprint: fingerprint(&files),
         root: root.to_path_buf(),
-        content_hash: content_hash(root, &sources),
+        content_hash: 0,
         sources,
         definitions,
         macro_use,
         invocations: OnceLock::new(),
+    };
+    macros.content_hash = macro_text_hash(&macros);
+    macros
+}
+
+// Lo único de otro archivo que cambia el análisis de uno son las macros: las definiciones, los
+// `#[macro_use]` y las invocaciones de las que arman funciones. Entra la lista de archivos y el
+// texto entero sólo de los que tienen alguna de esas tres cosas; editar el cuerpo de una función
+// común no invalida el resto del crate en la caché.
+fn macro_text_hash(macros: &CrateMacros) -> u64 {
+    let writer_marks: Vec<String> = function_writers(macros)
+        .iter()
+        .map(|name| format!("{name}{BANG}"))
+        .collect();
+    let mut hasher = DefaultHasher::new();
+    for source in &macros.sources {
+        relative_to(&macros.root, &source.path).hash(&mut hasher);
+        let text = source.text.as_ref();
+        let shapes_others = text.contains(DEFINITION_MARKER)
+            || text.contains(MACRO_USE_MARKER)
+            || writer_marks.iter().any(|mark| text.contains(mark.as_str()));
+        if shapes_others {
+            text.hash(&mut hasher);
+        }
     }
+    hasher.finish()
 }
 
 fn record_invocations(macros: &CrateMacros) -> Vec<RecordedInvocation> {

@@ -163,6 +163,9 @@ fn clone_location(located: &FunctionMetrics) -> FunctionMetrics {
 // Un closure pasado a una macro que no es del crate es código del usuario que clippy mide aparte
 // después de expandir. tree-sitter no lo ve: se buscan los argumentos que compilan como expresión.
 fn closures_in_macro(invocation: Node<'_>, code: &Code<'_>) -> Vec<FunctionMetrics> {
+    if !macros::may_hold_closures(invocation, code.bytes()) {
+        return Vec::new();
+    }
     macros::expand(invocation, code)
         .arguments
         .iter()
