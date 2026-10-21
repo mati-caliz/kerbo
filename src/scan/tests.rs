@@ -26,7 +26,10 @@ fn scan_tree(root: &Path, roots: &[PathBuf], stacks: &[Stack]) -> ScanOutcome {
 fn analyzes_supported_files_in_parallel_and_sorts_the_problems() {
     let tree = TempTree::new("scan-mixed");
     tree.write("b.py", "def f(a, b, c, d, e, f, g):\n    pass\n");
-    tree.write("a/x.ts", "function build(ab, bc, cd, de, ef) {}\n");
+    tree.write(
+        "a/x.ts",
+        "export function build(ab, bc, cd, de, ef) {\n  return [ab, bc, cd, de, ef];\n}\n",
+    );
     tree.write("notes.md", "# no es código\n");
     let outcome = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
     assert_eq!(outcome.files, 2);
@@ -95,7 +98,7 @@ fn follows_the_project_configuration() {
         "kerbo.toml",
         "[[ignore]]\npaths = [\"gen/**\"]\nreason = \"generado\"\n\n[[exceptions]]\npaths = [\"old/**\"]\nrule = \"parameter-count\"\nmax = 9\nreason = \"heredado\"\n",
     );
-    let many = "function build(ab, bc, cd, de, ef) {}\n";
+    let many = "export function build(ab, bc, cd, de, ef) {\n  return [ab, bc, cd, de, ef];\n}\n";
     tree.write("gen/client.ts", many);
     tree.write("old/legacy.ts", many);
     tree.write("src/new.ts", many);

@@ -75,6 +75,15 @@ impl Fix {
         Self::insert_at(node.start_position(), text, source)
     }
 
+    pub fn replace_range(start: Point, end: Point, replacement: &str, source: &[u8]) -> Self {
+        Self::single(
+            source,
+            TextPoint::from_point(start),
+            TextPoint::from_point(end),
+            replacement,
+        )
+    }
+
     pub fn insert_at(point: Point, text: &str, source: &[u8]) -> Self {
         let at = TextPoint::from_point(point);
         Self::single(source, at, at, text)

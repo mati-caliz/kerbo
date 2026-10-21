@@ -1,4 +1,5 @@
 mod markers;
+mod overlap;
 mod settings;
 
 use std::collections::{HashMap, HashSet};
@@ -15,6 +16,8 @@ use crate::rules::{Diagnostic, RuleId};
 use crate::suppressions::directives;
 
 use self::markers::{Marker, MarkerKind, directive_marker, find_markers};
+
+pub use self::overlap::add_guarded;
 
 const FIRST_LINE: usize = 1;
 const FIRST_COLUMN: usize = 1;
@@ -253,7 +256,8 @@ fn marker_message(rule: RuleId, marker: &Marker) -> Message {
         | RuleId::Compose(_)
         | RuleId::CommittedSecret
         | RuleId::VulnerableDependency
-        | RuleId::Python(_) => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
+        | RuleId::Python(_)
+        | RuleId::Eslint(_) => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
     }
 }
 

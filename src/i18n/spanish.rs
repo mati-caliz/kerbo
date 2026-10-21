@@ -6,6 +6,7 @@ use crate::rules::RuleId;
 
 mod deploy;
 mod dockerfile;
+mod eslint;
 mod explanations;
 mod fixes;
 
@@ -111,6 +112,7 @@ impl Catalog for Spanish {
             RuleId::CommittedSecret => security::COMMITTED_SECRET_DESCRIPTION,
             RuleId::VulnerableDependency => security::VULNERABLE_DEPENDENCY_DESCRIPTION,
             RuleId::Python(rule) => python::python(rule).description,
+            RuleId::Eslint(rule) => eslint::eslint(rule).description,
         }
     }
 
@@ -198,6 +200,7 @@ impl Catalog for Spanish {
             }
             LintKind::StarImport => format!("`{subject}` importa el paquete entero"),
             LintKind::RedundantModifier => format!("El modificador `{subject}` sobra: ya está implícito"),
+            LintKind::Eslint(rule) => with_subject(eslint::eslint(rule).description, subject),
             LintKind::FinalParameter => format!("El parámetro `{subject}` debería ser final"),
             LintKind::FinalClass => {
                 format!("La clase `{subject}` debería ser final: no se puede heredar desde afuera")

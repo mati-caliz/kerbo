@@ -1,0 +1,7 @@
+1:13 no-require-imports
+2:20 no-require-imports
+3:16 no-require-imports
+4:18 no-require-imports
+5:17 no-require-imports
+7:1 no-var
+7:13 no-unused-vars

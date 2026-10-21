@@ -317,6 +317,36 @@ biblioteca estándar de CPython (unos 11.000 archivos y 15.900 avisos). Las úni
 las de archivos que tree-sitter-python no parsea (ahí kerbo no corre las reglas de alcance) y E902,
 que es un error de lectura y no una regla.
 
+### TypeScript y JavaScript contra ESLint
+
+En TypeScript y JavaScript, kerbo hace las reglas más frecuentes de `@eslint/js` recommended y de
+`typescript-eslint` recommended que no piden tipos, con el nombre de ESLint sin el prefijo del
+plugin: `kerbo explain no-unused-vars`, `--max no-explicit-any=0` o `no-var = "off"`. Corren en los
+dos lenguajes como en un `eslint.config.js` con `js.configs.recommended` y
+`tseslint.configs.recommended`; en los `.ts` no corre `no-dupe-keys`, que ya revisa el compilador.
+`no-var` y `prefer-const` van también en JavaScript y `no-non-null-assertion` (de `strict`) entra
+en el preset `strict`. `recommended` la apaga y `minimal` deja sólo las que ESLint clasifica como
+problemas. Los `eslint-disable` no silencian nada: el aviso sale y el comentario lo marca la
+antitrampa.
+
+| Reglas | Qué marca |
+|---|---|
+| `no-unused-vars` | variables, funciones, clases, tipos, imports y parámetros sin usar, con los alcances de `@typescript-eslint/scope-manager` (tipos y valores por separado, `typeof`, JSX contra `React`, declaraciones ambientales y `.d.ts`) |
+| `prefer-const`, `no-var` | `let` que nunca se reasigna y `var`; los dos se arreglan solos cuando ESLint los arregla |
+| `no-unused-expressions` | expresiones sueltas que no hacen nada |
+| `no-require-imports` | `require()` sin un `require` propio e `import x = require()` |
+| `no-explicit-any`, `no-non-null-assertion`, `ban-ts-comment` | `any`, el `!` de no nulo y `@ts-ignore`, `@ts-nocheck` o `@ts-expect-error` sin motivo |
+| `no-useless-escape` | escapes que no hacen falta en strings, templates y expresiones regulares (se arregla solo) |
+| `prefer-rest-params`, `no-prototype-builtins`, `no-this-alias`, `no-empty-object-type` | `arguments`, `obj.hasOwnProperty()`, `const self = this` y el tipo `{}` |
+| `no-empty`, `no-cond-assign`, `no-case-declarations` | bloques vacíos, asignaciones en condiciones y declaraciones sueltas en un `case` |
+| `no-debugger`, `no-duplicate-case`, `no-dupe-else-if`, `no-dupe-keys` | `debugger` (se arregla solo), casos, ramas y claves repetidas |
+
+Paridad, contra ESLint 10.13 y typescript-eslint 8.72: ninguna diferencia de más por archivo,
+línea, columna y regla en next.js, react, VS Code, zod y express (42.488 avisos en unos 30.000
+archivos). Faltan 587 avisos, todos de archivos que tree-sitter no entiende (varianza `in`/`out`,
+`let as`, `export type *`, escapes en tipos de template) o de `.js` con argumentos de tipo en
+llamadas, que TypeScript lee como comparaciones.
+
 ### Secretos y dependencias vulnerables
 
 `committed-secret` revisa todos los archivos versionados, no sólo el código, con las 222 reglas de

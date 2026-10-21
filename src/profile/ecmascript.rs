@@ -159,7 +159,7 @@ pub static ECMASCRIPT: Profile = Profile {
     short_names: ShortNameStyle::Eslint,
     duplicates: DuplicateStyle::Sonar,
     commented_code: CommentedCodeStyle::Unmeasured,
-    lints: LintStyle::Unmeasured,
+    lints: LintStyle::Eslint,
     comments: &["comment", "html_comment"],
     literals: &["string", "template_string"],
     function_length_skips_iife: true,

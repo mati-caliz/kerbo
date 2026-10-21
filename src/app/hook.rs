@@ -8,7 +8,7 @@ use crate::baseline::{BASELINE_FILE, Baseline};
 use crate::cli::HookArgs;
 use crate::config::Config;
 use crate::diff::ChangedLines;
-use crate::guard::{GuardRequest, inspect};
+use crate::guard::{GuardRequest, add_guarded, inspect};
 use crate::i18n::{Lang, Notice, Problem};
 use crate::language::Language;
 use crate::report::{Format, render};
@@ -87,7 +87,8 @@ fn review(file: &Path, arguments: &HookArgs) -> Result<Vec<Diagnostic>, Problem>
             project_root: &project_root,
             stacks: &[],
         };
-        diagnostics.extend(
+        add_guarded(
+            &mut diagnostics,
             inspect(&request)
                 .into_iter()
                 .filter(|diagnostic| diagnostic.absolute_path == absolute),

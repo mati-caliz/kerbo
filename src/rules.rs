@@ -13,7 +13,7 @@ mod families;
 mod id;
 mod lints;
 
-pub use families::{ComposeRule, DockerfileRule, MigrationRule, PythonRule};
+pub use families::{ComposeRule, DockerfileRule, EslintRule, MigrationRule, PythonRule};
 pub use id::RuleId;
 
 const FIRST_LINE: usize = 1;
@@ -295,7 +295,8 @@ fn message(finding: &Finding<'_>, name: &str) -> Message {
         | RuleId::Compose(_)
         | RuleId::CommittedSecret
         | RuleId::VulnerableDependency
-        | RuleId::Python(_) => Message::Rule(finding.rule),
+        | RuleId::Python(_)
+        | RuleId::Eslint(_) => Message::Rule(finding.rule),
     }
 }
 

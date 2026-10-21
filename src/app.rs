@@ -7,7 +7,7 @@ use crate::cache::AnalysisCache;
 use crate::cli::{CheckArgs, Command, ScanArgs};
 use crate::config::Config;
 use crate::diff::ChangedLines;
-use crate::guard::{GuardRequest, inspect};
+use crate::guard::{GuardRequest, add_guarded, inspect};
 use crate::i18n::{Lang, LangPreference, Notice, Problem, Summary};
 use crate::osv::{AuditRequest, Curl, Ecosystem, OsvMode, audit, download};
 use crate::report::render;
@@ -95,12 +95,13 @@ pub fn findings(request: &FindingsRequest<'_>, directory: &Path) -> Result<Findi
             .root()
             .canonicalize()
             .unwrap_or_else(|_| config.root().to_path_buf());
-        diagnostics.extend(inspect(&GuardRequest {
+        let guarded = inspect(&GuardRequest {
             changes: &changes,
             config: &config,
             project_root: &project_root,
             stacks: &request.scan.languages,
-        }));
+        });
+        add_guarded(&mut diagnostics, guarded);
     }
     let mut known = 0;
     if request.use_baseline

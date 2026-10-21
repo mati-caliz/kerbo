@@ -154,6 +154,7 @@ pub enum LintStyle {
     Unmeasured,
     Checkstyle,
     Ruff,
+    Eslint,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

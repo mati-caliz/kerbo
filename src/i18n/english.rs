@@ -6,6 +6,7 @@ use crate::rules::RuleId;
 
 mod deploy;
 mod dockerfile;
+mod eslint;
 mod explanations;
 mod fixes;
 mod python;
@@ -113,6 +114,7 @@ impl Catalog for English {
             RuleId::CommittedSecret => security::COMMITTED_SECRET_DESCRIPTION,
             RuleId::VulnerableDependency => security::VULNERABLE_DEPENDENCY_DESCRIPTION,
             RuleId::Python(rule) => python::python(rule).description,
+            RuleId::Eslint(rule) => eslint::eslint(rule).description,
         }
     }
 
@@ -200,6 +202,7 @@ impl Catalog for English {
             LintKind::RedundantModifier => {
                 format!("The `{subject}` modifier is redundant: it is already implied")
             }
+            LintKind::Eslint(rule) => with_subject(eslint::eslint(rule).description, subject),
             LintKind::FinalParameter => format!("The parameter `{subject}` should be final"),
             LintKind::FinalClass => {
                 format!("The class `{subject}` should be final: it cannot be extended from outside")

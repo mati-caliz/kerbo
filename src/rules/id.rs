@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use super::families::{self, ComposeRule, DockerfileRule, MigrationRule, PythonRule};
+use super::families::{self, ComposeRule, DockerfileRule, EslintRule, MigrationRule, PythonRule};
 use crate::i18n::Problem;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -31,6 +31,7 @@ pub enum RuleId {
     Dockerfile(DockerfileRule),
     Compose(ComposeRule),
     Python(PythonRule),
+    Eslint(EslintRule),
 }
 
 impl RuleId {
@@ -89,6 +90,7 @@ impl RuleId {
             Self::Dockerfile(rule) => families::dockerfile_index(rule, Self::CODE_RULES.len()),
             Self::Compose(rule) => families::compose_index(rule, Self::CODE_RULES.len()),
             Self::Python(rule) => families::python_index(rule, Self::CODE_RULES.len()),
+            Self::Eslint(rule) => families::eslint_index(rule, Self::CODE_RULES.len()),
         }
     }
 
@@ -120,6 +122,7 @@ impl RuleId {
             Self::Dockerfile(rule) => rule.as_str(),
             Self::Compose(rule) => rule.as_str(),
             Self::Python(rule) => rule.as_str(),
+            Self::Eslint(rule) => rule.as_str(),
         }
     }
 }

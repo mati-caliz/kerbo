@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::deploy;
 use crate::i18n::Problem;
 use crate::language::Language;
-use crate::lint::python_relaxed_by;
+use crate::lint::{eslint_relaxed_by, python_relaxed_by};
 use crate::rules::RuleId;
 
 const BITS_PER_WORD: usize = 64;
@@ -200,6 +200,7 @@ impl Preset {
             .filter(|&&rule| rule != RuleId::SuppressionAdded)
             .chain(&deploy::relaxed_by(self))
             .chain(&python_relaxed_by(self))
+            .chain(&eslint_relaxed_by(self, language))
             .fold(base, |limits, &rule| limits.with_rule(rule, None));
         if !is_test {
             return base;

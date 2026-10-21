@@ -604,6 +604,89 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     pisada), F504/F522/F523 (sacar los argumentos de más) y E731 (pasar la lambda a `def`).
   - El arnés de esta paridad (ruff en JSON contra kerbo en JSON con la conversión de columnas)
     quedó fuera del repo, como los anteriores.
+- TypeScript y JavaScript contra ESLint (empezada, 2026-10-21): 20 reglas de `@eslint/js`
+  recommended y de `typescript-eslint` recommended sin tipos, con el nombre de ESLint sin el prefijo
+  del plugin, en una familia propia (`EslintRule`) y un submódulo propio (`src/lint/ecmascript/`).
+  - Frecuencia medida con todo `recommended` de los dos (más `no-var`, `prefer-const`,
+    `prefer-rest-params`, `prefer-spread` y `no-non-null-assertion`) sobre next.js, react, VS Code,
+    zod y express, de mayor a menor: no-var 79.279, no-unused-expressions 34.661, no-unused-vars
+    9.431, prefer-const 8.552, no-require-imports 8.221, no-explicit-any 6.688,
+    no-non-null-assertion 2.720, prefer-rest-params 1.780, no-useless-assignment 1.778,
+    no-prototype-builtins 1.480, no-redeclare 1.449, no-empty 953, no-useless-escape 711,
+    no-fallthrough 700, no-cond-assign 655, no-this-alias 612, ban-ts-comment 552, no-func-assign
+    508, prefer-spread 487, no-empty-object-type 293, no-misleading-character-class 290,
+    no-constant-condition 248 y el resto con menos de 160. Casi todo `no-var` y
+    `no-unused-expressions` sale del código compilado de next.js, que su `.ignore` deja afuera.
+  - Hechas: `no-unused-vars` (la de typescript-eslint, también en JavaScript), `prefer-const`,
+    `no-var`, `no-unused-expressions`, `no-require-imports`, `no-explicit-any`,
+    `no-non-null-assertion`, `prefer-rest-params`, `no-prototype-builtins`, `no-empty`,
+    `no-useless-escape`, `no-cond-assign`, `no-this-alias`, `ban-ts-comment`,
+    `no-empty-object-type`, `no-case-declarations`, `no-debugger`, `no-duplicate-case`,
+    `no-dupe-else-if` y `no-dupe-keys`.
+  - Motor de alcances calcado de `@typescript-eslint/scope-manager` sobre tree-sitter
+    (`src/lint/ecmascript/scope/`): los mismos alcances (también los de tipos, firmas, tipos
+    mapeados y condicionales, enums y namespaces), definiciones de tipo y de valor por separado,
+    referencias de tipo, de valor y dobles (`export { x }`), la resolución al cerrar cada alcance en
+    el mismo orden que ESLint (el orden de las referencias decide `prefer-const` y la posición de
+    `no-unused-vars`), el `arguments` implícito, la referencia a `React` del primer JSX y las marcas
+    de `typescript-eslint` (parámetros de firmas y setters, propiedades de parámetro, miembros de
+    enum, la clase dentro de su propio alcance, `for (k in o) return`, declaraciones ambientales y
+    `.d.ts`).
+  - Arreglos con el `Fix` de siempre (parche en `--format agent`, acción rápida del LSP y
+    `kerbo fix`): `prefer-const` y `no-var` con las mismas condiciones que ESLint (cada uno contra
+    `eslint --fix` en `src/lint/ecmascript/fixtures/*.fixed`), `no-useless-escape` (ESLint sólo lo
+    sugiere: kerbo borra la barra) y `no-debugger` cuando la sentencia está sola en una lista.
+  - Con la antitrampa: en `--diff` y el hook, un `any` o un `@ts-ignore` agregados salen sólo como
+    `type-escape` o `suppression-added`, no repetidos como `no-explicit-any` o `ban-ts-comment` en la
+    misma línea (`src/guard/overlap.rs`).
+  - Los avisos van a la caché por contenido con el resto del análisis (formato 6).
+  - Paridad contra ESLint 10.13 y typescript-eslint 8.72 (parser de typescript-eslint en todos los
+    archivos, JSX en los `.js`, `noInlineConfig` y sólo estas reglas; en los `.ts` apagado lo que
+    apaga `eslint-recommended`), por archivo, línea, columna, regla y cantidad, en next.js (24.682
+    archivos fuera de su `.ignore`), react (4.462), VS Code (722), zod (521) y express (141): 42.488
+    avisos iguales, ninguno de más y 587 de menos. Lo que queda, explicado:
+    - Archivos que tree-sitter-typescript 0.23 no parsea y kerbo no analiza (un árbol roto da falsos
+      positivos): `typeof import('x')` y `import('x').A['b']` en tipos, `let as`, `export type *`,
+      `abstract?:` en una interfaz, un template con argumentos de tipo y escapes dentro de un tipo
+      de template. Son 521 avisos en unas cuatro decenas de archivos (la mayoría de los tests de
+      Copilot en VS Code y algunos de next.js).
+    - 15 archivos `.js` de react-devtools con anotaciones de tipos y argumentos de tipo en llamadas
+      (`useState<boolean>(false)`): TypeScript los lee en modo JavaScript como comparaciones
+      (`useState < boolean > (false)`) y kerbo, que los parsea con la gramática de TSX, los deja
+      afuera; son 66 avisos.
+    - Para que no sobre nada, el árbol se repara antes de rendirse: un `.js` que la gramática de
+      JavaScript no parsea se vuelve a parsear con la de TSX (TypeScript acepta anotaciones en
+      JavaScript); los `&` sueltos en JSX (`Vercel & Next.js`, `?a=1&b=2`), que tree-sitter no
+      entiende, se blanquean, igual que la varianza `in`/`out` de los parámetros de tipo; y se
+      descartan los archivos con sintaxis de Flow que tree-sitter acepta y TypeScript no
+      (`(x: T)`, `import typeof`, `<T: U>`, `{| |}`, `declare module.exports`). Un archivo que ESLint
+      no parsea tampoco lo analiza kerbo; queda uno en next.js que kerbo sí lee.
+    - tree-sitter-typescript aplica el `!` de no nulo a toda la expresión de la izquierda
+      (`a || b < c!`) y parte `x satisfies a.b.C` en un acceso a miembro: las dos se corrigen al
+      ubicar el aviso.
+    - Las columnas cuentan bytes, como el resto de las reglas; ESLint cuenta unidades de UTF-16 (la
+      medición convierte).
+  - Lo que no se ve a simple vista quedó en `src/lint/ecmascript/fixtures/`, cada archivo con la
+    salida de ESLint al lado (`.eslint`) y, para los arreglos, el resultado de `eslint --fix`.
+- Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
+  - `no-useless-assignment` (1.778), `no-fallthrough` (700), `no-unreachable` (104) y
+    `no-unassigned-vars` (59): piden el grafo de control de ESLint (`code-path-analysis`); armarlo
+    sobre tree-sitter es el paso siguiente.
+  - `no-redeclare` (1.449) y `no-func-assign` (508), sólo en JavaScript, sobre el motor de
+    alcances que ya existe; `prefer-spread` (487), `no-misleading-character-class` (290),
+    `no-constant-condition` (248), `no-constant-binary-expression` (154),
+    `no-wrapper-object-types` (152), `no-control-regex` (138), `no-unsafe-function-type` (113),
+    `preserve-caught-error` (92), `triple-slash-reference` (70), `no-unsafe-finally` (67),
+    `getter-return` (43), `no-extra-boolean-cast` (38) y el resto con menos de 30.
+  - `no-undef`: pide las variables globales de cada entorno (navegador, Node, Jest).
+  - `no-useless-escape` no mira las expresiones regulares con el flag `v`.
+  - Los `.js` con argumentos de tipo en llamadas y los huecos de la gramática de arriba.
+  - `eslint-disable` no pasa por el registro de supresiones de `src/suppressions.rs`: hoy no
+    silencia nada (la paridad se midió con `noInlineConfig`).
+  - Las reglas con tipos de `typescript-eslint` (`recommended-type-checked`): esperan a los tipos
+    del compilador.
+  - El arnés de esta paridad (ESLint con un `eslint.config.mjs` de sólo estas reglas, kerbo en JSON
+    y la conversión de columnas) quedó fuera del repo, como los anteriores.
 - Shell contra ShellCheck.
 - Código muerto entre archivos: exports que nadie importa y dependencias declaradas que nadie
   usa, con paridad contra knip, vulture y depcheck donde las haya.

@@ -96,6 +96,8 @@ pub enum SnippetLanguage {
     Python,
     Go,
     Rust,
+    TypeScript,
+    Tsx,
 }
 
 thread_local! {
@@ -115,6 +117,8 @@ pub fn parse_snippet(language: SnippetLanguage, text: &str) -> Option<Tree> {
                     SnippetLanguage::Python => tree_sitter_python::LANGUAGE,
                     SnippetLanguage::Go => tree_sitter_go::LANGUAGE,
                     SnippetLanguage::Rust => tree_sitter_rust::LANGUAGE,
+                    SnippetLanguage::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT,
+                    SnippetLanguage::Tsx => tree_sitter_typescript::LANGUAGE_TSX,
                 };
                 parser.set_language(&grammar.into()).ok()?;
                 entry.insert(parser)

@@ -147,8 +147,15 @@ rule_family!(ComposeRule {
     HealthcheckInterval => "compose-healthcheck-interval",
 });
 
-pub const FAMILY_RULES: usize =
-    MigrationRule::ALL.len() + DockerfileRule::ALL.len() + ComposeRule::ALL.len() + PythonRule::ALL.len();
+mod eslint;
+
+pub use eslint::{EslintRule, eslint_index};
+
+pub const FAMILY_RULES: usize = MigrationRule::ALL.len()
+    + DockerfileRule::ALL.len()
+    + ComposeRule::ALL.len()
+    + PythonRule::ALL.len()
+    + EslintRule::ALL.len();
 
 pub const fn with_families<const CODE: usize, const TOTAL: usize>(code: [RuleId; CODE]) -> [RuleId; TOTAL] {
     let mut all = [RuleId::FileLength; TOTAL];
@@ -156,7 +163,8 @@ pub const fn with_families<const CODE: usize, const TOTAL: usize>(code: [RuleId;
     let free = wrap_migrations(free, &MigrationRule::ALL);
     let free = wrap_dockerfile(free, &DockerfileRule::ALL);
     let free = wrap_compose(free, &ComposeRule::ALL);
-    wrap_python(free, &PythonRule::ALL);
+    let free = wrap_python(free, &PythonRule::ALL);
+    eslint::wrap_eslint(free, &EslintRule::ALL);
     all
 }
 
