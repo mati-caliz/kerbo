@@ -194,10 +194,14 @@
       <div class="cta">
         <p class="eyebrow">Instalar</p>
         <h2>Probalo en tu repo en un minuto.</h2>
-        <p class="section-lead">En Linux y macOS, y en Windows desde el bash de Git, un comando: baja el binario de tu máquina, verifica el sha256 y lo deja en <code>~/.local/bin</code>. También con Homebrew, <code>brew install mati-caliz/tap/kerbo</code>, o con Rust, <code>cargo install kerbo --locked</code>.</p>
+        <p class="section-lead">En Linux y macOS, y en Windows desde el bash de Git o desde PowerShell, un comando: baja el binario de tu máquina, verifica el sha256 y lo deja en <code>~/.local/bin</code>. También con Homebrew, <code>brew install mati-caliz/tap/kerbo</code>, o con Rust, <code>cargo install kerbo --locked</code>.</p>
         <div class="install">
           <code>curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh</code>
           <button class="copy" type="button" data-copy="curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh" data-umami-event="install-copy" data-umami-event-placement="install">Copiar</button>
+        </div>
+        <div class="install">
+          <code>irm https://kerbo.matiascaliz.com.ar/install.ps1 | iex</code>
+          <button class="copy" type="button" data-copy="irm https://kerbo.matiascaliz.com.ar/install.ps1 | iex" data-umami-event="install-copy" data-umami-event-placement="install-powershell">Copiar</button>
         </div>
         <div class="install">
           <code>kerbo check</code>

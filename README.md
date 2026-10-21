@@ -19,15 +19,22 @@ kerbo: 5810 archivos, 2 problemas, 2250 ms
 ## Instalación
 
 Linux y macOS, en x86_64 y ARM (en Linux, un binario estático que corre en cualquier distro), y
-Windows x86_64 desde el bash de Git:
+Windows desde el bash de Git:
 
 ```sh
 curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh
 ```
 
+En Windows, x86_64 o ARM, también desde PowerShell:
+
+```powershell
+irm https://kerbo.matiascaliz.com.ar/install.ps1 | iex
+```
+
 El instalador baja la última versión de los
 [releases](https://github.com/mati-caliz/kerbo/releases) para la máquina, verifica el sha256 y
-deja `kerbo` en `~/.local/bin` (otra carpeta con `KERBO_INSTALL_DIR`).
+deja `kerbo` en `~/.local/bin` (el de PowerShell, en `%LOCALAPPDATA%\Programs\kerbo`, y la suma
+al `PATH`; otra carpeta con `KERBO_INSTALL_DIR`).
 
 Con Homebrew o con Rust instalado:
 

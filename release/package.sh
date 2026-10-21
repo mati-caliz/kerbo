@@ -32,7 +32,13 @@ output_dir="$(cd "${output_dir}" && pwd)"
 
 if [[ "${target}" == *"${WINDOWS_TARGET_MARKER}"* ]]; then
   archive="kerbo-${version}-${target}.zip"
-  (cd "${staging}" && 7z a -tzip -bso0 -bsp0 "${output_dir}/${archive}" "${binary_name}" README.md LICENSE)
+  if command -v 7z >/dev/null 2>&1; then
+    (cd "${staging}" && 7z a -tzip -bso0 -bsp0 "${output_dir}/${archive}" "${binary_name}" README.md LICENSE)
+  else
+    windows_archive="$(cygpath -w "${output_dir}/${archive}")"
+    (cd "${staging}" && powershell -NoProfile -Command \
+      "Compress-Archive -Path '${binary_name}','README.md','LICENSE' -DestinationPath '${windows_archive}'")
+  fi
 else
   archive="kerbo-${version}-${target}.tar.gz"
   tar -czf "${output_dir}/${archive}" -C "${staging}" "${binary_name}" README.md LICENSE

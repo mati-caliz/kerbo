@@ -76,7 +76,7 @@ pub fn walk_stmt<'ast>(visitor: &mut impl Visitor<'ast>, stmt: &'ast Stmt) {
             walk_stmt(visitor, statement);
         }
         Stmt::Expr(expr) | Stmt::IncDec(expr) | Stmt::Go(expr) | Stmt::Defer(expr) => {
-            walk_expr(visitor, expr)
+            walk_expr(visitor, expr);
         }
         Stmt::Send { channel, value } => {
             walk_expr(visitor, channel);

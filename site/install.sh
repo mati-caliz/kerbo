@@ -1,6 +1,6 @@
 #!/bin/sh
 # Instalador de kerbo: baja la última versión de los releases de GitHub para el sistema y la
-# arquitectura de la máquina (Linux y macOS en x86_64 y ARM, Windows x86_64 desde el bash de Git),
+# arquitectura de la máquina (Linux, macOS y Windows desde el bash de Git, en x86_64 y ARM),
 # verifica el sha256 y deja el binario en ~/.local/bin (o en KERBO_INSTALL_DIR).
 #
 #   curl -fsSL https://kerbo.matiascaliz.com.ar/install.sh | sh
@@ -12,6 +12,7 @@ LINUX_ARM_TARGET="aarch64-unknown-linux-musl"
 MACOS_X86_TARGET="x86_64-apple-darwin"
 MACOS_ARM_TARGET="aarch64-apple-darwin"
 WINDOWS_X86_TARGET="x86_64-pc-windows-msvc"
+WINDOWS_ARM_TARGET="aarch64-pc-windows-msvc"
 INSTALL_DIR="${KERBO_INSTALL_DIR:-${HOME}/.local/bin}"
 
 fail() {
@@ -41,6 +42,7 @@ detect_target() {
     Linux:aarch64 | Linux:arm64) echo "${LINUX_ARM_TARGET}" ;;
     Darwin:arm64 | Darwin:x86_64) macos_target "${machine}" ;;
     MINGW*:x86_64 | MSYS*:x86_64 | CYGWIN*:x86_64) echo "${WINDOWS_X86_TARGET}" ;;
+    MINGW*:aarch64 | MSYS*:aarch64 | CYGWIN*:aarch64) echo "${WINDOWS_ARM_TARGET}" ;;
     *) unsupported "${system}" "${machine}" ;;
   esac
 }
@@ -67,7 +69,8 @@ verify_checksum() {
 command -v curl >/dev/null 2>&1 || fail "hace falta curl"
 target="$(detect_target)"
 version="${KERBO_VERSION:-$(latest_version)}"
-if [ "${target}" = "${WINDOWS_X86_TARGET}" ]; then
+case "${target}" in *-windows-*) windows=1 ;; *) windows=0 ;; esac
+if [ "${windows}" = 1 ]; then
   command -v unzip >/dev/null 2>&1 || fail "hace falta unzip"
   archive="kerbo-${version}-${target}.zip"
   binary="kerbo.exe"
@@ -83,7 +86,7 @@ echo "kerbo: bajando ${version} para ${target}"
 curl -fsSL "${base_url}/${archive}" -o "${workdir}/${archive}"
 curl -fsSL "${base_url}/${archive}.sha256" -o "${workdir}/${archive}.sha256"
 verify_checksum "${workdir}" "${archive}"
-if [ "${target}" = "${WINDOWS_X86_TARGET}" ]; then
+if [ "${windows}" = 1 ]; then
   unzip -q "${workdir}/${archive}" "${binary}" -d "${workdir}"
 else
   tar -xzf "${workdir}/${archive}" -C "${workdir}" "${binary}"

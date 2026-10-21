@@ -168,7 +168,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   - El arnés queda en el repo y corre antes de cada versión, así una regresión en el consumo se
     ve igual que una en la paridad.
 
-### 4. Editor (LSP) e inspecciones de IntelliJ como mapa (hecho: el LSP en 0.5, el mapa en main)
+### 4. Editor (LSP) e inspecciones de IntelliJ como mapa (cerrada: el LSP en 0.5, el mapa en 0.7)
 
 - `kerbo lsp`: los problemas de kerbo subrayados mientras se escribe, en IntelliJ (de fábrica en
   Ultimate, con LSP4IJ en Community), VS Code, Neovim y Zed. Los arreglos como acción rápida
@@ -216,8 +216,8 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     en frío y el análisis de 1 a 3,5 minutos; el repo de 3.060 archivos usa 5 GB. En la
     máquina de 8 GB compartida no terminaba.
 
-  Pendiente: sumarlo al arnés de paridad como referencia cuando haya una regla de Java que
-  coincida con una inspección.
+  Sumar Qodana al arnés de paridad cuando una regla de Java coincida con una inspección quedó en
+  la etapa 8, con esas reglas.
 
 ### 5. Más reglas universales y Rust (hecho: las reglas en 0.6, Rust en main)
 
@@ -294,9 +294,9 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   - Lo que no se puede sin tipos: el `Result` que devuelve un closure sin anotarlo y los módulos
     que declara una macro procedural. Ahí la referencia sigue siendo clippy.
 
-### 6. Distribución (hecho: publicada desde 0.7.0)
+### 6. Distribución (cerrada: publicada desde 0.7.0)
 
-- Binarios para macOS (x86 y ARM), Windows y Linux ARM, armados sólo al publicar una versión
+- Binarios para Linux, macOS y Windows, en x86 y ARM, armados sólo al publicar una versión
   (hecho: el workflow de release corre con un tag `v<versión>` que tiene que coincidir con el
   Cargo.toml, compila cada target en un runner nativo, sin cross, y sube los archivos con su
   sha256 al release; el instalador elige el de la máquina, también bajo Rosetta).
@@ -309,24 +309,30 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   sobre el tap) y `CARGO_REGISTRY_TOKEN` (`publish-new` y `publish-update`); crates.io rechaza
   publicar si la cuenta no tiene el mail verificado. 0.4 a 0.6 son releases a mano con sólo el
   binario de Linux.
-- Pendientes de la distribución:
-  - El sitio con el instalador para Linux, macOS y Windows, Homebrew y `cargo install kerbo`
-    (hecho).
-  - Binario para Windows ARM e instalador en PowerShell para quien no tiene el bash de Git.
+- El sitio con el instalador para Linux, macOS y Windows, Homebrew y `cargo install kerbo`
+  (hecho).
+- Windows ARM e instalador en PowerShell (hecho, 2026-10-21): el release suma
+  `aarch64-pc-windows-msvc` en el runner `windows-11-arm` (instala rustup si la imagen no lo trae,
+  y si falta 7-Zip el zip lo arma PowerShell). `install.sh` lo elige desde el bash de Git en ARM y
+  `install.ps1` (`irm https://kerbo.matiascaliz.com.ar/install.ps1 | iex`) instala en Windows x86_64
+  y ARM sin bash: verifica el sha256, deja `kerbo.exe` en `%LOCALAPPDATA%\Programs\kerbo` y la
+  suma al PATH del usuario. Corre en Windows PowerShell 5.1 y en PowerShell 7. El binario ARM sale
+  recién con la próxima versión.
 - Mensajes, README y sitio en inglés además de español (hecho: `--lang`, `lang` en `kerbo.toml`
   o el locale del sistema, con español por defecto; `README.en.md` y el sitio en `/en/`).
-- Pendientes del inglés:
-  - El sitio pasó a tener `styles.css`, `copy.js` y la carpeta `en/` además de `index.html`: si
-    el deploy copia sólo `index.html`, hay que sumarlos (en el repo no hay configuración de
-    deploy para confirmarlo).
+- Lo que faltaba del inglés:
+  - El deploy del sitio copiaba sólo `index.html`, `install.sh` y `llms.txt`: `styles.css`,
+    `copy.js`, `install.ps1` y `en/` daban 404 (comprobado el 2026-10-21). El deploy vive en el
+    servidor, fuera del repo, y tiene que publicar la carpeta `site/` entera.
   - Plurales en español (hecho: el resumen, la línea de base, el hook y el aviso de tests
     borrados dicen "1 archivo", "1 problema" y "1 desvío").
   - El error "tree-sitter no devolvió un árbol" y el nombre de las funciones sin nombre (hecho:
     los dos pasan por el catálogo; el identificador estable sigue usando "(anónima)", así las
     líneas de base existentes no cambian, y un test lo fija).
-  - `README.en.md` y `site/en/` se mantienen a mano: un cambio en la versión en español tiene que
-    pasar también a la otra. Un test o un chequeo del gate que compare las secciones de los dos
-    README avisaría cuando se desfasan.
+  - `README.en.md` y `site/en/` se mantienen a mano (hecho el chequeo: `tests/translations.rs`
+    compara los títulos, las tablas y los bloques de código de los dos README, y las secciones,
+    filas, bloques de instalación y comandos copiables de los dos sitios; si algo está en un
+    idioma y no en el otro, el gate falla).
 
 ### 7. Caché y rendimiento
 

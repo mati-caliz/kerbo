@@ -60,6 +60,10 @@ jobs:
             runner: windows-2025
             binary: kerbo.exe
             rustflags: -C target-feature=+crt-static
+          - target: aarch64-pc-windows-msvc
+            runner: windows-11-arm
+            binary: kerbo.exe
+            rustflags: -C target-feature=+crt-static
     runs-on: ${{ matrix.runner }}
     env:
       TARGET: ${{ matrix.target }}
@@ -71,6 +75,15 @@ jobs:
       - name: musl
         if: runner.os == 'Linux'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends musl-tools
+      - name: rustup
+        if: runner.os == 'Windows' && runner.arch == 'ARM64'
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl -fsSL --proto '=https' --tlsv1.2 -o rustup-init.exe \
+              https://static.rust-lang.org/rustup/dist/aarch64-pc-windows-msvc/rustup-init.exe
+            ./rustup-init.exe -y --profile minimal --default-toolchain none
+            echo "${USERPROFILE}\.cargo\bin" >>"${GITHUB_PATH}"
+          fi
       - name: Toolchain
         run: rustup toolchain install "${RUSTUP_TOOLCHAIN}" --profile minimal --target "${TARGET}"
       - name: Compilar
