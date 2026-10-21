@@ -10,6 +10,7 @@ use super::matcher::{Binding, match_rule};
 use super::tokens::{LeafKind, Origin, TokenTree, lex};
 use super::{CrateMacros, MacroIndex, local_name};
 use crate::analysis::{SourceUnit, analyze_unit};
+use crate::config::RustTarget;
 use crate::language::Language;
 use crate::limits::Limits;
 use crate::metrics::FunctionMetrics;
@@ -205,7 +206,7 @@ fn reads_the_macros_of_the_whole_crate_before_measuring_a_file() {
     let tree = crate_tree();
     let index = MacroIndex::for_one_scan();
     let library = tree.path().join("src/lib.rs");
-    let macros = index.crate_of(Language::Rust, &library);
+    let macros = index.crate_with(Language::Rust, &library, &RustTarget::default());
     let calling = measure(&library, LIBRARY, macros.as_ref());
     let cognitive: Vec<Option<usize>> = calling.iter().map(|function| function.cognitive).collect();
     assert_eq!(
@@ -228,14 +229,18 @@ fn reads_the_macros_of_the_whole_crate_before_measuring_a_file() {
         invoking.is_empty(),
         "en el archivo de la invocación no queda nada"
     );
-    assert!(index.crate_of(Language::Python, &library).is_none());
+    assert!(
+        index
+            .crate_with(Language::Python, &library, &RustTarget::default())
+            .is_none()
+    );
 }
 
 #[test]
 fn the_shared_index_notices_changed_files_and_prefers_the_text_in_the_editor() {
     let tree = crate_tree();
     let library = tree.path().join("src/lib.rs");
-    let before = MacroIndex::shared().crate_of(Language::Rust, &library);
+    let before = MacroIndex::shared().crate_with(Language::Rust, &library, &RustTarget::default());
     assert_eq!(
         before
             .as_ref()
@@ -246,7 +251,7 @@ fn the_shared_index_notices_changed_files_and_prefers_the_text_in_the_editor() {
         "src/macros.rs",
         &format!("{MACROS}\nmacro_rules! added {{\n    () => {{}};\n}}\n"),
     );
-    let after = MacroIndex::shared().crate_of(Language::Rust, &library);
+    let after = MacroIndex::shared().crate_with(Language::Rust, &library, &RustTarget::default());
     assert_eq!(
         after
             .as_ref()
@@ -271,7 +276,7 @@ fn the_cache_context_only_changes_with_what_reaches_other_files() {
     let library = tree.path().join("src/lib.rs");
     let context = || {
         MacroIndex::for_one_scan()
-            .crate_of(Language::Rust, &library)
+            .crate_with(Language::Rust, &library, &RustTarget::default())
             .map(|macros| macros.analysis_context(&library))
     };
     let original = context();
@@ -366,7 +371,7 @@ fn expands_the_exported_macros_of_dependencies() {
     tree.write("helper/Cargo.toml", "[package]\nname = \"helper\"\n");
     tree.write("helper/src/lib.rs", HELPER);
     let library = tree.path().join("app/src/lib.rs");
-    let macros = MacroIndex::for_one_scan().crate_of(Language::Rust, &library);
+    let macros = MacroIndex::for_one_scan().crate_with(Language::Rust, &library, &RustTarget::default());
     let cognitive: Vec<Option<usize>> = measure(&library, APPLICATION, macros.as_ref())
         .iter()
         .map(|function| function.cognitive)

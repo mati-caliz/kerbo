@@ -159,7 +159,8 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
         return Some(diagnostics);
     };
     let mut parser = parser_for(language).ok()?;
-    let crate_macros = MacroIndex::shared().crate_of(language, &file.identity.absolute);
+    let crate_macros =
+        MacroIndex::shared().crate_with(language, &file.identity.absolute, config.rust_target());
     let unit = SourceUnit {
         language,
         source,
@@ -309,7 +310,7 @@ fn check_file(
         .fold(configured, |limits, &limit_override| {
             limits.with_override(limit_override)
         });
-    let crate_macros = macros.crate_of(language, &file.identity.absolute);
+    let crate_macros = macros.crate_with(language, &file.identity.absolute, request.config.rust_target());
     let context = crate_macros
         .as_ref()
         .map(|crate_macros| crate_macros.analysis_context(&file.identity.absolute))

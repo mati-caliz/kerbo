@@ -1,5 +1,5 @@
 use std::cell::{OnceCell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -12,6 +12,7 @@ use super::imports::Imports;
 use super::reader::definitions_in_text;
 use super::registry::{CrateMacros, RecordedInvocation};
 use super::tokens::Origin;
+use crate::config::RustTarget;
 
 const LINE_BREAK: u8 = b'\n';
 
@@ -80,6 +81,14 @@ impl<'scope> MacroScope<'scope> {
             expansions: RefCell::new(HashMap::new()),
             imports: OnceCell::new(),
         }
+    }
+
+    pub fn crate_features(&self) -> Option<&HashSet<String>> {
+        self.crate_macros.as_deref().map(CrateMacros::features)
+    }
+
+    pub fn target(&self) -> Option<&RustTarget> {
+        self.crate_macros.as_deref().map(CrateMacros::target)
     }
 
     pub const fn current(&self) -> usize {

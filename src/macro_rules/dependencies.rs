@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -9,6 +10,8 @@ const LOCKFILE: &str = "Cargo.lock";
 const DEPENDENCY_TABLES: &[&str] = &["dependencies", "dev-dependencies", "build-dependencies"];
 const TARGET_TABLE: &str = "target";
 const PACKAGE_KEY: &str = "package";
+const FEATURES_TABLE: &str = "features";
+const OPTIONAL_KEY: &str = "optional";
 const PATH_KEY: &str = "path";
 const NAME_KEY: &str = "name";
 const VERSION_KEY: &str = "version";
@@ -66,6 +69,24 @@ pub fn dependencies(crate_root: &Path) -> Vec<Dependency> {
     found.sort_by(|left, right| left.name.cmp(&right.name));
     found.dedup_by(|left, right| left.name == right.name);
     found
+}
+
+// Con `--all-features` vale toda feature declarada: las de `[features]` y las dependencias
+// opcionales.
+pub fn declared_features(crate_root: &Path) -> HashSet<String> {
+    let Some(manifest) = read_table(&crate_root.join(MANIFEST)) else {
+        return HashSet::new();
+    };
+    let named = manifest
+        .get(FEATURES_TABLE)
+        .and_then(Value::as_table)
+        .into_iter()
+        .flat_map(|features| features.keys().cloned());
+    let optional = declared(&manifest)
+        .into_iter()
+        .filter(|(_, declaration)| declaration.get(OPTIONAL_KEY).and_then(Value::as_bool) == Some(true))
+        .map(|(name, _)| name);
+    named.chain(optional).collect()
 }
 
 fn read_table(path: &Path) -> Option<Table> {

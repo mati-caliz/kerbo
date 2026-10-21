@@ -226,6 +226,12 @@ reason = "lo genera el compilador de protos"
 
 [cache]
 max_megabytes = 512               # opcional: el tope de la caché, 256 de fábrica
+
+[rust]                            # opcional: con qué se evalúan los #[cfg]
+target_os = "windows"             # de fábrica, la máquina donde corre kerbo
+target_arch = "aarch64"
+features = ["std"]                # de fábrica, todas (como --all-features)
+cfg = ["fast_path"]               # los que enciende el build.rs
 ```
 
 | Preset | Archivo | Función | Ciclomática | Cognitiva | Parámetros |
@@ -306,6 +312,13 @@ las exportadas por las dependencias (`dep::macro!`, `use dep::macro` o `#[macro_
 crate`), leídas de la caché de cargo con la versión del `Cargo.lock` o, sin lockfile, la más nueva
 compatible con lo pedido. Las de la biblioteca estándar se imitan; de las macros procedurales se
 cuentan sólo los argumentos.
+
+Como clippy mide lo que compila, un ítem, una sentencia o un brazo de `match` con un `#[cfg]` falso
+no cuenta para la complejidad ni para el anidamiento, y un archivo con `#![cfg(..)]` falso no se
+mide. Los `#[cfg]` se evalúan con la máquina donde corre kerbo, todas las features del
+`Cargo.toml` y `test` en los dos modos (la biblioteca y sus tests); lo que kerbo no conoce, como
+un `cfg` que emite el `build.rs`, no decide y el código se mide. La sección `[rust]` de
+`kerbo.toml` cambia la plataforma, las features y los `cfg` encendidos.
 
 ### Python contra ruff
 

@@ -11,9 +11,10 @@ use tree_sitter::Node;
 
 use super::MacroPath;
 use super::definition::Definition;
-use super::dependencies::dependencies;
+use super::dependencies::{declared_features, dependencies};
 use super::foreign::DependencyMacros;
 use super::reader::{definitions_in_text, file_shares_macros, macro_use_modules};
+use crate::config::RustTarget;
 use crate::language::Language;
 use crate::syntax::{SnippetLanguage, descendants, parse_snippet};
 
@@ -60,6 +61,8 @@ pub struct CrateMacros {
     definitions: HashMap<String, Vec<Arc<Definition>>>,
     macro_use: HashSet<String>,
     dependencies: Vec<DependencyMacros>,
+    features: HashSet<String>,
+    target: RustTarget,
     invocations: OnceLock<Vec<RecordedInvocation>>,
 }
 
@@ -81,6 +84,14 @@ impl CrateMacros {
             || self.dependency_of_source(source)?.source_text(source),
             |text| Some(text.text.as_bytes()),
         )
+    }
+
+    pub const fn features(&self) -> &HashSet<String> {
+        &self.features
+    }
+
+    pub const fn target(&self) -> &RustTarget {
+        &self.target
     }
 
     pub fn dependency_named(&self, name: &str) -> Option<&DependencyMacros> {
@@ -111,6 +122,7 @@ impl CrateMacros {
     pub fn analysis_context(&self, file: &Path) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.content_hash.hash(&mut hasher);
+        self.target.hash(&mut hasher);
         relative_to(&self.root, &canonical(file)).hash(&mut hasher);
         hasher.finish()
     }
@@ -141,15 +153,20 @@ impl MacroIndex {
         &SHARED
     }
 
-    pub fn crate_of(&self, language: Language, file: &Path) -> Option<Arc<CrateMacros>> {
+    pub fn crate_with(
+        &self,
+        language: Language,
+        file: &Path,
+        target: &RustTarget,
+    ) -> Option<Arc<CrateMacros>> {
         (language == Language::Rust)
-            .then(|| self.crate_for(file))
+            .then(|| self.crate_for(file, target))
             .flatten()
     }
 
     // Cada crate se lee una sola vez aunque lo pidan varios hilos a la vez: los demás esperan la
     // misma celda.
-    fn crate_for(&self, file: &Path) -> Option<Arc<CrateMacros>> {
+    fn crate_for(&self, file: &Path, target: &RustTarget) -> Option<Arc<CrateMacros>> {
         let root = crate_root(&canonical(file))?;
         let cell = Arc::clone(
             self.crates
@@ -158,11 +175,12 @@ impl MacroIndex {
                 .entry(root.clone())
                 .or_default(),
         );
-        let known = cell.get_or_init(|| Arc::new(collect(&root)));
-        if !self.verifies_freshness || known.fingerprint == fingerprint(&rust_files(&root)) {
+        let known = cell.get_or_init(|| Arc::new(collect(&root, target)));
+        let same_target = known.target == *target;
+        if same_target && (!self.verifies_freshness || known.fingerprint == fingerprint(&rust_files(&root))) {
             return Some(Arc::clone(known));
         }
-        let fresh = Arc::new(collect(&root));
+        let fresh = Arc::new(collect(&root, target));
         self.crates
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -223,7 +241,7 @@ fn fingerprint(files: &[PathBuf]) -> Fingerprint {
         .collect()
 }
 
-fn collect(root: &Path) -> CrateMacros {
+fn collect(root: &Path, target: &RustTarget) -> CrateMacros {
     let files = rust_files(root);
     let sources: Vec<SourceText> = files
         .iter()
@@ -257,6 +275,8 @@ fn collect(root: &Path) -> CrateMacros {
             .enumerate()
             .map(|(position, dependency)| DependencyMacros::new(dependency, position))
             .collect(),
+        features: declared_features(root),
+        target: target.clone(),
         invocations: OnceLock::new(),
     };
     macros.content_hash = macro_text_hash(&macros);

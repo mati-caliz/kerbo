@@ -173,7 +173,7 @@ fn visit(root: Node<'_>, code: &Code<'_>, tally: &mut Tally) {
 
 fn enter<'tree>(node: Node<'tree>, code: &Code<'_>, tally: &mut Tally, steps: &mut Vec<Step<'tree>>) {
     let kind = node.kind();
-    if is_item(kind) {
+    if is_item(kind) || super::cfg::is_compiled_out(node, code) {
         return;
     }
     if SEPARATE_BODIES.contains(&kind) {
@@ -191,7 +191,7 @@ fn enter<'tree>(node: Node<'tree>, code: &Code<'_>, tally: &mut Tally, steps: &m
             tally.expression();
         }
         MATCH => {
-            tally.add(match_increment(node));
+            tally.add(match_increment(node, code));
             tally.expression();
         }
         RETURN => tally.returned(),
@@ -258,13 +258,13 @@ fn expand_macro(invocation: Node<'_>, code: &Code<'_>, tally: &mut Tally) {
     tally.expression();
 }
 
-fn match_increment(node: Node<'_>) -> usize {
+fn match_increment(node: Node<'_>, code: &Code<'_>) -> usize {
     let arms: Vec<Node<'_>> = node
         .child_by_field_name(BODY_FIELD)
         .map(named_children)
         .unwrap_or_default()
         .into_iter()
-        .filter(|arm| arm.kind() == MATCH_ARM)
+        .filter(|arm| arm.kind() == MATCH_ARM && !super::cfg::is_compiled_out(*arm, code))
         .collect();
     let guards = arms
         .iter()

@@ -4,6 +4,7 @@ use tree_sitter::Node;
 
 use super::NestingFinding;
 use crate::macro_rules::{Code, Expansion, MacroScope};
+use crate::metrics::clippy::cfg::is_compiled_out;
 use crate::metrics::clippy::macros::arguments_outside_blocks;
 use crate::syntax::one_based;
 
@@ -44,7 +45,10 @@ fn walk(root: Node<'_>, code: &Code<'_>, start_level: usize, findings: &mut Find
     let mut pending = vec![(root, start_level)];
     while let Some((node, outer_level)) = pending.pop() {
         let kind = node.kind();
-        if kind == UNSAFE_BLOCK || (is_spanned(kind) && !is_written_here(node, code)) {
+        if kind == UNSAFE_BLOCK
+            || (is_spanned(kind) && !is_written_here(node, code))
+            || is_compiled_out(node, code)
+        {
             continue;
         }
         if kind == MACRO {

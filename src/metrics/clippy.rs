@@ -1,3 +1,4 @@
+pub(super) mod cfg;
 mod cognitive;
 mod lines;
 pub(super) mod macros;
@@ -22,6 +23,9 @@ type MetricKey = (usize, usize, usize, Option<usize>, Option<usize>, Option<usiz
 
 pub(super) fn measure_file(root: Node<'_>, scope: &MacroScope<'_>) -> Vec<FunctionMetrics> {
     let code = Code::root(scope.current_text(), scope);
+    if cfg::file_is_compiled_out(root, &code) {
+        return Vec::new();
+    }
     let mut functions = measure_tree(root, &code);
     for invocation in scope.foreign_invocations() {
         let Some(text) = scope.source_text(invocation.source) else {
@@ -50,6 +54,9 @@ fn measure_tree(root: Node<'_>, code: &Code<'_>) -> Vec<FunctionMetrics> {
     let mut functions = Vec::new();
     let mut pending = vec![root];
     while let Some(node) = pending.pop() {
+        if cfg::is_compiled_out(node, code) {
+            continue;
+        }
         functions.extend(measure(node, code));
         let mut cursor = node.walk();
         pending.extend(node.children(&mut cursor));

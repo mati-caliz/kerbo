@@ -282,7 +282,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   Sumar Qodana al arnés de paridad cuando una regla de Java coincida con una inspección quedó en
   la etapa 8, con esas reglas.
 
-### 5. Más reglas universales y Rust (abierta: las reglas en 0.6, Rust en main)
+### 5. Más reglas universales y Rust (cerrada: las reglas en 0.6, Rust en main)
 
 - Anidamiento (hecho para TypeScript y Go, con paridad contra `max-depth` de ESLint y
   `max-control-nesting` de revive; Java mide `if`, `for` y `try` por separado y va con las reglas
@@ -314,7 +314,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   winnow, unos 31.000 avisos) lo que difiere es lo que no se ve sin compilar: macros propias o de
   otros crates que esconden un `if`, código escrito adentro de una macro, un `#[cfg]` adentro de
   una función y closures que devuelven `Result` sin decirlo.
-- Paridad total en Rust (pendiente). Lo que falta se puede cerrar sin compilar:
+- Paridad en Rust hasta donde llega sin compilar (hecho, 2026-10-21):
   - **Expansor de `macro_rules!`** (hecho). Antes de medir un archivo se leen las definiciones
     de todo el crate (una vez por corrida; el editor y el hook vuelven a leerlas sólo si cambió
     algún archivo) y cada invocación se expande como rustc: todos los fragmentos, las
@@ -334,7 +334,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     su propia macro) y closures que devuelven `Result` sin decirlo. Analizar un crate con muchas
     macros tarda hasta el doble que antes. En la caché por contenido, la clave de un archivo de
     Rust suma una huella del texto de todo el crate y de la ruta del archivo en él.
-  - Pendientes del expansor:
+  - Después del expansor:
     - El hook reusa las definiciones (hecho, 2026-10-21): un escaneo de un solo archivo usa el
       índice compartido del proceso, el mismo del editor, que se revisa por fecha y tamaño. Con
       el demonio de la fase 7, el hook de un archivo de Rust de kerbo baja de 19 a 16 ms.
@@ -351,11 +351,6 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
       texto sólo de los que tienen una definición, un `#[macro_use]` o una invocación de una macro
       que arma funciones, que es lo único que cambia el análisis de otro archivo. Editar una
       función común ya no invalida el resto del crate.
-    - Casos sin cubrir: una función armada por una macro cuyos extremos escribió el usuario pero
-      con el `fn` de la definición, y macros no compartidas que invocan funciones-macro de otro
-      archivo.
-    - El arnés de paridad contra clippy (el crate con un caso por criterio y el script que compara
-      los ocho crates de terceros) quedó afuera del repo: sumarlo, como el resto de los arneses.
   - **Macros de otros crates** (hecho, 2026-10-21). Las `macro_rules!` exportadas por las
     dependencias del `Cargo.toml` (normales, de desarrollo, de build y por plataforma, también las
     de `path`), leídas de la caché de cargo con la versión del `Cargo.lock` o, sin lockfile, la
@@ -375,12 +370,29 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     resto, sueltas. Medir lo que ahora se expande cuesta: winnow tarda de 194 a 270 ms; los demás
     casi no cambian. Corriendo el arnés apareció que kerbo tomaba `dockerfile.rs` por un
     Dockerfile: ahora la extensión de un lenguaje manda sobre el nombre.
-  - **`#[cfg]` evaluado**: decidir qué código compila con una plataforma y unas features
-    configurables en `kerbo.toml` (por defecto, la máquina donde corre y todas las features), con
-    los `cfg` que emite el `build.rs`, para sacar lo que clippy no ve, también adentro de una
-    función.
-  - Lo que no se puede sin tipos: el `Result` que devuelve un closure sin anotarlo y los módulos
-    que declara una macro procedural. Ahí la referencia sigue siendo clippy.
+  - **`#[cfg]` evaluado** (hecho, 2026-10-21). Un ítem, una sentencia o un brazo de `match` con un
+    `#[cfg]` falso no cuenta para la complejidad ni para el anidamiento (el largo sigue contando el
+    texto, como `too_many_lines`), y un archivo con `#![cfg(..)]` falso no se mide. Se evalúa con
+    lógica de tres valores: la máquina donde corre kerbo, las features del `Cargo.toml` (todas,
+    como `--all-features`) y `test` en los dos modos; lo desconocido (un `cfg` del `build.rs`, un
+    `target_feature`) no decide y el código se mide, porque esconderlo por adivinar sería peor.
+    `[rust]` en `kerbo.toml` cambia `target_os`, `target_arch`, las `features` y los `cfg`
+    encendidos, y entra en la clave de la caché.
+
+    Paridad contra clippy en los ocho crates y kerbo, con el filtro de `cfg` del arnés: de 64
+    diferencias a 28, y seis crates en cero (kerbo incluido). serde_json baja de 30 a 0 en la
+    complejidad. Sin el filtro del arnés, kerbo solo deja 45, todas de funciones bajo un `cfg` del
+    `build.rs` que kerbo mide a propósito.
+  - Lo que queda no se puede sin compilar, y ahí la referencia sigue siendo clippy: el `Result` que
+    devuelve un closure sin anotarlo (16 en winnow), los módulos que declara una macro procedural
+    (10 en serde_json, `automod::dir!`) y código escrito adentro de una macro (2). Los dos casos
+    del expansor sin cubrir (una función armada por una macro con el `fn` de la definición y los
+    extremos del usuario, y macros no compartidas que invocan funciones-macro de otro archivo) no
+    aparecen en ninguno de los nueve crates.
+  - El arnés de paridad de Rust está en `ideas/kerbo/parity` (`run_rust.sh`, `cfg_filter.py`,
+    `rust_macro_diffs.py`), como el resto. El crate con un caso por criterio se perdió, pero sus
+    casos viven como tests de kerbo (`src/metrics/clippy/expansion_tests.rs` y los de
+    `src/macro_rules`), con los valores de clippy fijados.
 
 ### 6. Distribución (cerrada: publicada desde 0.7.0)
 

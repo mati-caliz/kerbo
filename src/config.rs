@@ -9,6 +9,10 @@ use crate::language::{Language, Stack};
 use crate::limits::{Limits, Preset, REPORT_EVERY_OCCURRENCE};
 use crate::rules::RuleId;
 
+mod rust_target;
+
+pub use rust_target::RustTarget;
+
 pub const CONFIG_FILE: &str = "kerbo.toml";
 
 #[derive(Debug, Deserialize)]
@@ -25,6 +29,8 @@ struct RawConfig {
     ignore: Vec<RawIgnore>,
     #[serde(default)]
     cache: RawCache,
+    #[serde(default)]
+    rust: RustTarget,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -82,6 +88,7 @@ pub struct Config {
     deviations: usize,
     lang: Option<Lang>,
     cache_max_megabytes: Option<usize>,
+    rust: RustTarget,
 }
 
 impl Config {
@@ -113,6 +120,7 @@ impl Config {
             deviations: 0,
             lang: None,
             cache_max_megabytes: None,
+            rust: RustTarget::default(),
         }
     }
 
@@ -151,12 +159,17 @@ impl Config {
             deviations,
             lang: raw.lang,
             cache_max_megabytes: raw.cache.max_megabytes,
+            rust: raw.rust,
             root,
         })
     }
 
     pub const fn lang(&self) -> Option<Lang> {
         self.lang
+    }
+
+    pub const fn rust_target(&self) -> &RustTarget {
+        &self.rust
     }
 
     pub const fn cache_max_megabytes(&self) -> Option<usize> {
