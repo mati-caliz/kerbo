@@ -1,6 +1,8 @@
 use super::java::{CallSite, Declaration, JavaSummary, lint_at};
+use super::java_nullness::{ProjectTypes, unannotated_overrides};
 use super::java_project::{IndexedSummary, Project, key_of};
 use super::java_unused::{Usage, unused_method};
+use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body, Returns, Visibility};
 use crate::rules::JavaRule;
@@ -9,8 +11,9 @@ const STRING_QUOTE: char = '"';
 
 // Las inspecciones de IntelliJ que miran el proyecto entero, por archivo. Sólo valen si el
 // análisis ve todo el proyecto: una llamada que falta cambia la respuesta.
-pub fn project_lints(files: &[IndexedSummary<'_>]) -> Vec<Vec<LintFinding>> {
+pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec<LintFinding>> {
     let project = Project::new(files);
+    let types = ProjectTypes::new(files);
     let usage = Usage::new(files);
     files
         .iter()
@@ -27,6 +30,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>]) -> Vec<Vec<LintFinding>> {
                     }
                     found.extend(same_return_value(&project, summary, declaration));
                     found.extend(unused_method(&project, declaration, file, &usage));
+                    found.extend(unannotated_overrides(&types, library, summary, declaration));
                     found
                 })
                 .collect()

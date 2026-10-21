@@ -1,8 +1,12 @@
+use std::collections::HashSet;
+
 use tree_sitter::Node;
 
-use crate::lint::java_calls::{Arity, Body, Call, Returns, TYPE_DECLARATIONS, Visibility, extract};
+use crate::lint::java::children;
+use crate::lint::java_calls::{Arity, Body, Call, Callable, Returns, TYPE_DECLARATIONS, Visibility, extract};
 use crate::lint::java_constants::{Constant, declared_constants};
-use crate::lint::java_owner::Owner;
+use crate::lint::java_inference::unconditionally_dereferenced;
+use crate::lint::java_owner::{Owner, annotation_names};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::JavaRule;
@@ -11,6 +15,15 @@ use crate::syntax::{named_children, one_based};
 
 const PACKAGE: &str = "package_declaration";
 const ANNOTATION: &str = "marker_annotation";
+const ANNOTATIONS: &[&str] = &["marker_annotation", "annotation"];
+const IMPORT: &str = "import_declaration";
+const STATIC: &str = "static";
+const ASTERISK: &str = "asterisk";
+const WILDCARD_SUFFIX: &str = ".*";
+const NAME_FIELD: &str = "name";
+const BODY_FIELD: &str = "body";
+const QUALIFIER_SEPARATOR: char = '.';
+const NULLNESS_ANNOTATIONS: &[&str] = &["Nullable", "NonNull", "NotNull", "Nonnull", "CheckForNull"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Position {
@@ -22,6 +35,8 @@ pub struct Position {
 pub struct Parameter {
     pub name: String,
     pub position: Position,
+    pub declares_nullness: bool,
+    pub dereferenced: bool,
 }
 
 // Un método o constructor tal como lo necesita el índice: sin nodos, para guardarlo en la caché.
@@ -61,6 +76,8 @@ pub struct JavaSummary {
     pub constants: Vec<Constant>,
     pub mentioned: Vec<String>,
     pub hierarchy: Vec<(String, Vec<String>)>,
+    pub imports: Vec<String>,
+    pub package_annotations: Vec<String>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -76,6 +93,17 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
             .and_then(|name| name.utf8_text(source).ok())
             .unwrap_or_default()
             .to_owned(),
+        imports: named_children(root)
+            .into_iter()
+            .filter(|node| node.kind() == IMPORT)
+            .filter(|import| !children(*import).iter().any(|child| child.kind() == STATIC))
+            .filter_map(|import| imported_path(import, source))
+            .collect(),
+        package_annotations: named_children(root)
+            .into_iter()
+            .find(|node| node.kind() == PACKAGE)
+            .map(|package| package_annotation_names(package, source))
+            .unwrap_or_default(),
         ..JavaSummary::default()
     };
     for top_level in named_children(root)
@@ -88,31 +116,12 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
             .unwrap_or_default()
             .to_owned();
         let extracted = extract(top_level, source);
-        summary
-            .declarations
-            .extend(extracted.callables.into_iter().map(|callable| {
-                Declaration {
-                    name: callable.name,
-                    scope: scope.clone(),
-                    position: position_of(callable.name_node),
-                    is_constructor: callable.is_constructor,
-                    visibility: callable.visibility,
-                    overrides: callable.overrides,
-                    body: callable.body,
-                    arity: callable.arity,
-                    returns: callable.returns,
-                    annotations: callable.annotations,
-                    owner: callable.owner,
-                    parameters: callable
-                        .parameters
-                        .iter()
-                        .map(|parameter| Parameter {
-                            name: parameter.utf8_text(source).unwrap_or_default().to_owned(),
-                            position: position_of(*parameter),
-                        })
-                        .collect(),
-                }
-            }));
+        summary.declarations.extend(
+            extracted
+                .callables
+                .into_iter()
+                .map(|callable| declaration_of(callable, &scope, source)),
+        );
         summary.calls.extend(extracted.calls.into_iter().map(call_site));
         summary.referenced.extend(extracted.referenced);
         summary.types.extend(extracted.types);
@@ -123,6 +132,84 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
             .extend(declared_constants(&descendants(top_level), source));
     }
     summary
+}
+
+// `import a.b.C;` da `a.b.C` y `import a.b.*;` da `a.b.*`.
+fn imported_path(import: Node<'_>, source: &[u8]) -> Option<String> {
+    let parts = named_children(import);
+    let path = parts.first()?.utf8_text(source).ok()?;
+    let wildcard = parts.iter().any(|part| part.kind() == ASTERISK);
+    Some(if wildcard {
+        format!("{path}{WILDCARD_SUFFIX}")
+    } else {
+        path.to_owned()
+    })
+}
+
+fn package_annotation_names(package: Node<'_>, source: &[u8]) -> Vec<String> {
+    named_children(package)
+        .into_iter()
+        .filter(|child| ANNOTATIONS.contains(&child.kind()))
+        .filter_map(|annotation| annotation.child_by_field_name(NAME_FIELD))
+        .filter_map(|name| name.utf8_text(source).ok())
+        .map(simple_name)
+        .collect()
+}
+
+// Si el parámetro dice algo de su nulabilidad (`@Nullable`, `@NonNull`, `@NotNull`...).
+fn declares_nullness(name: Node<'_>, source: &[u8]) -> bool {
+    name.parent()
+        .map(|parameter| annotation_names(parameter, source))
+        .unwrap_or_default()
+        .iter()
+        .any(|annotation| NULLNESS_ANNOTATIONS.contains(&annotation.as_str()))
+}
+
+fn simple_name(written: &str) -> String {
+    written
+        .rsplit(QUALIFIER_SEPARATOR)
+        .next()
+        .unwrap_or(written)
+        .to_owned()
+}
+
+fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declaration {
+    let dereferenced = if callable.overrides {
+        callable
+            .name_node
+            .parent()
+            .and_then(|declaration| declaration.child_by_field_name(BODY_FIELD))
+            .map(|body| unconditionally_dereferenced(body, source))
+            .unwrap_or_default()
+    } else {
+        HashSet::new()
+    };
+    Declaration {
+        name: callable.name,
+        scope: scope.to_owned(),
+        position: position_of(callable.name_node),
+        is_constructor: callable.is_constructor,
+        visibility: callable.visibility,
+        overrides: callable.overrides,
+        body: callable.body,
+        arity: callable.arity,
+        returns: callable.returns,
+        annotations: callable.annotations,
+        owner: callable.owner,
+        parameters: callable
+            .parameters
+            .iter()
+            .map(|parameter| {
+                let name = parameter.utf8_text(source).unwrap_or_default();
+                Parameter {
+                    name: name.to_owned(),
+                    position: position_of(*parameter),
+                    declares_nullness: declares_nullness(*parameter, source),
+                    dereferenced: dereferenced.contains(name),
+                }
+            })
+            .collect(),
+    }
 }
 
 fn call_site(call: Call) -> CallSite {

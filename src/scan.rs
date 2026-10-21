@@ -124,7 +124,9 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
     }
     outcome.diagnostics.extend(duplicate_diagnostics(pooled));
     if project::covers_project(request.roots, &project_root(request.config)) {
-        outcome.diagnostics.extend(project::diagnostics(&indexed));
+        outcome
+            .diagnostics
+            .extend(project::diagnostics(&indexed, &project_root(request.config)));
     }
     outcome.diagnostics.sort_by(|left, right| {
         (&left.path, left.line, left.column, left.rule).cmp(&(

@@ -272,6 +272,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "No call, reference or string in the project names it, and no known framework invokes it (Spring, JPA, JUnit, Jackson or MapStruct annotations, accessors, JDK methods). Dead code that still has to be read and maintained. Like IntelliJ's unused, without the framework noise.",
         "A repository query findByCode(String code) that nobody calls is deleted.",
     ),
+    RuleText::new(
+        "Unannotated parameter overriding a non-null one from a library",
+        "annotate it (@NonNull, or @Nullable if it really accepts null), or mark the package @NullMarked",
+        "The library (Spring with @NullMarked or @NonNullApi) promises that parameter is never null; the unannotated override says nothing, and whoever reads or analyzes it does not know what to expect. Like IntelliJ's NullableProblems.",
+        "protected void doFilterInternal(HttpServletRequest request, ...) in a Spring 7 OncePerRequestFilter becomes doFilterInternal(@NonNull HttpServletRequest request, ...), or the package gets @NullMarked.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

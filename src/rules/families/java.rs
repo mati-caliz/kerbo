@@ -45,6 +45,7 @@ rule_family!(JavaRule {
     UnusedReturnValue => "unused-return-value",
     SameReturnValue => "same-return-value",
     UnusedMethod => "unused-method",
+    NullableProblems => "nullable-problems",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {

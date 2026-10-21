@@ -344,6 +344,18 @@ From IntelliJ's inspections, kerbo does:
   the ones the JDK calls by name. Public and protected code is only flagged in an application
   (`@SpringBootApplication`, `@QuarkusMain`, `@MicronautApplication`): in a library it is its API.
 
+- `NullableProblems` for parameters (`nullable-problems`): an `@Override` method overriding one
+  from a library that is non-null by default (Spring 7 with `@NullMarked`, Spring 6 with
+  `@NonNullApi`) that leaves a parameter unannotated. Like IntelliJ, it does not flag a parameter
+  the body dereferences unconditionally (from that it infers non-null), one the library declares
+  `@Nullable`, or anything if the project package is already `@NullMarked`.
+
+To read libraries, kerbo asks Maven for the classpath once, offline
+(`mvn -o dependency:build-classpath`), and stores it with the fingerprint of the `pom.xml` files;
+from the jars it reads only the index and the classes it needs, no bytecode. With Gradle or any
+other tool, the list of jars goes in `KERBO_JAVA_CLASSPATH` (separated as in PATH). Without a
+classpath, that rule flags nothing.
+
 The ones that look at the whole project only run when the analysis covers it (`kerbo check` at the
 root): over a folder or a single file, calls would be missing. Without compiling, kerbo resolves a
 call's receiver when it can be read: `repo.find()` with `Repository repo` declared in the file,

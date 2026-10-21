@@ -3,7 +3,7 @@ mod budget;
 mod codec;
 mod key;
 mod lint_codec;
-mod location;
+pub mod location;
 mod secret_codec;
 mod shard;
 mod store;
@@ -28,7 +28,7 @@ use crate::rules::RuleId;
 use crate::secrets::{PathProfile, SecretFinding};
 
 const FORMAT_DIRECTORY: &str = "analysis-v2";
-const FORMAT_VERSION: u64 = 11;
+const FORMAT_VERSION: u64 = 13;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisSubject<'subject> {

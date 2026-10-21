@@ -22,7 +22,8 @@ use crate::shell;
 use crate::syntax::rust_parse_text;
 
 // Las reglas de Java que miran el proyecto entero: sin ninguna prendida, no hace falta el resumen.
-const PROJECT_RULES: [JavaRule; 4] = [
+const PROJECT_RULES: [JavaRule; 5] = [
+    JavaRule::NullableProblems,
     JavaRule::SameParameterValue,
     JavaRule::UnusedReturnValue,
     JavaRule::SameReturnValue,

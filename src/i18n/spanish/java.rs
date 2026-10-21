@@ -272,6 +272,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Ninguna llamada, referencia ni texto del proyecto lo nombra, y no lo invoca ningún framework conocido (anotaciones de Spring, JPA, JUnit, Jackson o MapStruct, accessors, métodos del JDK). Código muerto que hay que leer y mantener. Como unused de IntelliJ, sin el ruido de los frameworks.",
         "Una consulta findByCodigo(String codigo) de un repositorio que nadie llama se borra.",
     ),
+    RuleText::new(
+        "Parámetro sin anotar que redefine uno no nulo de una librería",
+        "anotalo (@NonNull, o @Nullable si de verdad acepta null), o marcá el paquete con @NullMarked",
+        "La librería (Spring con @NullMarked o @NonNullApi) promete que ese parámetro nunca es null; la redefinición sin anotar no dice nada, y quien la lea o la analice no sabe qué esperar. Como NullableProblems de IntelliJ.",
+        "protected void doFilterInternal(HttpServletRequest request, ...) de un OncePerRequestFilter de Spring 7 se vuelve doFilterInternal(@NonNull HttpServletRequest request, ...), o el paquete lleva @NullMarked.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

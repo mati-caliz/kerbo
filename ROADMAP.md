@@ -808,8 +808,28 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     (antes 13).
   - En una librería, lo público y lo protegido es API: `unused-return-value` y
     `same-parameter-value` no lo miran (commons-lang marcaba 16 retornos de API pública).
-- Lo que sigue en el índice: "todas las implementaciones devuelven lo mismo" con la jerarquía, y
-  campos, constructores y clases sin usar con las tablas de JPA, Jackson y la inyección.
+- Firmas de las dependencias, primera parte (hecho, 2026-10-21): `src/jvm/`. Un lector de zip
+  propio (directorio central, entradas comprimidas con `miniz_oxide`, zip64) que lee del disco
+  sólo el índice y las clases pedidas, y un lector de `.class` sin bytecode: padres, anotaciones
+  de clase (las de `package-info` también) y, por método, las de cada parámetro, incluidas las de
+  tipo (el `@Nullable` de JSpecify es `TYPE_USE` y va en otra tabla). El classpath se le pide a
+  Maven offline una vez y se guarda en la caché con la huella de los `pom.xml`;
+  `KERBO_JAVA_CLASSPATH` lo da a mano (Gradle y el resto). Sólo se carga si una regla lo usa.
+  - Todavía sin el JDK (`ct.sym`) ni Gradle propio.
+- `NullableProblems` para parámetros (hecho, 2026-10-21): `nullable-problems`. Los padres de la
+  clase se resuelven con los imports del archivo (explícitos, con comodín, el mismo paquete,
+  `java.lang`) y se sube por el proyecto y por la librería hasta el método redefinido; si su
+  clase, una que la encierra o su paquete son `@NullMarked` o `@NonNullApi`, cada parámetro sin
+  anotación que en la librería no es `@Nullable` se marca. Como IntelliJ, el parámetro que el
+  cuerpo desreferencia en todos los caminos (`p.algo()` antes de cualquier salida temprana; de
+  un `if` cuenta la condición) se infiere no nulo y no se marca (`src/lint/java_inference.rs`).
+  - Contra Qodana, con los jars que usó Qodana (los volúmenes de su caché): 67 coincidencias,
+    ningún aviso de más (antes de la inferencia eran 23 de más) y 19 faltantes: 14 son la
+    variante del retorno ("método sin anotar"), que falta; los demás, anotaciones `@NotNull` que
+    IntelliJ agrega al JDK por fuera de los jars, y clases anónimas.
+- Lo que sigue en el índice: la variante del retorno de `NullableProblems`, "todas las
+  implementaciones devuelven lo mismo" con la jerarquía, y campos, constructores y clases sin
+  usar con las tablas de JPA, Jackson y la inyección.
 
 ### 10. Go, Python, TypeScript y shell completos
 

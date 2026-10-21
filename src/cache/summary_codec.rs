@@ -50,6 +50,8 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
         writer.text(name);
         writer.list(supertypes, |writer, supertype| writer.text(supertype));
     });
+    writer.list(&summary.imports, |writer, path| writer.text(path));
+    writer.list(&summary.package_annotations, |writer, name| writer.text(name));
     writer.list(&summary.constants, |writer, constant| {
         writer.text(&constant.owner);
         writer.text(&constant.name);
@@ -77,6 +79,8 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         package: reader.text()?,
         mentioned: reader.list(Reader::text)?,
         hierarchy: reader.list(|reader| Ok((reader.text()?, reader.list(Reader::text)?)))?,
+        imports: reader.list(Reader::text)?,
+        package_annotations: reader.list(Reader::text)?,
         constants: reader.list(|reader| {
             Ok(Constant {
                 owner: reader.text()?,
@@ -107,6 +111,8 @@ fn write_declaration(writer: &mut Writer, declaration: &Declaration) {
     writer.list(&declaration.parameters, |writer, parameter| {
         writer.text(&parameter.name);
         write_position(writer, &parameter.position);
+        write_flag(writer, parameter.declares_nullness);
+        write_flag(writer, parameter.dereferenced);
     });
     writer.list(&declaration.annotations, |writer, name| writer.text(name));
     writer.number(match declaration.owner.kind {
@@ -149,6 +155,8 @@ fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
             Ok(Parameter {
                 name: reader.text()?,
                 position: read_position(reader)?,
+                declares_nullness: read_flag(reader)?,
+                dereferenced: read_flag(reader)?,
             })
         })?,
         annotations: reader.list(Reader::text)?,

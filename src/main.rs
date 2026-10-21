@@ -12,6 +12,7 @@ mod fix;
 mod guard;
 mod i18n;
 mod index;
+mod jvm;
 mod language;
 mod limits;
 mod lines;

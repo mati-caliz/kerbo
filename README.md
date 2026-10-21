@@ -340,6 +340,18 @@ De las inspecciones de IntelliJ, kerbo hace:
   protegido sólo se marca en una aplicación (`@SpringBootApplication`, `@QuarkusMain`,
   `@MicronautApplication`): en una librería es su API.
 
+- `NullableProblems` para parámetros (`nullable-problems`): un método con `@Override` que redefine
+  uno de una librería no nula por defecto (Spring 7 con `@NullMarked`, Spring 6 con
+  `@NonNullApi`) y deja un parámetro sin anotar. Como IntelliJ, no marca el parámetro que el cuerpo
+  desreferencia sin condición (de ahí infiere que es no nulo), ni el que la librería declara
+  `@Nullable`, ni nada si el paquete del proyecto ya es `@NullMarked`.
+
+Para leer las librerías, kerbo le pide a Maven el classpath una sola vez, sin red
+(`mvn -o dependency:build-classpath`), y lo guarda con la huella de los `pom.xml`; de los jars lee
+sólo el índice y las clases que necesita, sin bytecode. Con Gradle u otra herramienta, la lista de
+jars va en `KERBO_JAVA_CLASSPATH` (separados como en el PATH). Sin classpath, esa regla no marca
+nada.
+
 Las que miran el proyecto entero sólo corren cuando el análisis lo abarca (`kerbo check` en la
 raíz): sobre una carpeta o un archivo suelto faltarían llamadas. Sin compilar, kerbo resuelve el
 receptor de una llamada cuando se puede leer: `repo.buscar()` con `Repositorio repo` declarado en
