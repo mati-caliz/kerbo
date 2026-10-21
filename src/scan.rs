@@ -18,6 +18,7 @@ use crate::rules::{Diagnostic, FileIdentity, RuleId, evaluate};
 use crate::shell;
 use crate::suppressions::{Suppressed, split};
 
+mod project;
 mod walk;
 
 const PATH_SEPARATOR: &str = "/";
@@ -106,12 +107,14 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
         ..ScanOutcome::default()
     };
     let mut pooled = Vec::new();
+    let mut indexed = Vec::new();
     for result in results {
         match result {
             Ok(checked) => {
                 outcome.diagnostics.extend(checked.diagnostics);
                 outcome.suppressed.extend(checked.suppressed);
                 pooled.extend(checked.pooled);
+                indexed.extend(checked.indexed);
             }
             Err(failure) => failures.push(failure),
         }
@@ -120,6 +123,9 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
         cache.persist();
     }
     outcome.diagnostics.extend(duplicate_diagnostics(pooled));
+    if project::covers_project(request.roots, &project_root(request.config)) {
+        outcome.diagnostics.extend(project::diagnostics(&indexed));
+    }
     outcome.diagnostics.sort_by(|left, right| {
         (&left.path, left.line, left.column, left.rule).cmp(&(
             &right.path,
@@ -180,6 +186,7 @@ struct Checked {
     diagnostics: Vec<Diagnostic>,
     suppressed: Vec<Suppressed>,
     pooled: Option<(Stack, PooledFile)>,
+    indexed: Option<project::IndexedFile>,
 }
 
 fn pooled_file(identity: &FileIdentity, analysis: &mut FileAnalysis, limits: Limits) -> Option<PooledFile> {
@@ -297,6 +304,7 @@ fn check_file(
             diagnostics,
             suppressed: Vec::new(),
             pooled: None,
+            indexed: None,
         });
     };
     let source = fs::read(&file.identity.absolute).map_err(|error| failure(error.to_string()))?;
@@ -338,6 +346,12 @@ fn check_file(
             }
         })?;
     let pooled = pooled_file(&file.identity, &mut analysis, limits);
+    let indexed = analysis.java_summary.take().map(|summary| project::IndexedFile {
+        identity: file.identity.clone(),
+        limits,
+        summary,
+        in_tests: file.is_test,
+    });
     let mut diagnostics = evaluate(&file.identity, &analysis, limits);
     if let Some(profile) = secret_scan::profile(&file.identity, request.config, Some(limits)) {
         diagnostics.extend(secret_scan::diagnostics(
@@ -352,6 +366,7 @@ fn check_file(
         diagnostics,
         suppressed,
         pooled: pooled.map(|pooled| (language.stack(), pooled)),
+        indexed,
     })
 }
 

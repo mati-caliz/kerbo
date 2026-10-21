@@ -12,6 +12,7 @@ use crate::syntax::ANONYMOUS_FUNCTION_IDENTITY;
 mod families;
 mod id;
 mod lints;
+pub use lints::finding_diagnostics;
 
 pub use families::{
     ComposeRule, DockerfileRule, EslintRule, GoRule, JavaRule, MigrationRule, PythonRule, ShellRule,

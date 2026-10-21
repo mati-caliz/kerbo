@@ -5,6 +5,7 @@ use tree_sitter::Parser;
 
 use crate::deploy::{self, Violation};
 use crate::duplicates::{DuplicateUnits, duplicate_units};
+use crate::index::java::{JavaSummary, summarize};
 use crate::language::Language;
 use crate::limits::Limits;
 use crate::lines::LineMap;
@@ -16,9 +17,16 @@ use crate::metrics::names::{ShortName, find_short_names};
 use crate::metrics::nesting::{NestingFinding, find_deep_nesting};
 use crate::metrics::{FunctionMetrics, measure_clippy_functions, measure_functions};
 use crate::profile::MetricsStyle;
-use crate::rules::RuleId;
+use crate::rules::{JavaRule, RuleId};
 use crate::shell;
 use crate::syntax::rust_parse_text;
+
+// Las reglas de Java que miran el proyecto entero: sin ninguna prendida, no hace falta el resumen.
+const PROJECT_RULES: [JavaRule; 3] = [
+    JavaRule::SameParameterValue,
+    JavaRule::UnusedReturnValue,
+    JavaRule::SameReturnValue,
+];
 
 #[derive(Debug)]
 pub struct FileAnalysis {
@@ -31,6 +39,7 @@ pub struct FileAnalysis {
     pub commented_code: Vec<CommentedCode>,
     pub lints: Vec<LintFinding>,
     pub violations: Vec<Violation>,
+    pub java_summary: Option<JavaSummary>,
 }
 
 impl FileAnalysis {
@@ -45,6 +54,7 @@ impl FileAnalysis {
             commented_code: Vec::new(),
             lints: Vec::new(),
             violations,
+            java_summary: None,
         }
     }
 }
@@ -136,5 +146,10 @@ pub fn analyze_unit(
         } else {
             Vec::new()
         },
+        java_summary: (language == Language::Java
+            && PROJECT_RULES
+                .iter()
+                .any(|rule| limits.get(RuleId::Java(*rule)).is_some()))
+        .then(|| summarize(root, source)),
     })
 }

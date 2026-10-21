@@ -244,3 +244,44 @@ fn checks_secrets_in_the_text_the_editor_sends() {
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].rule, RuleId::CommittedSecret);
 }
+
+const SHOP: &str = "package shop;\n\nclass Shop {\n    static final int UNITS = 3;\n    int total(int amount, int units) { return amount * units; }\n    String label() { return \"shop\"; }\n    int save(int value) { return value; }\n}\n";
+const USER: &str = "package shop;\n\nclass User {\n    int run(Shop shop) {\n        shop.save(1);\n        shop.save(2);\n        String name = shop.label();\n        return shop.total(5, Shop.UNITS) + shop.total(6, Shop.UNITS) + name.length();\n    }\n}\n";
+
+fn project_rules(outcome: &ScanOutcome) -> Vec<String> {
+    let wanted = ["same-parameter-value", "unused-return-value", "same-return-value"];
+    outcome
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| wanted.contains(&diagnostic.rule.as_str()))
+        .map(|diagnostic| {
+            format!(
+                "{}:{} {}",
+                diagnostic.relative_path,
+                diagnostic.line,
+                diagnostic.rule.as_str()
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn project_rules_cross_files_only_when_the_whole_project_is_analyzed() {
+    let tree = TempTree::new("scan-project-rules");
+    tree.write("Shop.java", SHOP);
+    tree.write("User.java", USER);
+    let whole = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
+    assert_eq!(
+        project_rules(&whole),
+        [
+            "Shop.java:5 same-parameter-value",
+            "Shop.java:6 same-return-value",
+            "Shop.java:7 unused-return-value",
+        ]
+    );
+    let alone = scan_tree(tree.path(), &[tree.path().join("Shop.java")], &[]);
+    assert!(
+        project_rules(&alone).is_empty(),
+        "un archivo suelto no ve las llamadas"
+    );
+}

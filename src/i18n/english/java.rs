@@ -254,6 +254,18 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "If every call passes the same constant, the parameter parameterizes nothing: it only adds noise to each call. Like IntelliJ's SameParameterValue, for private methods and constructors.",
         "private String label(String currency) always called with \"USD\" becomes private String label() with \"USD\" inside.",
     ),
+    RuleText::new(
+        "Method whose result nobody uses",
+        "make it void, or use what it returns",
+        "If no call in the project uses what it returns, the return value is a promise nobody asked for: it complicates the method and confuses whoever reads it. Like IntelliJ's UnusedReturnValue.",
+        "int save(Order order) that nobody reads becomes void save(Order order).",
+    ),
+    RuleText::new(
+        "Method that always returns the same thing",
+        "replace it with the constant, or check whether a case is missing",
+        "If every return gives back the same constant, the method decides nothing; sometimes it is a forgotten case. Like IntelliJ's SameReturnValue.",
+        "boolean enabled() { if (x) return true; return true; } becomes the constant true.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

@@ -254,6 +254,18 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Si todas las llamadas pasan la misma constante, el parámetro no parametriza nada: sólo agrega ruido en cada llamada. Como SameParameterValue de IntelliJ, para métodos y constructores privados.",
         "private String etiqueta(String moneda) llamado siempre con \"ARS\" se vuelve private String etiqueta() con \"ARS\" adentro.",
     ),
+    RuleText::new(
+        "Método cuyo resultado nadie usa",
+        "hacelo void, o usá lo que devuelve",
+        "Si ninguna llamada del proyecto usa lo que devuelve, el valor de retorno es una promesa que nadie pidió: complica el método y confunde a quien lo lee. Como UnusedReturnValue de IntelliJ.",
+        "int guardar(Pedido pedido) que nadie lee se vuelve void guardar(Pedido pedido).",
+    ),
+    RuleText::new(
+        "Método que siempre devuelve lo mismo",
+        "reemplazalo por la constante, o revisá si falta un caso",
+        "Si todos los return devuelven la misma constante, el método no decide nada; a veces es un caso que se olvidó. Como SameReturnValue de IntelliJ.",
+        "boolean habilitado() { if (x) return true; return true; } se vuelve la constante true.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

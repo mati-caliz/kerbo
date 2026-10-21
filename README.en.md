@@ -327,11 +327,19 @@ method named like its class; an interface field is a constant; `serialVersionUID
 the patterns are ASCII, so an `ñ` in a name is flagged; `WhitespaceAround` also flags empty braces
 written together (`{}`), as `sun_checks` does. `minimal` does not ask for them.
 
-From IntelliJ's inspections, kerbo does `SameParameterValue` (`same-parameter-value`) for private
-methods and constructors (also an enum's and a private record's): a parameter that every call
-passes the same constant, shown the way IntelliJ shows it (`"USD"`, `Prices.SCALE`). If another
-method has the same name and number of parameters, or it is used as a reference
-(`this::method`), there is no telling which call goes where and it is not flagged.
+From IntelliJ's inspections, kerbo does:
+
+- `SameParameterValue` (`same-parameter-value`): a parameter that every call passes the same
+  constant, shown the way IntelliJ shows it (`"USD"`, `Prices.SCALE`). Private code is checked
+  per file; package-private and protected code, over the whole project (IntelliJ does not flag
+  public code).
+- `UnusedReturnValue` (`unused-return-value`): a method that returns something no call uses.
+- `SameReturnValue` (`same-return-value`): every `return` gives back the same literal.
+
+The ones that look at the whole project only run when the analysis covers it (`kerbo check` at the
+root): over a folder or a single file, calls would be missing. Without types, kerbo cannot tell
+which of two methods with the same name and number of parameters a call goes to, nor what a
+reference (`this::method`) does: there it flags nothing.
 
 In Rust, kerbo measures only what clippy measures (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` and `excessive_nesting`), and the cognitive complexity is clippy's, not

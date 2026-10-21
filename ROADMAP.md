@@ -752,10 +752,34 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     (`.product(flan)` de un builder con el mismo nombre que un método privado del test). Los
     valores mostrados coinciden con los de IntelliJ. En Guava, commons-lang y junit4 da 102 avisos;
     los revisados a mano son correctos.
-  - Falta lo de paquete y protegido (24 en Qodana; nunca marca lo público): pide el índice del
-    proyecto de arriba y correr sobre el proyecto entero, no sobre un archivo suelto. Después,
-    `UnusedReturnValue` (19) y `SameReturnValue` (18) con el mismo índice, y `unused` (3.919)
-    con las tablas de frameworks.
+- El índice del proyecto, primera versión (hecho, 2026-10-21): cada archivo Java deja un resumen
+  (`src/index/java.rs`: métodos y constructores con visibilidad, `@Override`, aridad, si tienen
+  cuerpo y qué devuelven; llamadas con sus argumentos constantes y si usan el resultado;
+  referencias a métodos; tipos, paquete y constantes con su visibilidad), que va a la caché por
+  contenido con el resto del análisis. El scan junta los resúmenes y corre las reglas de proyecto
+  (`src/index/java_rules.rs`) sólo si analiza la raíz: con una carpeta o un archivo suelto faltan
+  llamadas. Todavía sin resolver tipos: una llamada va a todo método con su nombre y aridad, y si
+  hay más de uno declarado en el proyecto no se razona sobre ninguno.
+  - `SameParameterValue` de paquete y protegido. Como IntelliJ, el valor tiene que poder llevarse
+    adentro del método: un literal, una constante del mismo archivo, una pública o de afuera del
+    proyecto, o una de paquete del mismo paquete (y no de los tests, si el método no lo es).
+  - `UnusedReturnValue` (`unused-return-value`): un método que devuelve algo y al que todas las
+    llamadas le tiran el resultado. Lo que da un `case X -> metodo();` de un switch que devuelve
+    valor se usa.
+  - `SameReturnValue` (`same-return-value`): todos los `return` devuelven el mismo literal (una
+    constante con nombre no: es la forma de exponerla). Alcanza con que ningún método con el
+    mismo nombre y aridad diga `@Override`; lo privado, con que no haya otro igual en su clase.
+  - Contra los SARIF de Qodana de los tres servicios: `SameParameterValue` 215 coincidencias y 7
+    faltantes, `UnusedReturnValue` 13 y 6, `SameReturnValue` 14 y 4 (los 4 son "todas las
+    implementaciones de una interfaz devuelven lo mismo", que pide jerarquía de tipos). Ningún
+    aviso de más en las tres. Los faltantes son sobrecargas o nombres repetidos en el proyecto,
+    que piden resolver tipos.
+  - Costo en Guava, proyecto entero: 10,3 s y ~430 MB sin caché (unos 55 MB más), 0,73 s con
+    caché (la pasada del índice corre igual: es barata).
+- Lo que sigue en el índice: resolver tipos donde se pueda sin compilar (la clase de una variable
+  local, un campo o un parámetro declarado; las llamadas sin calificar van a la propia clase o a
+  las que la encierran), para recuperar los faltantes, y la jerarquía (`extends`/`implements`)
+  para "todas las implementaciones". Después `unused` (3.919) con las tablas de frameworks.
 
 ### 10. Go, Python, TypeScript y shell completos
 

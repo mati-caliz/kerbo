@@ -4,6 +4,8 @@ mod final_parameters;
 mod go;
 mod imports;
 mod java;
+pub mod java_calls;
+pub mod java_constants;
 mod java_curly;
 mod java_design;
 mod java_flow;

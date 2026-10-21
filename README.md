@@ -322,12 +322,19 @@ reacomodar líneas). Siguen a Checkstyle en lo que no se ve: `MethodName` no mir
 `WhitespaceAround` también marca las llaves vacías pegadas (`{}`), como `sun_checks`. `minimal`
 no las pide.
 
-De las inspecciones de IntelliJ, kerbo hace `SameParameterValue` (`same-parameter-value`) para
-métodos y constructores privados (también los de un enum y el de un record privado): un parámetro
-al que todas las llamadas le pasan la misma constante, que se muestra como la muestra IntelliJ
-(`"ARS"`, `Precios.ESCALA`). Si hay otro método con el mismo nombre y la misma cantidad de
-parámetros, o se lo usa como referencia (`this::metodo`), no se sabe qué llamada va a cuál y no
-se marca.
+De las inspecciones de IntelliJ, kerbo hace:
+
+- `SameParameterValue` (`same-parameter-value`): un parámetro al que todas las llamadas le pasan la
+  misma constante, que se muestra como la muestra IntelliJ (`"ARS"`, `Precios.ESCALA`). Lo privado
+  se mira por archivo; lo de paquete y protegido, sobre el proyecto entero (IntelliJ no marca lo
+  público).
+- `UnusedReturnValue` (`unused-return-value`): un método que devuelve algo que ninguna llamada usa.
+- `SameReturnValue` (`same-return-value`): todos los `return` devuelven el mismo literal.
+
+Las que miran el proyecto entero sólo corren cuando el análisis lo abarca (`kerbo check` en la
+raíz): sobre una carpeta o un archivo suelto faltarían llamadas. Sin tipos, kerbo no sabe a cuál
+de dos métodos con el mismo nombre y la misma cantidad de parámetros va una llamada, ni qué hace
+una referencia (`this::metodo`): ahí no marca nada.
 
 En Rust, kerbo mide sólo lo que mide clippy (`too_many_lines`, `too_many_arguments`,
 `cognitive_complexity` y `excessive_nesting`), y la complejidad cognitiva es la de clippy, no la de

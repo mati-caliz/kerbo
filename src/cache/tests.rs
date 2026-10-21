@@ -30,6 +30,20 @@ const GO_SOURCE: &str = "package sample\n\nfunc Many(a, b, c, d, e int) int {\n\
 const PYTHON_SOURCE: &str =
     "def build(first, second, third, fourth, fifth, sixth, seventh):\n    # x = 1\n    return first * 42\n";
 const PYTHON_LINTS: &str = "import os\nimport sys\nprint(f\"hola\", sys)\nif sys == None: pass\n";
+const JAVA_PROJECT: &str = "package shop;
+
+class Shop {
+    static final int UNITS = 3;
+    enum Kind { A }
+    record Line(int amount) { }
+    int total(int amount, int units) { return amount * units; }
+    private boolean open() { if (UNITS > 1) { return true; } return true; }
+    int run(int... values) { save(1); return total(2, UNITS) + new Line(-1).amount() + (open() ? 1 : 0); }
+    @Override public String toString() { return switch (UNITS) { case 3 -> label(); default -> \"x\"; }; }
+    protected String label() { return \"shop\"; }
+    int save(int value) { java.util.function.IntUnaryOperator twice = this::save; return value; }
+}
+";
 const RUST_BRANCHES: usize = 40;
 const RUST_MANIFEST: &str = "[package]\nname = \"sample\"\nversion = \"0.1.0\"\n";
 const RUST_CALLER_PATH: &str = "src/caller.rs";
@@ -150,6 +164,7 @@ fn every_kind_of_analysis_decodes_to_the_same_value() {
     let samples = [
         (Language::Java, format!("class A {{\n{JAVA_METHOD}}}\n")),
         (Language::Java, JAVA_LINTS.to_owned()),
+        (Language::Java, JAVA_PROJECT.to_owned()),
         (Language::Go, GO_SOURCE.to_owned()),
         (Language::Python, PYTHON_SOURCE.to_owned()),
         (Language::Python, PYTHON_LINTS.to_owned()),

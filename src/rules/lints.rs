@@ -12,8 +12,15 @@ pub fn lint_diagnostics<'analysis>(
     file: &'analysis FileIdentity,
     analysis: &'analysis FileAnalysis,
 ) -> impl Iterator<Item = Diagnostic> + 'analysis {
+    finding_diagnostics(file, &analysis.lints)
+}
+
+pub fn finding_diagnostics<'found>(
+    file: &'found FileIdentity,
+    findings: &'found [LintFinding],
+) -> impl Iterator<Item = Diagnostic> + 'found {
     let mut occurrences: HashMap<(RuleId, &str), usize> = HashMap::new();
-    analysis.lints.iter().map(move |found| {
+    findings.iter().map(move |found| {
         let rule = found.kind.rule();
         let occurrence = occurrences.entry((rule, found.subject.as_str())).or_default();
         *occurrence = occurrence.saturating_add(1);
