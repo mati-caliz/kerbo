@@ -491,6 +491,10 @@ con anclas y `<<:` resueltos. No hay herramienta de referencia: el criterio es p
 | `compose-memory-limit` | un servicio con `image` o `build` sin `deploy.resources.limits.memory` ni `mem_limit`; los que usan `extends` y los fragmentos de un override se saltean |
 | `compose-healthcheck-start-period` | un `healthcheck` activo sin `start_period` |
 | `compose-healthcheck-interval` | un `interval` de menos de 5 s o más de 5 min, o un `timeout` igual o mayor que el intervalo |
+| `compose-cpu-limit` | un servicio con `image` o `build` sin `deploy.resources.limits.cpus` ni `cpus` |
+| `compose-restart` | un servicio sin `restart` ni `deploy.restart_policy` (`restart: "no"` vale para una tarea que corre una vez) |
+| `compose-image-tag` | una imagen sin tag o con `latest`; un digest o una variable no cuentan |
+| `compose-depends-on-healthy` | un `depends_on` hacia un servicio con healthcheck que no pide `condition: service_healthy` |
 
 Cada una se apaga como cualquier otra regla, con `[[limits]]` sin `max` y su motivo; el `max` no
 aplica. Con `--language sql` o `--language docker` se analiza sólo eso.

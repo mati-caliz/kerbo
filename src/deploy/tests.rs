@@ -137,6 +137,8 @@ fn scans_migrations_dockerfiles_and_compose_files_through_the_cache() {
         ("alembic/versions/1_drop.py".to_owned(), "ban-drop-table"),
         ("api/Dockerfile".to_owned(), "dl3006"),
         ("compose.yaml".to_owned(), "compose-memory-limit"),
+        ("compose.yaml".to_owned(), "compose-cpu-limit"),
+        ("compose.yaml".to_owned(), "compose-restart"),
         (
             "prisma/migrations/1_init/migration.sql".to_owned(),
             "require-lock-timeout",
@@ -161,5 +163,5 @@ fn scans_migrations_dockerfiles_and_compose_files_through_the_cache() {
         assert_eq!(found, expected);
     }
     assert_eq!(run(&[Stack::Sql]).diagnostics.len(), 3);
-    assert_eq!(run(&[Stack::Docker]).diagnostics.len(), 2);
+    assert_eq!(run(&[Stack::Docker]).diagnostics.len(), 4);
 }

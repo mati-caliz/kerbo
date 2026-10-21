@@ -1,4 +1,5 @@
 mod duration;
+mod services;
 mod yaml;
 
 use std::time::Duration;
@@ -31,11 +32,13 @@ pub fn violations(root: Node<'_>, source: &[u8]) -> Vec<Violation> {
     let Some(document) = yaml::document(root, source) else {
         return Vec::new();
     };
-    let mut found = Vec::new();
-    for service in document.get(SERVICES).map(Value::entries).unwrap_or_default() {
+    let services = document.get(SERVICES).map(Value::entries).unwrap_or_default();
+    let mut found = services::violations(services);
+    for service in services {
         found.extend(memory_limit(service));
         found.extend(healthcheck(service));
     }
+    found.sort_by_key(|violation| violation.line);
     found
 }
 

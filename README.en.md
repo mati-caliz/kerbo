@@ -497,6 +497,10 @@ criteria are kerbo's own.
 | `compose-memory-limit` | a service with `image` or `build` and neither `deploy.resources.limits.memory` nor `mem_limit`; services using `extends` and override fragments are skipped |
 | `compose-healthcheck-start-period` | an active `healthcheck` without `start_period` |
 | `compose-healthcheck-interval` | an `interval` under 5 s or over 5 min, or a `timeout` equal to or longer than the interval |
+| `compose-cpu-limit` | a service with `image` or `build` and no `deploy.resources.limits.cpus` nor `cpus` |
+| `compose-restart` | a service without `restart` nor `deploy.restart_policy` (`restart: "no"` is fine for a one-off task) |
+| `compose-image-tag` | an image without a tag or with `latest`; a digest or a variable does not count |
+| `compose-depends-on-healthy` | a `depends_on` on a service with a healthcheck that does not ask for `condition: service_healthy` |
 
 Each one is turned off like any other rule, with a `[[limits]]` entry without `max` and its reason;
 `max` does not apply. `--language sql` or `--language docker` analyzes only those.

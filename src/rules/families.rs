@@ -186,6 +186,10 @@ rule_family!(ComposeRule {
     MemoryLimit => "compose-memory-limit",
     HealthcheckStartPeriod => "compose-healthcheck-start-period",
     HealthcheckInterval => "compose-healthcheck-interval",
+    CpuLimit => "compose-cpu-limit",
+    Restart => "compose-restart",
+    ImageTag => "compose-image-tag",
+    DependsOnHealthy => "compose-depends-on-healthy",
 });
 
 mod eslint;

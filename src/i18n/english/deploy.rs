@@ -337,5 +337,29 @@ pub const fn compose(rule: ComposeRule) -> RuleText {
             "A very short interval loads the service and marks it down on a spike; a very long one takes minutes to notice an outage; a timeout equal or longer overlaps one check with the next.",
             "interval: 1s becomes interval: 10s with timeout: 5s.",
         ),
+        ComposeRule::CpuLimit => RuleText::new(
+            "The service has no CPU limit",
+            "set deploy.resources.limits.cpus (or cpus) on every service",
+            "Without a limit, a service stuck in a loop or hit by a spike takes every core on the host and the other containers stop responding.",
+            "deploy: { resources: { limits: { cpus: \"1.0\" } } }",
+        ),
+        ComposeRule::Restart => RuleText::new(
+            "The service does not say what to do when it goes down",
+            "set restart (unless-stopped, on-failure, or \"no\" for a one-off task)",
+            "Without a restart policy, a service that crashes on an error or an OOM stays down until someone brings it up by hand.",
+            "restart: unless-stopped",
+        ),
+        ComposeRule::ImageTag => RuleText::new(
+            "The image has no pinned version",
+            "pin a version tag, or a digest",
+            "Without a tag (or with latest) every pull may bring a different version: the same compose file starts different things on each machine and an update breaks things nobody asked for.",
+            "image: postgres becomes image: postgres:16.4.",
+        ),
+        ComposeRule::DependsOnHealthy => RuleText::new(
+            "Depends on a service with a healthcheck without waiting for it to be healthy",
+            "use depends_on with condition: service_healthy",
+            "Without the condition, compose starts the service as soon as the other one started, not when it is ready: the application tries to connect to a database that does not accept connections yet.",
+            "depends_on: [db] becomes depends_on: { db: { condition: service_healthy } }.",
+        ),
     }
 }

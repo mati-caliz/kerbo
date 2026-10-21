@@ -1038,8 +1038,10 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
       `squawk-ignore`, en la posición del nombre.
     - El SARIF manda lo silenciado como resultados con `suppressions` (`kind: inSource` y el
       motivo como `justification`), así GitHub los muestra como descartados.
-  - compose: el límite de CPU, `restart`, imágenes sin versión fija (como DL3006/DL3007) y los
-    servicios que dependen de otro sin `condition: service_healthy`.
+  - compose (hecho, 2026-10-21): `compose-cpu-limit`, `compose-restart`, `compose-image-tag`
+    (sin tag o con `latest`, como DL3006/DL3007; un digest o una variable no cuentan) y
+    `compose-depends-on-healthy` (un `depends_on` hacia un servicio con healthcheck activo que no
+    espera `service_healthy`). Criterio propio, como las tres primeras; `minimal` las apaga.
 
 ### 13. Formateo propio
 

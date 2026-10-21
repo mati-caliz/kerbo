@@ -4,7 +4,23 @@ use super::violations;
 use crate::language::Language;
 use crate::rules::{ComposeRule, RuleId};
 
+const RESOURCE_AND_HEALTH_RULES: [ComposeRule; 3] = [
+    ComposeRule::MemoryLimit,
+    ComposeRule::HealthcheckStartPeriod,
+    ComposeRule::HealthcheckInterval,
+];
+const SERVICE_RULES: [ComposeRule; 4] = [
+    ComposeRule::CpuLimit,
+    ComposeRule::Restart,
+    ComposeRule::ImageTag,
+    ComposeRule::DependsOnHealthy,
+];
+
 fn found(source: &str) -> Vec<(ComposeRule, usize, String)> {
+    found_of(source, &RESOURCE_AND_HEALTH_RULES)
+}
+
+fn found_of(source: &str, rules: &[ComposeRule]) -> Vec<(ComposeRule, usize, String)> {
     let mut parser = Parser::new();
     parser
         .set_language(&Language::Compose.grammar().expect("tiene gramática"))
@@ -18,6 +34,7 @@ fn found(source: &str) -> Vec<(ComposeRule, usize, String)> {
             };
             (rule, violation.line, violation.subject)
         })
+        .filter(|(rule, _, _)| rules.contains(rule))
         .collect()
 }
 
@@ -104,4 +121,58 @@ fn reads_flow_mappings_and_ignores_files_without_services() {
     );
     assert_eq!(found("version: '3'\n"), Vec::new());
     assert_eq!(found(""), Vec::new());
+}
+
+#[test]
+fn services_need_cpu_limits_a_restart_policy_pinned_images_and_healthy_dependencies() {
+    let source = "services:
+  db:
+    image: postgres
+    cpus: 1
+    restart: always
+    healthcheck:
+      test: [\"CMD\", \"pg_isready\"]
+  cache:
+    image: redis:latest
+    deploy:
+      resources:
+        limits:
+          cpus: \"0.5\"
+      restart_policy:
+        condition: on-failure
+  api:
+    build: .
+    image: registry:5000/team/api@sha256:abc
+    depends_on:
+      db:
+        condition: service_started
+      cache:
+        condition: service_started
+  worker:
+    image: ${WORKER_IMAGE}
+    cpus: 1
+    restart: unless-stopped
+    depends_on: [db, cache]
+  ready:
+    image: localhost:5000/ready:1.2
+    cpus: 1
+    restart: \"no\"
+    depends_on:
+      db:
+        condition: service_healthy
+  base:
+    extends:
+      service: api
+";
+    assert_eq!(
+        found_of(source, &SERVICE_RULES),
+        vec![
+            (ComposeRule::ImageTag, 3, "postgres".to_owned()),
+            (ComposeRule::ImageTag, 9, "redis:latest".to_owned()),
+            (ComposeRule::CpuLimit, 16, "api".to_owned()),
+            (ComposeRule::Restart, 16, "api".to_owned()),
+            (ComposeRule::DependsOnHealthy, 20, "db".to_owned()),
+            (ComposeRule::DependsOnHealthy, 28, "db".to_owned()),
+        ]
+    );
 }
