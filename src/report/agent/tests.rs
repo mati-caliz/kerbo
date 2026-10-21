@@ -165,3 +165,25 @@ fn an_empty_report_is_two_lines_and_the_hint() {
         "problems: 0\nshown: 0\nexplain: kerbo explain <rule>\n"
     );
 }
+
+#[test]
+fn says_how_many_problems_kerbo_fix_solves_even_beyond_the_shown_ones() {
+    let mut diagnostics = large_sample();
+    for item in diagnostics.iter_mut().step_by(2) {
+        item.fix = Some(crate::fix::Fix {
+            edits: Vec::new(),
+            hunk: "@@ -1 +0,0 @@\n-import x\n".to_owned(),
+        });
+    }
+    let fixable = diagnostics.len().div_ceil(2);
+    let output = rendered(&diagnostics, Lang::Spanish);
+    assert!(
+        output.ends_with(&format!(
+            "explain: kerbo explain <rule>\nautofix[{fixable}]: kerbo fix\n"
+        )),
+        "{output}"
+    );
+    let document = super::document(&build(&diagnostics, Lang::Spanish));
+    assert_eq!(document["autofix"]["problems"], fixable);
+    assert_eq!(document["autofix"]["command"], "kerbo fix");
+}

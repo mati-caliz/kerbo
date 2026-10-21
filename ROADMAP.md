@@ -83,7 +83,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   main` marca sólo lo nuevo, así se adopta sin arreglar todo antes.
 - **SARIF** y una **GitHub Action** que anota los problemas en el pull request.
 
-### 3. Capa para agentes de IA (abierta: lo central en 0.3 y el servidor MCP en 0.4)
+### 3. Capa para agentes de IA (cerrada: lo central en 0.3, el servidor MCP en 0.4 y el arnés en main)
 
 - **Antitrampa**: avisar cuando un cambio agrega una supresión (`eslint-disable`, `noqa`,
   `nolint`, `@SuppressWarnings`, `#[allow]`), afloja un umbral en una
@@ -141,8 +141,12 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
       (Claude Code no deja editar sin leer), así que no ahorraría lecturas.
     - Los tokens se miden con el uso real que reporta la API en cada sesión, que es lo que se
       paga; contar la salida sola con el tokenizador de los Claude actuales ya no hace falta.
-    - El corte de 30 problemas del hook queda como está hasta probarlo con un archivo grande
-      (pendiente abajo): ningún caso del piloto pasa de 10 por archivo.
+    - El corte de 30 problemas queda: con un archivo de 220 problemas, kerbo sale un 15 % más
+      barato que ruff con la salida entera (tabla de abajo).
+    - El agente no sabía que existe `kerbo fix`: con permisos para correr cualquier comando,
+      arreglaba todo a mano mientras con ruff usaba `--fix`, porque ruff cierra su salida con
+      cuántos arregla. Ahora la última línea de `--format agent` es `autofix[N]: kerbo fix` (y
+      `autofix` en `agent-json`), contado sobre el reporte entero; el agente la usa.
 - **El demonio para agentes** (hecho, 2026-10-21; el demonio en sí es de la fase 7):
   - El hook lo arranca solo: si nadie de este binario responde, corre el pedido en su proceso y
     después lanza `kerbo daemon run` desacoplado (si responde uno de otro binario, primero lo
@@ -188,18 +192,44 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
   dos herramientas. Los tokens de entrada son casi todos lecturas de la caché del modelo, por eso
   pesan poco en el costo.
 
-  Pendiente, ampliar el piloto:
-  - Java (Checkstyle, PMD y SpotBugs por Maven o Gradle), TypeScript (ESLint) y Rust (clippy),
-    y en todos un repo sin gate que se adopta con línea de base.
-  - Un caso con un archivo de cientos de problemas, para el corte de 30 del hook.
-  - Una variante con permisos amplios, como trabaja un agente de verdad (con `kerbo fix` y
-    `ruff --fix` a mano).
-  - Lo que se espera ver, y hay que confirmar con números: los logs de Maven y Gradle, el XML de
-    SpotBugs y el mismo problema reportado por dos herramientas inflan la entrada; sin modo
-    instantáneo el agente vuelve a correr el gate entero después de cada arreglo; sin
-    identificadores estables no sabe qué ya arregló.
-  - El arnés queda en el repo y corre antes de cada versión, así una regresión en el consumo se
-    ve igual que una en la paridad.
+  Ampliación (2026-10-21, 48 sesiones más, 4,82 USD): Java contra Checkstyle 14.3 (las seis
+  reglas de forma), TypeScript contra ESLint 10.13 con typescript-eslint 8.72, Rust contra clippy
+  con los umbrales de `strict` en `clippy.toml`, un archivo de Python con 220 problemas y una
+  variante (`--wide`) en la que el agente puede correr cualquier comando. Todas en verde y sin
+  trampas:
+
+  | Caso | Herramientas | Costo USD | Vueltas | Corridas del gate | Segundos |
+  |---|---|---|---|---|---|
+  | Java, 28 problemas | Checkstyle | 0,118 (0,103–0,143) | 11 | 2 | 32 |
+  | | kerbo | 0,107 (0,097–0,116) | 11 | 3 | 28 |
+  | TypeScript, 19 problemas | ESLint | 0,100 (0,095–0,101) | 7 | 2 | 44 |
+  | | kerbo | 0,103 (0,099–0,115) | 7 | 3 | 40 |
+  | Rust, 4 problemas | clippy | 0,105 (0,104–0,112) | 6 | 2 | 27 |
+  | | kerbo | 0,106 (0,105–0,107) | 8 | 2 | 41 |
+  | Python, 220 problemas en un archivo | ruff | 0,175 (0,134–0,185) | 16 | 3 | 54 |
+  | | kerbo | 0,148 (0,140–0,151) | 12 | 4 | 39 |
+  | Con permisos amplios: Python, 37 | ruff | 0,083 (0,080–0,096) | 5 | 2 | 19 |
+  | | kerbo, con `autofix` | 0,092 (0,075–0,098) | 6 | 4 | 24 |
+  | Python, 220 | ruff | 0,071 (0,068–0,082) | 5 | 2 | 18 |
+  | | kerbo, con `autofix` | 0,070 (0,069–0,072) | 6 | 3 | 16 |
+  | TypeScript, 19 | ESLint | 0,079 (0,077–0,082) | 4 | 2 | 24 |
+  | | kerbo, con `autofix` | 0,087 (0,084–0,089) | 4 | 3 | 22 |
+  | Go, 6 | golangci-lint | 0,076 (0,070–0,077) | 5 | 3 | 36 |
+  | | kerbo | 0,078 (0,078–0,086) | 4 | 2 | 24 |
+
+  Con el agente limitado al gate, kerbo cuesta lo mismo o menos y es más rápido salvo en Rust
+  (las vueltas de más son del agente, no del gate). Con permisos amplios cuesta lo mismo en
+  archivos grandes y hasta un 10 % más en los chicos, dentro de la dispersión de las corridas.
+  Lo que se esperaba ver (logs de Maven y Gradle, XML de SpotBugs, el mismo problema reportado
+  dos veces) no aparece en casos así de chicos: las salidas de las herramientas de siempre son
+  más largas, pero el agente las corta con `tail` y lo que paga es casi todo el contexto fijo de
+  la sesión, leído de la caché del modelo. La ventaja de kerbo para agentes es la velocidad del
+  gate y una sola herramienta para todos los lenguajes, no tokens.
+
+  Quedó afuera el repo que se adopta con línea de base: ruff no tiene, golangci-lint usa
+  `--new-from-rev` y Checkstyle un XML de supresiones, así que no hay una comparación pareja. El
+  arnés se corre a mano antes de cada versión (unos 7 USD las dos tandas), así una regresión en el
+  consumo se ve igual que una en la paridad.
 
 ### 4. Editor (LSP) e inspecciones de IntelliJ como mapa (cerrada: el LSP en 0.5, el mapa en 0.7)
 

@@ -145,7 +145,8 @@ dismissed.
   MCP server return `--format agent`.
   When the fix is mechanical (a redundant import, an extra modifier, a missing `final`), the
   `patch` section carries, by `id`, the unified diff hunk that solves it (in `agent-json`, the
-  problem's `patch` field).
+  problem's `patch` field), and the last line, `autofix[N]: kerbo fix`, says how many problems of
+  the whole report `kerbo fix` solves on its own.
 - `kerbo explain <rule>`: why it exists, how to fix it and an example, short enough for the
   context window.
 - **Claude Code hook**: reviews every file the agent edits, in milliseconds, and if it finds

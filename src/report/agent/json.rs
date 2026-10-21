@@ -1,6 +1,6 @@
 use serde_json::{Map, Value, json};
 
-use super::{EXPLAIN_HINT, FileGroup, Report};
+use super::{AUTOFIX_COMMAND, EXPLAIN_HINT, FileGroup, Report};
 
 const PATCH_KEY: &str = "patch";
 
@@ -17,6 +17,7 @@ pub(in crate::report) fn document(report: &Report<'_>) -> Value {
         "files": report.files.iter().map(file).collect::<Vec<Value>>(),
         "fix": fixes,
         "explain": EXPLAIN_HINT,
+        "autofix": { "problems": report.fixable, "command": AUTOFIX_COMMAND },
     })
 }
 

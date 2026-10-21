@@ -2,8 +2,12 @@
 # cada caso, una vez con las herramientas de siempre y otra con kerbo (salida para agentes y hook).
 # Mide costo, tokens, vueltas, corridas del gate, tiempo, si terminó en verde y si hizo trampa.
 #
-#   python -I scripts/agent-harness/run.py --kerbo ruta/a/kerbo --check
-#   python -I scripts/agent-harness/run.py --kerbo ruta/a/kerbo --runs 3 --out resultados/
+# Checkstyle y ESLint se instalan una vez en --tools (checkstyle.jar y node_modules); clippy y
+# golangci-lint corren por Docker.
+#
+#   python -I scripts/agent-harness/run.py --kerbo ruta/a/kerbo --tools ruta/herramientas --check
+#   python -I scripts/agent-harness/run.py --kerbo ruta/a/kerbo --tools ruta/herramientas --runs 3
+#   python -I scripts/agent-harness/run.py ... --wide    (el agente puede correr cualquier comando)
 import argparse
 import concurrent.futures
 import json
@@ -28,15 +32,27 @@ PROMPT = (
     "las herramientas y no cambies lo que hace el código. Cuando el gate pase, terminá."
 )
 ALLOWED_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", "Bash(bash gate.sh:*)"]
+WIDE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", "Bash"]
+WIDE_SUFFIX = "+amplio"
 CHEAT_PATTERN = re.compile(r"^\+.*(noqa|nolint|type:\s*ignore|ruff:\s*noqa|kerbo:)", re.IGNORECASE)
-PROTECTED_FILES = {"gate.sh", "kerbo.toml", "ruff.toml", "pyproject.toml", ".golangci.yml"}
+PROTECTED_FILES = {
+    "gate.sh", "kerbo.toml", "ruff.toml", "pyproject.toml", ".golangci.yml", "clippy.toml", "Cargo.toml",
+}
 HIDDEN_WINDOW = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
 GATE_COUNTER = f'echo run >> {GATE_LOG}\n'
+HERE = '"$(pwd -W 2>/dev/null || pwd)"'
 TOOL_GATES = {
     "python": "uvx ruff@0.17.0 check --no-cache --select E4,E7,E9,F .\n",
     "go": (
-        'MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W 2>/dev/null || pwd):/app" -w /app '
+        f"MSYS_NO_PATHCONV=1 docker run --rm -v {HERE}:/app -w /app "
         "golangci/golangci-lint:v2.15.0 golangci-lint run ./...\n"
+    ),
+    "java": 'java -jar "{tools}/checkstyle.jar" -c "{harness}/tools/checkstyle.xml" src\n',
+    "ts": '"{tools}/node_modules/.bin/eslint" --config "{tools}/eslint.config.mjs" .\n',
+    "rust": (
+        f"MSYS_NO_PATHCONV=1 docker run --rm -v {HERE}:/src -w /src -v rust-quality-cache:/cache "
+        "-e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR=/tmp/target {rust_image} "
+        "cargo clippy -q -- -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines\n"
     ),
 }
 
@@ -53,8 +69,13 @@ def language_of(case):
     return case.name.split("-")[0]
 
 
-def gate_script(case, toolchain, kerbo):
-    command = f'"{kerbo}" check --format agent .\n' if toolchain == "kerbo" else TOOL_GATES[language_of(case)]
+def gate_script(case, toolchain, options):
+    if toolchain == "kerbo":
+        command = f'"{options.kerbo}" check --format agent .\n'
+    else:
+        command = TOOL_GATES[language_of(case)].format(
+            tools=options.tools, harness=HARNESS.as_posix(), rust_image=options.rust_image
+        )
     return "#!/usr/bin/env bash\nset -o pipefail\n" + GATE_COUNTER + command
 
 
@@ -74,13 +95,13 @@ def git(directory, *arguments):
     ).stdout
 
 
-def prepare(case, toolchain, kerbo, workspace):
+def prepare(case, toolchain, options, workspace):
     shutil.copytree(case, workspace, dirs_exist_ok=True)
-    (workspace / "gate.sh").write_text(gate_script(case, toolchain, kerbo), newline="\n")
+    (workspace / "gate.sh").write_text(gate_script(case, toolchain, options), newline="\n")
     if toolchain == "kerbo":
         settings = workspace / ".claude" / "settings.json"
         settings.parent.mkdir(parents=True, exist_ok=True)
-        settings.write_text(json.dumps(hook_settings(kerbo), indent=2))
+        settings.write_text(json.dumps(hook_settings(options.kerbo), indent=2))
     git(workspace, "init", "-q")
     git(workspace, "add", "-A")
     git(workspace, "commit", "-q", "-m", "caso")
@@ -98,14 +119,14 @@ def run_gate(workspace):
     return finished.returncode, finished.stdout + finished.stderr
 
 
-def run_agent(workspace, model):
+def run_agent(workspace, model, wide):
     command = [
         shutil.which("claude") or "claude", "-p", PROMPT,
         "--output-format", "json",
         "--model", model,
         "--setting-sources", "project",
         "--no-session-persistence",
-        "--allowedTools", *ALLOWED_TOOLS,
+        "--allowedTools", *(WIDE_TOOLS if wide else ALLOWED_TOOLS),
     ]
     started = time.monotonic()
     finished = subprocess.run(
@@ -135,14 +156,14 @@ def measure(case, toolchain, attempt, options):
         prefix=f"kerbo-arnes-{case.name}-{toolchain}-", ignore_cleanup_errors=True
     ) as directory:
         workspace = Path(directory)
-        prepare(case, toolchain, options.kerbo, workspace)
-        result, elapsed = run_agent(workspace, options.model)
+        prepare(case, toolchain, options, workspace)
+        result, elapsed = run_agent(workspace, options.model, options.wide)
         agent_gate_runs = gate_runs(workspace)
         status, _ = run_gate(workspace)
         usage = result.get("usage", {})
         return {
             "case": case.name,
-            "toolchain": toolchain,
+            "toolchain": toolchain + (WIDE_SUFFIX if options.wide else ""),
             "attempt": attempt,
             "model": options.model,
             "green": status == 0,
@@ -165,7 +186,7 @@ def check_cases(options):
         for toolchain in TOOLCHAINS:
             with tempfile.TemporaryDirectory() as directory:
                 workspace = Path(directory)
-                prepare(case, toolchain, options.kerbo, workspace)
+                prepare(case, toolchain, options, workspace)
                 status, output = run_gate(workspace)
                 print(f"== {case.name} con {toolchain}: salida {status}\n{output.strip()}\n")
 
@@ -200,7 +221,12 @@ def run_all(options):
     out = Path(options.out)
     out.mkdir(parents=True, exist_ok=True)
     cases = [case for case in sorted(CASES.iterdir()) if not options.cases or case.name in options.cases]
-    plan = [(case, toolchain, attempt) for attempt in range(options.runs) for case in cases for toolchain in TOOLCHAINS]
+    plan = [
+        (case, toolchain, attempt)
+        for attempt in range(options.runs)
+        for case in cases
+        for toolchain in options.toolchains
+    ]
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=options.jobs) as pool:
         futures = [pool.submit(measure, case, toolchain, attempt, options) for case, toolchain, attempt in plan]
@@ -214,6 +240,17 @@ def run_all(options):
     print(summarize(results))
 
 
+def rust_image():
+    images = subprocess.run(
+        ["docker", "images", "--format", "{{.Repository}}:{{.Tag}}", "quality-rust"],
+        capture_output=True,
+        text=True,
+        check=False,
+        **HIDDEN_WINDOW,
+    ).stdout.split()
+    return images[0] if images else "rust:1.99.1-slim-trixie"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--kerbo", required=True)
@@ -223,8 +260,14 @@ def main():
     parser.add_argument("--cases", nargs="*")
     parser.add_argument("--out", default="agent-harness-results")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--wide", action="store_true")
+    parser.add_argument("--toolchains", nargs="*", choices=TOOLCHAINS, default=TOOLCHAINS)
+    parser.add_argument("--tools", required=True)
     options = parser.parse_args()
     options.kerbo = Path(options.kerbo).resolve().as_posix()
+    options.tools = Path(options.tools).resolve().as_posix()
+    shutil.copy(HARNESS / "tools" / "eslint.config.mjs", Path(options.tools) / "eslint.config.mjs")
+    options.rust_image = rust_image()
     if options.check:
         check_cases(options)
     else:

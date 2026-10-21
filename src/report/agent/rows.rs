@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use super::{EXPLAIN_HINT, FileGroup, Report, RuleFix};
+use super::{AUTOFIX_COMMAND, EXPLAIN_HINT, FileGroup, Report, RuleFix};
 
 const INDENT: &str = "  ";
 const COLUMNS: &str = "id,line,end,rule,value,max";
@@ -24,7 +24,11 @@ pub(in crate::report) fn write<W: Write + ?Sized>(report: &Report<'_>, writer: &
             write_fix(fix, writer)?;
         }
     }
-    writeln!(writer, "explain: {EXPLAIN_HINT}")
+    writeln!(writer, "explain: {EXPLAIN_HINT}")?;
+    if report.fixable > 0 {
+        writeln!(writer, "autofix[{}]: {AUTOFIX_COMMAND}", report.fixable)?;
+    }
+    Ok(())
 }
 
 fn write_file<W: Write + ?Sized>(file: &FileGroup<'_>, writer: &mut W) -> io::Result<()> {

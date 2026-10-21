@@ -142,7 +142,8 @@ suprimido en el código (`inSource`), con su motivo, y GitHub lo muestra como de
   el servidor MCP devuelven `--format agent`.
   Si el arreglo es mecánico (un import que sobra, un modificador de más, un `final` que falta),
   la sección `patch` trae, por `id`, el bloque de diff unificado que lo resuelve (en
-  `agent-json`, el campo `patch` del problema).
+  `agent-json`, el campo `patch` del problema), y la última línea, `autofix[N]: kerbo fix`, dice
+  cuántos problemas del reporte entero arregla `kerbo fix` solo.
 - `kerbo explain <regla>`: por qué existe, cómo se arregla y un ejemplo, corto para el contexto.
 - **Hook de Claude Code**: revisa cada archivo que el agente edita, en milisegundos, y si encuentra
   algo se lo devuelve para que lo corrija en la misma vuelta. En `.claude/settings.json`:

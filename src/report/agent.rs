@@ -10,6 +10,7 @@ pub(super) use rows::write;
 
 const SHOWN_LIMIT: usize = 30;
 const EXPLAIN_HINT: &str = "kerbo explain <rule>";
+const AUTOFIX_COMMAND: &str = "kerbo fix";
 const CHEATING_RULES: [RuleId; 4] = [
     RuleId::SuppressionAdded,
     RuleId::TestDisabled,
@@ -20,6 +21,7 @@ const CHEATING_RULES: [RuleId; 4] = [
 #[derive(Debug)]
 pub(super) struct Report<'diagnostic> {
     problems: usize,
+    fixable: usize,
     files: Vec<FileGroup<'diagnostic>>,
     fixes: Vec<RuleFix>,
 }
@@ -67,6 +69,10 @@ pub(super) fn build(diagnostics: &[Diagnostic], lang: Lang) -> Report<'_> {
     let fixes = fixes(&ordered, lang);
     Report {
         problems: diagnostics.len(),
+        fixable: diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.fix.is_some())
+            .count(),
         files: group_by_file(ordered),
         fixes,
     }
