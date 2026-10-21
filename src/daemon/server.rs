@@ -1,7 +1,7 @@
 use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{self, Cursor};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -19,10 +19,11 @@ const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const IDLE_CHECK: Duration = Duration::from_secs(30);
 const INSTANCE_LOCK: &str = "daemon.lock";
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Lifetime {
     pub idle_timeout: Duration,
     pub identity: u64,
+    pub home: PathBuf,
 }
 
 #[derive(Debug)]
@@ -42,7 +43,7 @@ impl Shared {
     }
 }
 
-pub fn serve(directory: &Path, lifetime: Lifetime) -> io::Result<()> {
+pub fn serve(directory: &Path, lifetime: &Lifetime) -> io::Result<()> {
     let Some(_instance) = claim_instance(directory)? else {
         return Ok(());
     };
@@ -52,7 +53,7 @@ pub fn serve(directory: &Path, lifetime: Lifetime) -> io::Result<()> {
     let shared = Arc::new(Shared {
         token: endpoint.token.clone(),
         address: endpoint.address(),
-        workspace: Workspace::default(),
+        workspace: Workspace::new(&lifetime.home),
         last_activity: Mutex::new(Instant::now()),
         in_flight: AtomicUsize::new(0),
         stopping: AtomicBool::new(false),

@@ -134,18 +134,15 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     48 problemas en 8 archivos. Como en los tests no hay tokenizador, se cuentan las piezas que
     separa el pretokenizador de los modelos (palabras, grupos de hasta tres dígitos y cada signo),
     que sobreestima a o200k; hoy da 619.
-  - Pendientes:
-    - Comprobar que el agente lo lee igual de bien que el JSON (que no confunde columnas ni
-      pierde problemas): va con el arnés de punta a punta de abajo.
-    - Ninguna fila trae el símbolo (la función o la clase) ni el mensaje: el agente se ubica por
-      línea. Ver con el arnés si agregar el símbolo ahorra lecturas de archivo.
-    - El hook corta en 30 problemas, como `--format agent` (antes los mostraba todos), y queda
-      así: corre después de cada edición, así que el agente ve los siguientes apenas arregla los
-      primeros, las trampas van siempre adelante y `more` dice cuántos quedan. Mostrar todos sólo
-      engorda el contexto cuando un archivo grande arranca con cientos. El arnés de punta a punta
-      lo confirma o lo revierte.
-    - Medir con el tokenizador de los Claude actuales (por la API de conteo de tokens) cuando el
-      arnés la use de todos modos.
+  - Lo que dijo el piloto del arnés de abajo (2026-10-21):
+    - El agente lee las filas sin problema: las 12 corridas con kerbo terminaron en verde, sin
+      perder ni confundir problemas.
+    - El símbolo en las filas no se agrega: el agente igual lee el archivo entero antes de editar
+      (Claude Code no deja editar sin leer), así que no ahorraría lecturas.
+    - Los tokens se miden con el uso real que reporta la API en cada sesión, que es lo que se
+      paga; contar la salida sola con el tokenizador de los Claude actuales ya no hace falta.
+    - El corte de 30 problemas del hook queda como está hasta probarlo con un archivo grande
+      (pendiente abajo): ningún caso del piloto pasa de 10 por archivo.
 - **El demonio para agentes** (hecho, 2026-10-21; el demonio en sí es de la fase 7):
   - El hook lo arranca solo: si nadie de este binario responde, corre el pedido en su proceso y
     después lanza `kerbo daemon run` desacoplado (si responde uno de otro binario, primero lo
@@ -158,21 +155,45 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     directorio a todo lo que hoy resuelve rutas relativas (escaneo, configuración, línea de
     base, git) sacaría también esa espera; no vale el cambio mientras cada sesión trabaje en un
     solo repo.
-- **Cuánto gasta un agente de punta a punta** (pendiente). La velocidad de kerbo ya está medida;
-  falta medir lo que paga quien lo usa con un agente: correr el gate, leer la salida, arreglar y
-  volver a correr hasta que pase.
-  - Arnés: el mismo repo, en el mismo commit y con los mismos problemas, y un agente (Claude Code
-    sin interfaz, con el mismo modelo y la misma instrucción) que tiene que dejar el gate en
-    verde. Una vez con las herramientas de hoy (Checkstyle, PMD y SpotBugs por Maven o Gradle;
-    ESLint; ruff; golangci-lint; clippy) y otra con kerbo (`--format agent`, el modo instantáneo
-    y el hook).
-  - Medir tokens de entrada y de salida, costo, cantidad de llamadas a herramientas y de corridas
-    del gate, tiempo total, si terminó en verde y si hizo trampa (supresiones, umbrales aflojados,
-    tests vaciados), revisado con la antitrampa de kerbo en las dos corridas.
-  - Varias corridas por caso, porque un agente no responde siempre igual; se publica la mediana y
-    la dispersión, con la misma tabla y la fecha que la de velocidad.
-  - Casos chicos y grandes por lenguaje: un problema suelto, decenas de la misma regla y un repo
-    sin gate que se adopta con línea de base.
+- **Cuánto gasta un agente de punta a punta** (piloto hecho, 2026-10-21; falta ampliarlo). Lo que
+  paga quien lo usa con un agente: correr el gate, leer la salida, arreglar y volver a correr hasta
+  que pase. El arnés está en `scripts/agent-harness/`: copia cada caso a una carpeta temporal con
+  git, le pone un `gate.sh` (ruff 0.17 con `E4,E7,E9,F`, o golangci-lint 2.15 por Docker; o kerbo
+  con `--format agent` y el hook de Claude Code) y corre `claude -p` con la misma instrucción,
+  Sonnet y sólo `Read`, `Edit`, `Write`, `Glob`, `Grep` y `bash gate.sh`. Mide costo, tokens,
+  vueltas, corridas del gate y tiempo de la sesión, vuelve a correr el gate al final y busca
+  supresiones o archivos de configuración tocados en el diff. `--check` corre los dos gates sin
+  agente, para confirmar que fallan por lo mismo (1 y 37 problemas en Python, 1 y 6 en Go).
+
+  Piloto: Python y Go, un problema suelto y varios, tres corridas por caso (24 sesiones, 2,04 USD
+  en total). Todas terminaron en verde y ninguna hizo trampa. Medianas (rango entre paréntesis):
+
+  | Caso | Herramientas | Costo USD | Tokens de entrada | Vueltas | Corridas del gate | Segundos |
+  |---|---|---|---|---|---|---|
+  | Python, 37 problemas | ruff | 0,129 (0,119–0,130) | 265.473 | 13 (11–15) | 3 | 51 |
+  | | kerbo | 0,114 (0,108–0,132) | 210.501 | 9 (9–13) | 3 | 39 |
+  | Python, 1 problema | ruff | 0,053 (0,053–0,053) | 80.696 | 4 | 2 | 13 |
+  | | kerbo | 0,062 (0,062–0,062) | 135.687 | 6 | 2 | 23 |
+  | Go, 6 problemas | golangci-lint | 0,099 (0,093–0,100) | 144.294 | 11 | 2 | 41 |
+  | | kerbo | 0,105 (0,099–0,105) | 205.036 | 13 (11–15) | 3 | 35 |
+  | Go, 1 problema | golangci-lint | 0,060 (0,059–0,061) | 108.186 | 5 | 2 | 31 |
+  | | kerbo | 0,059 (0,059–0,059) | 108.366 | 5 | 2 | 15 |
+
+  Con muchos problemas en Python kerbo sale un 12 % más barato y más rápido; en Go es más
+  rápido siempre (el gate tarda milisegundos y golangci-lint por Docker, segundos) y cuesta lo
+  mismo. Las dos diferencias en contra salen de cómo trabaja el agente, según las trazas: con el
+  parche de `--format agent` a la vista intenta arreglar con `sed` o un script de Python, el
+  arnés se lo niega (sólo deja `bash gate.sh`) y rehace el cambio con `Edit`. Con un agente que
+  puede correr cualquier comando eso no pasa, pero el arnés lo limita a propósito, igual para las
+  dos herramientas. Los tokens de entrada son casi todos lecturas de la caché del modelo, por eso
+  pesan poco en el costo.
+
+  Pendiente, ampliar el piloto:
+  - Java (Checkstyle, PMD y SpotBugs por Maven o Gradle), TypeScript (ESLint) y Rust (clippy),
+    y en todos un repo sin gate que se adopta con línea de base.
+  - Un caso con un archivo de cientos de problemas, para el corte de 30 del hook.
+  - Una variante con permisos amplios, como trabaja un agente de verdad (con `kerbo fix` y
+    `ruff --fix` a mano).
   - Lo que se espera ver, y hay que confirmar con números: los logs de Maven y Gradle, el XML de
     SpotBugs y el mismo problema reportado por dos herramientas inflan la entrada; sin modo
     instantáneo el agente vuelve a correr el gate entero después de cada arreglo; sin

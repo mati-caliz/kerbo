@@ -33,9 +33,10 @@ fn start_server(directory: &Path, idle_timeout: Duration) -> JoinHandle<()> {
     let handle = thread::spawn(move || {
         serve(
             &owned,
-            Lifetime {
+            &Lifetime {
                 idle_timeout,
                 identity: IDENTITY,
+                home: env::current_dir().expect("hay directorio actual"),
             },
         )
         .expect("el demonio arranca");
@@ -245,8 +246,9 @@ fn start_waits_for_the_daemon_and_reports_when_it_is_already_up_or_cannot_launch
 
 #[test]
 fn the_real_daemon_lives_in_the_user_cache_and_matches_this_binary() {
-    assert!(endpoint_directory().is_some());
-    let lifetime = default_lifetime();
+    let directory = endpoint_directory().expect("hay carpeta de caché");
+    let lifetime = default_lifetime(&directory);
+    assert_eq!(lifetime.home, directory);
     assert_eq!(lifetime.idle_timeout, IDLE_TIMEOUT);
     assert_eq!(lifetime.identity, crate::cache::runtime_identity());
 }
@@ -287,9 +289,10 @@ fn a_second_daemon_on_the_same_folder_leaves_at_once() {
     let published = Endpoint::read(&endpoint);
     serve(
         &endpoint,
-        Lifetime {
+        &Lifetime {
             idle_timeout: LONG_IDLE,
             identity: IDENTITY,
+            home: env::current_dir().expect("hay directorio actual"),
         },
     )
     .expect("el segundo se va sin error");

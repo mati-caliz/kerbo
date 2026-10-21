@@ -201,7 +201,7 @@ fn daemon_action(action: DaemonAction, lang: Lang, terminal: &mut Terminal<'_>) 
         DaemonAction::Stop => daemon::stop(&directory),
         DaemonAction::Status => daemon::status(&directory),
         DaemonAction::Run => {
-            daemon::serve(&directory, daemon::default_lifetime())
+            daemon::serve(&directory, &daemon::default_lifetime(&directory))
                 .map_err(|error| Problem::DaemonUnavailable(error.to_string()))?;
             return Ok(EXIT_CLEAN);
         }

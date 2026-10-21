@@ -5,6 +5,7 @@ mod server;
 mod workspace;
 
 use std::env;
+use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command as Process, Stdio};
@@ -26,7 +27,7 @@ const RUN_ACTION: &str = "run";
 const SWITCH_VARIABLE: &str = "KERBO_DAEMON";
 const SWITCHED_OFF: &str = "off";
 #[cfg(windows)]
-const DETACHED_PROCESS: u32 = 0x0000_0008;
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 #[cfg(windows)]
 const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
 
@@ -34,10 +35,11 @@ pub fn endpoint_directory() -> Option<PathBuf> {
     cache_root()
 }
 
-pub fn default_lifetime() -> Lifetime {
+pub fn default_lifetime(directory: &Path) -> Lifetime {
     Lifetime {
         idle_timeout: IDLE_TIMEOUT,
         identity: runtime_identity(),
+        home: directory.to_path_buf(),
     }
 }
 
@@ -63,7 +65,7 @@ pub fn enabled() -> bool {
 }
 
 pub fn ensure_running(directory: &Path, identity: u64) {
-    ensure_running_with(directory, identity, spawn_detached);
+    ensure_running_with(directory, identity, || spawn_detached(directory));
 }
 
 fn ensure_running_with(directory: &Path, identity: u64, launch: impl FnOnce() -> io::Result<()>) {
@@ -78,7 +80,7 @@ fn ensure_running_with(directory: &Path, identity: u64, launch: impl FnOnce() ->
 }
 
 pub fn start(directory: &Path) -> Result<Notice, Problem> {
-    start_with(directory, spawn_detached)
+    start_with(directory, || spawn_detached(directory))
 }
 
 fn start_with(directory: &Path, launch: impl FnOnce() -> io::Result<()>) -> Result<Notice, Problem> {
@@ -95,10 +97,12 @@ fn start_with(directory: &Path, launch: impl FnOnce() -> io::Result<()>) -> Resu
     Err(Problem::DaemonUnavailable(directory.display().to_string()))
 }
 
-fn spawn_detached() -> io::Result<()> {
+fn spawn_detached(directory: &Path) -> io::Result<()> {
+    fs::create_dir_all(directory)?;
     let mut process = Process::new(env::current_exe()?);
     process
         .args([DAEMON_COMMAND, RUN_ACTION])
+        .current_dir(directory)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
@@ -115,7 +119,7 @@ fn detach(process: &mut Process) {
 #[cfg(windows)]
 fn detach(process: &mut Process) {
     use std::os::windows::process::CommandExt;
-    process.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+    process.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
 }
 
 #[cfg(not(any(unix, windows)))]

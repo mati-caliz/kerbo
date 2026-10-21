@@ -18,7 +18,7 @@ fn same_directory_spelled_differently() -> (PathBuf, PathBuf) {
 #[test]
 fn requests_for_the_same_directory_share_it_and_another_one_waits_its_turn() {
     let (directory, other) = same_directory_spelled_differently();
-    let workspace = Workspace::default();
+    let workspace = Workspace::new(&directory);
     let first = workspace.enter(&directory).expect("entra");
     let second = workspace
         .enter(&directory)
@@ -44,7 +44,7 @@ fn requests_for_the_same_directory_share_it_and_another_one_waits_its_turn() {
 
 #[test]
 fn a_directory_that_does_not_exist_is_refused() {
-    let workspace = Workspace::default();
+    let workspace = Workspace::new(&env::current_dir().expect("hay directorio actual"));
     assert!(
         workspace
             .enter(&PathBuf::from("/kerbo-no-existe/en-ningun-lado"))

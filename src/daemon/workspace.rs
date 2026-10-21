@@ -3,8 +3,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Condvar, Mutex, PoisonError};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Workspace {
+    home: PathBuf,
     occupancy: Mutex<Occupancy>,
     released: Condvar,
 }
@@ -21,6 +22,14 @@ pub struct Visit<'workspace> {
 }
 
 impl Workspace {
+    pub fn new(home: &Path) -> Self {
+        Self {
+            home: home.to_path_buf(),
+            occupancy: Mutex::default(),
+            released: Condvar::new(),
+        }
+    }
+
     pub fn enter(&self, directory: &Path) -> io::Result<Visit<'_>> {
         let guard = self.occupancy.lock().unwrap_or_else(PoisonError::into_inner);
         let mut occupancy = self
@@ -47,6 +56,9 @@ impl Drop for Visit<'_> {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         occupancy.active = occupancy.active.saturating_sub(1);
+        if occupancy.active == 0 && env::set_current_dir(&self.workspace.home).is_ok() {
+            occupancy.directory = Some(self.workspace.home.clone());
+        }
         drop(occupancy);
         self.workspace.released.notify_all();
     }
