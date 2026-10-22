@@ -416,11 +416,13 @@ the database, not from its arguments. A library call returns what its receiver a
 bring, except the ones that give a number, a boolean or a UUID (`parseInt`, `length`, `equals`,
 `UUID.fromString`...).
 
-To read libraries, kerbo asks Maven for the classpath once, offline
-(`mvn -o dependency:build-classpath`), and stores it with the fingerprint of the `pom.xml` files;
-from the jars it reads only the index and the classes it needs, no bytecode. With Gradle or any
+To read libraries, kerbo asks for the classpath once, offline, to Maven
+(`mvn -o dependency:build-classpath`) or to Gradle (the project's `gradlew` when there is one, with
+kerbo's own init script that lists the jars of `testRuntimeClasspath`, `runtimeClasspath` and
+`compileClasspath` and skips what is not downloaded), and stores it with the fingerprint of the
+build files; from the jars it reads only the index and the classes it needs, no bytecode. With any
 other tool, the list of jars goes in `KERBO_JAVA_CLASSPATH` (separated as in PATH). Without a
-classpath, that rule flags nothing.
+classpath, the rules that read libraries only know kerbo's own JDK table.
 
 The ones that look at the whole project only run when the analysis covers it (`kerbo check` at the
 root): over a folder or a single file, calls would be missing. Without compiling, kerbo resolves a

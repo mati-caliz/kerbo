@@ -100,6 +100,43 @@ fn the_classpath_comes_from_the_poms_and_survives_their_changes() {
 }
 
 #[test]
+fn gradle_projects_are_found_by_their_build_files_and_asked_through_the_wrapper() {
+    use super::classpath::files_named;
+    use super::gradle::{BUILD_FILES, ask_gradle};
+    use crate::test_support::TempTree;
+    let tree = TempTree::new("jvm-gradle");
+    tree.write("settings.gradle.kts", "rootProject.name = \"app\"");
+    tree.write("api/build.gradle", "plugins { id 'java' }");
+    tree.write("build/build.gradle", "");
+    let found = files_named(tree.path(), BUILD_FILES);
+    assert_eq!(found.len(), 2, "build no cuenta: {found:?}");
+    let saved = tree.path().join("cache/classpath.txt");
+    assert_eq!(
+        ask_gradle(tree.path(), &saved).filter(|listed| !listed.is_empty()),
+        None
+    );
+    if cfg!(not(windows)) {
+        tree.write(
+            "gradlew",
+            "for argument in \"$@\"; do case \"$argument\" in -Dkerbo.classpath.output=*) printf '/g/a.jar\n' > \"${argument#*=}\";; esac; done
+",
+        );
+        assert_eq!(
+            ask_gradle(tree.path(), &saved).as_deref(),
+            Some(
+                "/g/a.jar
+"
+            )
+        );
+        tree.write(
+            "gradlew", "exit 1
+",
+        );
+        assert_eq!(ask_gradle(tree.path(), &saved), None);
+    }
+}
+
+#[test]
 fn a_varargs_method_accepts_more_arguments_and_knows_its_class_parameters() {
     let method = Method {
         name: "queryForObject".to_owned(),

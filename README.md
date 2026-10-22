@@ -414,11 +414,13 @@ sale de la base, no de sus argumentos. Una llamada a una librería devuelve lo q
 y los argumentos, salvo las que dan un número, un booleano o un UUID (`parseInt`, `length`,
 `equals`, `UUID.fromString`...).
 
-Para leer las librerías, kerbo le pide a Maven el classpath una sola vez, sin red
-(`mvn -o dependency:build-classpath`), y lo guarda con la huella de los `pom.xml`; de los jars lee
-sólo el índice y las clases que necesita, sin bytecode. Con Gradle u otra herramienta, la lista de
-jars va en `KERBO_JAVA_CLASSPATH` (separados como en el PATH). Sin classpath, esa regla no marca
-nada.
+Para leer las librerías, kerbo le pide el classpath una sola vez, sin red, a Maven
+(`mvn -o dependency:build-classpath`) o a Gradle (el `gradlew` del proyecto si está, con un script
+de inicio propio que lista los jars de `testRuntimeClasspath`, `runtimeClasspath` y
+`compileClasspath` y saltea lo que no está bajado), y lo guarda con la huella de los archivos de
+build; de los jars lee sólo el índice y las clases que necesita, sin bytecode. Con otra
+herramienta, la lista de jars va en `KERBO_JAVA_CLASSPATH` (separados como en el PATH). Sin
+classpath, las reglas que leen las librerías sólo saben lo de la tabla propia del JDK.
 
 Las que miran el proyecto entero sólo corren cuando el análisis lo abarca (`kerbo check` en la
 raíz): sobre una carpeta o un archivo suelto faltarían llamadas. Sin compilar, kerbo resuelve el

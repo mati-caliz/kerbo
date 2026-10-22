@@ -846,7 +846,16 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   tipo (el `@Nullable` de JSpecify es `TYPE_USE` y va en otra tabla). El classpath se le pide a
   Maven offline una vez y se guarda en la caché con la huella de los `pom.xml`;
   `KERBO_JAVA_CLASSPATH` lo da a mano (Gradle y el resto). Sólo se carga si una regla lo usa.
-  - Todavía sin el JDK (`ct.sym`) ni Gradle propio.
+  - Gradle propio (hecho, 2026-10-22): sin `pom.xml`, con `build.gradle`, `settings.gradle` (o sus
+    `.kts`), `gradle.lockfile` o `libs.versions.toml`, se le pide a Gradle (el wrapper del proyecto
+    si está, con `sh` porque el checkout puede no tener el permiso de ejecución) con un script de
+    inicio propio, `--offline` y sin la caché de configuración. La vista tolerante de los artefactos
+    saltea lo que no está bajado: en soma, `runtimeClasspath` pide `spring-boot-devtools`
+    (`developmentOnly`), que nunca se bajó, y sin eso fallaba todo. En soma da 290 jars y los mismos
+    avisos que con el classpath a mano.
+  - Todavía sin el JDK desde `ct.sym`: trae el API hasta la versión anterior a la del JDK (la
+    actual está en `lib/modules`, en formato jimage), y lo que hace falta del JDK para las reglas de
+    hoy (qué se cierra, qué puede ser null) no está en las firmas sino en tablas propias.
 - `NullableProblems` para parámetros (hecho, 2026-10-21): `nullable-problems`. Los padres de la
   clase se resuelven con los imports del archivo (explícitos, con comodín, el mismo paquete,
   `java.lang`) y se sube por el proyecto y por la librería hasta el método redefinido; si su

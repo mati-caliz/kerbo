@@ -4,15 +4,16 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use super::gradle::{BUILD_FILES, ask_gradle};
 use crate::cache::location::default_directory;
 
 const CLASSPATH_VARIABLE: &str = "KERBO_JAVA_CLASSPATH";
 const POM: &str = "pom.xml";
 const CLASSPATH_DIRECTORY: &str = "classpath";
 const CLASSPATH_EXTENSION: &str = "txt";
-const PARTIAL_EXTENSION: &str = "partial";
+pub(super) const PARTIAL_EXTENSION: &str = "partial";
 const SKIPPED_DIRECTORIES: &[&str] = &["target", "node_modules", ".git", "build"];
-const MAX_POM_DEPTH: usize = 3;
+const MAX_BUILD_DEPTH: usize = 3;
 const LINE_FEED: char = '\n';
 const CARRIAGE_RETURN: char = '\r';
 // Silencioso, sin red, y con el classpath de cada módulo agregado al mismo archivo.
@@ -30,27 +31,35 @@ const MAVEN: &str = "mvn";
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-// Los jars de las dependencias del proyecto. Se le piden una sola vez a Maven (sin red: lo que
-// no esté bajado no está) y se guardan con la huella de los `pom.xml`; si no cambian, no se
-// vuelve a preguntar. `KERBO_JAVA_CLASSPATH` los da a mano, para Gradle o cualquier otra cosa.
+type BuildTool = fn(&Path, &Path) -> Option<String>;
+
+// Los jars de las dependencias del proyecto. Se le piden una sola vez a Maven o a Gradle (sin
+// red: lo que no esté bajado no está) y se guardan con la huella de los archivos de build; si no
+// cambian, no se vuelve a preguntar. `KERBO_JAVA_CLASSPATH` los da a mano, para cualquier otra
+// herramienta.
 pub fn for_project(root: &Path) -> Vec<PathBuf> {
     if let Some(given) = env::var_os(CLASSPATH_VARIABLE).filter(|value| !value.is_empty()) {
         return env::split_paths(&given).collect();
     }
     let poms = pom_files(root);
-    if poms.is_empty() {
+    let (build_files, ask): (Vec<PathBuf>, BuildTool) = if poms.is_empty() {
+        (files_named(root, BUILD_FILES), ask_gradle)
+    } else {
+        (poms, ask_maven)
+    };
+    if build_files.is_empty() {
         return Vec::new();
     }
     let Some(directory) = default_directory().map(|cache| cache.join(CLASSPATH_DIRECTORY)) else {
         return Vec::new();
     };
     let saved = directory
-        .join(format!("{:016x}", fingerprint(root, &poms)))
+        .join(format!("{:016x}", fingerprint(root, &build_files)))
         .with_extension(CLASSPATH_EXTENSION);
     if let Ok(contents) = fs::read_to_string(&saved) {
         return jars_in(&contents);
     }
-    let contents = ask_maven(root, &saved).unwrap_or_default();
+    let contents = ask(root, &saved).unwrap_or_default();
     if fs::create_dir_all(&directory).is_ok() {
         drop(fs::write(&saved, &contents));
     }
@@ -58,14 +67,21 @@ pub fn for_project(root: &Path) -> Vec<PathBuf> {
 }
 
 pub(super) fn pom_files(root: &Path) -> Vec<PathBuf> {
+    files_named(root, &[POM])
+}
+
+// Los archivos con esos nombres en el proyecto y sus módulos, hasta unos pocos niveles.
+pub(super) fn files_named(root: &Path, names: &[&str]) -> Vec<PathBuf> {
     let mut found = Vec::new();
     let mut pending = vec![(root.to_path_buf(), 0_usize)];
     while let Some((directory, depth)) = pending.pop() {
-        let pom = directory.join(POM);
-        if pom.is_file() {
-            found.push(pom);
-        }
-        if depth >= MAX_POM_DEPTH {
+        found.extend(
+            names
+                .iter()
+                .map(|name| directory.join(name))
+                .filter(|path| path.is_file()),
+        );
+        if depth >= MAX_BUILD_DEPTH {
             continue;
         }
         let Ok(entries) = fs::read_dir(&directory) else {
@@ -116,13 +132,13 @@ pub(super) fn ask_maven(root: &Path, saved: &Path) -> Option<String> {
 }
 
 #[cfg(windows)]
-fn hide_window(command: &mut Command) {
+pub(super) fn hide_window(command: &mut Command) {
     use std::os::windows::process::CommandExt;
     command.creation_flags(CREATE_NO_WINDOW);
 }
 
 #[cfg(not(windows))]
-const fn hide_window(_command: &mut Command) {}
+pub(super) const fn hide_window(_command: &mut Command) {}
 
 // Maven escribe cada módulo en una línea, con los jars separados como en el PATH.
 pub(super) fn jars_in(contents: &str) -> Vec<PathBuf> {
