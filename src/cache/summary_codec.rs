@@ -1,6 +1,7 @@
 use super::codec::{Corrupt, Reader, Writer};
 use crate::index::java::{CallSite, Declaration, JavaSummary, Parameter, Position};
 use crate::lint::java_calls::{Arity, Body, ReturnType, Returns, Visibility};
+use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::lint::java_constants::Constant;
 use crate::lint::java_owner::{Owner, OwnerKind};
 use crate::lint::java_receivers::Receiver;
@@ -25,6 +26,8 @@ const OWNER_LOCAL: u64 = 5;
 const RETURN_TYPE_VOID: u64 = 0;
 const RETURN_TYPE_PRIMITIVE: u64 = 1;
 const RETURN_TYPE_REFERENCE: u64 = 2;
+const ROOT_INSTANCE: u64 = 0;
+const ROOT_CLASS: u64 = 1;
 const RECEIVER_UNKNOWN: u64 = 0;
 const RECEIVER_TYPE: u64 = 1;
 const RECEIVER_SCOPE: u64 = 2;
@@ -55,6 +58,25 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     });
     writer.list(&summary.imports, |writer, path| writer.text(path));
     writer.list(&summary.package_annotations, |writer, name| writer.text(name));
+    writer.list(&summary.chains, |writer, chain| {
+        match &chain.root {
+            ChainRoot::Instance(name) => {
+                writer.number(ROOT_INSTANCE);
+                writer.text(name);
+            }
+            ChainRoot::Class(name) => {
+                writer.number(ROOT_CLASS);
+                writer.text(name);
+            }
+        }
+        writer.list(&chain.steps, |writer, step| {
+            writer.text(&step.name);
+            writer.size(step.arity);
+            writer.size(step.line);
+            writer.size(step.column);
+            write_flag(writer, step.checked);
+        });
+    });
     writer.list(&summary.constants, |writer, constant| {
         writer.text(&constant.owner);
         writer.text(&constant.name);
@@ -84,6 +106,24 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         hierarchy: reader.list(|reader| Ok((reader.text()?, reader.list(Reader::text)?)))?,
         imports: reader.list(Reader::text)?,
         package_annotations: reader.list(Reader::text)?,
+        chains: reader.list(|reader| {
+            Ok(Chain {
+                root: match reader.number()? {
+                    ROOT_INSTANCE => ChainRoot::Instance(reader.text()?),
+                    ROOT_CLASS => ChainRoot::Class(reader.text()?),
+                    _ => return Err(Corrupt),
+                },
+                steps: reader.list(|reader| {
+                    Ok(ChainStep {
+                        name: reader.text()?,
+                        arity: reader.size()?,
+                        line: reader.size()?,
+                        column: reader.size()?,
+                        checked: read_flag(reader)?,
+                    })
+                })?,
+            })
+        })?,
         constants: reader.list(|reader| {
             Ok(Constant {
                 owner: reader.text()?,

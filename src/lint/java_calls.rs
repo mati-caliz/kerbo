@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, PRIVATE, children, modifiers, text};
+use super::java_chains::{Chain, NullFacts, chain_of};
 use super::java_constants::{Constants, constant_value, constants_in};
 use super::java_owner::{Owner, annotation_names, mentioned_name, owner_of};
 use super::java_receivers::{Receiver, StaticImports, simple_type_name, supertypes, variable_types};
@@ -99,6 +100,7 @@ pub struct Extracted<'tree> {
     pub types: Vec<String>,
     pub mentioned: Vec<String>,
     pub hierarchy: Vec<(String, Vec<String>)>,
+    pub chains: Vec<Chain>,
 }
 
 // Lo que declara y lo que llama una clase de nivel superior, con sus clases anidadas.
@@ -114,10 +116,13 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
         types: Vec::new(),
         mentioned: Vec::new(),
         hierarchy: Vec::new(),
+        chains: Vec::new(),
     };
+    let mut facts = NullFacts::default();
     let variables = variable_types(&nodes, source);
     let imported = StaticImports::of(top_level, source);
     for &node in &nodes {
+        facts.observe(node, source);
         if TYPE_DECLARATIONS.contains(&node.kind())
             && let Some(name) = node.child_by_field_name(NAME_FIELD)
         {
@@ -137,6 +142,11 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
                 discarded.extend(named_children(node).first().map(Node::id));
             }
             INVOCATION | CREATION | EXPLICIT_CONSTRUCTOR | ENUM_CONSTANT => {
+                if node.kind() == INVOCATION {
+                    extracted
+                        .chains
+                        .extend(chain_of(node, source, &variables, &mut facts));
+                }
                 let receiver = || imported.receiver(node, source, &variables);
                 extracted.calls.extend(
                     call(node, source, &constants, !discarded.contains(&node.id())).map(|found| Call {

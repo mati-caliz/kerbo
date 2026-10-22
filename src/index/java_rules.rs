@@ -1,4 +1,5 @@
 use super::java::{CallSite, Declaration, JavaSummary, lint_at};
+use super::java_dereference::nullable_dereferences;
 use super::java_nullness::{ProjectTypes, unannotated_overrides};
 use super::java_project::{IndexedSummary, Project, key_of};
 use super::java_unused::{Usage, unused_method};
@@ -19,21 +20,19 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
         .iter()
         .map(|file| {
             let summary = file.summary;
-            summary
-                .declarations
-                .iter()
-                .flat_map(|declaration| {
-                    let mut found = Vec::new();
-                    if usage.sees_callers_of(declaration.visibility) {
-                        found.extend(same_parameter_values(&project, file, declaration));
-                        found.extend(unused_return_value(&project, declaration));
-                    }
-                    found.extend(same_return_value(&project, summary, declaration));
-                    found.extend(unused_method(&project, declaration, file, &usage));
-                    found.extend(unannotated_overrides(&types, library, summary, declaration));
-                    found
-                })
-                .collect()
+            let mut in_file = nullable_dereferences(&types, library, summary);
+            in_file.extend(summary.declarations.iter().flat_map(|declaration| {
+                let mut found = Vec::new();
+                if usage.sees_callers_of(declaration.visibility) {
+                    found.extend(same_parameter_values(&project, file, declaration));
+                    found.extend(unused_return_value(&project, declaration));
+                }
+                found.extend(same_return_value(&project, summary, declaration));
+                found.extend(unused_method(&project, declaration, file, &usage));
+                found.extend(unannotated_overrides(&types, library, summary, declaration));
+                found
+            }));
+            in_file
         })
         .collect()
 }

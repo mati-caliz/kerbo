@@ -8,6 +8,8 @@ use crate::limits::Limits;
 use crate::lint::LintFinding;
 use crate::rules::{Diagnostic, FileIdentity, JavaRule, RuleId, finding_diagnostics};
 
+const LIBRARY_RULES: [JavaRule; 2] = [JavaRule::NullableProblems, JavaRule::DataFlowIssue];
+
 #[derive(Debug)]
 pub struct IndexedFile {
     pub identity: FileIdentity,
@@ -27,9 +29,9 @@ pub fn covers_project(roots: &[PathBuf], project_root: &Path) -> bool {
 // Las firmas de las dependencias sólo se cargan si alguna regla prendida las usa.
 pub fn diagnostics(files: &[IndexedFile], root: &Path) -> Vec<Diagnostic> {
     let wants_library = files.iter().any(|file| {
-        file.limits
-            .get(RuleId::Java(JavaRule::NullableProblems))
-            .is_some()
+        LIBRARY_RULES
+            .iter()
+            .any(|rule| file.limits.get(RuleId::Java(*rule)).is_some())
     });
     let jars = if wants_library {
         classpath::for_project(root)

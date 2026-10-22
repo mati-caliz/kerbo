@@ -71,6 +71,15 @@ impl Method {
         self.parameter_annotations.len()
     }
 
+    // La clase que devuelve, si es un objeto (`Ljava/lang/String;` da `java.lang.String`).
+    pub fn return_class(&self) -> Option<String> {
+        let (_, returned) = self.descriptor.split_once(char::from(DESCRIPTOR_CLOSE))?;
+        let binary = returned
+            .strip_prefix(char::from(OBJECT_START))?
+            .strip_suffix(char::from(OBJECT_END))?;
+        Some(binary_to_source(binary))
+    }
+
     // Si devuelve un objeto o un arreglo (lo único que puede ser null).
     pub fn returns_reference(&self) -> bool {
         self.descriptor

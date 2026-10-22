@@ -342,3 +342,25 @@ fn same_parameter_value_follows_intellij_for_private_code() {
         )
     );
 }
+
+#[test]
+fn optional_get_is_reported_only_right_after_what_creates_the_optional() {
+    let source = "class A {
+    int f(java.util.List<Integer> list) {
+        int first = list.stream().findFirst().get();
+        int top = list.stream().max(Integer::compare).get();
+        return first + top + list.get(0) + java.util.Collections.max(list);
+    }
+}
+";
+    let found = rendered_where(&lints(source, strict()), |rule| {
+        rule == RuleId::Java(JavaRule::OptionalGetWithoutIsPresent)
+    });
+    assert_eq!(
+        found,
+        expected(
+            "3:47 optional-get-without-is-present findFirst
+4:55 optional-get-without-is-present max"
+        )
+    );
+}

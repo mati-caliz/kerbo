@@ -49,3 +49,23 @@ fn an_unannotated_override_of_a_null_marked_library_is_reported_unless_inferred(
             .all(|finding| finding.kind.rule().as_str() != "nullable-problems")
     );
 }
+
+const CALLER: &str = "package app;\n\nimport sample.web.Filter;\n\nclass Caller {\n    String use(Filter filter) {\n        String first = filter.find(\"a\").toString();\n        assertThat(filter.find(\"b\")).isNotNull();\n        return first + filter.find(\"b\").toString() + Filter.describe().trim();\n    }\n}\n";
+
+#[test]
+fn a_call_on_a_nullable_library_result_is_reported_unless_checked_before() {
+    let jar = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/jvm/fixtures/sample.jar");
+    let library = Library::load(&[jar]);
+    let summary = summary_of(CALLER);
+    let files = [IndexedSummary {
+        summary: &summary,
+        in_tests: false,
+    }];
+    let found: Vec<String> = project_lints(&files, &library)
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "data-flow-issue")
+        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
+        .collect();
+    assert_eq!(found, ["7:41 toString()"]);
+}

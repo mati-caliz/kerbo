@@ -6,6 +6,7 @@ use crate::lint::java::children;
 use crate::lint::java_calls::{
     Arity, Body, Call, Callable, ReturnType, Returns, TYPE_DECLARATIONS, Visibility, extract,
 };
+use crate::lint::java_chains::Chain;
 use crate::lint::java_constants::{Constant, declared_constants};
 use crate::lint::java_inference::unconditionally_dereferenced;
 use crate::lint::java_owner::{Owner, annotation_names};
@@ -81,6 +82,7 @@ pub struct JavaSummary {
     pub hierarchy: Vec<(String, Vec<String>)>,
     pub imports: Vec<String>,
     pub package_annotations: Vec<String>,
+    pub chains: Vec<Chain>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -130,6 +132,7 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.types.extend(extracted.types);
         summary.mentioned.extend(extracted.mentioned);
         summary.hierarchy.extend(extracted.hierarchy);
+        summary.chains.extend(extracted.chains);
         summary
             .constants
             .extend(declared_constants(&descendants(top_level), source));

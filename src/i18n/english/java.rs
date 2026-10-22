@@ -278,6 +278,18 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "The library (Spring with @NullMarked or @NonNullApi) promises that parameter is never null; the unannotated override says nothing, and whoever reads or analyzes it does not know what to expect. Like IntelliJ's NullableProblems.",
         "protected void doFilterInternal(HttpServletRequest request, ...) in a Spring 7 OncePerRequestFilter becomes doFilterInternal(@NonNull HttpServletRequest request, ...), or the package gets @NullMarked.",
     ),
+    RuleText::new(
+        "Call on a result that may be null",
+        "check for null first, or use Objects.requireNonNull with a message",
+        "The previous method in the chain is declared @Nullable in its library (like ResponseEntity's getBody()): if it returns null, this call throws NullPointerException. Like IntelliJ's DataFlowIssue.",
+        "response.getBody().error() becomes Objects.requireNonNull(response.getBody()).error(), or the null is checked first.",
+    ),
+    RuleText::new(
+        "Optional get() without checking it has a value",
+        "use orElseThrow() with a message, orElse(...) or ifPresent(...)",
+        "Chained to findFirst(), findAny(), max(), min() or ofNullable(), the Optional may be empty and get() throws NoSuchElementException without saying what was missing. Like IntelliJ's OptionalGetWithoutIsPresent.",
+        "orders.stream().filter(...).findFirst().get() becomes ....findFirst().orElseThrow(() -> new OrderNotFound(id)).",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

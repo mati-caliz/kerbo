@@ -278,6 +278,18 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "La librería (Spring con @NullMarked o @NonNullApi) promete que ese parámetro nunca es null; la redefinición sin anotar no dice nada, y quien la lea o la analice no sabe qué esperar. Como NullableProblems de IntelliJ.",
         "protected void doFilterInternal(HttpServletRequest request, ...) de un OncePerRequestFilter de Spring 7 se vuelve doFilterInternal(@NonNull HttpServletRequest request, ...), o el paquete lleva @NullMarked.",
     ),
+    RuleText::new(
+        "Llamada sobre un resultado que puede ser null",
+        "chequeá el null antes, o usá Objects.requireNonNull con un mensaje",
+        "El método anterior de la cadena está declarado @Nullable en su librería (como getBody() de ResponseEntity): si devuelve null, esta llamada tira NullPointerException. Como DataFlowIssue de IntelliJ.",
+        "respuesta.getBody().error() se vuelve Objects.requireNonNull(respuesta.getBody()).error(), o se chequea el null antes.",
+    ),
+    RuleText::new(
+        "get() de un Optional sin ver si tiene valor",
+        "usá orElseThrow() con un mensaje, orElse(...) o ifPresent(...)",
+        "Encadenado a findFirst(), findAny(), max(), min() u ofNullable(), el Optional puede estar vacío y get() tira NoSuchElementException sin decir qué faltaba. Como OptionalGetWithoutIsPresent de IntelliJ.",
+        "pedidos.stream().filter(...).findFirst().get() se vuelve ....findFirst().orElseThrow(() -> new PedidoNoEncontrado(id)).",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

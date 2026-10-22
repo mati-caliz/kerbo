@@ -5,12 +5,14 @@ mod go;
 mod imports;
 pub mod java;
 pub mod java_calls;
+pub mod java_chains;
 pub mod java_constants;
 mod java_curly;
 mod java_design;
 mod java_flow;
 mod java_hidden;
 pub mod java_inference;
+mod java_optional;
 mod java_order;
 pub mod java_owner;
 mod java_padding;
@@ -168,6 +170,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: Limits) -> Vec<LintFinding>
     findings.extend(java_curly::reported(&nodes, &lines));
     findings.extend(java_wrap::reported(&tokens));
     findings.extend(java_same_value::reported(root, source));
+    findings.extend(java_optional::reported(&nodes, source));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
     findings.sort_by_key(|finding| (finding.line, finding.column));
     findings

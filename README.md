@@ -347,6 +347,15 @@ De las inspecciones de IntelliJ, kerbo hace:
   o `try` (de ahí infiere que es no nulo), ni lo que la librería declara `@Nullable`, ni nada si
   el paquete del proyecto ya es `@NullMarked`; el retorno se marca aunque devuelva un literal.
 
+- `DataFlowIssue`, el caso de las cadenas (`data-flow-issue`): una llamada sobre el resultado de
+  un método que su librería declara `@Nullable`, en la misma expresión
+  (`respuesta.getBody().error()`, `SecurityContextHolder.getContext().getAuthentication().getName()`).
+  El tipo de cada paso sale de la firma del anterior en los jars. No marca si ese mismo resultado
+  se chequeó antes en el archivo (`!= null`, `assertThat(...).isNotNull()`, `assertNotNull`,
+  `requireNonNull`).
+- `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` encadenado a
+  `findFirst()`, `findAny()`, `max(...)`, `min(...)` u `Optional.ofNullable(...)`.
+
 Para leer las librerías, kerbo le pide a Maven el classpath una sola vez, sin red
 (`mvn -o dependency:build-classpath`), y lo guarda con la huella de los `pom.xml`; de los jars lee
 sólo el índice y las clases que necesita, sin bytecode. Con Gradle u otra herramienta, la lista de

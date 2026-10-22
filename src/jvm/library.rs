@@ -84,6 +84,35 @@ impl Library {
             .find_map(|found| label_of(&found.annotations))
     }
 
+    // Los métodos con ese nombre y cantidad de parámetros (estáticos también) de la primera clase
+    // que los declara, subiendo por la clase padre y las interfaces.
+    pub fn overloads(&self, class: &str, name: &str, arity: usize) -> Vec<Method> {
+        let mut pending = vec![class.to_owned()];
+        let mut seen = HashSet::new();
+        while let Some(current) = pending.pop() {
+            if !seen.insert(current.clone()) {
+                continue;
+            }
+            let Some(found) = self.class(&current) else {
+                continue;
+            };
+            let matching: Vec<Method> = found
+                .methods
+                .iter()
+                .filter(|method| {
+                    method.name == name && method.parameter_count() == arity && !method.is_private
+                })
+                .cloned()
+                .collect();
+            if !matching.is_empty() {
+                return matching;
+            }
+            pending.extend(found.interfaces.iter().cloned());
+            pending.extend(found.superclass.clone());
+        }
+        Vec::new()
+    }
+
     // El método que redefine uno de esta clase: el primero con ese nombre y cantidad de
     // parámetros, subiendo por la clase padre y las interfaces.
     pub fn inherited_method(&self, class: &str, name: &str, arity: usize) -> Option<(Rc<ClassFile>, Method)> {

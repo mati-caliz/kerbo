@@ -38,7 +38,7 @@ impl<'summary> ProjectTypes<'summary> {
     }
 }
 
-enum Resolved {
+pub enum Resolved {
     Project(String),
     Library(String),
 }
@@ -189,7 +189,7 @@ fn supertypes_of(
 // Un nombre simple de padre, con los imports del archivo: el importado (de la librería si la
 // tiene, si no del proyecto), uno del proyecto, uno de un import con comodín o del mismo paquete
 // que esté en la librería, o uno de `java.lang`.
-fn resolve(types: &ProjectTypes<'_>, library: &Library, summary: &JavaSummary, simple: &str) -> Resolved {
+pub fn resolve(types: &ProjectTypes<'_>, library: &Library, summary: &JavaSummary, simple: &str) -> Resolved {
     let in_project = types.declared.contains_key(simple);
     if let Some(imported) = summary
         .imports

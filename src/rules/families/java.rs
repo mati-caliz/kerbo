@@ -46,6 +46,8 @@ rule_family!(JavaRule {
     SameReturnValue => "same-return-value",
     UnusedMethod => "unused-method",
     NullableProblems => "nullable-problems",
+    DataFlowIssue => "data-flow-issue",
+    OptionalGetWithoutIsPresent => "optional-get-without-is-present",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {

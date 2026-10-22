@@ -832,6 +832,27 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Contra Qodana, con los jars que usó Qodana (los volúmenes de su caché): 84 coincidencias,
     ningún aviso de más (antes de la inferencia eran 23 de más) y 2 faltantes: anotaciones
     `@NotNull` que IntelliJ le agrega al JDK por fuera de los jars.
+- Nulos, primera parte (hecho, 2026-10-21):
+  - `data-flow-issue`: en una cadena de llamadas, un paso que la librería declara `@Nullable`
+    seguido de otra llamada sobre su resultado. Cada archivo guarda sus cadenas (raíz: una
+    variable con su tipo declarado o una clase; pasos con nombre, aridad y posición) y el índice
+    las recorre con los jars: el tipo de cada paso es la clase que devuelve el anterior según su
+    firma; con sobrecargas del mismo nombre y aridad, sólo si todas dicen lo mismo. Un resultado
+    ya chequeado antes en el archivo (por texto: `!= null`, `assertThat(...).isNotNull()`,
+    `assertNotNull`, `requireNonNull`) no se marca, como IntelliJ.
+  - Se probó seguir una variable inicializada con una llamada (`Cache cache = m.getCache(x);
+    cache.clear();`) y dio 31 avisos de más: el código real chequea con `if (x == null)
+    return;` o `x == null || x.algo()`, y eso pide flujo de datos de verdad, que queda para la
+    parte que sigue.
+  - Contra Qodana: 12 coincidencias, ningún aviso de más. Lo que falta son las otras variantes
+    (unboxing, argumento que puede ser null, variables, `Map.get` y lo del JDK, cuyas anotaciones
+    IntelliJ trae aparte).
+  - `optional-get-without-is-present` (por archivo, sin librerías): `get()` encadenado a lo que
+    crea el `Optional`. Las 3 de Qodana, exactas.
+- Lo que sigue en nulos: un grafo de control por método para seguir variables (asignada de algo
+  `@Nullable`, chequeada o no antes de usarla), argumentos que pueden ser null hacia parámetros no
+  nulos, y las anotaciones del JDK (`ct.sym` no las trae: hay que sumar una tabla propia de los
+  métodos que devuelven null, como `Map.get`).
 - Lo que sigue en el índice: "todas las implementaciones devuelven lo mismo" con la jerarquía, y
   campos, constructores y clases sin usar con las tablas de JPA, Jackson y la inyección.
 
