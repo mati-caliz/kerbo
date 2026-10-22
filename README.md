@@ -358,6 +358,13 @@ De las inspecciones de IntelliJ, kerbo hace:
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` encadenado a
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` u `Optional.ofNullable(...)`.
 
+- `AutoCloseableResource` (`auto-closeable-resource`): una llamada que crea algo que se cierra
+  (un `InputStream`, una `Connection`, un `ResultSet`, un `ExecutorService`, un `HttpClient`...)
+  fuera de un `try` con recursos: en una variable que no se cierra, no se devuelve ni se pasa a
+  otro método, o encadenada (`fabrica().getValidator()`). Qué se cierra sale de los jars, del tipo
+  que declara un método del proyecto o de una tabla propia del JDK; lo que devuelve un `get...` es
+  de quien lo da (el contenedor o el pool).
+
 Para leer las librerías, kerbo le pide a Maven el classpath una sola vez, sin red
 (`mvn -o dependency:build-classpath`), y lo guarda con la huella de los `pom.xml`; de los jars lee
 sólo el índice y las clases que necesita, sin bytecode. Con Gradle u otra herramienta, la lista de

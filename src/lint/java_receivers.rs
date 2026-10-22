@@ -153,7 +153,7 @@ fn receiver_of(invocation: Node<'_>, source: &[u8], variables: &Variables) -> Re
 
 // Las clases que encierran un nodo, de la más cercana a la más lejana; una clase anónima cuenta
 // como el tipo que crea.
-fn enclosing_types(node: Node<'_>, source: &[u8]) -> Vec<String> {
+pub fn enclosing_types(node: Node<'_>, source: &[u8]) -> Vec<String> {
     let mut types = Vec::new();
     let mut current = node.parent();
     while let Some(candidate) = current {

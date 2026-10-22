@@ -362,6 +362,13 @@ From IntelliJ's inspections, kerbo does:
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` chained to
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` or `Optional.ofNullable(...)`.
 
+- `AutoCloseableResource` (`auto-closeable-resource`): a call that creates something closeable (an
+  `InputStream`, a `Connection`, a `ResultSet`, an `ExecutorService`, an `HttpClient`...) outside a
+  try-with-resources: in a variable that is not closed, returned or passed to another method, or
+  chained (`factory().getValidator()`). What is closeable comes from the jars, from the type a
+  project method declares, or from kerbo's own JDK table; what a `get...` returns belongs to whoever
+  gives it (the container or the pool).
+
 To read libraries, kerbo asks Maven for the classpath once, offline
 (`mvn -o dependency:build-classpath`), and stores it with the fingerprint of the `pom.xml` files;
 from the jars it reads only the index and the classes it needs, no bytecode. With Gradle or any

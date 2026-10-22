@@ -10,6 +10,7 @@ use super::java_owner::{Owner, annotation_names, mentioned_name, owner_of};
 use super::java_receivers::{
     Receiver, StaticImports, Variables, simple_type_name, supertypes, variable_types,
 };
+use super::java_resources::{ResourceCandidate, resource_candidates};
 pub use super::java_returns::{ReturnType, Returns};
 use super::java_returns::{return_type, returned};
 use super::java_switch::{rule_bodies, yields_value};
@@ -82,6 +83,7 @@ pub struct Callable<'tree> {
     pub arity: Arity,
     pub returns: Returns,
     pub return_type: ReturnType,
+    pub returned: String,
     pub annotations: Vec<String>,
     pub owner: Owner,
 }
@@ -96,6 +98,7 @@ pub struct Call {
     pub result_used: bool,
 }
 
+#[derive(Default)]
 pub struct Extracted<'tree> {
     pub callables: Vec<Callable<'tree>>,
     pub calls: Vec<Call>,
@@ -105,6 +108,7 @@ pub struct Extracted<'tree> {
     pub hierarchy: Vec<(String, Vec<String>)>,
     pub chains: Vec<Chain>,
     pub null_flows: Vec<NullFlow>,
+    pub resources: Vec<ResourceCandidate>,
 }
 
 // Lo que declara y lo que llama una clase de nivel superior, con sus clases anidadas.
@@ -113,16 +117,7 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
     let constants = constants_in(&nodes, source);
     let mut discarded: HashSet<usize> = HashSet::new();
     let mut yielded: HashSet<usize> = HashSet::new();
-    let mut extracted = Extracted {
-        callables: Vec::new(),
-        calls: Vec::new(),
-        referenced: Vec::new(),
-        types: Vec::new(),
-        mentioned: Vec::new(),
-        hierarchy: Vec::new(),
-        chains: Vec::new(),
-        null_flows: Vec::new(),
-    };
+    let mut extracted = Extracted::default();
     let mut facts = NullFacts::default();
     let file_variables = variable_types(&nodes, source);
     let mut scopes: Vec<(usize, Variables)> = Vec::new();
@@ -150,6 +145,9 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
                 extracted.callables.extend(callable(node, source));
                 if let Some(body) = node.child_by_field_name(BODY_FIELD) {
                     extracted.null_flows.extend(null_flows(body, source, variables));
+                    extracted
+                        .resources
+                        .extend(resource_candidates(body, source, variables));
                 }
             }
             ENUM => extracted
@@ -232,6 +230,10 @@ fn callable<'tree>(declaration: Node<'tree>, source: &[u8]) -> Option<Callable<'
             returned(declaration, source)
         },
         return_type: return_type(declaration),
+        returned: declaration
+            .child_by_field_name(TYPE_FIELD)
+            .map(|written_type| simple_type_name(text(written_type, source)))
+            .unwrap_or_default(),
         annotations: annotation_names(declaration, source),
         owner: owner_of(declaration, source),
     })
@@ -274,6 +276,7 @@ fn implicit_enum_constructor<'tree>(declaration: Node<'tree>, source: &[u8]) -> 
         arity: Arity::Fixed,
         returns: Returns::Nothing,
         return_type: ReturnType::Void,
+        returned: String::new(),
         annotations: Vec::new(),
         owner: owner_of(declaration, source),
     })

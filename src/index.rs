@@ -1,7 +1,9 @@
 pub mod java;
 mod java_dereference;
+mod java_jdk;
 mod java_nullness;
 mod java_project;
+mod java_resources;
 mod java_rules;
 mod java_unused;
 

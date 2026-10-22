@@ -6,6 +6,7 @@ use crate::lint::java_constants::Constant;
 use crate::lint::java_null_flow::{Dereference, NullFlow};
 use crate::lint::java_owner::{Owner, OwnerKind};
 use crate::lint::java_receivers::Receiver;
+use crate::lint::java_resources::ResourceCandidate;
 
 const ABSENT: u64 = 0;
 const PRESENT: u64 = 1;
@@ -61,6 +62,11 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     writer.list(&summary.package_annotations, |writer, name| writer.text(name));
     writer.list(&summary.chains, write_chain);
     writer.list(&summary.null_flows, write_flow);
+    writer.list(&summary.resources, |writer, candidate| {
+        write_chain(writer, &candidate.origin);
+        writer.size(candidate.line);
+        writer.size(candidate.column);
+    });
     writer.list(&summary.constants, |writer, constant| {
         writer.text(&constant.owner);
         writer.text(&constant.name);
@@ -92,6 +98,13 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         package_annotations: reader.list(Reader::text)?,
         chains: reader.list(read_chain)?,
         null_flows: reader.list(read_flow)?,
+        resources: reader.list(|reader| {
+            Ok(ResourceCandidate {
+                origin: read_chain(reader)?,
+                line: reader.size()?,
+                column: reader.size()?,
+            })
+        })?,
         constants: reader.list(|reader| {
             Ok(Constant {
                 owner: reader.text()?,
@@ -119,6 +132,7 @@ fn write_declaration(writer: &mut Writer, declaration: &Declaration) {
         }
         Returns::Varied => writer.number(RETURNS_VARIED),
     }
+    writer.text(&declaration.returned);
     writer.number(match declaration.return_type {
         ReturnType::Void => RETURN_TYPE_VOID,
         ReturnType::Primitive => RETURN_TYPE_PRIMITIVE,
@@ -167,6 +181,7 @@ fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
             RETURNS_VARIED => Returns::Varied,
             _ => return Err(Corrupt),
         },
+        returned: reader.text()?,
         return_type: match reader.number()? {
             RETURN_TYPE_VOID => ReturnType::Void,
             RETURN_TYPE_PRIMITIVE => ReturnType::Primitive,

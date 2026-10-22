@@ -2,6 +2,7 @@ use super::java::{CallSite, Declaration, JavaSummary, lint_at};
 use super::java_dereference::nullable_dereferences;
 use super::java_nullness::{ProjectTypes, unannotated_overrides};
 use super::java_project::{IndexedSummary, Project, key_of};
+use super::java_resources::unclosed_resources;
 use super::java_unused::{Usage, unused_method};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
@@ -21,6 +22,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
         .map(|file| {
             let summary = file.summary;
             let mut in_file = nullable_dereferences(&types, library, summary);
+            in_file.extend(unclosed_resources(&types, library, summary));
             in_file.extend(summary.declarations.iter().flat_map(|declaration| {
                 let mut found = Vec::new();
                 if usage.sees_callers_of(declaration.visibility) {

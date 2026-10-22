@@ -48,6 +48,7 @@ rule_family!(JavaRule {
     NullableProblems => "nullable-problems",
     DataFlowIssue => "data-flow-issue",
     OptionalGetWithoutIsPresent => "optional-get-without-is-present",
+    AutoCloseableResource => "auto-closeable-resource",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {

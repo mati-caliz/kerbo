@@ -90,3 +90,21 @@ fn a_variable_from_a_nullable_call_is_reported_where_no_path_checks_it() {
     found.sort();
     assert_eq!(found, ["26:25 length()", "28:18 trim()", "8:15 hashCode()"]);
 }
+
+const JOBS: &str = "package app;\n\nimport java.io.InputStream;\nimport java.util.concurrent.ExecutorService;\nimport java.util.concurrent.Executors;\n\nclass Jobs {\n    void leak() {\n        ExecutorService pool = Executors.newFixedThreadPool(2);\n        pool.submit(() -> { });\n    }\n\n    void closed() {\n        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {\n            pool.submit(() -> { });\n        }\n    }\n\n    void handed() {\n        ExecutorService pool = Executors.newFixedThreadPool(2);\n        register(pool);\n    }\n\n    void register(ExecutorService pool) {\n        pool.shutdown();\n    }\n\n    InputStream open() {\n        return null;\n    }\n\n    int read() throws Exception {\n        return open().read();\n    }\n}\n";
+
+#[test]
+fn a_resource_created_outside_try_with_resources_is_reported() {
+    let summary = summary_of(JOBS);
+    let files = [IndexedSummary {
+        summary: &summary,
+        in_tests: false,
+    }];
+    let found: Vec<String> = project_lints(&files, &Library::load(&[]))
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "auto-closeable-resource")
+        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
+        .collect();
+    assert_eq!(found, ["9:42 ExecutorService", "33:16 InputStream"]);
+}

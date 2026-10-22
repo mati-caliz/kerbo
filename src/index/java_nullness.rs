@@ -36,6 +36,24 @@ impl<'summary> ProjectTypes<'summary> {
         }
         Self { declared }
     }
+
+    // Los métodos que declara un tipo del proyecto, con el archivo donde están.
+    pub fn declarations_of<'query>(
+        &'query self,
+        owner: &'query str,
+    ) -> impl Iterator<Item = (&'summary JavaSummary, &'summary Declaration)> + 'query {
+        self.declared
+            .get(owner)
+            .into_iter()
+            .flatten()
+            .flat_map(move |(summary, _)| {
+                summary
+                    .declarations
+                    .iter()
+                    .filter(move |declaration| declaration.owner.name == owner)
+                    .map(move |declaration| (*summary, declaration))
+            })
+    }
 }
 
 pub enum Resolved {
@@ -209,6 +227,9 @@ fn supertypes_of(
 // tiene, si no del proyecto), uno del proyecto, uno de un import con comodín o del mismo paquete
 // que esté en la librería, o uno de `java.lang`.
 pub fn resolve(types: &ProjectTypes<'_>, library: &Library, summary: &JavaSummary, simple: &str) -> Resolved {
+    if simple.contains(QUALIFIER_SEPARATOR) {
+        return Resolved::Library(simple.to_owned());
+    }
     let in_project = types.declared.contains_key(simple);
     if let Some(imported) = summary
         .imports

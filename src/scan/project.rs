@@ -8,7 +8,11 @@ use crate::limits::Limits;
 use crate::lint::LintFinding;
 use crate::rules::{Diagnostic, FileIdentity, JavaRule, RuleId, finding_diagnostics};
 
-const LIBRARY_RULES: [JavaRule; 2] = [JavaRule::NullableProblems, JavaRule::DataFlowIssue];
+const LIBRARY_RULES: [JavaRule; 3] = [
+    JavaRule::NullableProblems,
+    JavaRule::DataFlowIssue,
+    JavaRule::AutoCloseableResource,
+];
 
 #[derive(Debug)]
 pub struct IndexedFile {

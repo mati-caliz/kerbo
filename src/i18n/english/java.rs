@@ -290,6 +290,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Chained to findFirst(), findAny(), max(), min() or ofNullable(), the Optional may be empty and get() throws NoSuchElementException without saying what was missing. Like IntelliJ's OptionalGetWithoutIsPresent.",
         "orders.stream().filter(...).findFirst().get() becomes ....findFirst().orElseThrow(() -> new OrderNotFound(id)).",
     ),
+    RuleText::new(
+        "Resource opened without try-with-resources",
+        "open it in a try (...) { } so it is closed even if something fails",
+        "An InputStream, a connection, a ResultSet, an ExecutorService or an HttpClient that is not closed keeps files, connections or threads taken; without try-with-resources, an exception in the middle skips close(). Like IntelliJ's AutoCloseableResource.",
+        "ExecutorService pool = Executors.newFixedThreadPool(4); becomes try (ExecutorService pool = Executors.newFixedThreadPool(4)) { ... }.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

@@ -12,6 +12,7 @@ use crate::lint::java_inference::unconditionally_dereferenced;
 use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_owner::{Owner, annotation_names};
 use crate::lint::java_receivers::Receiver;
+use crate::lint::java_resources::ResourceCandidate;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::JavaRule;
 use crate::syntax::descendants;
@@ -56,6 +57,7 @@ pub struct Declaration {
     pub arity: Arity,
     pub returns: Returns,
     pub return_type: ReturnType,
+    pub returned: String,
     pub parameters: Vec<Parameter>,
     pub annotations: Vec<String>,
     pub owner: Owner,
@@ -85,6 +87,7 @@ pub struct JavaSummary {
     pub package_annotations: Vec<String>,
     pub chains: Vec<Chain>,
     pub null_flows: Vec<NullFlow>,
+    pub resources: Vec<ResourceCandidate>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -136,6 +139,7 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.hierarchy.extend(extracted.hierarchy);
         summary.chains.extend(extracted.chains);
         summary.null_flows.extend(extracted.null_flows);
+        summary.resources.extend(extracted.resources);
         summary
             .constants
             .extend(declared_constants(&descendants(top_level), source));
@@ -204,6 +208,7 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
         arity: callable.arity,
         returns: callable.returns,
         return_type: callable.return_type,
+        returned: callable.returned,
         annotations: callable.annotations,
         owner: callable.owner,
         parameters: callable

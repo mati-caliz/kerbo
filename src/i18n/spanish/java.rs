@@ -290,6 +290,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Encadenado a findFirst(), findAny(), max(), min() u ofNullable(), el Optional puede estar vacío y get() tira NoSuchElementException sin decir qué faltaba. Como OptionalGetWithoutIsPresent de IntelliJ.",
         "pedidos.stream().filter(...).findFirst().get() se vuelve ....findFirst().orElseThrow(() -> new PedidoNoEncontrado(id)).",
     ),
+    RuleText::new(
+        "Recurso que se abre sin try con recursos",
+        "abrilo en un try (...) { } para que se cierre aunque algo falle",
+        "Un InputStream, una conexión, un ResultSet, un ExecutorService o un HttpClient que no se cierra deja archivos, conexiones o hilos tomados; sin try con recursos, una excepción en el medio saltea el close(). Como AutoCloseableResource de IntelliJ.",
+        "ExecutorService pool = Executors.newFixedThreadPool(4); se vuelve try (ExecutorService pool = Executors.newFixedThreadPool(4)) { ... }.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

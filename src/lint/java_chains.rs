@@ -3,11 +3,13 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
-use super::java_receivers::Variables;
+use super::java_receivers::{Variables, enclosing_types};
 use crate::syntax::{named_children, one_based};
 
 const INVOCATION: &str = "method_invocation";
 const IDENTIFIER: &str = "identifier";
+const FIELD_ACCESS: &str = "field_access";
+const QUALIFIER_SEPARATOR: char = '.';
 const BINARY: &str = "binary_expression";
 const NULL: &str = "null_literal";
 const NOT_EQUAL: &str = "!=";
@@ -161,15 +163,28 @@ fn walk(
             column: one_based(start.column),
             checked: facts.is_checked(current, source),
         });
-        let object = current.child_by_field_name(OBJECT_FIELD)?;
+        let Some(object) = current.child_by_field_name(OBJECT_FIELD) else {
+            steps.reverse();
+            let enclosing = enclosing_types(current, source).into_iter().next()?;
+            return Some((ChainRoot::Class(enclosing), steps));
+        };
         if object.kind() == INVOCATION {
             current = object;
             continue;
         }
+        steps.reverse();
+        if object.kind() == FIELD_ACCESS {
+            let written = text(object, source);
+            let qualified_class = written
+                .rsplit(QUALIFIER_SEPARATOR)
+                .next()
+                .is_some_and(|last| last.starts_with(|first: char| first.is_ascii_uppercase()))
+                && written.starts_with(|first: char| first.is_ascii_lowercase());
+            return qualified_class.then(|| (ChainRoot::Class(written.to_owned()), steps));
+        }
         if object.kind() != IDENTIFIER {
             return None;
         }
-        steps.reverse();
         let written = text(object, source);
         let root = match variables.get(written) {
             Some(Some(declared)) => ChainRoot::Instance(declared.clone()),

@@ -861,6 +861,18 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   librería, y a través de un cast). Los tipos de las variables se miran por método: el mismo
   nombre puede ser de otro tipo en otro método. Los chequeos por texto valen dentro del método.
   - Contra Qodana: 17 coincidencias, ningún aviso de más.
+- Recursos sin cerrar (hecho, 2026-10-21): `auto-closeable-resource`. Cada método deja sus
+  candidatos (`src/lint/java_resources.rs`): una llamada que inicializa una variable local que
+  nunca va a un `try (variable)`, no se devuelve (fuera de una lambda), no se asigna, no recibe
+  `close()` ni se pasa como argumento (fuera de una lambda); y una llamada sobre cuyo resultado se
+  llama a otra. El índice decide si lo que devuelve se cierra, siguiendo la cadena por el proyecto
+  (el tipo que declara cada método, resuelto con los imports de su archivo), los jars (subiendo
+  hasta `AutoCloseable`) o la tabla del JDK (`src/index/java_jdk.rs`: qué tipos se cierran, cuáles
+  IntelliJ no pide cerrar, y qué devuelven `Executors.new*`, `HttpClient.newHttpClient`,
+  `Files.new*`, `getConnection`...). Lo que devuelve un `get...` no cuenta como creado.
+  - Contra Qodana: 9 de 10 coincidencias. Falta `dataSource.unwrap(HikariDataSource.class)`
+    (devuelve un genérico) y sobra uno: un `ExecutorService` de `AuditTrailIntegrationTest` igual
+    en forma a otros dos del mismo archivo que Qodana sí marca; no se encontró qué lo distingue.
 - Lo que sigue en nulos: el tipo de retorno de los métodos del proyecto (para seguir cadenas que
   pasan por ellos), argumentos que pueden ser null hacia parámetros no nulos (también los que
   IntelliJ infiere no nulos porque el método los desreferencia), unboxing, y las anotaciones del
