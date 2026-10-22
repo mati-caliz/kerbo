@@ -751,7 +751,14 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     plantillas (Thymeleaf con `th:utext`, JSP con `<%= %>`) ni `@ResponseBody` que devuelve HTML.
   - FindSecBugs como segunda referencia: pide compilar el Benchmark con Maven.
   - Los campos no se siguen: un dato del usuario guardado en `this.x` y leído en otro método se
-    pierde. Tampoco lambdas ni clases anónimas.
+    pierde.
+  - Lambdas y clases anónimas (hecho, 2026-10-22): corren en el lugar con lo que capturan. Los
+    parámetros de la lambda de `forEach`, `map`, `filter`, `ifPresent`, `thenApply` y parecidos valen
+    lo que trae el receptor, y lo que devuelve sólo sale como resultado en los métodos que lo usan
+    así (`map`, `reduce`, `orElseGet`, `computeIfAbsent`...). Con `orElseThrow` no: la primera
+    versión daba 2 falsos en gastronova porque el mensaje de la excepción, armado con el id del
+    pedido, contaminaba la entidad que devolvía el repositorio. En el Benchmark sigue en 100 % sin
+    falsos positivos; en los tres servicios, Guava, commons-lang y junit4, ningún aviso.
   - Los sumideros con receptor desconocido (una cadena `a.b().query(...)`) no se miran.
   - Sumideros de MyBatis (`${}` en los mapeos XML y en `@Select`).
 - Contaminación en Python (hecho, 2026-10-22): las cuatro reglas pasan a una familia propia
