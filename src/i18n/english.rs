@@ -48,6 +48,10 @@ impl Catalog for English {
             }
             Text::HelpFixRule => "Only the fixes of this rule (can be repeated)",
             Text::HelpDryRun => "Shows the patch without writing the files",
+            Text::AboutFmt => "Formats the Go files exactly like gofmt",
+            Text::HelpFmtCheck => {
+                "Writes nothing: lists the files that would change and exits with 1 if there are any"
+            }
             Text::HelpSince => "Fixes only the problems on lines changed since that git reference",
             Text::FixAllTitle => "fix everything mechanical in the file",
             Text::AboutKerbo => "Multi-language code quality analyzer",
@@ -317,6 +321,7 @@ impl Catalog for English {
                 reason,
             } => fixes::suppressed(path, *line, *rule, reason),
             Notice::Fix(notice) => fixes::notice(notice),
+            Notice::Format(notice) => fixes::format_notice(notice),
             Notice::DaemonStarted { pid, port } => format!("daemon started (process {pid}, port {port})"),
             Notice::DaemonAlreadyRunning { pid, port } => {
                 format!("the daemon was already running (process {pid}, port {port})")

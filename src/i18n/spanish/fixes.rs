@@ -1,5 +1,5 @@
 use super::counted;
-use crate::i18n::catalog::{FixNotice, SINGLE};
+use crate::i18n::catalog::{FixNotice, FormatNotice, SINGLE};
 use crate::rules::RuleId;
 
 pub fn notice(notice: &FixNotice) -> String {
@@ -24,6 +24,22 @@ pub fn notice(notice: &FixNotice) -> String {
             plural_verb(*count, "queda", "quedan"),
             counted(*count, "arreglo que se pisa", "arreglos que se pisan")
         ),
+    }
+}
+
+pub fn format_notice(notice: &FormatNotice) -> String {
+    match notice {
+        FormatNotice::Written { files, total } => format!(
+            "{} de {total}",
+            counted(*files, "archivo formateado", "archivos formateados")
+        ),
+        FormatNotice::Unformatted { files, total } => format!(
+            "{} de {total} sin el formato de gofmt",
+            counted(*files, "archivo", "archivos")
+        ),
+        FormatNotice::Unparsable { path } => {
+            format!("{path}: no parsea limpio con tree-sitter-go; quedó como estaba")
+        }
     }
 }
 

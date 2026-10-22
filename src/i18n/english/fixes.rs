@@ -1,5 +1,5 @@
 use super::counted;
-use crate::i18n::catalog::FixNotice;
+use crate::i18n::catalog::{FixNotice, FormatNotice};
 use crate::rules::RuleId;
 
 pub fn notice(notice: &FixNotice) -> String {
@@ -22,6 +22,24 @@ pub fn notice(notice: &FixNotice) -> String {
             "{} left that overlap with others: review them by hand",
             counted(*count, "fix", "fixes")
         ),
+    }
+}
+
+pub fn format_notice(notice: &FormatNotice) -> String {
+    match notice {
+        FormatNotice::Written { files, total } => format!(
+            "{} of {total}",
+            counted(*files, "file formatted", "files formatted")
+        ),
+        FormatNotice::Unformatted { files, total } => {
+            format!(
+                "{} of {total} not formatted like gofmt",
+                counted(*files, "file", "files")
+            )
+        }
+        FormatNotice::Unparsable { path } => {
+            format!("{path}: does not parse cleanly with tree-sitter-go; left as it was")
+        }
     }
 }
 

@@ -305,7 +305,7 @@ pub fn wanted_fix<'diagnostic>(
     diagnostic.fix.as_ref().filter(|_| wanted)
 }
 
-fn write_atomically(path: &Path, contents: &str) -> io::Result<()> {
+pub fn write_atomically(path: &Path, contents: &str) -> io::Result<()> {
     let name = path
         .file_name()
         .map(|name| name.to_string_lossy())

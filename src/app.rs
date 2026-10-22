@@ -38,6 +38,10 @@ pub fn run(
         Command::Baseline(arguments) => (baseline(arguments, directory, lang, terminal), EXIT_FAILURE),
         Command::Explain { rule } => (explain_rule(*rule, lang, terminal), EXIT_FAILURE),
         Command::Fix(arguments) => (fixing::run(arguments, directory, lang, terminal), EXIT_FAILURE),
+        Command::Fmt(arguments) => (
+            formatting::run(arguments, directory, lang, terminal),
+            EXIT_FAILURE,
+        ),
         Command::Hook(arguments) => (
             hook::run(arguments, directory, lang, terminal),
             hook::NON_BLOCKING_ERROR,
@@ -265,6 +269,7 @@ const fn exit_status(failures: &[ScanFailure], diagnostics: &[Diagnostic]) -> u8
 }
 
 mod fixing;
+mod formatting;
 mod hook;
 mod lsp;
 mod mcp;

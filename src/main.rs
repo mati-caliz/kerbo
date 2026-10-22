@@ -9,6 +9,7 @@ mod deploy;
 mod diff;
 mod duplicates;
 mod fix;
+mod formatter;
 mod guard;
 mod i18n;
 mod index;

@@ -1,12 +1,12 @@
 use super::{
-    BlockUnit, Cheat, FixNotice, FunctionName, Lang, LangPreference, Message, Notice, OsvProblem, Problem,
-    Summary, Text,
+    BlockUnit, Cheat, FixNotice, FormatNotice, FunctionName, Lang, LangPreference, Message, Notice,
+    OsvProblem, Problem, Summary, Text,
 };
 use crate::rules::RuleId;
 
 const LANGS: [Lang; 2] = [Lang::Spanish, Lang::English];
 
-const TEXTS: [Text; 42] = [
+const TEXTS: [Text; 44] = [
     Text::WhyLabel,
     Text::FixLabel,
     Text::ExampleLabel,
@@ -30,6 +30,8 @@ const TEXTS: [Text; 42] = [
     Text::AboutDaemonStop,
     Text::AboutDaemonStatus,
     Text::AboutFix,
+    Text::AboutFmt,
+    Text::HelpFmtCheck,
     Text::HelpFixRule,
     Text::HelpDryRun,
     Text::HelpSince,
@@ -242,6 +244,11 @@ fn notices() -> Vec<Notice> {
             introduced: 1,
         }),
         Notice::Fix(FixNotice::Left { count: 2 }),
+        Notice::Format(FormatNotice::Written { files: 1, total: 3 }),
+        Notice::Format(FormatNotice::Unformatted { files: 2, total: 2 }),
+        Notice::Format(FormatNotice::Unparsable {
+            path: "main.go".to_owned(),
+        }),
         Notice::OsvDatabaseSaved {
             ecosystem: "npm".to_owned(),
             advisories: 2,

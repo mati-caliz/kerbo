@@ -48,6 +48,10 @@ impl Catalog for Spanish {
             }
             Text::HelpFixRule => "Sólo los arreglos de esta regla (se puede repetir)",
             Text::HelpDryRun => "Muestra el parche sin escribir los archivos",
+            Text::AboutFmt => "Formatea los archivos Go igual que gofmt",
+            Text::HelpFmtCheck => {
+                "No escribe nada: lista los archivos que cambiarían y sale con 1 si hay alguno"
+            }
             Text::HelpSince => {
                 "Arregla sólo los problemas de las líneas que cambiaron desde esa referencia de git"
             }
@@ -317,6 +321,7 @@ impl Catalog for Spanish {
                 reason,
             } => fixes::suppressed(path, *line, *rule, reason),
             Notice::Fix(notice) => fixes::notice(notice),
+            Notice::Format(notice) => fixes::format_notice(notice),
             Notice::DaemonStarted { pid, port } => {
                 format!("demonio arrancado (proceso {pid}, puerto {port})")
             }

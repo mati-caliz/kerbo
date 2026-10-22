@@ -53,6 +53,8 @@ pub enum Text {
     AboutDaemonStop,
     AboutDaemonStatus,
     AboutFix,
+    AboutFmt,
+    HelpFmtCheck,
     HelpFixRule,
     HelpDryRun,
     HelpSince,
@@ -284,6 +286,7 @@ pub enum Notice {
         reason: String,
     },
     Fix(FixNotice),
+    Format(FormatNotice),
     DaemonStarted {
         pid: u32,
         port: u16,
@@ -311,6 +314,13 @@ pub enum FixNotice {
     Previewed { count: usize, files: usize },
     Withheld { path: String, introduced: usize },
     Left { count: usize },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormatNotice {
+    Written { files: usize, total: usize },
+    Unformatted { files: usize, total: usize },
+    Unparsable { path: String },
 }
 
 pub(super) const SINGLE: usize = 1;

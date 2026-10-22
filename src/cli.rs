@@ -22,6 +22,8 @@ const DAEMON_START_COMMAND: &str = "start";
 const DAEMON_STOP_COMMAND: &str = "stop";
 const DAEMON_STATUS_COMMAND: &str = "status";
 const FIX_COMMAND: &str = "fix";
+const FMT_COMMAND: &str = "fmt";
+const CHECK_ARGUMENT: &str = "check";
 const RULES_ARGUMENT: &str = "rules";
 const DRY_RUN_ARGUMENT: &str = "dry_run";
 const SINCE_ARGUMENT: &str = "since";
@@ -57,6 +59,7 @@ pub enum Command {
         rule: RuleId,
     },
     Fix(FixArgs),
+    Fmt(FmtArgs),
     Hook(HookArgs),
     Mcp,
     #[command(name = OSV_DOWNLOAD_COMMAND)]
@@ -87,6 +90,7 @@ impl Command {
             Self::Baseline(arguments) => arguments.config.as_deref(),
             Self::Hook(arguments) => arguments.config.as_deref(),
             Self::Fix(arguments) => arguments.config.as_deref(),
+            Self::Fmt(arguments) => arguments.config.as_deref(),
             Self::Explain { .. } | Self::Mcp | Self::Lsp | Self::Daemon { .. } | Self::OsvDownload { .. } => {
                 None
             }
@@ -114,6 +118,16 @@ pub struct FixArgs {
     pub dry_run: bool,
     #[arg(long)]
     pub since: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct FmtArgs {
+    #[arg(default_value = ".")]
+    pub paths: Vec<PathBuf>,
+    #[arg(long)]
+    pub check: bool,
+    #[arg(long)]
+    pub config: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -191,6 +205,7 @@ pub fn command(lang: Lang) -> clap::Command {
                 })
         })
         .mut_subcommand(FIX_COMMAND, |fix| fix_command(fix, lang))
+        .mut_subcommand(FMT_COMMAND, |fmt| fmt_command(fmt, lang))
         .mut_subcommand(HOOK_COMMAND, |hook| {
             config_argument(hook, lang).about(lang.text(Text::AboutHook))
         })
@@ -238,6 +253,13 @@ fn fix_command(command: clap::Command, lang: Lang) -> clap::Command {
             arg.help(lang.text(Text::HelpSince))
                 .value_name(lang.text(Text::ValueReference))
         })
+}
+
+fn fmt_command(command: clap::Command, lang: Lang) -> clap::Command {
+    config_argument(command, lang)
+        .about(lang.text(Text::AboutFmt))
+        .mut_arg(PATHS_ARGUMENT, |arg| arg.help(lang.text(Text::HelpPaths)))
+        .mut_arg(CHECK_ARGUMENT, |arg| arg.help(lang.text(Text::HelpFmtCheck)))
 }
 
 fn config_argument(command: clap::Command, lang: Lang) -> clap::Command {
