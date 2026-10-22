@@ -840,9 +840,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     que es un recorrido de carpetas salvo que el router limpie la ruta.
   - En tus proyectos con Go (atlas, despe, dotfiles y soma): ningún aviso. La primera versión daba
     uno, falso: el gateway de dotfiles reenvía la respuesta de otro servidor con su `Content-Type`.
-- Pendientes de contaminación en Go:
-  - Los campos de un struct no se siguen (`h.db.Query(...)` con `h` un handler no sabe el tipo de
-    `db`; cae en el nombre).
+- Campos de struct en Go (hecho, 2026-10-22): el tipo de `h.store` sale del struct declarado en el
+  archivo, así `h.store.Query(...)` con `store *sql.DB` es un sumidero y `h.db.Query(...)` con `db`
+  un caché propio ya no lo es (antes se decidía por el nombre del campo). Los structs de otro
+  archivo del paquete todavía no se ven: ahí sigue decidiendo el nombre. En los tests de Semgrep, los
+  mismos avisos; en tus proyectos con Go, ninguno.
 - Funciones anónimas en Go (hecho, 2026-10-22): como las clausuras de JavaScript, la de un
   `HandleFunc`, un `go func() { ... }()` o una que se guarda en una variable corre en el lugar con
   lo que captura; un parámetro `*http.Request` trae datos del usuario, lo que les asigna a las
@@ -1642,9 +1644,9 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
 - Con el formateador, compilar los tests con cobertura queda al borde de los 1,5 GB del gate: sin
   la caché caliente lo mata el límite de memoria (SIGKILL). Pasa, pero hay que ganar margen
   (partir el crate o bajar la información de depuración de los tests) antes de que crezca más.
-- Test intermitente (no es del formateador): `osv::transport::tests::reports_what_curl_says_when_it_fails`
-  a veces falla con "Broken pipe": el curl falso termina antes de leer el cuerpo que se le escribe.
-  Hay que ignorar el `BrokenPipe` al escribir la entrada de curl y quedarse con lo que dice curl.
+- El test intermitente de osv (`reports_what_curl_says_when_it_fails`, "Broken pipe" cuando el curl
+  falso termina antes de leer el cuerpo) quedó arreglado (2026-10-22): si curl sale antes de leer, la
+  escritura se ignora y vale lo que curl dice al salir. Pasaba igual con el curl de verdad.
 
 ### 14. Más migraciones: Django y Rails
 

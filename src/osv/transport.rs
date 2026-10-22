@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::fmt::Write as _;
 use std::fs;
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -65,8 +65,13 @@ impl Curl {
 
     fn run(mut command: Command, input: &[u8]) -> Result<Vec<u8>, String> {
         let mut child = command.spawn().map_err(|error| error.to_string())?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(input).map_err(|error| error.to_string())?;
+        // Si curl termina antes de leer el cuerpo, la escritura da BrokenPipe: lo que importa es
+        // lo que curl dice al salir.
+        if let Some(mut stdin) = child.stdin.take()
+            && let Err(error) = stdin.write_all(input)
+            && error.kind() != ErrorKind::BrokenPipe
+        {
+            return Err(error.to_string());
         }
         let output = child.wait_with_output().map_err(|error| error.to_string())?;
         checked(output)

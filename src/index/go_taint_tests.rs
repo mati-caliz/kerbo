@@ -132,6 +132,25 @@ func Register(db *sql.DB) {
 }
 "#;
 
+const FIELDS: &str = r#"package server
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+type Handler struct {
+	store *sql.DB
+	db    *Cache
+}
+
+func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
+	term := r.URL.Query().Get("term")
+	h.store.Query("SELECT * FROM logs WHERE term = '" + term + "'")
+	h.db.Query("logs:" + term)
+}
+"#;
+
 fn taints_of(source: &str) -> Vec<TaintMethod> {
     let mut parser = Parser::new();
     parser
@@ -202,6 +221,21 @@ fn anonymous_functions_see_what_they_capture() {
         .map(|finding| format!("{} {}", finding.line, finding.kind.rule().as_str()))
         .collect();
     assert_eq!(found, ["14 sql-injection", "22 xss", "29 xss"]);
+}
+
+#[test]
+fn struct_fields_carry_their_declared_type() {
+    let server = taints_of(FIELDS);
+    let files = [GoFile {
+        path: "internal/server/handler.go",
+        taints: &server,
+    }];
+    let found: Vec<String> = go_tainted(&files)
+        .into_iter()
+        .flatten()
+        .map(|finding| format!("{} {}", finding.line, finding.kind.rule().as_str()))
+        .collect();
+    assert_eq!(found, ["15 sql-injection"]);
 }
 
 #[test]

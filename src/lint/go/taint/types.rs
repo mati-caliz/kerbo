@@ -9,6 +9,10 @@ const PARAMETER: &str = "parameter_declaration";
 const VARIADIC_PARAMETER: &str = "variadic_parameter_declaration";
 const VAR_SPEC: &str = "var_spec";
 const VAR_DECLARATION: &str = "var_declaration";
+const TYPE_SPEC: &str = "type_spec";
+const STRUCT_TYPE: &str = "struct_type";
+const FIELD_DECLARATION: &str = "field_declaration";
+const FIELD_SEPARATOR: char = '.';
 const POINTER: &str = "pointer_type";
 const QUALIFIED: &str = "qualified_type";
 const TYPE_IDENTIFIER: &str = "type_identifier";
@@ -20,10 +24,12 @@ const TYPE_FIELD: &str = "type";
 pub const LOCAL_PREFIX: &str = "@";
 
 // Los tipos declarados de las variables que se ven desde una función: los parámetros, los `var x T`
-// de ella y de las funciones que la contienen, y las variables del paquete.
+// de ella y de las funciones que la contienen, y las variables del paquete. También los campos de
+// los structs del archivo, como `@Handler.db`.
 #[derive(Debug, Default)]
 pub struct Types {
     declared: HashMap<String, String>,
+    fields: HashMap<String, String>,
 }
 
 impl Types {
@@ -37,7 +43,18 @@ impl Types {
             .filter(|node| matches!(node.kind(), PARAMETER | VARIADIC_PARAMETER | VAR_SPEC))
             .flat_map(|declaration| typed_names(declaration, source, imports))
             .collect();
-        Self { declared }
+        let fields = descendants(root)
+            .into_iter()
+            .filter(|node| node.kind() == TYPE_SPEC)
+            .flat_map(|spec| struct_fields(spec, source, imports))
+            .collect();
+        Self { declared, fields }
+    }
+
+    pub fn field(&self, owner: &str, field: &str) -> Option<&str> {
+        self.fields
+            .get(&format!("{owner}{FIELD_SEPARATOR}{field}"))
+            .map(String::as_str)
     }
 
     pub fn get(&self, name: &str) -> Option<&str> {
@@ -47,6 +64,25 @@ impl Types {
     pub fn declare(&mut self, name: &str, written: String) {
         self.declared.insert(name.to_owned(), written);
     }
+}
+
+fn struct_fields(spec: Node<'_>, source: &[u8], imports: &Imports) -> Vec<(String, String)> {
+    let (Some(name), Some(body)) = (
+        spec.child_by_field_name(NAME_FIELD),
+        spec.child_by_field_name(TYPE_FIELD),
+    ) else {
+        return Vec::new();
+    };
+    if body.kind() != STRUCT_TYPE {
+        return Vec::new();
+    }
+    let owner = format!("{LOCAL_PREFIX}{}", name.utf8_text(source).unwrap_or_default());
+    descendants(body)
+        .into_iter()
+        .filter(|node| node.kind() == FIELD_DECLARATION)
+        .flat_map(|declaration| typed_names(declaration, source, imports))
+        .map(|(field, written)| (format!("{owner}{FIELD_SEPARATOR}{field}"), written))
+        .collect()
 }
 
 fn typed_names(declaration: Node<'_>, source: &[u8], imports: &Imports) -> Vec<(String, String)> {

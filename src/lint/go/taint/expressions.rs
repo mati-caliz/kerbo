@@ -154,6 +154,11 @@ impl Interpreter<'_, '_> {
             kind if WRAPPERS.contains(&kind) => named_children(node)
                 .first()
                 .and_then(|inner| self.type_of(*inner)),
+            SELECTOR => {
+                let owner = self.type_of(node.child_by_field_name(OPERAND_FIELD)?)?;
+                let field = self.text(node.child_by_field_name(FIELD_FIELD)?);
+                self.types.field(&owner, field).map(str::to_owned)
+            }
             CALL => {
                 let target = call_target(self, node)?;
                 tables::returned_type(&target.qualified, target.receiver_type.as_deref(), &target.method)
