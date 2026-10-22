@@ -296,6 +296,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Un InputStream, una conexión, un ResultSet, un ExecutorService o un HttpClient que no se cierra deja archivos, conexiones o hilos tomados; sin try con recursos, una excepción en el medio saltea el close(). Como AutoCloseableResource de IntelliJ.",
         "ExecutorService pool = Executors.newFixedThreadPool(4); se vuelve try (ExecutorService pool = Executors.newFixedThreadPool(4)) { ... }.",
     ),
+    RuleText::new(
+        "Campo que nadie usa",
+        "borralo, o usalo donde haga falta",
+        "Ningún código ni texto del proyecto lo nombra, y no lo usa ningún framework conocido (un campo con @Autowired, @Column, @Mock o @Value, o uno de instancia en una clase de Lombok o JPA). Código muerto que confunde a quien lo lee. Como unused de IntelliJ, sin el ruido de los frameworks.",
+        "private static final int MAX_PAGINA = 50; que nadie lee se borra.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

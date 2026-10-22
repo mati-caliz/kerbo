@@ -1,5 +1,5 @@
 use super::codec::{Corrupt, Reader, Writer};
-use crate::index::java::{CallSite, Declaration, JavaSummary, Parameter, Position};
+use crate::index::java::{CallSite, Declaration, Field, JavaSummary, Parameter, Position};
 use crate::lint::java_calls::{Arity, Body, ReturnType, Returns, Visibility};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::lint::java_constants::Constant;
@@ -72,6 +72,15 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
         writer.text(&constant.name);
         write_visibility(writer, constant.visibility);
     });
+    writer.list(&summary.fields, |writer, field| {
+        writer.text(&field.name);
+        write_position(writer, &field.position);
+        write_visibility(writer, field.visibility);
+        write_flag(writer, field.is_static);
+        writer.list(&field.annotations, |writer, name| writer.text(name));
+        write_owner(writer, &field.owner);
+    });
+    writer.list(&summary.identifiers, |writer, name| writer.text(name));
 }
 
 pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corrupt> {
@@ -112,6 +121,17 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
                 visibility: read_visibility(reader)?,
             })
         })?,
+        fields: reader.list(|reader| {
+            Ok(Field {
+                name: reader.text()?,
+                position: read_position(reader)?,
+                visibility: read_visibility(reader)?,
+                is_static: read_flag(reader)?,
+                annotations: reader.list(Reader::text)?,
+                owner: read_owner(reader)?,
+            })
+        })?,
+        identifiers: reader.list(Reader::text)?,
     }))
 }
 
@@ -145,7 +165,11 @@ fn write_declaration(writer: &mut Writer, declaration: &Declaration) {
         write_flag(writer, parameter.dereferenced);
     });
     writer.list(&declaration.annotations, |writer, name| writer.text(name));
-    writer.number(match declaration.owner.kind {
+    write_owner(writer, &declaration.owner);
+}
+
+fn write_owner(writer: &mut Writer, owner: &Owner) {
+    writer.number(match owner.kind {
         OwnerKind::Class => OWNER_CLASS,
         OwnerKind::Interface => OWNER_INTERFACE,
         OwnerKind::Enum => OWNER_ENUM,
@@ -153,8 +177,8 @@ fn write_declaration(writer: &mut Writer, declaration: &Declaration) {
         OwnerKind::Annotation => OWNER_ANNOTATION,
         OwnerKind::Local => OWNER_LOCAL,
     });
-    writer.text(&declaration.owner.name);
-    writer.list(&declaration.owner.annotations, |writer, name| writer.text(name));
+    writer.text(&owner.name);
+    writer.list(&owner.annotations, |writer, name| writer.text(name));
 }
 
 fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
@@ -197,19 +221,23 @@ fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
             })
         })?,
         annotations: reader.list(Reader::text)?,
-        owner: Owner {
-            kind: match reader.number()? {
-                OWNER_CLASS => OwnerKind::Class,
-                OWNER_INTERFACE => OwnerKind::Interface,
-                OWNER_ENUM => OwnerKind::Enum,
-                OWNER_RECORD => OwnerKind::Record,
-                OWNER_ANNOTATION => OwnerKind::Annotation,
-                OWNER_LOCAL => OwnerKind::Local,
-                _ => return Err(Corrupt),
-            },
-            name: reader.text()?,
-            annotations: reader.list(Reader::text)?,
+        owner: read_owner(reader)?,
+    })
+}
+
+fn read_owner(reader: &mut Reader<'_>) -> Result<Owner, Corrupt> {
+    Ok(Owner {
+        kind: match reader.number()? {
+            OWNER_CLASS => OwnerKind::Class,
+            OWNER_INTERFACE => OwnerKind::Interface,
+            OWNER_ENUM => OwnerKind::Enum,
+            OWNER_RECORD => OwnerKind::Record,
+            OWNER_ANNOTATION => OwnerKind::Annotation,
+            OWNER_LOCAL => OwnerKind::Local,
+            _ => return Err(Corrupt),
         },
+        name: reader.text()?,
+        annotations: reader.list(Reader::text)?,
     })
 }
 

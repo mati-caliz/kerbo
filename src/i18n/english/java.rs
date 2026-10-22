@@ -296,6 +296,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "An InputStream, a connection, a ResultSet, an ExecutorService or an HttpClient that is not closed keeps files, connections or threads taken; without try-with-resources, an exception in the middle skips close(). Like IntelliJ's AutoCloseableResource.",
         "ExecutorService pool = Executors.newFixedThreadPool(4); becomes try (ExecutorService pool = Executors.newFixedThreadPool(4)) { ... }.",
     ),
+    RuleText::new(
+        "Field nobody uses",
+        "delete it, or use it where it is needed",
+        "No code or string in the project names it, and no known framework uses it (a field with @Autowired, @Column, @Mock or @Value, or an instance field in a Lombok or JPA class). Dead code that confuses whoever reads it. Like IntelliJ's unused, without the framework noise.",
+        "private static final int MAX_PAGE = 50; that nobody reads gets deleted.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

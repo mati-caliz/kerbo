@@ -1,4 +1,4 @@
-use super::java::{Declaration, lint_at};
+use super::java::{Declaration, Field, lint_at};
 use super::java_project::{IndexedSummary, Project};
 use crate::lint::LintFinding;
 use crate::lint::java_calls::Visibility;
@@ -80,6 +80,61 @@ const CALLED_BY_NAME: &[&str] = &[
     "tearDown",
     "suite",
 ];
+// La inyección escribe el campo, pero si nadie lo lee sobra igual. `@Mock`, `@Spy` y `@MockitoBean`
+// no están: se inyectan en lo que se prueba o reemplazan un bean del contexto.
+const INJECTION_ANNOTATIONS: &[&str] = &[
+    "Autowired",
+    "Inject",
+    "Resource",
+    "Value",
+    "Qualifier",
+    "PersistenceContext",
+    "LocalServerPort",
+];
+// Anotaciones de clase que no leen los campos de instancia: los estereotipos de Spring, la
+// configuración de los tests y los constructores de Lombok. Con cualquier otra (`@Data`, `@Getter`,
+// `@Entity`, `@JsonIgnoreProperties`, `@ConfigurationProperties`, una propia), un framework puede
+// estar leyéndolos.
+const FIELD_BLIND_OWNERS: &[&str] = &[
+    "Service",
+    "Component",
+    "Controller",
+    "RestController",
+    "Repository",
+    "Configuration",
+    "TestConfiguration",
+    "RequestMapping",
+    "Validated",
+    "Order",
+    "Profile",
+    "ExtendWith",
+    "SpringBootTest",
+    "WebMvcTest",
+    "DataJpaTest",
+    "JdbcTest",
+    "JsonTest",
+    "RestClientTest",
+    "AutoConfigureMockMvc",
+    "AutoConfigureTestDatabase",
+    "ActiveProfiles",
+    "Import",
+    "TestPropertySource",
+    "DirtiesContext",
+    "Sql",
+    "Testcontainers",
+    "DisplayName",
+    "Tag",
+    "Nested",
+    "TestInstance",
+    "Execution",
+    "RequiredArgsConstructor",
+    "NoArgsConstructor",
+    "AllArgsConstructor",
+    "Slf4j",
+    "Log4j2",
+];
+// Los campos que lee la serialización de Java por su nombre.
+const SERIALIZATION_FIELDS: &[&str] = &["serialVersionUID", "serialPersistentFields"];
 const ACCESSOR_PREFIXES: &[&str] = &["get", "is", "set"];
 const JUNIT3_TEST_PREFIX: &str = "test";
 // Una aplicación se reconoce por la anotación de su framework: un `main` solo no alcanza, porque
@@ -127,7 +182,7 @@ pub fn unused_method(
         && declaration
             .annotations
             .iter()
-            .all(|annotation| PASSIVE_ANNOTATIONS.contains(&annotation.as_str()))
+            .all(|annotation| is_passive(annotation))
         && !declaration
             .owner
             .annotations
@@ -141,6 +196,46 @@ pub fn unused_method(
             declaration.name.clone(),
         )
     })
+}
+
+// Un campo que nada del proyecto nombra, ni en el código ni en un texto. Uno con una anotación que
+// no es pasiva ni de inyección (`@Column`, `@Mock`, `@JsonProperty`...) lo usa un framework, y los
+// de instancia de una clase con una anotación que puede leerlos (Lombok, JPA, Jackson) también. Lo
+// privado se mira en su archivo; lo público y protegido, sólo en una aplicación.
+pub fn unused_field(
+    project: &Project<'_>,
+    field: &Field,
+    file: &IndexedSummary<'_>,
+    usage: &Usage,
+) -> Option<LintFinding> {
+    let unused = !SERIALIZATION_FIELDS.contains(&field.name.as_str())
+        && field
+            .annotations
+            .iter()
+            .all(|annotation| is_passive(annotation) || INJECTION_ANNOTATIONS.contains(&annotation.as_str()))
+        && (field.is_static
+            || field.owner.annotations.iter().all(|annotation| {
+                is_passive(annotation) || FIELD_BLIND_OWNERS.contains(&annotation.as_str())
+            }))
+        && if field.visibility == Visibility::Private || field.owner.kind == OwnerKind::Local {
+            !file_mentions(file, &field.name)
+        } else {
+            usage.sees_callers_of(field.visibility) && !project.mentions_identifier(&field.name)
+        };
+    unused.then(|| lint_at(JavaRule::UnusedField, &field.position, field.name.clone()))
+}
+
+fn is_passive(annotation: &str) -> bool {
+    PASSIVE_ANNOTATIONS.contains(&annotation)
+}
+
+fn file_mentions(file: &IndexedSummary<'_>, name: &str) -> bool {
+    let summary = file.summary;
+    summary
+        .identifiers
+        .binary_search_by(|identifier| identifier.as_str().cmp(name))
+        .is_ok()
+        || summary.mentioned.iter().any(|mentioned| mentioned == name)
 }
 
 // Los accessors los usan Jackson, JPA y las plantillas; algunos nombres los llama el JDK; en los

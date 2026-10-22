@@ -108,3 +108,36 @@ fn a_resource_created_outside_try_with_resources_is_reported() {
         .collect();
     assert_eq!(found, ["9:42 ExecutorService", "33:16 InputStream"]);
 }
+
+const APPLICATION: &str = "package app;\n\n@SpringBootApplication\nclass App {\n    public static void main(String[] args) {\n    }\n}\n";
+const FIELDS: &str = "package app;\n\n@Service\n@RequiredArgsConstructor\nclass Invitations {\n    private static final long serialVersionUID = 1L;\n    private static final int MAX_PAGE = 50;\n    private static final int LIMIT = 5;\n    public static final String PAID = \"PAID\";\n    private final Mailer mailer;\n    private final Clock clock;\n    @Autowired\n    private Auditor auditor;\n    @Mock\n    private Payments payments;\n\n    int send() {\n        return this.clock.hashCode() + LIMIT;\n    }\n}\n\n@Data\nclass Invitation {\n    private String email;\n}\n\n@Entity\nclass Stored {\n    @Column\n    private String key;\n\n    @interface Marked {\n        String DEFAULT = \"none\";\n    }\n}\n";
+
+fn unused_fields(sources: &[&str]) -> Vec<String> {
+    let summaries: Vec<JavaSummary> = sources.iter().map(|source| summary_of(source)).collect();
+    let files: Vec<IndexedSummary<'_>> = summaries
+        .iter()
+        .map(|summary| IndexedSummary {
+            summary,
+            in_tests: false,
+        })
+        .collect();
+    project_lints(&files, &Library::load(&[]))
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "unused-field")
+        .map(|finding| format!("{} {}", finding.line, finding.subject))
+        .collect()
+}
+
+#[test]
+fn a_field_nobody_names_is_reported_unless_a_framework_uses_it() {
+    assert_eq!(
+        unused_fields(&[APPLICATION, FIELDS]),
+        ["7 MAX_PAGE", "9 PAID", "10 mailer", "13 auditor", "33 DEFAULT"]
+    );
+    assert_eq!(
+        unused_fields(&[FIELDS]),
+        ["7 MAX_PAGE", "10 mailer", "13 auditor"],
+        "en una librería lo público es su API"
+    );
+}

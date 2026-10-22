@@ -339,6 +339,14 @@ De las inspecciones de IntelliJ, kerbo hace:
   (`get`/`is`/`set`, que usan Jackson y JPA) y los que llama el JDK por nombre. Lo público y lo
   protegido sólo se marca en una aplicación (`@SpringBootApplication`, `@QuarkusMain`,
   `@MicronautApplication`): en una librería es su API.
+- `unused` para campos (`unused-field`): ningún código ni texto del proyecto nombra el campo (lo
+  privado se mira en su archivo). Un texto que inicializa a una constante de su mismo nombre
+  (`PAGADO = "PAGADO"`) no cuenta como uso. Las anotaciones de inyección (`@Autowired`, `@Inject`,
+  `@Value`…) no salvan a un campo que nadie lee; cualquier otra que no sea pasiva sí (`@Column`,
+  `@Mock`, `@MockitoBean`, `@JsonProperty`), y también una anotación de la clase que puede leer sus
+  campos de instancia (`@Data`, `@Getter`, `@Entity`, una propia). Los estereotipos de Spring, las
+  anotaciones de los tests y los constructores de Lombok no leen campos: un `private final` de un
+  `@Service` con `@RequiredArgsConstructor` que nadie usa se marca.
 
 - `NullableProblems` (`nullable-problems`): un método con `@Override` (también en una clase
   anónima) que redefine uno de una librería no nula por defecto (Spring 7 con `@NullMarked`,

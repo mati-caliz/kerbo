@@ -22,6 +22,7 @@ const MEMBER_CONTAINERS: &[&str] = &[
 ];
 const STRING_LITERAL: &str = "string_literal";
 const STRING_FRAGMENT: &str = "string_fragment";
+const VARIABLE_DECLARATOR: &str = "variable_declarator";
 const QUALIFIER_SEPARATOR: char = '.';
 const IDENTIFIER_SEPARATOR: char = '_';
 
@@ -110,7 +111,8 @@ pub fn annotation_names(declaration: Node<'_>, source: &[u8]) -> Vec<String> {
 }
 
 // Un texto que es un nombre de Java (`"argumentos"` en `@MethodSource("argumentos")`, o el nombre
-// que se busca por reflexión) cuenta como uso de lo que se llame así.
+// que se busca por reflexión) cuenta como uso de lo que se llame así. El que inicializa a una
+// variable de su mismo nombre (`String PAGADO = "PAGADO"`) no nombra a nadie más.
 pub fn mentioned_name(literal: Node<'_>, source: &[u8]) -> Option<String> {
     if literal.kind() != STRING_LITERAL {
         return None;
@@ -125,6 +127,15 @@ pub fn mentioned_name(literal: Node<'_>, source: &[u8]) -> Option<String> {
         .next()
         .is_some_and(|first| first.is_ascii_alphabetic() || first == IDENTIFIER_SEPARATOR);
     (starts_like_a_name
-        && characters.all(|letter| letter.is_ascii_alphanumeric() || letter == IDENTIFIER_SEPARATOR))
+        && characters.all(|letter| letter.is_ascii_alphanumeric() || letter == IDENTIFIER_SEPARATOR)
+        && !initializes_itself(literal, content, source))
     .then(|| content.to_owned())
+}
+
+fn initializes_itself(literal: Node<'_>, content: &str, source: &[u8]) -> bool {
+    literal
+        .parent()
+        .filter(|parent| parent.kind() == VARIABLE_DECLARATOR)
+        .and_then(|declarator| declarator.child_by_field_name(NAME_FIELD))
+        .is_some_and(|name| text(name, source) == content)
 }

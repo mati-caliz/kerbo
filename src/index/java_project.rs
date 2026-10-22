@@ -36,6 +36,7 @@ pub struct Project<'summary> {
     ancestors: HashMap<&'summary str, HashSet<&'summary str>>,
     named: HashSet<&'summary str>,
     referenced: HashSet<&'summary str>,
+    identifiers: HashSet<&'summary str>,
     constants: HashMap<(&'summary str, &'summary str), Vec<Reach<'summary>>>,
 }
 
@@ -48,6 +49,7 @@ impl<'summary> Project<'summary> {
             ancestors: HashMap::new(),
             named: HashSet::new(),
             referenced: HashSet::new(),
+            identifiers: HashSet::new(),
             constants: HashMap::new(),
         };
         let mut parents: HashMap<&str, Vec<&str>> = HashMap::new();
@@ -97,6 +99,8 @@ impl<'summary> Project<'summary> {
             .extend(summary.referenced.iter().map(String::as_str));
         self.named.extend(summary.referenced.iter().map(String::as_str));
         self.named.extend(summary.mentioned.iter().map(String::as_str));
+        self.identifiers
+            .extend(summary.identifiers.iter().map(String::as_str));
     }
 
     fn is_ancestor(&self, ancestor: &str, of: &str) -> bool {
@@ -193,6 +197,11 @@ impl<'summary> Project<'summary> {
                     .iter()
                     .any(|call| self.reaches(call, &declaration.owner.name))
             })
+    }
+
+    // Si algún archivo del proyecto usa ese nombre en el código o en un texto.
+    pub fn mentions_identifier(&self, name: &str) -> bool {
+        self.identifiers.contains(name) || self.named.contains(name)
     }
 
     // IntelliJ marca un valor sólo si se puede llevar adentro del método: un literal, una constante

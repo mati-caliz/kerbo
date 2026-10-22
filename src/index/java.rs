@@ -8,6 +8,7 @@ use crate::lint::java_calls::{
 };
 use crate::lint::java_chains::Chain;
 use crate::lint::java_constants::{Constant, declared_constants};
+use crate::lint::java_fields::{DeclaredField, declared_fields, used_identifiers};
 use crate::lint::java_inference::unconditionally_dereferenced;
 use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_owner::{Owner, annotation_names};
@@ -63,6 +64,17 @@ pub struct Declaration {
     pub owner: Owner,
 }
 
+// Un campo tal como lo necesita el índice para saber si alguien lo usa.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Field {
+    pub name: String,
+    pub position: Position,
+    pub visibility: Visibility,
+    pub is_static: bool,
+    pub annotations: Vec<String>,
+    pub owner: Owner,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallSite {
     pub name: String,
@@ -88,6 +100,8 @@ pub struct JavaSummary {
     pub chains: Vec<Chain>,
     pub null_flows: Vec<NullFlow>,
     pub resources: Vec<ResourceCandidate>,
+    pub fields: Vec<Field>,
+    pub identifiers: Vec<String>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -125,6 +139,7 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
             .and_then(|name| name.utf8_text(source).ok())
             .unwrap_or_default()
             .to_owned();
+        let nodes = descendants(top_level);
         let extracted = extract(top_level, source);
         summary.declarations.extend(
             extracted
@@ -140,10 +155,14 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.chains.extend(extracted.chains);
         summary.null_flows.extend(extracted.null_flows);
         summary.resources.extend(extracted.resources);
+        summary.constants.extend(declared_constants(&nodes, source));
         summary
-            .constants
-            .extend(declared_constants(&descendants(top_level), source));
+            .fields
+            .extend(declared_fields(&nodes, source).into_iter().map(field_of));
+        summary.identifiers.extend(used_identifiers(&nodes, source));
     }
+    summary.identifiers.sort_unstable();
+    summary.identifiers.dedup();
     summary
 }
 
@@ -224,6 +243,17 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
                 }
             })
             .collect(),
+    }
+}
+
+fn field_of(field: DeclaredField<'_>) -> Field {
+    Field {
+        name: field.name,
+        position: position_of(field.name_node),
+        visibility: field.visibility,
+        is_static: field.is_static,
+        annotations: field.annotations,
+        owner: field.owner,
     }
 }
 

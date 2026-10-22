@@ -343,6 +343,14 @@ From IntelliJ's inspections, kerbo does:
   MapStruct `@Mapper` or an `@Aspect`, accessors (`get`/`is`/`set`, used by Jackson and JPA) and
   the ones the JDK calls by name. Public and protected code is only flagged in an application
   (`@SpringBootApplication`, `@QuarkusMain`, `@MicronautApplication`): in a library it is its API.
+- `unused` for fields (`unused-field`): no code or string in the project names the field (private
+  fields are checked in their own file). A string that initializes a constant of the same name
+  (`PAID = "PAID"`) does not count as a use. Injection annotations (`@Autowired`, `@Inject`,
+  `@Value`…) do not save a field nobody reads; any other non-passive one does (`@Column`, `@Mock`,
+  `@MockitoBean`, `@JsonProperty`), and so does a class annotation that may read its instance
+  fields (`@Data`, `@Getter`, `@Entity`, a custom one). Spring stereotypes, test annotations and
+  Lombok constructors do not read fields: an unused `private final` in a `@Service` with
+  `@RequiredArgsConstructor` is flagged.
 
 - `NullableProblems` (`nullable-problems`): an `@Override` method (also in an anonymous class)
   overriding one from a library that is non-null by default (Spring 7 with `@NullMarked`, Spring 6

@@ -24,7 +24,7 @@ pub const TYPE_DECLARATIONS: &[&str] = &[
 ];
 const ENUM: &str = "enum_declaration";
 const RECORD: &str = "record_declaration";
-const INTERFACE_BODY: &str = "interface_body";
+const PUBLIC_BODIES: &[&str] = &["interface_body", "annotation_type_body"];
 const ENUM_CONSTANT: &str = "enum_constant";
 const PUBLIC: &str = "public";
 const PROTECTED: &str = "protected";
@@ -293,7 +293,7 @@ pub fn visibility(declaration: Node<'_>, source: &[u8]) -> Visibility {
         Visibility::Protected
     } else if declaration
         .parent()
-        .is_some_and(|body| body.kind() == INTERFACE_BODY)
+        .is_some_and(|body| PUBLIC_BODIES.contains(&body.kind()))
     {
         Visibility::Public
     } else {

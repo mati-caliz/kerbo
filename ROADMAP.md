@@ -873,13 +873,42 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Contra Qodana: 9 de 10 coincidencias. Falta `dataSource.unwrap(HikariDataSource.class)`
     (devuelve un genérico) y sobra uno: un `ExecutorService` de `AuditTrailIntegrationTest` igual
     en forma a otros dos del mismo archivo que Qodana sí marca; no se encontró qué lo distingue.
+- Campos sin usar (hecho, 2026-10-22): `unused-field`. Cada archivo guarda sus campos (con las
+  anotaciones propias y las de la clase) y los identificadores que usa fuera de las declaraciones de
+  campos. Un campo privado se da por usado si su archivo lo nombra; uno de paquete, protegido o
+  público, si lo nombra cualquier archivo (lo público y protegido sólo en una aplicación). Los
+  frameworks, como tablas en `src/index/java_unused.rs`: la inyección (`@Autowired`, `@Inject`,
+  `@Value`…) no salva un campo que nadie lee, las demás anotaciones no pasivas sí, y las anotaciones
+  de clase que no leen campos de instancia (estereotipos de Spring, tests, constructores de Lombok)
+  no los salvan. El texto que inicializa a una variable de su mismo nombre (`X = "X"`) ya no cuenta
+  como mención, tampoco para `unused-method`. Los campos de un `@interface` son públicos, como los
+  de una interfaz (antes `visibility()` los tomaba como de paquete).
+  - Contra Qodana: 53 coincidencias y 1 de más, que es una mejora: un `private final AuthService` de
+    un `@Service` con `@RequiredArgsConstructor` que nadie usa (Qodana no conoce Spring y da la
+    clase entera por inalcanzable, así que no mira sus campos). De los 376 que faltan, 369 son
+    `@MockitoBean`, `@Mock` y `@Spy` en tests (reemplazan un bean o se inyectan en lo que se prueba:
+    se usan), 4 son `@Column` de una entidad, 2 son `@Autowired` cuyo nombre usa otra clase y 1 es
+    una constante con el mismo nombre que otra que sí se usa.
+  - En Guava y commons-lang (librerías: sólo lo no público): 64 y 42. Son constantes sin uso, los
+    campos de relleno de `Striped64` contra el false sharing y, en commons-lang, campos que los
+    tests leen por reflexión recorriendo todos los de la clase. IntelliJ también los marca.
+- Pendientes de código muerto:
+  - Un `@interface` de nivel superior no entra al resumen (`TYPE_DECLARATIONS` de `java_calls` no
+    lo incluye): sus constantes no se miran. Los anidados sí.
+  - Resolver el dueño de cada uso de un campo (como los receptores de las llamadas): hoy un nombre
+    usado en cualquier clase salva a todos los campos que se llaman igual.
+  - "Asignado pero nunca leído" (Qodana lo marca aparte): pide distinguir lectura de escritura.
+  - Constructores y constantes de enum sin uso: casi todo lo que marca Qodana es inyección de Spring,
+    records que llegan por JSON y valores que manda el frontend; hace falta saber qué tipos
+    deserializa Jackson antes de marcar algo.
+  - Clases sin usar: con la jerarquía y las mismas tablas de frameworks.
 - Lo que sigue en nulos: el tipo de retorno de los métodos del proyecto (para seguir cadenas que
   pasan por ellos), argumentos que pueden ser null hacia parámetros no nulos (también los que
   IntelliJ infiere no nulos porque el método los desreferencia), unboxing, y las anotaciones del
   JDK (`ct.sym` no las trae: hay que sumar una tabla propia de los métodos que devuelven null,
   como `Map.get` o `getResourceAsStream`).
 - Lo que sigue en el índice: "todas las implementaciones devuelven lo mismo" con la jerarquía, y
-  campos, constructores y clases sin usar con las tablas de JPA, Jackson y la inyección.
+  lo que queda de código muerto (arriba).
 
 ### 10. Go, Python, TypeScript y shell completos
 

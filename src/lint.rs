@@ -9,6 +9,7 @@ pub mod java_chains;
 pub mod java_constants;
 mod java_curly;
 mod java_design;
+pub mod java_fields;
 mod java_flow;
 mod java_hidden;
 pub mod java_inference;
