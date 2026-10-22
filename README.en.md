@@ -344,11 +344,12 @@ From IntelliJ's inspections, kerbo does:
   the ones the JDK calls by name. Public and protected code is only flagged in an application
   (`@SpringBootApplication`, `@QuarkusMain`, `@MicronautApplication`): in a library it is its API.
 
-- `NullableProblems` for parameters (`nullable-problems`): an `@Override` method overriding one
-  from a library that is non-null by default (Spring 7 with `@NullMarked`, Spring 6 with
-  `@NonNullApi`) that leaves a parameter unannotated. Like IntelliJ, it does not flag a parameter
-  the body dereferences unconditionally (from that it infers non-null), one the library declares
-  `@Nullable`, or anything if the project package is already `@NullMarked`.
+- `NullableProblems` (`nullable-problems`): an `@Override` method (also in an anonymous class)
+  overriding one from a library that is non-null by default (Spring 7 with `@NullMarked`, Spring 6
+  with `@NonNullApi`) that leaves a parameter or the returned object unannotated. Like IntelliJ,
+  it does not flag a parameter the body dereferences before any exiting `if` or a `try` (from
+  that it infers non-null), what the library declares `@Nullable`, or anything if the project
+  package is already `@NullMarked`; the return is flagged even if it returns a literal.
 
 To read libraries, kerbo asks Maven for the classpath once, offline
 (`mvn -o dependency:build-classpath`), and stores it with the fingerprint of the `pom.xml` files;

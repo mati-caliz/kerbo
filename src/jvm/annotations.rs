@@ -4,12 +4,13 @@ const ENUM_CONSTANT_VALUE: u8 = b'e';
 const ANNOTATION_VALUE: u8 = b'@';
 const ARRAY_VALUE: u8 = b'[';
 // Los tipos de destino de una anotación de tipo (JVMS 4.7.20.1), agrupados por cuánto ocupa lo que
-// sigue: el del parámetro formal es el único que interesa.
+// sigue: interesan el del parámetro formal y el del retorno.
 const FORMAL_PARAMETER_TARGET: u8 = 0x16;
+const RETURN_TARGET: u8 = 0x14;
 const TYPE_PARAMETER_TARGETS: [u8; 2] = [0x00, 0x01];
 const TWO_BYTE_TARGETS: [u8; 8] = [0x10, 0x17, 0x42, 0x43, 0x44, 0x45, 0x46, 0x11];
 const BOUND_TARGETS: [u8; 1] = [0x12];
-const EMPTY_TARGETS: [u8; 3] = [0x13, 0x14, 0x15];
+const EMPTY_TARGETS: [u8; 2] = [0x13, 0x15];
 const LOCAL_VARIABLE_TARGETS: [u8; 2] = [0x40, 0x41];
 const TYPE_ARGUMENT_TARGETS: [u8; 5] = [0x47, 0x48, 0x49, 0x4A, 0x4B];
 const LOCAL_VARIABLE_ENTRY: usize = 6;
@@ -54,28 +55,38 @@ fn skip_element_value(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<(), Malfor
 
 // Las anotaciones de tipo sobre los parámetros formales (target 0x16), con el índice del
 // parámetro. Las demás se leen sólo para saltearlas.
+// Sobre qué cae una anotación de tipo que importa: un parámetro (por índice) o el retorno.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum TypeTarget {
+    Parameter(usize),
+    Return,
+}
+
 pub(super) fn type_annotations(
     cursor: &mut Cursor<'_>,
     pool: &Pool,
-) -> Result<Vec<(usize, String)>, Malformed> {
+) -> Result<Vec<(TypeTarget, String)>, Malformed> {
     let count = cursor.u16()?;
     let mut found = Vec::new();
     for _ in 0..count {
         let target = cursor.u8()?;
-        let parameter = skip_target_info(cursor, target)?;
+        let place = skip_target_info(cursor, target)?;
         let path_length = usize::from(cursor.u8()?);
         cursor.take(path_length.saturating_mul(TWO_BYTES))?;
         let name = annotation(cursor, pool)?;
-        if let Some(parameter) = parameter.filter(|_| path_length == 0) {
-            found.push((parameter, name));
+        if let Some(place) = place.filter(|_| path_length == 0) {
+            found.push((place, name));
         }
     }
     Ok(found)
 }
 
-fn skip_target_info(cursor: &mut Cursor<'_>, target: u8) -> Result<Option<usize>, Malformed> {
+fn skip_target_info(cursor: &mut Cursor<'_>, target: u8) -> Result<Option<TypeTarget>, Malformed> {
     if target == FORMAL_PARAMETER_TARGET {
-        return Ok(Some(usize::from(cursor.u8()?)));
+        return Ok(Some(TypeTarget::Parameter(usize::from(cursor.u8()?))));
+    }
+    if target == RETURN_TARGET {
+        return Ok(Some(TypeTarget::Return));
     }
     if TYPE_PARAMETER_TARGETS.contains(&target) {
         cursor.u8()?;

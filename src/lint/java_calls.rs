@@ -3,9 +3,11 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, PRIVATE, children, modifiers, text};
-use super::java_constants::{Constants, constant_value, constants_in, literal_value};
+use super::java_constants::{Constants, constant_value, constants_in};
 use super::java_owner::{Owner, annotation_names, mentioned_name, owner_of};
 use super::java_receivers::{Receiver, StaticImports, simple_type_name, supertypes, variable_types};
+pub use super::java_returns::{ReturnType, Returns};
+use super::java_returns::{return_type, returned};
 use super::java_switch::{rule_bodies, yields_value};
 use crate::syntax::{descendants, named_children};
 
@@ -30,15 +32,13 @@ const METHOD_REFERENCE: &str = "method_reference";
 const EXPRESSION_STATEMENT: &str = "expression_statement";
 const SWITCH: &str = "switch_expression";
 const STRING_LITERAL: &str = "string_literal";
-const RETURN: &str = "return_statement";
-const RETURN_BOUNDARIES: &[&str] = &["lambda_expression", "class_body"];
-const VOID: &str = "void_type";
 const ARGUMENTS_FIELD: &str = "arguments";
 const PARAMETERS_FIELD: &str = "parameters";
 const BODY_FIELD: &str = "body";
 const TYPE_FIELD: &str = "type";
 const FORMAL_PARAMETER: &str = "formal_parameter";
 const SPREAD_PARAMETER: &str = "spread_parameter";
+const VARIABLE_DECLARATOR: &str = "variable_declarator";
 const THIS: &str = "this";
 const COMMENTS: &[&str] = &["line_comment", "block_comment"];
 const QUALIFIER_SEPARATOR: char = '.';
@@ -65,15 +65,6 @@ pub enum Arity {
     Variadic,
 }
 
-// Qué devuelve un método: nada (void o un constructor), siempre la misma constante, o cosas que
-// varían o no se pueden leer sin compilar.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Returns {
-    Nothing,
-    Always(String),
-    Varied,
-}
-
 // Un método o constructor: el nombre (el del tipo para un constructor), sus parámetros y lo que
 // importa para saber si se puede razonar sobre él sin compilar.
 pub struct Callable<'tree> {
@@ -86,6 +77,7 @@ pub struct Callable<'tree> {
     pub body: Body,
     pub arity: Arity,
     pub returns: Returns,
+    pub return_type: ReturnType,
     pub annotations: Vec<String>,
     pub owner: Owner,
 }
@@ -179,8 +171,7 @@ fn callable<'tree>(declaration: Node<'tree>, source: &[u8]) -> Option<Callable<'
         name_node,
         parameters: written
             .iter()
-            .filter(|parameter| parameter.kind() == FORMAL_PARAMETER)
-            .filter_map(|parameter| parameter.child_by_field_name(NAME_FIELD))
+            .filter_map(|parameter| parameter_name(*parameter))
             .collect(),
         is_constructor,
         visibility: visibility(declaration, source),
@@ -203,9 +194,22 @@ fn callable<'tree>(declaration: Node<'tree>, source: &[u8]) -> Option<Callable<'
         } else {
             returned(declaration, source)
         },
+        return_type: return_type(declaration),
         annotations: annotation_names(declaration, source),
         owner: owner_of(declaration, source),
     })
+}
+
+// El nombre de un parámetro, también el de un varargs (`String... args`), que va en su declarador.
+fn parameter_name(parameter: Node<'_>) -> Option<Node<'_>> {
+    match parameter.kind() {
+        FORMAL_PARAMETER => parameter.child_by_field_name(NAME_FIELD),
+        SPREAD_PARAMETER => named_children(parameter)
+            .into_iter()
+            .find(|child| child.kind() == VARIABLE_DECLARATOR)
+            .and_then(|declarator| declarator.child_by_field_name(NAME_FIELD)),
+        _ => None,
+    }
 }
 
 // Un record trae un constructor con sus componentes, con la visibilidad del record.
@@ -232,6 +236,7 @@ fn implicit_enum_constructor<'tree>(declaration: Node<'tree>, source: &[u8]) -> 
         body: Body::Abstract,
         arity: Arity::Fixed,
         returns: Returns::Nothing,
+        return_type: ReturnType::Void,
         annotations: Vec::new(),
         owner: owner_of(declaration, source),
     })
@@ -284,40 +289,6 @@ fn in_enum(constructor: Node<'_>) -> bool {
         .and_then(|body| body.parent())
         .and_then(|enum_body| enum_body.parent())
         .is_some_and(|declaration| declaration.kind() == ENUM)
-}
-
-// Los `return` del método, sin entrar en lambdas ni en clases anónimas o locales.
-fn returned(method: Node<'_>, source: &[u8]) -> Returns {
-    if method
-        .child_by_field_name(TYPE_FIELD)
-        .is_none_or(|written| written.kind() == VOID)
-    {
-        return Returns::Nothing;
-    }
-    let Some(body) = method.child_by_field_name(BODY_FIELD) else {
-        return Returns::Varied;
-    };
-    let mut values = Vec::new();
-    let mut pending = vec![body];
-    while let Some(node) = pending.pop() {
-        if node.kind() == RETURN {
-            values.push(
-                named_children(node)
-                    .into_iter()
-                    .find(|child| !COMMENTS.contains(&child.kind()))
-                    .and_then(|value| literal_value(value, source)),
-            );
-        } else if !RETURN_BOUNDARIES.contains(&node.kind()) {
-            pending.extend(named_children(node));
-        }
-    }
-    let mut all = values.into_iter();
-    match all.next() {
-        Some(Some(first)) if all.all(|value| value.as_deref() == Some(first.as_str())) => {
-            Returns::Always(first)
-        }
-        _ => Returns::Varied,
-    }
 }
 
 fn call(node: Node<'_>, source: &[u8], constants: &Constants, result_used: bool) -> Option<Call> {

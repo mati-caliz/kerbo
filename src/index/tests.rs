@@ -7,7 +7,7 @@ use super::{IndexedSummary, project_lints};
 use crate::jvm::library::Library;
 use crate::language::Language;
 
-const FILTER: &str = "package app;\n\nimport java.util.List;\nimport sample.web.Filter;\n\nclass AuditFilter extends Filter {\n    @Override\n    protected void handle(String request, Object handler, List<String> names) {\n        if (names.isEmpty()) {\n            return;\n        }\n    }\n\n    @Override\n    public int compareTo(Filter other) {\n        return 0;\n    }\n}\n";
+const FILTER: &str = "package app;\n\nimport java.util.List;\nimport sample.web.Filter;\n\nclass AuditFilter extends Filter {\n    @Override\n    protected void handle(String request, Object handler, List<String> names) {\n        if (names.isEmpty()) {\n            return;\n        }\n    }\n\n    @Override\n    public int compareTo(Filter other) {\n        return 0;\n    }\n\n    @Override\n    public String name() {\n        return \"audit\";\n    }\n\n    @Override\n    public Object find(String key) {\n        return null;\n    }\n}\n";
 
 fn summary_of(source: &str) -> JavaSummary {
     let mut parser = Parser::new();
@@ -33,7 +33,14 @@ fn an_unannotated_override_of_a_null_marked_library_is_reported_unless_inferred(
         .filter(|finding| finding.kind.rule().as_str() == "nullable-problems")
         .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
         .collect();
-    assert_eq!(found, ["8:34 request @NullMarked"]);
+    assert_eq!(
+        found,
+        [
+            "8:34 request @NullMarked",
+            "20:19 name() @NullMarked",
+            "25:31 key @NullMarked"
+        ]
+    );
     let without_library = project_lints(&files, &Library::load(&[]));
     assert!(
         without_library

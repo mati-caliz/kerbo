@@ -2,7 +2,7 @@
 // clase y, por método, el nombre, el descriptor, la visibilidad y las anotaciones de cada
 // parámetro (las de declaración y las de tipo, como el `@Nullable` de JSpecify).
 
-use super::annotations::{annotation_list, type_annotations};
+use super::annotations::{TypeTarget, annotation_list, type_annotations};
 
 const MAGIC: u32 = 0xCAFE_BABE;
 const VERSION_SIZE: usize = 4;
@@ -63,11 +63,21 @@ pub struct Method {
     pub is_private: bool,
     pub is_static: bool,
     pub parameter_annotations: Vec<Vec<String>>,
+    pub return_annotations: Vec<String>,
 }
 
 impl Method {
     pub const fn parameter_count(&self) -> usize {
         self.parameter_annotations.len()
+    }
+
+    // Si devuelve un objeto o un arreglo (lo único que puede ser null).
+    pub fn returns_reference(&self) -> bool {
+        self.descriptor
+            .bytes()
+            .skip_while(|letter| *letter != DESCRIPTOR_CLOSE)
+            .nth(1)
+            .is_some_and(|letter| letter == OBJECT_START || letter == ARRAY)
     }
 }
 
@@ -224,6 +234,7 @@ fn method(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Option<Method>, Malfor
     let name = pool.text(cursor.u16()?)?.to_owned();
     let descriptor = pool.text(cursor.u16()?)?.to_owned();
     let mut parameter_annotations = vec![Vec::new(); parameter_count(&descriptor)];
+    let mut return_annotations = Vec::new();
     let attribute_count = cursor.u16()?;
     for _ in 0..attribute_count {
         let attribute = pool.text(cursor.u16()?)?;
@@ -242,9 +253,17 @@ fn method(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Option<Method>, Malfor
                 }
             }
             VISIBLE_TYPE_ANNOTATIONS | INVISIBLE_TYPE_ANNOTATIONS => {
-                for (parameter, annotation) in type_annotations(&mut body, pool)? {
-                    add_to(&mut parameter_annotations, parameter, vec![annotation]);
+                for (place, annotation) in type_annotations(&mut body, pool)? {
+                    place_annotation(
+                        &mut parameter_annotations,
+                        &mut return_annotations,
+                        place,
+                        annotation,
+                    );
                 }
+            }
+            VISIBLE_ANNOTATIONS | INVISIBLE_ANNOTATIONS => {
+                return_annotations.extend(annotation_list(&mut body, pool)?);
             }
             _ => {}
         }
@@ -256,7 +275,20 @@ fn method(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Option<Method>, Malfor
         is_private: access & ACCESS_PRIVATE != 0,
         is_static: access & ACCESS_STATIC != 0,
         parameter_annotations,
+        return_annotations,
     }))
+}
+
+fn place_annotation(
+    parameters: &mut [Vec<String>],
+    returned: &mut Vec<String>,
+    place: TypeTarget,
+    annotation: String,
+) {
+    match place {
+        TypeTarget::Parameter(parameter) => add_to(parameters, parameter, vec![annotation]),
+        TypeTarget::Return => returned.push(annotation),
+    }
 }
 
 fn add_to(parameters: &mut [Vec<String>], index: usize, found: Vec<String>) {

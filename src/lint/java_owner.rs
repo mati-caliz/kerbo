@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, modifiers, text};
+use super::java_receivers::simple_type_name;
 use crate::syntax::named_children;
 
 const ANNOTATIONS: &[&str] = &["marker_annotation", "annotation"];
@@ -9,6 +10,8 @@ const CLASS: &str = "class_declaration";
 const INTERFACE: &str = "interface_declaration";
 const ENUM: &str = "enum_declaration";
 const RECORD: &str = "record_declaration";
+const CREATION: &str = "object_creation_expression";
+const TYPE_FIELD: &str = "type";
 const ANNOTATION_TYPE: &str = "annotation_type_declaration";
 const MEMBER_CONTAINERS: &[&str] = &[
     "program",
@@ -54,6 +57,15 @@ pub fn owner_of(member: Node<'_>, source: &[u8]) -> Owner {
     let Some(declaration) = container else {
         return local;
     };
+    if declaration.kind() == CREATION {
+        return Owner {
+            name: declaration
+                .child_by_field_name(TYPE_FIELD)
+                .map(|written| simple_type_name(text(written, source)))
+                .unwrap_or_default(),
+            ..local
+        };
+    }
     let kind = match declaration.kind() {
         CLASS => OwnerKind::Class,
         INTERFACE => OwnerKind::Interface,

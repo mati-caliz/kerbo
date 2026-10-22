@@ -13,7 +13,6 @@ const ARRAY_FIELD: &str = "array";
 const CONDITION_FIELD: &str = "condition";
 const INIT_FIELD: &str = "init";
 const VALUE_FIELD: &str = "value";
-const BODY_FIELD: &str = "body";
 const RESOURCES_FIELD: &str = "resources";
 const LOCK_FIELD: &str = "lock";
 const BLOCK: &str = "block";
@@ -47,9 +46,9 @@ const COMMENTS: &[&str] = &["line_comment", "block_comment"];
 
 // Los nombres que el cuerpo de un método desreferencia (`p.algo()`, `p.campo`, `p[0]`) en todos
 // los caminos: IntelliJ infiere de eso que el parámetro es no nulo. Se recorren las sentencias en
-// orden hasta la primera que puede salir antes; de un `if` o un bucle cuenta la condición, no el
-// cuerpo, y de una expresión no cuentan las lambdas, las ramas de un ternario ni lo que está a la
-// derecha de un `&&` o un `||`.
+// orden hasta la primera que puede salir antes o un `try` (de él sólo cuentan los recursos); de un
+// `if` o un bucle cuenta la condición, no el cuerpo, y de una expresión no cuentan las lambdas,
+// las ramas de un ternario ni lo que está a la derecha de un `&&` o un `||`.
 pub fn unconditionally_dereferenced(body: Node<'_>, source: &[u8]) -> HashSet<String> {
     let mut found = HashSet::new();
     for statement in statements(body) {
@@ -89,14 +88,10 @@ fn visit_statement(statement: Node<'_>, source: &[u8], found: &mut HashSet<Strin
     } else if kind == SYNCHRONIZED {
         statement.child_by_field_name(LOCK_FIELD).into_iter().collect()
     } else if TRY_STATEMENTS.contains(&kind) {
-        let resources = statement.child_by_field_name(RESOURCES_FIELD);
-        if let Some(body) = statement.child_by_field_name(BODY_FIELD) {
-            if let Some(resources) = resources {
-                collect(resources, source, found);
-            }
-            return visit_statement(body, source, found) && !exits_early(statement);
+        if let Some(resources) = statement.child_by_field_name(RESOURCES_FIELD) {
+            collect(resources, source, found);
         }
-        Vec::new()
+        return false;
     } else {
         Vec::new()
     };

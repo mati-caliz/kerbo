@@ -1,6 +1,6 @@
 use super::codec::{Corrupt, Reader, Writer};
 use crate::index::java::{CallSite, Declaration, JavaSummary, Parameter, Position};
-use crate::lint::java_calls::{Arity, Body, Returns, Visibility};
+use crate::lint::java_calls::{Arity, Body, ReturnType, Returns, Visibility};
 use crate::lint::java_constants::Constant;
 use crate::lint::java_owner::{Owner, OwnerKind};
 use crate::lint::java_receivers::Receiver;
@@ -22,6 +22,9 @@ const OWNER_ENUM: u64 = 2;
 const OWNER_RECORD: u64 = 3;
 const OWNER_ANNOTATION: u64 = 4;
 const OWNER_LOCAL: u64 = 5;
+const RETURN_TYPE_VOID: u64 = 0;
+const RETURN_TYPE_PRIMITIVE: u64 = 1;
+const RETURN_TYPE_REFERENCE: u64 = 2;
 const RECEIVER_UNKNOWN: u64 = 0;
 const RECEIVER_TYPE: u64 = 1;
 const RECEIVER_SCOPE: u64 = 2;
@@ -108,6 +111,11 @@ fn write_declaration(writer: &mut Writer, declaration: &Declaration) {
         }
         Returns::Varied => writer.number(RETURNS_VARIED),
     }
+    writer.number(match declaration.return_type {
+        ReturnType::Void => RETURN_TYPE_VOID,
+        ReturnType::Primitive => RETURN_TYPE_PRIMITIVE,
+        ReturnType::Reference => RETURN_TYPE_REFERENCE,
+    });
     writer.list(&declaration.parameters, |writer, parameter| {
         writer.text(&parameter.name);
         write_position(writer, &parameter.position);
@@ -149,6 +157,12 @@ fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
             RETURNS_NOTHING => Returns::Nothing,
             RETURNS_ALWAYS => Returns::Always(reader.text()?),
             RETURNS_VARIED => Returns::Varied,
+            _ => return Err(Corrupt),
+        },
+        return_type: match reader.number()? {
+            RETURN_TYPE_VOID => ReturnType::Void,
+            RETURN_TYPE_PRIMITIVE => ReturnType::Primitive,
+            RETURN_TYPE_REFERENCE => ReturnType::Reference,
             _ => return Err(Corrupt),
         },
         parameters: reader.list(|reader| {

@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 use crate::lint::java::children;
-use crate::lint::java_calls::{Arity, Body, Call, Callable, Returns, TYPE_DECLARATIONS, Visibility, extract};
+use crate::lint::java_calls::{
+    Arity, Body, Call, Callable, ReturnType, Returns, TYPE_DECLARATIONS, Visibility, extract,
+};
 use crate::lint::java_constants::{Constant, declared_constants};
 use crate::lint::java_inference::unconditionally_dereferenced;
 use crate::lint::java_owner::{Owner, annotation_names};
@@ -51,6 +53,7 @@ pub struct Declaration {
     pub body: Body,
     pub arity: Arity,
     pub returns: Returns,
+    pub return_type: ReturnType,
     pub parameters: Vec<Parameter>,
     pub annotations: Vec<String>,
     pub owner: Owner,
@@ -194,6 +197,7 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
         body: callable.body,
         arity: callable.arity,
         returns: callable.returns,
+        return_type: callable.return_type,
         annotations: callable.annotations,
         owner: callable.owner,
         parameters: callable

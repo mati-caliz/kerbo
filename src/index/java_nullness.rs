@@ -1,15 +1,20 @@
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use super::java::{Declaration, JavaSummary, lint_at};
 use super::java_project::IndexedSummary;
+use crate::jvm::class_file::{ClassFile, Method};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
+use crate::lint::java_calls::ReturnType;
+use crate::lint::java_owner::OwnerKind;
 use crate::rules::JavaRule;
 
 const WILDCARD_SUFFIX: &str = ".*";
 const JAVA_LANG: &str = "java.lang.";
 const QUALIFIER_SEPARATOR: char = '.';
 const NULLABLE: &str = "Nullable";
+const NULLNESS_ANNOTATIONS: &[&str] = &["Nullable", "NonNull", "NotNull", "Nonnull", "CheckForNull"];
 const PROJECT_DEFAULTS: &[&str] = &["NullMarked", "NonNullApi"];
 
 // Los tipos del proyecto por nombre simple, con el archivo que los declara (para resolver sus
@@ -62,6 +67,39 @@ pub fn unannotated_overrides(
     let Some(label) = library.null_default(&class) else {
         return Vec::new();
     };
+    let mut found: Vec<LintFinding> = unannotated_return(declaration, &method, label)
+        .into_iter()
+        .collect();
+    found.extend(unannotated_parameters(declaration, &method, label));
+    found
+}
+
+// Un método que devuelve un objeto, redefiniendo uno cuyo retorno no es `@Nullable`, sin decir
+// nada de su nulabilidad. IntelliJ no infiere nada para el retorno: marca aunque devuelva un
+// literal o un `new`.
+fn unannotated_return(declaration: &Declaration, method: &Method, label: &str) -> Option<LintFinding> {
+    let declares = declaration
+        .annotations
+        .iter()
+        .any(|annotation| NULLNESS_ANNOTATIONS.contains(&annotation.as_str()));
+    let inherited_nullable = method
+        .return_annotations
+        .iter()
+        .any(|annotation| is_nullable(annotation));
+    (declaration.return_type == ReturnType::Reference
+        && method.returns_reference()
+        && !declares
+        && !inherited_nullable)
+        .then(|| {
+            lint_at(
+                JavaRule::NullableProblems,
+                &declaration.position,
+                format!("{}() {label}", declaration.name),
+            )
+        })
+}
+
+fn unannotated_parameters(declaration: &Declaration, method: &Method, label: &str) -> Vec<LintFinding> {
     declaration
         .parameters
         .iter()
@@ -85,10 +123,7 @@ fn is_nullable(annotation: &str) -> bool {
     annotation.rsplit(QUALIFIER_SEPARATOR).next() == Some(NULLABLE)
 }
 
-type Overridden = (
-    std::rc::Rc<crate::jvm::class_file::ClassFile>,
-    crate::jvm::class_file::Method,
-);
+type Overridden = (Rc<ClassFile>, Method);
 
 // El método de librería que redefine: subiendo por los padres de la clase (los del proyecto con
 // los imports de su archivo) hasta encontrar una clase de librería que lo declare.
@@ -99,7 +134,11 @@ fn overridden(
     declaration: &Declaration,
 ) -> Option<Overridden> {
     let arity = declaration.parameters.len();
-    let mut pending: Vec<Resolved> = supertypes_of(types, library, &declaration.owner.name, summary);
+    let mut pending: Vec<Resolved> = if declaration.owner.kind == OwnerKind::Local {
+        vec![resolve(types, library, summary, &declaration.owner.name)]
+    } else {
+        supertypes_of(types, library, &declaration.owner.name, summary)
+    };
     let mut seen = HashSet::new();
     while let Some(next) = pending.pop() {
         match next {

@@ -823,13 +823,17 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   anotación que en la librería no es `@Nullable` se marca. Como IntelliJ, el parámetro que el
   cuerpo desreferencia en todos los caminos (`p.algo()` antes de cualquier salida temprana; de
   un `if` cuenta la condición) se infiere no nulo y no se marca (`src/lint/java_inference.rs`).
-  - Contra Qodana, con los jars que usó Qodana (los volúmenes de su caché): 67 coincidencias,
-    ningún aviso de más (antes de la inferencia eran 23 de más) y 19 faltantes: 14 son la
-    variante del retorno ("método sin anotar"), que falta; los demás, anotaciones `@NotNull` que
-    IntelliJ agrega al JDK por fuera de los jars, y clases anónimas.
-- Lo que sigue en el índice: la variante del retorno de `NullableProblems`, "todas las
-  implementaciones devuelven lo mismo" con la jerarquía, y campos, constructores y clases sin
-  usar con las tablas de JPA, Jackson y la inyección.
+  - La variante del retorno (hecho): un método que devuelve un objeto, redefiniendo uno cuyo
+    retorno no es `@Nullable`, sin anotación propia. IntelliJ no infiere nada para el retorno:
+    marca aunque devuelva un literal o un `new`. El lector de `.class` suma las anotaciones del
+    método y las de tipo con destino "retorno". Una clase anónima redefine los métodos del tipo
+    que crea, y un varargs cuenta como parámetro.
+  - La inferencia no mira adentro de un `try` (sólo sus recursos): IntelliJ tampoco.
+  - Contra Qodana, con los jars que usó Qodana (los volúmenes de su caché): 84 coincidencias,
+    ningún aviso de más (antes de la inferencia eran 23 de más) y 2 faltantes: anotaciones
+    `@NotNull` que IntelliJ le agrega al JDK por fuera de los jars.
+- Lo que sigue en el índice: "todas las implementaciones devuelven lo mismo" con la jerarquía, y
+  campos, constructores y clases sin usar con las tablas de JPA, Jackson y la inyección.
 
 ### 10. Go, Python, TypeScript y shell completos
 
