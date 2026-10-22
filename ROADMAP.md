@@ -1609,9 +1609,31 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     `compose-depends-on-healthy` (un `depends_on` hacia un servicio con healthcheck activo que no
     espera `service_healthy`). Criterio propio, como las tres primeras; `minimal` las apaga.
 
-### 13. Formateo propio
+### 13. Formateo propio (empezada: Go, sin medir)
 
 - Lenguaje por lenguaje, y sólo cuando la salida sea idéntica a la de la herramienta actual.
+- Go, primera versión (2026-10-22; la armó un agente en una rama aparte, que quedó cortado, y se
+  trajo a main recién después de pasar el gate): `kerbo fmt [rutas]` reescribe los `.go` y
+  `kerbo fmt --check` sólo avisa cuáles cambiarían. Un archivo con errores de sintaxis no se toca.
+  No reimplementa gofmt a ojo: arma desde tree-sitter el mismo AST que `go/parser` y lo imprime con
+  un port de `go/printer` (`src/formatter/go/`: tabwriter, comentarios, cortes de línea, orden de
+  imports, paréntesis que se sacan de las condiciones). `new(expresión)` de Go 1.26, que
+  tree-sitter-go todavía no conoce, se parsea cambiando `new` por un nombre del mismo largo.
+  - Probado: dos archivos de ejemplo (`src/formatter/go/fixtures/`, sintaxis y comentarios) dan
+    byte a byte lo de gofmt, formatear dos veces no cambia nada, y los finales CRLF pasan a LF.
+  - **Falta medirlo contra gofmt sobre código real**, que es lo que exige el principio de esta
+    etapa: hasta entonces no se publica ni se recomienda. El arnés empezado (gofmt y kerbo sobre el
+    mismo corpus, también con el código desordenado a propósito y con CRLF, y la comparación
+    archivo por archivo) se cortó porque en Windows una ruta de terraform pasa el largo máximo; hay
+    que correrlo entero dentro de Docker.
+  - Después de Go, en el orden de la etapa: ruff format (Python), Prettier (JS/TS) y
+    google-java-format o palantir (Java).
+- Con el formateador, compilar los tests con cobertura queda al borde de los 1,5 GB del gate: sin
+  la caché caliente lo mata el límite de memoria (SIGKILL). Pasa, pero hay que ganar margen
+  (partir el crate o bajar la información de depuración de los tests) antes de que crezca más.
+- Test intermitente (no es del formateador): `osv::transport::tests::reports_what_curl_says_when_it_fails`
+  a veces falla con "Broken pipe": el curl falso termina antes de leer el cuerpo que se le escribe.
+  Hay que ignorar el `BrokenPipe` al escribir la entrada de curl y quedarse con lo que dice curl.
 
 ### 14. Más migraciones: Django y Rails
 

@@ -59,7 +59,16 @@ const KEPT_PARENS: &str = "package main
 
 func main() {
 	if (func() bool {
-		var a = T{}
+		var a T
+		var b, c = [...]int{1}, s[1:2:3]
+		var d struct{ f [3]int }
+		type L[P any] []P
+		_ = G[int, string](*p, -q, x.(interface{ M() }), t+b[0])
+		_ = func(n ...int) (r map[string]chan int) { return }
+	next:
+		for c.f, d = range m {
+			break next
+		}
 		a.x++
 		ch <- 1
 		go f()
