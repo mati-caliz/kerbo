@@ -1,4 +1,5 @@
 use crate::lint::taint::SinkKind;
+use crate::lint::taint::responses::is_named_html_escape;
 
 // Los objetos que traen lo que manda el usuario (el `request` de Flask, Django o Starlette, también
 // como atributo: `self.request`) y lo que se lee de ellos.
@@ -219,6 +220,11 @@ const HTML_FUNCTIONS: &[&str] = &[
     "flask.render_template_string",
     "django.http.HttpResponse",
     "markupsafe.Markup",
+    "flask.Markup",
+    "jinja2.Markup",
+    "django.utils.safestring.mark_safe",
+    "django.utils.safestring.SafeString",
+    "jinja2.Template",
     "starlette.responses.HTMLResponse",
     "fastapi.responses.HTMLResponse",
 ];
@@ -238,9 +244,6 @@ const HTML_ESCAPES: &[&str] = &[
 ];
 const COMMAND_ESCAPES: &[&str] = &["shlex.quote", "pipes.quote"];
 const PATH_ESCAPES: &[&str] = &["werkzeug.utils.secure_filename", "os.path.basename"];
-// Un escape de HTML propio se reconoce por el nombre (`escape_for_html`, `html_escape`).
-const ESCAPE_WORD: &str = "escape";
-const HTML_WORD: &str = "html";
 const LAMBDA_PARAMETERS: [&str; 2] = ["event", "context"];
 const QUOTES: &[char] = &['\'', '"'];
 const VARIABLE_PART: char = '<';
@@ -382,7 +385,7 @@ pub fn creates_map(qualified: &str) -> bool {
 // Para qué sumideros deja de ser peligroso lo que devuelve esta función.
 pub fn escapes(qualified: &str) -> Option<SinkKind> {
     let simple = qualified.rsplit('.').next().unwrap_or(qualified).to_lowercase();
-    if HTML_ESCAPES.contains(&qualified) || (simple.contains(ESCAPE_WORD) && simple.contains(HTML_WORD)) {
+    if HTML_ESCAPES.contains(&qualified) || is_named_html_escape(&simple) {
         Some(SinkKind::Html)
     } else if COMMAND_ESCAPES.contains(&qualified) {
         Some(SinkKind::Command)

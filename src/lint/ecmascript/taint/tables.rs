@@ -1,4 +1,6 @@
 use crate::lint::taint::SinkKind;
+use crate::lint::taint::responses::is_named_html_escape;
+pub use crate::lint::taint::responses::{is_content_type_header, is_html_type};
 
 // Los objetos de un pedido (Express, Koa, Next, Fastify, Lambda) y lo que traen del usuario.
 const REQUEST_OBJECTS: &[&str] = &["req", "request", "ctx", "ctx.request", "event"];
@@ -18,8 +20,36 @@ const REQUEST_PROPERTIES: &[&str] = &[
     "queryStringParameters",
     "pathParameters",
     "multiValueQueryStringParameters",
+    "nextUrl",
 ];
 const REQUEST_METHODS: &[&str] = &["get", "header", "param", "json", "text", "formData"];
+// El pedido de Hono: `c.req.query('x')`, `c.req.param('id')`, `await c.req.json()`.
+const HONO_REQUEST: &str = "c.req";
+const HONO_METHODS: &[&str] = &[
+    "query",
+    "queries",
+    "param",
+    "header",
+    "json",
+    "text",
+    "formData",
+    "parseBody",
+];
+// Los decoradores de Nest que llenan un parámetro con lo que manda el usuario.
+const NEST_SOURCES: &[&str] = &[
+    "Query",
+    "Param",
+    "Body",
+    "Headers",
+    "Req",
+    "Request",
+    "UploadedFile",
+    "UploadedFiles",
+];
+// Las props de una página de Next: lo que viene en la URL.
+const NEXT_PROPS: &[&str] = &["searchParams"];
+const DECORATOR_MARK: char = '@';
+const ARGUMENTS_START: char = '(';
 // Lo que el navegador trae de la URL o de otra ventana.
 const BROWSER_SOURCES: &[&str] = &[
     "location.hash",
@@ -103,15 +133,10 @@ const HTML_PROPERTIES: &[&str] = &["innerHTML", "outerHTML"];
 const HTML_METHODS: &[&str] = &["insertAdjacentHTML", "bypassSecurityTrustHtml", "html"];
 // jQuery arma elementos con el HTML que recibe: `$("<span>" + nombre + "</span>")`.
 const HTML_FUNCTIONS: &[&str] = &["jQuery", "$"];
-// La respuesta de un handler de Lambda: `{ body, headers: { 'Content-Type': 'text/html' } }`.
-pub const RESPONSE_BODY: &str = "body";
-pub const RESPONSE_HEADERS: &str = "headers";
 const DOCUMENT: &str = "document";
 const DOCUMENT_METHODS: &[&str] = &["write", "writeln"];
 // Lo que declara el tipo de una respuesta: si no es HTML, escribir en ella no es un XSS.
 const CONTENT_TYPE_METHODS: &[&str] = &["set", "setHeader", "header", "type", "contentType", "writeHead"];
-const CONTENT_TYPE_HEADER: &str = "content-type";
-const HTML_TYPE: &str = "html";
 const LAMBDA_PARAMETERS: [&str; 2] = ["event", "context"];
 const LAMBDA_EVENT: &str = "event";
 const LAMBDA_HANDLER: &str = "handler";
@@ -144,8 +169,6 @@ const CLEAN_RESULTS: &[&str] = &[
     "existsSync",
 ];
 const PATH_ESCAPES: &[&str] = &["path.basename"];
-// Un escape de HTML propio se reconoce por el nombre (`escapeHtml`, `htmlEscape`).
-const ESCAPE_WORD: &str = "escape";
 const NAME_BOUNDARIES: &[char] = &['.', '#'];
 
 pub fn is_request_object(written: &str) -> bool {
@@ -158,6 +181,21 @@ pub fn is_request_property(name: &str) -> bool {
 
 pub fn is_request_method(name: &str) -> bool {
     REQUEST_METHODS.contains(&name)
+}
+
+pub fn is_hono_source(receiver: &str, method: &str) -> bool {
+    receiver == HONO_REQUEST && HONO_METHODS.contains(&method)
+}
+
+// `@Query('id')` o `@Body()`: el nombre del decorador, sin la arroba ni los argumentos.
+pub fn is_nest_source(decorator: &str) -> bool {
+    let name = decorator.trim_start_matches(DECORATOR_MARK);
+    let name = name.split(ARGUMENTS_START).next().unwrap_or(name).trim();
+    NEST_SOURCES.contains(&name)
+}
+
+pub fn is_next_prop(name: &str) -> bool {
+    NEXT_PROPS.contains(&name)
 }
 
 pub fn is_browser_source(written: &str) -> bool {
@@ -212,14 +250,6 @@ pub fn declares_content_type(receiver: &str, method: &str) -> bool {
     RESPONSE_OBJECTS.contains(&receiver) && CONTENT_TYPE_METHODS.contains(&method)
 }
 
-pub fn is_html_type(written: &str) -> bool {
-    written.to_lowercase().contains(HTML_TYPE)
-}
-
-pub const fn is_content_type_header(name: &str) -> bool {
-    name.eq_ignore_ascii_case(CONTENT_TYPE_HEADER)
-}
-
 // `(event, context)`, o un único `event` en una función que se llama `handler`.
 pub fn is_lambda_handler(name: Option<&str>, parameters: &[&str]) -> bool {
     let named_handler = name.is_some_and(|written| written.rsplit('.').next() == Some(LAMBDA_HANDLER));
@@ -237,7 +267,7 @@ pub fn escapes(qualified: &str) -> Option<SinkKind> {
         .next()
         .unwrap_or(qualified)
         .to_lowercase();
-    if HTML_ESCAPES.contains(&qualified) || (simple.contains(ESCAPE_WORD) && simple.contains(HTML_TYPE)) {
+    if HTML_ESCAPES.contains(&qualified) || is_named_html_escape(&simple) {
         Some(SinkKind::Html)
     } else if PATH_ESCAPES.contains(&qualified) {
         Some(SinkKind::Path)

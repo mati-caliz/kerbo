@@ -30,6 +30,8 @@ const PARAMETERS_FIELD: &str = "parameters";
 const PARAMETER_FIELD: &str = "parameter";
 const PATTERN_FIELD: &str = "pattern";
 const ASSIGNMENT: &str = "assignment_expression";
+const DECORATOR: &str = "decorator";
+const OBJECT_PATTERN: &str = "object_pattern";
 const LEFT_FIELD: &str = "left";
 // Un nombre del archivo: empieza con `@` para que el índice lo complete con el módulo.
 const LOCAL_PREFIX: &str = "@";
@@ -89,6 +91,10 @@ fn summary(
 ) -> Option<TaintMethod> {
     let body = function.child_by_field_name(BODY_FIELD)?;
     let parameters = parameter_patterns(function);
+    let from_user: Vec<bool> = parameters
+        .iter()
+        .map(|parameter| comes_from_user(*parameter, source))
+        .collect();
     let mut interpreter = Interpreter::new(source, imports, locals);
     let mut state = State::new();
     let written: Vec<&str> = parameters
@@ -99,7 +105,7 @@ fn summary(
     let lambda = tables::is_lambda_handler(declared_name.as_deref(), &written);
     interpreter.lambda = lambda;
     for (position, parameter) in parameters.iter().enumerate() {
-        let atom = if lambda && position == 0 {
+        let atom = if (lambda && position == 0) || from_user.get(position).copied().unwrap_or_default() {
             Atom::Source
         } else {
             Atom::Parameter(position)
@@ -126,6 +132,22 @@ fn assigned_name(function: Node<'_>, source: &[u8]) -> Option<String> {
         .filter(|parent| parent.kind() == ASSIGNMENT)
         .and_then(|assignment| assignment.child_by_field_name(LEFT_FIELD))
         .map(|left| text(left, source).to_owned())
+}
+
+// Un parámetro de Nest con `@Query()`, `@Body()`..., o las `searchParams` de una página de Next.
+fn comes_from_user(pattern: Node<'_>, source: &[u8]) -> bool {
+    let decorated = pattern
+        .parent()
+        .map(named_children)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|child| child.kind() == DECORATOR)
+        .any(|decorator| tables::is_nest_source(text(decorator, source)));
+    let next_props = pattern.kind() == OBJECT_PATTERN
+        && named_children(pattern)
+            .into_iter()
+            .any(|part| tables::is_next_prop(text(part, source)));
+    decorated || next_props
 }
 
 // Los parámetros, en orden: `x`, `x: T`, `x = 1`, `{ a, b }` o el único de `x => ...`.

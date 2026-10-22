@@ -27,7 +27,7 @@ const SOURCE_METHODS: &[&str] = &[
     "getPart",
     "getParts",
 ];
-// Los parámetros que Spring llena con lo que manda el usuario.
+// Los parámetros que Spring, JAX-RS (también Quarkus) y Micronaut llenan con lo que manda el usuario.
 const SOURCE_PARAMETER_ANNOTATIONS: &[&str] = &[
     "RequestParam",
     "PathVariable",
@@ -37,6 +37,22 @@ const SOURCE_PARAMETER_ANNOTATIONS: &[&str] = &[
     "RequestPart",
     "ModelAttribute",
     "MatrixVariable",
+    "QueryParam",
+    "PathParam",
+    "FormParam",
+    "HeaderParam",
+    "CookieParam",
+    "MatrixParam",
+    "BeanParam",
+    "RestQuery",
+    "RestPath",
+    "RestForm",
+    "RestHeader",
+    "RestCookie",
+    "QueryValue",
+    "Body",
+    "Header",
+    "Part",
 ];
 // Lo que devuelven no puede llevar texto armado por el usuario: un número, un booleano, un UUID.
 const CLEAN_RESULTS: &[&str] = &[
@@ -120,6 +136,22 @@ const SQL_SESSIONS: &[&str] = &["EntityManager", "Session", "StatelessSession"];
 const SQL_SESSION_METHODS: &[&str] = &["createQuery", "createNativeQuery", "createSQLQuery"];
 const SQL_CLIENTS: &[&str] = &["JdbcClient"];
 const SQL_CLIENT_METHODS: &[&str] = &["sql"];
+// jOOQ con SQL en texto: el `DSLContext` y los `DSL.sql`, `DSL.field`... estáticos.
+const JOOQ_CONTEXTS: &[&str] = &["DSLContext"];
+const JOOQ_CONTEXT_METHODS: &[&str] = &[
+    "fetch",
+    "fetchOne",
+    "fetchSingle",
+    "fetchOptional",
+    "fetchLazy",
+    "fetchStream",
+    "fetchValue",
+    "execute",
+    "query",
+    "resultQuery",
+];
+const JOOQ_BUILDERS: &[&str] = &["DSL"];
+const JOOQ_BUILDER_METHODS: &[&str] = &["sql", "field", "condition", "table", "query", "resultQuery"];
 const COMMAND_RUNTIMES: &[&str] = &["Runtime"];
 const COMMAND_RUNTIME_METHODS: &[&str] = &["exec"];
 const COMMAND_BUILDERS: &[&str] = &["ProcessBuilder"];
@@ -141,6 +173,8 @@ const METHOD_SINKS: &[(&[&str], &[&str], SinkKind)] = &[
     (SQL_TEMPLATES, SQL_TEMPLATE_METHODS, SinkKind::Sql),
     (SQL_SESSIONS, SQL_SESSION_METHODS, SinkKind::Sql),
     (SQL_CLIENTS, SQL_CLIENT_METHODS, SinkKind::Sql),
+    (JOOQ_CONTEXTS, JOOQ_CONTEXT_METHODS, SinkKind::Sql),
+    (JOOQ_BUILDERS, JOOQ_BUILDER_METHODS, SinkKind::Sql),
     (COMMAND_RUNTIMES, COMMAND_RUNTIME_METHODS, SinkKind::Command),
     (COMMAND_BUILDERS, COMMAND_BUILDER_METHODS, SinkKind::Command),
     (RESPONSE_WRITERS, RESPONSE_WRITER_METHODS, SinkKind::Html),

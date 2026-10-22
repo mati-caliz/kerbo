@@ -753,8 +753,7 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Los campos no se siguen: un dato del usuario guardado en `this.x` y leído en otro método se
     pierde. Tampoco lambdas ni clases anónimas.
   - Los sumideros con receptor desconocido (una cadena `a.b().query(...)`) no se miran.
-  - Fuentes de otros frameworks (JAX-RS `@QueryParam`, Micronaut, Quarkus) y sumideros de
-    MyBatis (`${}` en los mapeos) y de jOOQ (`DSL.sql`).
+  - Sumideros de MyBatis (`${}` en los mapeos XML y en `@Select`).
 - Contaminación en Python (hecho, 2026-10-22): las cuatro reglas pasan a una familia propia
   (`TaintRule`, los mismos nombres) y el motor queda compartido (`src/lint/taint/`,
   `src/index/taint_engine.rs`); cada dato lleva un bit por tipo de sumidero para el que sigue siendo
@@ -776,13 +775,12 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     versión daba 84, todos falsos: el `return` de una ruta de FastAPI es JSON, no HTML, y las
     sentencias de SQLAlchemy Core van con parámetros ligados.
 - Pendientes de contaminación en Python:
-  - Inyección de argumentos: un programa o argumentos elegidos por el usuario sin shell
-    (`subprocess.run([cmd, ...])`).
   - Fuentes de línea de comandos (`sys.argv`, `os.environ`, `input()`), apagadas para no marcar
     scripts y herramientas.
   - El código de nivel de módulo (fuera de funciones) no se recorre.
   - La herencia entre clases y los métodos de clases que llegan como parámetro no se resuelven.
-  - Plantillas (`Markup`, `|safe` en Jinja) y el XSS de una respuesta de Lambda.
+  - Plantillas en archivos (`|safe` en Jinja): pide leer el template y cruzarlo con lo que se le
+    pasa a `render_template`.
 - Contaminación en JavaScript y TypeScript (hecho, 2026-10-22): un intérprete
   (`src/lint/ecmascript/taint/`) con constantes, `switch`, plantillas de texto, objetos y arreglos
   por clave y posición (`push`/`pop`/`shift`), y la resolución entre archivos por `import` y
@@ -804,9 +802,7 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     pierde, y el código de nivel de módulo no se recorre.
   - Sin tipos, las conexiones y los objetos del pedido se reconocen por el nombre de la variable;
     con el chequeo de tipos de TypeScript se podría mirar el tipo.
-  - Fuentes de otros frameworks (Next con `searchParams`, Nest con `@Query`, Hono) y plantillas
-    (EJS con `<%-`, Handlebars con `{{{`).
-  - Inyección de argumentos sin shell (`spawn(cmd)` con el programa elegido por el usuario).
+  - Plantillas en archivos (EJS con `<%-`, Handlebars con `{{{`): como en Python.
 - Contaminación en Go (hecho, 2026-10-22): un intérprete (`src/lint/go/taint/`) que usa los tipos
   declarados para las fuentes y los sumideros, con constantes, `switch`, `range`, mapas por clave y
   `strings.Builder`, y la resolución entre paquetes por carpeta (`src/index/go_taint.rs`). Los
@@ -822,8 +818,22 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
 - Pendientes de contaminación en Go:
   - Los campos de un struct no se siguen (`h.db.Query(...)` con `h` un handler no sabe el tipo de
     `db`; cae en el nombre) y los valores capturados por una función anónima no llegan a ella.
-  - Plantillas (`text/template` escribiendo HTML) y `c.Data(..., "text/html", ...)` de gin.
-  - Inyección de argumentos sin shell (`exec.Command(programa)` con el programa del usuario).
+- Contaminación, segunda tanda (hecho, 2026-10-22):
+  - Fuentes de JAX-RS, Quarkus y Micronaut (`@QueryParam`, `@PathParam`, `@RestQuery`,
+    `@QueryValue`...), de Nest (`@Query()`, `@Body()`...), de Hono (`c.req.query()`) y de Next
+    (`request.nextUrl`, las `searchParams` de una página).
+  - Sumideros de jOOQ con SQL en texto (`dsl.fetch(...)`, `DSL.sql`, `DSL.field`), `c.Data(...,
+    "text/html", ...)` de gin, `Markup`/`mark_safe`/`jinja2.Template` en Python y `text/template`
+    (que no escapa) ejecutado sobre la respuesta en Go.
+  - Inyección de argumentos sin shell, en los cuatro lenguajes: el usuario elige el programa
+    (`exec.Command(prog)`, `spawn(cmd)`, `subprocess.run([cmd, ...])`). Un texto suelto sin shell
+    en Python no cuenta: es el nombre del programa entero.
+  - La respuesta HTML de un handler de Lambda (`{body, headers}`), también en Python, y los escapes
+    propios por nombre quedan en `src/lint/taint/responses.rs`, compartidos.
+  - Medido: el OWASP Benchmark de Java y el de Python siguen en 100 % sin falsos positivos; en los
+    tests de Semgrep, los comandos de Python pasan de 39 a 41 de 71 y los de JavaScript de 1 a 2 de
+    8. El único aviso "de más" nuevo es correcto: `subprocess.call([cmd[0], ...])` con `cmd` del
+    usuario, que Semgrep da por bueno porque no hay shell. En tus proyectos, ninguno.
 - **Renombres de columnas y tablas que el código desplegado todavía usa** (viene de la etapa 12).
   Sin compilar no hay forma confiable: los nombres pasan por los mapeos del ORM (`@map` de
   Prisma, `name=` de SQLAlchemy, los nombres de drizzle), cambian de caso y coinciden con palabras

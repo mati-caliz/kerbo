@@ -225,7 +225,13 @@ fn record_sinks(
     let found = sql_sink(interpreter, target)
         .map(|position| (SinkKind::Sql, from(position)))
         .or_else(|| {
-            command_sink(interpreter, target, nodes).map(|position| (SinkKind::Command, from(position)))
+            command_sink(interpreter, target, nodes).map(|positions| {
+                let flows = positions
+                    .iter()
+                    .filter_map(|position| carried.get(*position).cloned())
+                    .collect();
+                (SinkKind::Command, flows)
+            })
         })
         .or_else(|| {
             path_sink(target).map(|position| {
@@ -250,8 +256,13 @@ fn sql_sink(interpreter: &Interpreter<'_, '_>, target: &Target<'_>) -> Option<us
     tables::sql_query_position(target.receiver_type.as_deref(), last, &target.method)
 }
 
-// `exec.Command("sh", "-c", texto)`: sólo con una shell el texto armado se interpreta.
-fn command_sink(interpreter: &Interpreter<'_, '_>, target: &Target<'_>, nodes: &[Node<'_>]) -> Option<usize> {
+// `exec.Command("sh", "-c", texto)`: con una shell se interpreta todo lo que sigue; sin shell, lo
+// peligroso es que el usuario elija el programa.
+fn command_sink(
+    interpreter: &Interpreter<'_, '_>,
+    target: &Target<'_>,
+    nodes: &[Node<'_>],
+) -> Option<Vec<usize>> {
     if !tables::is_command(&target.qualified) {
         return None;
     }
@@ -265,7 +276,11 @@ fn command_sink(interpreter: &Interpreter<'_, '_>, target: &Target<'_>, nodes: &
     };
     let shell =
         tables::is_shell(&constant(offset)) && tables::is_shell_flag(&constant(offset.saturating_add(1)));
-    shell.then(|| offset.saturating_add(2))
+    Some(if shell {
+        (offset.saturating_add(2)..nodes.len()).collect()
+    } else {
+        vec![offset]
+    })
 }
 
 fn path_sink(target: &Target<'_>) -> Option<usize> {
@@ -287,9 +302,21 @@ fn html_sink(interpreter: &Interpreter<'_, '_>, target: &Target<'_>, nodes: &[No
     if on_writer || tables::is_html_conversion(&target.qualified) {
         return Some(0);
     }
+    let on_context = target
+        .receiver_type
+        .as_deref()
+        .is_some_and(tables::is_context_type);
+    let declared_html = nodes
+        .get(1)
+        .and_then(|declared| literal_of(*declared, interpreter.source))
+        .is_some_and(|literal| matches!(literal, Literal::Text(written) if tables::is_html_type(&written)));
+    if on_context && tables::is_context_data(&target.method) && declared_html {
+        return Some(2);
+    }
     let to_writer = nodes
         .first()
         .and_then(|writer| interpreter.type_of(*writer))
         .is_some_and(|written| tables::is_writer_type(&written));
-    (tables::is_printer(&target.qualified) && to_writer).then_some(1)
+    let executes = tables::is_text_template_execute(target.receiver_type.as_deref(), &target.method);
+    ((tables::is_printer(&target.qualified) || executes) && to_writer).then_some(1)
 }

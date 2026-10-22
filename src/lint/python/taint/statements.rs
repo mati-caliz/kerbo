@@ -4,6 +4,7 @@ use tree_sitter::Node;
 
 use super::imports::Imports;
 use crate::lint::taint::folding::{same_label, truth};
+use crate::lint::taint::responses::lambda_html_body;
 use crate::lint::taint::{Flow, Literal, SinkKind, State, TaintCall, TaintSink, Value, join_states};
 use crate::syntax::named_children;
 
@@ -154,6 +155,14 @@ impl<'source, 'context> Interpreter<'source, 'context> {
     // sea JSON.
     fn returned(&mut self, statement: Node<'_>, child: Node<'_>, state: &mut State) {
         let returned = self.expression(child, state);
+        if let Some(body) = lambda_html_body(&returned) {
+            self.sinks.push(super::expressions::sink_at(
+                statement,
+                RETURN_SUBJECT,
+                SinkKind::Html,
+                vec![body],
+            ));
+        }
         if self.route && !JSON_RESULTS.contains(&child.kind()) && !matches!(returned, Value::Map(_)) {
             let body = super::expressions::response_body(child, &returned);
             self.sinks.push(super::expressions::sink_at(

@@ -43,6 +43,16 @@ exports.handler = async (event) => {
   await connection.raw(`SELECT * FROM items WHERE id = ${event.pathParameters.id}`);
 };
 
+const { Hono } = require('hono');
+const hono = new Hono();
+hono.get('/hono', (c) => {
+  db.query('SELECT * FROM t WHERE id = ' + c.req.query('id'));
+});
+
+export default async function Page({ searchParams }) {
+  db.query(`SELECT * FROM t WHERE q = '${searchParams.q}'`);
+}
+
 exports.page = function (event, context) {
   const html = `<div>${event.name}</div>`;
   const json = { statusCode: 200, body: html, headers: { 'Content-Type': 'application/json' } };
@@ -82,10 +92,25 @@ const BROWSER: &str = r"function render() {
 }
 ";
 
+const NEST: &str = r"@Controller('items')
+export class ItemsController {
+  constructor(private readonly db: Pool) {}
+
+  @Get()
+  find(@Query('q') name: string, limit: number) {
+    return this.db.query(`SELECT * FROM items WHERE name = '${name}' LIMIT ${limit}`);
+  }
+}
+";
+
 fn taints_of(source: &str) -> Vec<TaintMethod> {
+    taints_in(Language::JavaScript, source)
+}
+
+fn taints_in(language: Language, source: &str) -> Vec<TaintMethod> {
     let mut parser = Parser::new();
     parser
-        .set_language(&Language::JavaScript.grammar().expect("tiene gramática"))
+        .set_language(&language.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("se parsea");
     ecmascript_taints(tree.root_node(), source.as_bytes())
@@ -129,7 +154,9 @@ fn user_data_reaching_node_sinks_is_reported_across_modules() {
             "16 path-traversal readFileSync",
             "17 xss send",
             "36 sql-injection raw",
-            "45 xss return",
+            "42 sql-injection query",
+            "46 sql-injection query",
+            "55 xss return",
         ]
     );
 }
@@ -151,6 +178,16 @@ fn browser_sources_reach_the_document() {
             "19 xss dangerouslySetInnerHTML",
         ]
     );
+}
+
+#[test]
+fn nest_decorated_parameters_come_from_the_user() {
+    let controller = taints_in(Language::TypeScript, NEST);
+    let modules = [ScriptModule {
+        path: "src/items.controller.ts",
+        taints: &controller,
+    }];
+    assert_eq!(found(&modules), ["7 sql-injection query"]);
 }
 
 #[test]

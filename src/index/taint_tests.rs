@@ -115,6 +115,35 @@ fn user_data_reaching_a_query_a_command_or_a_path_is_reported() {
     );
 }
 
+const ITEMS: &str = r#"package app;
+
+@Path("/items")
+class Items {
+    private final DSLContext dsl;
+
+    @GET
+    Object find(@QueryParam("q") String name) {
+        return dsl.fetch("SELECT * FROM items WHERE name = '" + name + "'");
+    }
+
+    Object column(@PathParam("c") String column) {
+        return DSL.field(column);
+    }
+
+    Object bound(@QueryParam("q") String name) {
+        return dsl.fetch("SELECT * FROM items WHERE name = ?", name);
+    }
+}
+"#;
+
+#[test]
+fn jax_rs_parameters_reaching_jooq_are_reported() {
+    assert_eq!(
+        tainted(&[("Items", ITEMS)]),
+        ["Items:9 sql-injection fetch", "Items:13 sql-injection field"]
+    );
+}
+
 #[test]
 fn without_a_source_in_the_project_nothing_is_reported() {
     assert_eq!(tainted(&[("Helper", HELPER)]), Vec::<String>::new());

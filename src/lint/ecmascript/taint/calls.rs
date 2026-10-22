@@ -81,6 +81,18 @@ fn with_shell(arguments: &[Value]) -> bool {
     })
 }
 
+// `"abc".toUpperCase()` con todo constante da otra constante.
+fn folded_text_method(receiver: Option<&Value>, method: &str, arguments: &[Value]) -> Option<Literal> {
+    let Some(Literal::Text(written)) = receiver.and_then(Value::literal) else {
+        return None;
+    };
+    let constants: Option<Vec<Literal>> = arguments
+        .iter()
+        .map(|argument| argument.literal().cloned())
+        .collect();
+    fold_text_method(written, method, &constants?)
+}
+
 pub(super) fn call(interpreter: &mut Interpreter<'_, '_>, node: Node<'_>, state: &mut State) -> Value {
     let Some(function) = node
         .child_by_field_name(FUNCTION_FIELD)
@@ -110,20 +122,16 @@ pub(super) fn call(interpreter: &mut Interpreter<'_, '_>, node: Node<'_>, state:
     if let Some(value) = followed_call(list, method, &arguments, state) {
         return value;
     }
-    if let Some(Literal::Text(written)) = receiver.as_ref().and_then(Value::literal) {
-        let constants: Option<Vec<Literal>> = arguments
-            .iter()
-            .map(|argument| argument.literal().cloned())
-            .collect();
-        if let Some(folded) = constants.and_then(|constants| fold_text_method(written, method, &constants)) {
-            return Value::Constant(folded);
-        }
+    if let Some(folded) = folded_text_method(receiver.as_ref(), method, &arguments) {
+        return Value::Constant(folded);
     }
     let receiver_text = object.map(|inner| interpreter.text(inner)).unwrap_or_default();
     if tables::declares_content_type(receiver_text, method) && declared_not_html(&arguments) {
         interpreter.plain_response = true;
     }
-    if tables::is_request_object(receiver_text) && tables::is_request_method(method) {
+    if (tables::is_request_object(receiver_text) && tables::is_request_method(method))
+        || tables::is_hono_source(receiver_text, method)
+    {
         return Value::Data(Flow::of(Atom::Source));
     }
     let qualified = qualified(interpreter, function);
@@ -206,10 +214,16 @@ fn record_sinks(
         receiver,
     } = *site;
     let at = function.child_by_field_name(PROPERTY_FIELD).unwrap_or(function);
-    let command = qualified.and_then(tables::function_sink).filter(|kind| {
-        *kind != SinkKind::Command || qualified.is_some_and(tables::always_shell) || with_shell(arguments)
-    });
-    let sink = command
+    let function_kind = qualified.and_then(tables::function_sink);
+    let shell = qualified.is_some_and(tables::always_shell) || with_shell(arguments);
+    if function_kind == Some(SinkKind::Command) && !shell {
+        let program = carried.first().cloned().into_iter().collect();
+        interpreter
+            .sinks
+            .push(sink_at(at, method, SinkKind::Command, program));
+        return;
+    }
+    let sink = function_kind
         .or_else(|| tables::sql_method_sink(receiver, method))
         .or_else(|| {
             tables::response_sink(receiver, method).filter(|kind| {

@@ -440,7 +440,7 @@ by name: the request (`req`, `request`, `ctx`) and its `query`, `params`, `body`
 `event` in a function called `handler`); and in the browser, `location.hash`, `location.search`,
 `document.URL`, `document.referrer` and `window.name`. Sinks: `query`, `execute`, `raw` and
 `$queryRawUnsafe` on a connection (`db`, `conn`, `pool`, `client`, `knex`, `prisma`...);
-`child_process.exec` always and `spawn`/`execFile` only with `{ shell: true }`; `fs.*` and
+`child_process.exec` always and `spawn`/`execFile` with `{ shell: true }` or with a program chosen by the user; `fs.*` and
 `res.sendFile`; and for HTML, `res.send`, `res.write` and `res.end` from Express and Node (not
 Fastify's, which sends plain text, nor when the function declares another type with
 `res.type('json')` or `writeHead(200, { 'content-type': 'application/json' })`), `innerHTML`,

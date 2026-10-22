@@ -90,6 +90,31 @@ fn user_data_reaching_python_sinks_is_reported_across_modules() {
     );
 }
 
+const LAMBDA: &str = r#"import json
+
+def handler(event, context):
+    name = event["queryStringParameters"]["name"]
+    page = "<p>" + name + "</p>"
+    if event.get("json"):
+        return {"statusCode": 200, "body": json.dumps({"name": name}), "headers": {"Content-Type": "application/json"}}
+    return {"statusCode": 200, "body": page, "headers": {"Content-Type": "text/html"}}
+"#;
+
+#[test]
+fn a_lambda_response_declared_html_is_a_sink() {
+    let handler = taints_of(LAMBDA);
+    let modules = [PythonModule {
+        path: "handler.py",
+        taints: &handler,
+    }];
+    let found: Vec<String> = python_tainted(&modules)
+        .into_iter()
+        .flatten()
+        .map(|finding| format!("{} {}", finding.line, finding.kind.rule().as_str()))
+        .collect();
+    assert_eq!(found, ["8 xss"]);
+}
+
 #[test]
 fn module_names_come_from_the_path() {
     assert_eq!(module_name("helpers/utils.py"), "helpers.utils");

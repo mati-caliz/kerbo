@@ -1,4 +1,6 @@
 use crate::lint::taint::SinkKind;
+use crate::lint::taint::responses::is_named_html_escape;
+pub use crate::lint::taint::responses::{is_content_type_header, is_html_type};
 
 // Los tipos que traen el pedido entero: lo que se lea de ellos lo manda el usuario.
 const REQUEST_TYPES: &[&str] = &[
@@ -38,7 +40,27 @@ const WRITER_TYPE: &str = "net/http.ResponseWriter";
 const WRITER_METHODS: &[&str] = &["Write", "WriteString"];
 // Lo que escribe en el `io.Writer` de su primer argumento.
 const PRINTERS: &[&str] = &["fmt.Fprintf", "fmt.Fprint", "fmt.Fprintln", "io.WriteString"];
-const HTML_CONVERSIONS: &[&str] = &["html/template.HTML"];
+const HTML_CONVERSIONS: &[&str] = &["html/template.HTML", "html/template.JS", "html/template.HTMLAttr"];
+// `text/template` no escapa: lo que se le pasa a `Execute` sobre la respuesta sale como HTML.
+const TEXT_TEMPLATE: &str = "text/template.Template";
+const TEXT_TEMPLATE_BUILDERS: &[&str] = &[
+    "text/template.New",
+    "text/template.Must",
+    "text/template.ParseFiles",
+    "text/template.ParseGlob",
+    "text/template.ParseFS",
+];
+const TEXT_TEMPLATE_CHAIN: &[&str] = &[
+    "New",
+    "Parse",
+    "ParseFiles",
+    "ParseGlob",
+    "ParseFS",
+    "Funcs",
+    "Option",
+    "Lookup",
+];
+const TEXT_TEMPLATE_EXECUTE: &[&str] = &["Execute", "ExecuteTemplate"];
 const SQL_TYPES: &[&str] = &[
     "database/sql.DB",
     "database/sql.Tx",
@@ -107,6 +129,8 @@ const PATH_FUNCTIONS: &[(&str, usize)] = &[
     ("io/ioutil.ReadDir", 0),
     ("net/http.ServeFile", 2),
 ];
+// `c.Data(200, "text/html", cuerpo)` de gin: el tipo va en el segundo argumento.
+const CONTEXT_DATA: &str = "Data";
 const CONTEXT_FILE_METHODS: &[&str] = &["File", "FileAttachment", "SendFile", "Attachment"];
 const HTML_ESCAPES: &[&str] = &[
     "html.EscapeString",
@@ -121,9 +145,6 @@ const PATH_ESCAPES: &[&str] = &["path/filepath.Base", "path.Base"];
 // `path.Clean("/" + x)`: con la raíz adelante, Clean no deja ningún `..`.
 pub const ROOTED_CLEANS: &[&str] = &["path.Clean", "path/filepath.Clean"];
 pub const ROOT: &str = "/";
-// Un escape de HTML propio se reconoce por el nombre (`escapeHTML`, `HTMLEscape`).
-const ESCAPE_WORD: &str = "escape";
-const HTML_WORD: &str = "html";
 const CLEAN_RESULTS: &[&str] = &[
     "len",
     "cap",
@@ -142,14 +163,10 @@ const CLEAN_RESULTS: &[&str] = &[
     "Match",
     "Len",
 ];
-const CONTENT_TYPE_HEADER: &str = "content-type";
 // Lo que se escribe en un `strings.Builder` o un `bytes.Buffer` queda en él.
 const BUILDER_WRITES: &[&str] = &["WriteString", "WriteByte", "WriteRune"];
 const HEADER_SETTERS: &[&str] = &["Set", "Add"];
 pub const HEADER_CALL: &str = "Header()";
-// La respuesta de un handler de Lambda: `events.APIGatewayProxyResponse{Body: ..., Headers: ...}`.
-pub const RESPONSE_BODY: &str = "Body";
-pub const RESPONSE_HEADERS: &str = "Headers";
 
 pub fn is_request_type(written: &str) -> bool {
     REQUEST_TYPES.contains(&written)
@@ -173,6 +190,10 @@ pub fn is_writer_type(written: &str) -> bool {
 
 pub fn is_writer_method(method: &str) -> bool {
     WRITER_METHODS.contains(&method)
+}
+
+pub fn is_text_template_execute(receiver_type: Option<&str>, method: &str) -> bool {
+    receiver_type == Some(TEXT_TEMPLATE) && TEXT_TEMPLATE_EXECUTE.contains(&method)
 }
 
 pub fn is_printer(qualified: &str) -> bool {
@@ -203,7 +224,13 @@ pub fn returned_type(qualified: &str, receiver_type: Option<&str>, method: &str)
     if let Some((_, opened)) = OPENERS.iter().find(|(opener, _)| *opener == qualified) {
         return Some((*opened).to_owned());
     }
+    if TEXT_TEMPLATE_BUILDERS.contains(&qualified) {
+        return Some(TEXT_TEMPLATE.to_owned());
+    }
     let receiver = receiver_type?;
+    if receiver == TEXT_TEMPLATE && TEXT_TEMPLATE_CHAIN.contains(&method) {
+        return Some(TEXT_TEMPLATE.to_owned());
+    }
     if GORM_TYPES.contains(&receiver) {
         return Some(receiver.to_owned());
     }
@@ -234,13 +261,17 @@ pub fn path_position(qualified: &str) -> Option<usize> {
         .map(|(_, position)| *position)
 }
 
+pub fn is_context_data(method: &str) -> bool {
+    method == CONTEXT_DATA
+}
+
 pub fn is_context_file_method(method: &str) -> bool {
     CONTEXT_FILE_METHODS.contains(&method)
 }
 
 pub fn escapes(qualified: &str) -> Option<SinkKind> {
     let simple = qualified.rsplit('.').next().unwrap_or(qualified).to_lowercase();
-    if HTML_ESCAPES.contains(&qualified) || (simple.contains(ESCAPE_WORD) && simple.contains(HTML_WORD)) {
+    if HTML_ESCAPES.contains(&qualified) || is_named_html_escape(&simple) {
         Some(SinkKind::Html)
     } else if PATH_ESCAPES.contains(&qualified) {
         Some(SinkKind::Path)
@@ -259,12 +290,4 @@ pub fn is_builder_write(method: &str) -> bool {
 
 pub fn is_header_setter(method: &str) -> bool {
     HEADER_SETTERS.contains(&method)
-}
-
-pub const fn is_content_type_header(name: &str) -> bool {
-    name.eq_ignore_ascii_case(CONTENT_TYPE_HEADER)
-}
-
-pub fn is_html_type(written: &str) -> bool {
-    written.to_lowercase().contains(HTML_WORD)
 }

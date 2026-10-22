@@ -3,12 +3,10 @@ use tree_sitter::Node;
 use super::calls::sink_at;
 use super::expressions::literal_of;
 use super::imports::Imports;
-use super::tables;
 use super::types::Types;
 use crate::lint::taint::folding::{same_label, truth};
-use crate::lint::taint::{
-    Flow, Literal, SinkKind, SinkReceiver, State, TaintCall, TaintSink, Value, element, join_states,
-};
+use crate::lint::taint::responses::lambda_html_body;
+use crate::lint::taint::{Flow, SinkKind, SinkReceiver, State, TaintCall, TaintSink, Value, join_states};
 use crate::syntax::named_children;
 
 const BLOCK: &str = "block";
@@ -60,22 +58,6 @@ pub struct Interpreter<'source, 'context> {
     pub(super) sinks: Vec<TaintSink>,
     pub(super) plain_response: bool,
     exits: Vec<Option<State>>,
-}
-
-// Lo que lleva el cuerpo de una respuesta de Lambda que se declara HTML.
-fn html_response_body(response: &Value) -> Option<Flow> {
-    let Value::Map(_) = response else {
-        return None;
-    };
-    let field = |name: &str| element(response, &Value::Constant(Literal::Text(name.to_owned())));
-    let Value::Map(headers) = field(tables::RESPONSE_HEADERS) else {
-        return None;
-    };
-    let declared_html = headers.iter().any(|(name, value)| {
-        tables::is_content_type_header(name)
-            && matches!(value.literal(), Some(Literal::Text(written)) if tables::is_html_type(written))
-    });
-    declared_html.then(|| field(tables::RESPONSE_BODY).flow())
 }
 
 impl<'source, 'context> Interpreter<'source, 'context> {
@@ -326,7 +308,7 @@ impl<'source, 'context> Interpreter<'source, 'context> {
         let returned = named_children(node).into_iter().flat_map(named_children);
         for child in returned {
             let value = self.expression(child, state);
-            if let Some(body) = html_response_body(&value) {
+            if let Some(body) = lambda_html_body(&value) {
                 self.sinks
                     .push(sink_at(node, RETURN_SUBJECT, SinkKind::Html, vec![body]));
             }

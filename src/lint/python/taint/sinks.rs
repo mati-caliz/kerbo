@@ -85,6 +85,15 @@ pub(super) fn response(
     Some(body)
 }
 
+// Sin shell, lo peligroso es el programa: el primero de la lista. Un texto suelto es el nombre del
+// programa entero (`"grep -R {}".format(x)` no corre nada), así que no cuenta.
+fn program_of(command: Option<&Value>) -> Flow {
+    match command {
+        Some(Value::List(items)) => items.first().map(Value::flow).unwrap_or_default(),
+        Some(Value::Constant(_) | Value::Data(_) | Value::Map(_)) | None => Flow::default(),
+    }
+}
+
 // Anota los sumideros de la llamada y devuelve lo que llevan sus argumentos.
 pub(super) fn record_sinks(
     interpreter: &mut Interpreter<'_, '_>,
@@ -97,12 +106,16 @@ pub(super) fn record_sinks(
         .child_by_field_name(ATTRIBUTE_FIELD)
         .unwrap_or(site.function);
     let qualified = site.qualified.as_deref();
-    if qualified.is_some_and(tables::runs_program)
-        && (with_shell(&arguments.keywords) || runs_shell(&arguments.positional))
-    {
+    if qualified.is_some_and(tables::runs_program) {
+        let shell = with_shell(&arguments.keywords) || runs_shell(&arguments.positional);
+        let flows = if shell {
+            carried.clone()
+        } else {
+            vec![program_of(arguments.positional.first())]
+        };
         interpreter
             .sinks
-            .push(sink_at(at, site.method, SinkKind::Command, carried.clone()));
+            .push(sink_at(at, site.method, SinkKind::Command, flows));
     }
     if site.object.is_some_and(|inner| on_query(interpreter, inner))
         && let Some(kind) = tables::query_method_sink(site.method)

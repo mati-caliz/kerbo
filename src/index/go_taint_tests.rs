@@ -17,7 +17,9 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"text/template"
 
+	"github.com/gin-gonic/gin"
 	"github.com/me/app/internal/store"
 	"gorm.io/gorm"
 )
@@ -31,6 +33,7 @@ func Search(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 		db.Exec(fmt.Sprintf("DELETE FROM users WHERE id = %d", id))
 		exec.Command("sh", "-c", "ping "+name).Run()
 		exec.Command("ping", name).Run()
+		exec.Command(name, "--version").Run()
 		os.ReadFile(filepath.Base(name))
 		os.ReadFile(path.Clean("/" + name))
 		os.Open(store.Resolve(name))
@@ -46,6 +49,17 @@ func Orders(w http.ResponseWriter, r *http.Request, db *gorm.DB) {
 	table.Order("created_at").Find(nil)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(order))
+}
+
+func Page(c *gin.Context) {
+	name := c.Query("name")
+	c.Data(200, "text/html; charset=utf-8", []byte("<p>"+name+"</p>"))
+	c.Data(200, "application/json", []byte(name))
+}
+
+func Render(w http.ResponseWriter, r *http.Request) {
+	page := template.Must(template.New("page").Parse("<p>{{.}}</p>"))
+	page.Execute(w, r.FormValue("name"))
 }
 
 func Mode(w http.ResponseWriter, r *http.Request) {
@@ -128,12 +142,15 @@ fn user_data_reaching_go_sinks_is_reported_across_packages() {
     assert_eq!(
         found,
         [
-            "21 sql-injection Query",
-            "25 command-injection Command",
-            "29 path-traversal Open",
-            "30 xss Fprintf",
-            "38 sql-injection Order",
-            "55 xss Fprintln",
+            "23 sql-injection Query",
+            "27 command-injection Command",
+            "29 command-injection Command",
+            "32 path-traversal Open",
+            "33 xss Fprintf",
+            "41 sql-injection Order",
+            "49 xss Data",
+            "55 xss Execute",
+            "69 xss Fprintln",
             "7 xss return",
         ]
     );

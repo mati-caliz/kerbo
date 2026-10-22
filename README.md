@@ -438,7 +438,7 @@ reconocen por el nombre: el pedido (`req`, `request`, `ctx`) y sus `query`, `par
 un único `event` en una función que se llama `handler`); y en el navegador, `location.hash`,
 `location.search`, `document.URL`, `document.referrer` y `window.name`. Los sumideros: `query`,
 `execute`, `raw` y `$queryRawUnsafe` sobre una conexión (`db`, `conn`, `pool`, `client`, `knex`,
-`prisma`...); `child_process.exec` siempre y `spawn`/`execFile` sólo con `{ shell: true }`;
+`prisma`...); `child_process.exec` siempre y `spawn`/`execFile` con `{ shell: true }` o con el programa elegido por el usuario;
 `fs.*` y `res.sendFile`; y para HTML, `res.send`, `res.write` y `res.end` de Express y Node (no
 los de Fastify, que manda texto plano, ni si la función declara otro tipo con `res.type('json')`
 o `writeHead(200, { 'content-type': 'application/json' })`), `innerHTML`, `document.write`,
