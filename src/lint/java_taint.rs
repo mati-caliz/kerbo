@@ -8,7 +8,7 @@ mod values;
 
 use tree_sitter::Node;
 
-pub use values::{Atom, Flow};
+pub use values::{Atom, Dangers, Flow};
 
 use super::java::{NAME_FIELD, text};
 use super::java_owner::{annotation_names, owner_of};
@@ -29,6 +29,29 @@ pub enum SinkKind {
     Command,
     Path,
     Html,
+}
+
+impl SinkKind {
+    pub const ALL: [Self; 4] = [Self::Sql, Self::Command, Self::Path, Self::Html];
+    pub const ALL_BITS: u8 = 0b1111;
+
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Sql => 0,
+            Self::Command => 1,
+            Self::Path => 2,
+            Self::Html => 3,
+        }
+    }
+
+    pub const fn bit(self) -> u8 {
+        match self {
+            Self::Sql => 0b0001,
+            Self::Command => 0b0010,
+            Self::Path => 0b0100,
+            Self::Html => 0b1000,
+        }
+    }
 }
 
 // Sobre qué se llama un posible sumidero: un tipo conocido, un campo estático de otra clase (cuyo

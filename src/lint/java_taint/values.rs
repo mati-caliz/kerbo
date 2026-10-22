@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use super::SinkKind;
+
 // De dónde puede venir un dato: lo que manda el usuario, un parámetro del método o lo que
 // devuelve una llamada (que decide el índice, porque puede ser de otro archivo).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -9,47 +11,54 @@ pub enum Atom {
     Call(usize),
 }
 
-// Lo que puede llevar un valor, separado en lo que llega tal cual y lo que pasó por un escape de
-// HTML: escapado no sirve para un XSS, pero sigue armando una consulta o una ruta.
+// Para qué sumideros sigue siendo peligroso un dato, un bit por tipo: un escape de HTML le saca el
+// de HTML, un chequeo de `../` el de las rutas, y lo que queda sirve para lo demás.
+pub type Dangers = u8;
+
+pub const ALL_DANGERS: Dangers = SinkKind::ALL_BITS;
+
+// Lo que puede llevar un valor: de dónde vienen sus datos y para qué siguen siendo peligrosos.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Flow {
-    pub atoms: Vec<Atom>,
-    pub escaped: Vec<Atom>,
-}
-
-fn insert_sorted(atoms: &mut Vec<Atom>, atom: Atom) {
-    if let Err(position) = atoms.binary_search(&atom) {
-        atoms.insert(position, atom);
-    }
+    pub atoms: Vec<(Atom, Dangers)>,
 }
 
 impl Flow {
     pub fn of(atom: Atom) -> Self {
         Self {
-            atoms: vec![atom],
-            escaped: Vec::new(),
+            atoms: vec![(atom, ALL_DANGERS)],
         }
     }
 
     pub fn absorb(&mut self, other: &Self) {
-        for atom in &other.atoms {
-            insert_sorted(&mut self.atoms, *atom);
-        }
-        for atom in &other.escaped {
-            insert_sorted(&mut self.escaped, *atom);
+        for (atom, dangers) in &other.atoms {
+            match self.atoms.binary_search_by(|(existing, _)| existing.cmp(atom)) {
+                Ok(position) => self.merge_at(position, *dangers),
+                Err(position) => self.atoms.insert(position, (*atom, *dangers)),
+            }
         }
     }
 
-    // El mismo valor después de un escape de HTML.
-    pub fn escaped_for_html(&self) -> Self {
-        let mut escaped = self.escaped.clone();
-        for atom in &self.atoms {
-            insert_sorted(&mut escaped, *atom);
+    fn merge_at(&mut self, position: usize, dangers: Dangers) {
+        if let Some((_, existing)) = self.atoms.get_mut(position) {
+            *existing |= dangers;
         }
+    }
+
+    // El mismo valor después de algo que lo vuelve seguro para esos sumideros.
+    pub fn without(&self, removed: Dangers) -> Self {
         Self {
-            atoms: Vec::new(),
-            escaped,
+            atoms: self
+                .atoms
+                .iter()
+                .map(|(atom, dangers)| (*atom, dangers & !removed))
+                .filter(|(_, dangers)| *dangers != 0)
+                .collect(),
         }
+    }
+
+    pub fn escaped_for_html(&self) -> Self {
+        self.without(SinkKind::Html.bit())
     }
 
     pub fn union(mut self, other: &Self) -> Self {

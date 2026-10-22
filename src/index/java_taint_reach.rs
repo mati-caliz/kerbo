@@ -1,7 +1,8 @@
-use crate::lint::java_taint::{Atom, Flow};
+use crate::lint::java_taint::{Atom, Flow, SinkKind};
 
 // Los parámetros, como bits: los de más allá del 64 no se siguen.
 const TRACKED_PARAMETERS: usize = 64;
+const KINDS: usize = SinkKind::ALL.len();
 
 pub fn parameter_bit(position: usize) -> u64 {
     u32::try_from(position)
@@ -28,78 +29,95 @@ impl Origins {
     }
 }
 
-// Qué puede llevar un valor, tal cual o después de un escape de HTML.
+// Qué puede llevar un valor que siga siendo peligroso, por cada tipo de sumidero.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Reach {
-    pub raw: Origins,
-    pub escaped: Origins,
+    kinds: [Origins; KINDS],
 }
 
-// Qué parámetros de un método reciben algo del usuario desde alguna llamada, tal cual o escapado.
+// Qué parámetros de un método reciben desde alguna llamada algo del usuario peligroso para cada
+// tipo de sumidero.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Tainted {
-    pub raw: u64,
-    pub escaped: u64,
+    kinds: [u64; KINDS],
+}
+
+fn kinds_in(dangers: u8) -> impl Iterator<Item = usize> {
+    SinkKind::ALL
+        .into_iter()
+        .filter(move |kind| dangers & kind.bit() != 0)
+        .map(SinkKind::index)
 }
 
 impl Tainted {
-    // Suma un parámetro que recibe algo del usuario; dice si cambió algo.
-    pub fn mark(&mut self, position: usize, raw: bool) -> bool {
+    // Suma un parámetro que recibe algo peligroso para esos sumideros; dice si cambió algo.
+    pub fn mark(&mut self, position: usize, dangers: u8) -> bool {
         let before = *self;
-        if raw {
-            self.raw |= parameter_bit(position);
-        } else {
-            self.escaped |= parameter_bit(position);
+        for kind in kinds_in(dangers) {
+            if let Some(bits) = self.kinds.get_mut(kind) {
+                *bits |= parameter_bit(position);
+            }
         }
         *self != before
     }
 }
 
 impl Reach {
-    pub const fn absorb(&mut self, other: Self) {
-        self.raw.absorb(other.raw);
-        self.escaped.absorb(other.escaped);
+    pub fn absorb(&mut self, other: Self) {
+        for (mine, theirs) in self.kinds.iter_mut().zip(other.kinds) {
+            mine.absorb(theirs);
+        }
     }
 
-    pub const fn absorb_escaped(&mut self, other: Self) {
-        self.escaped.absorb(other.raw);
-        self.escaped.absorb(other.escaped);
+    fn origins_for(&mut self, dangers: u8) -> impl Iterator<Item = &mut Origins> {
+        self.kinds
+            .iter_mut()
+            .zip(SinkKind::ALL)
+            .filter(move |(_, kind)| dangers & kind.bit() != 0)
+            .map(|(origins, _)| origins)
     }
 
-    // Si llega algo del usuario sin escapar: lo que importa para un XSS.
-    pub const fn raw_user(self, tainted: Tainted) -> bool {
-        self.raw.source || self.raw.parameters & tainted.raw != 0
+    fn absorb_for(&mut self, other: Self, dangers: u8) {
+        for kind in kinds_in(dangers) {
+            if let (Some(mine), Some(theirs)) = (self.kinds.get_mut(kind), other.kinds.get(kind)) {
+                mine.absorb(*theirs);
+            }
+        }
     }
 
-    // Si llega algo del usuario, escapado o no: lo que importa para una consulta, un comando o una ruta.
-    pub const fn any_user(self, tainted: Tainted) -> bool {
-        self.raw_user(tainted)
-            || self.escaped.source
-            || self.raw.parameters & tainted.escaped != 0
-            || self.escaped.parameters & (tainted.raw | tainted.escaped) != 0
+    // Si llega algo del usuario que sigue siendo peligroso para ese sumidero.
+    pub fn reaches(self, kind: SinkKind, tainted: Tainted) -> bool {
+        let origins = self.kinds.get(kind.index()).copied().unwrap_or_default();
+        let parameters = tainted.kinds.get(kind.index()).copied().unwrap_or_default();
+        origins.source || origins.parameters & parameters != 0
+    }
+
+    // Para qué sumideros es peligroso lo que llega del usuario.
+    pub fn dangers(self, tainted: Tainted) -> u8 {
+        SinkKind::ALL
+            .into_iter()
+            .filter(|kind| self.reaches(*kind, tainted))
+            .fold(0, |dangers, kind| dangers | kind.bit())
     }
 }
 
 pub fn evaluate(flow: &Flow, values: &[Reach]) -> Reach {
     let mut reach = Reach::default();
-    for atom in &flow.atoms {
+    for (atom, dangers) in &flow.atoms {
         match atom {
-            Atom::Source => reach.raw.source = true,
-            Atom::Parameter(position) => reach.raw.parameters |= parameter_bit(*position),
-            Atom::Call(index) => {
-                if let Some(value) = values.get(*index) {
-                    reach.absorb(*value);
+            Atom::Source => {
+                for origins in reach.origins_for(*dangers) {
+                    origins.source = true;
                 }
             }
-        }
-    }
-    for atom in &flow.escaped {
-        match atom {
-            Atom::Source => reach.escaped.source = true,
-            Atom::Parameter(position) => reach.escaped.parameters |= parameter_bit(*position),
+            Atom::Parameter(position) => {
+                for origins in reach.origins_for(*dangers) {
+                    origins.parameters |= parameter_bit(*position);
+                }
+            }
             Atom::Call(index) => {
                 if let Some(value) = values.get(*index) {
-                    reach.absorb_escaped(*value);
+                    reach.absorb_for(*value, *dangers);
                 }
             }
         }
@@ -108,24 +126,19 @@ pub fn evaluate(flow: &Flow, values: &[Reach]) -> Reach {
 }
 
 // Lo que devuelve una llamada a un método del proyecto: lo que él devuelve, con cada parámetro
-// reemplazado por lo que trae el argumento.
+// reemplazado por lo que trae el argumento, tipo por tipo.
 pub fn substitute(returned: Reach, arguments: &[Reach]) -> Reach {
     let mut result = Reach::default();
-    result.raw.source = returned.raw.source;
-    result.escaped.source = returned.escaped.source;
-    for argument in returned
-        .raw
-        .positions()
-        .filter_map(|position| arguments.get(position))
-    {
-        result.absorb(*argument);
-    }
-    for argument in returned
-        .escaped
-        .positions()
-        .filter_map(|position| arguments.get(position))
-    {
-        result.absorb_escaped(*argument);
+    for (kind, origins) in returned.kinds.iter().enumerate() {
+        let Some(target) = result.kinds.get_mut(kind) else {
+            continue;
+        };
+        target.source |= origins.source;
+        for argument in origins.positions().filter_map(|position| arguments.get(position)) {
+            if let Some(carried) = argument.kinds.get(kind) {
+                target.absorb(*carried);
+            }
+        }
     }
     result
 }

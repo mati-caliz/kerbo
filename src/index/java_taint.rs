@@ -28,7 +28,7 @@ enum Callees {
 }
 
 fn mentions_source(method: &TaintMethod) -> bool {
-    let has = |flow: &Flow| flow.atoms.contains(&Atom::Source) || flow.escaped.contains(&Atom::Source);
+    let has = |flow: &Flow| flow.atoms.iter().any(|(atom, _)| *atom == Atom::Source);
     has(&method.returns)
         || method
             .calls
@@ -202,9 +202,9 @@ impl<'summary> Taints<'summary> {
         }
     }
 
-    // Los parámetros de otros métodos a los que este método les pasa algo del usuario, y si va sin
-    // escapar.
-    fn reached_parameters(&self, id: MethodId, method: &TaintMethod) -> Vec<(MethodId, usize, bool)> {
+    // Los parámetros de otros métodos a los que este método les pasa algo del usuario, y para qué
+    // sumideros sigue siendo peligroso.
+    fn reached_parameters(&self, id: MethodId, method: &TaintMethod) -> Vec<(MethodId, usize, u8)> {
         let values = self.call_values(id, method);
         let tainted = self.tainted.get(&id).copied().unwrap_or_default();
         let mut reached = Vec::new();
@@ -217,10 +217,10 @@ impl<'summary> Taints<'summary> {
                 .iter()
                 .map(|argument| evaluate(argument, &values))
                 .enumerate()
-                .filter(|(_, carried)| carried.any_user(tainted));
-            for (position, carried) in contaminated {
-                let raw = carried.raw_user(tainted);
-                reached.extend(found.iter().map(|callee| (*callee, position, raw)));
+                .map(|(position, carried)| (position, carried.dangers(tainted)))
+                .filter(|(_, dangers)| *dangers != 0);
+            for (position, dangers) in contaminated {
+                reached.extend(found.iter().map(|callee| (*callee, position, dangers)));
             }
         }
         reached
@@ -228,14 +228,14 @@ impl<'summary> Taints<'summary> {
 
     fn settle_parameters(&mut self) {
         for _ in 0..MAX_PASSES {
-            let reached: Vec<(MethodId, usize, bool)> = self
+            let reached: Vec<(MethodId, usize, u8)> = self
                 .methods
                 .iter()
                 .flat_map(|(id, method)| self.reached_parameters(*id, method))
                 .collect();
             let mut changed = false;
-            for (callee, position, raw) in reached {
-                changed |= self.tainted.entry(callee).or_default().mark(position, raw);
+            for (callee, position, dangers) in reached {
+                changed |= self.tainted.entry(callee).or_default().mark(position, dangers);
             }
             if !changed {
                 break;
@@ -259,14 +259,7 @@ impl<'summary> Taints<'summary> {
         let tainted = self.tainted.get(&id).copied().unwrap_or_default();
         checked
             .iter()
-            .any(|argument| {
-                let carried = evaluate(argument, values);
-                if kind == SinkKind::Html {
-                    carried.raw_user(tainted)
-                } else {
-                    carried.any_user(tainted)
-                }
-            })
+            .any(|argument| evaluate(argument, values).reaches(kind, tainted))
             .then(|| {
                 let rule = match kind {
                     SinkKind::Sql => TaintRule::SqlInjection,

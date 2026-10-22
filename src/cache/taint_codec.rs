@@ -1,6 +1,6 @@
 use super::codec::{Corrupt, Reader, Writer};
 use super::summary_codec::{read_receiver, write_receiver};
-use crate::lint::java_taint::{Atom, Flow, SinkReceiver, TaintCall, TaintMethod, TaintSink};
+use crate::lint::java_taint::{Atom, Dangers, Flow, SinkReceiver, TaintCall, TaintMethod, TaintSink};
 
 const ATOM_SOURCE: u64 = 0;
 const ATOM_PARAMETER: u64 = 1;
@@ -60,8 +60,10 @@ pub fn read_taints(reader: &mut Reader<'_>) -> Result<Vec<TaintMethod>, Corrupt>
 }
 
 fn write_flow(writer: &mut Writer, flow: &Flow) {
-    writer.list(&flow.atoms, write_atom);
-    writer.list(&flow.escaped, write_atom);
+    writer.list(&flow.atoms, |writer, (atom, dangers)| {
+        write_atom(writer, atom);
+        writer.number(u64::from(*dangers));
+    });
 }
 
 fn write_atom(writer: &mut Writer, atom: &Atom) {
@@ -80,8 +82,11 @@ fn write_atom(writer: &mut Writer, atom: &Atom) {
 
 fn read_flow(reader: &mut Reader<'_>) -> Result<Flow, Corrupt> {
     Ok(Flow {
-        atoms: reader.list(read_atom)?,
-        escaped: reader.list(read_atom)?,
+        atoms: reader.list(|reader| {
+            let atom = read_atom(reader)?;
+            let dangers = Dangers::try_from(reader.number()?).map_err(|_| Corrupt)?;
+            Ok((atom, dangers))
+        })?,
     })
 }
 
