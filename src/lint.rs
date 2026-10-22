@@ -35,6 +35,7 @@ mod modifiers;
 mod python;
 mod recovered;
 mod references;
+pub mod taint;
 
 use std::path::Path;
 

@@ -2,10 +2,9 @@ use tree_sitter::Node;
 
 use super::statements::Interpreter;
 use super::tables;
-use super::values::Flow;
-use super::{SinkReceiver, TaintSink};
 use crate::lint::java::NAME_FIELD;
 use crate::lint::java_receivers::simple_type_name;
+use crate::lint::taint::{Flow, SinkReceiver, TaintSink};
 use crate::syntax::one_based;
 
 const IDENTIFIER: &str = "identifier";

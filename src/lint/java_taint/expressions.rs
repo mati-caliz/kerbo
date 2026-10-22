@@ -1,14 +1,14 @@
 use tree_sitter::Node;
 
 use super::collections::{collection_call, empty_collection};
-use super::constants::{fold_binary, fold_text_method, fold_unary, literal_of, truth};
+use super::constants::literal_of;
 use super::receivers::{chain_root, declared_type, sink_at, sink_receiver};
 use super::statements::{BODY_FIELD, Interpreter, SWITCH, SWITCH_LABEL};
 use super::tables;
-use super::values::{Atom, Flow, Literal, State, Value};
-use super::{SinkReceiver, TaintCall};
 use crate::lint::java::NAME_FIELD;
 use crate::lint::java_receivers::{Receiver, simple_type_name};
+use crate::lint::taint::folding::{fold_binary, fold_text_method, fold_unary, truth};
+use crate::lint::taint::{Atom, Flow, Literal, SinkReceiver, State, TaintCall, Value};
 use crate::syntax::named_children;
 
 const IDENTIFIER: &str = "identifier";

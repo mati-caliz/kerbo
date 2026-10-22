@@ -1,4 +1,4 @@
-use super::values::{Flow, Literal, Value};
+use crate::lint::taint::{Flow, Literal, Value};
 
 const LIST_TYPES: &[&str] = &["ArrayList", "LinkedList", "Vector", "CopyOnWriteArrayList"];
 const MAP_TYPES: &[&str] = &[

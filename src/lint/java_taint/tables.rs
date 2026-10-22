@@ -1,4 +1,4 @@
-use super::SinkKind;
+use crate::lint::taint::SinkKind;
 
 // Los tipos que traen lo que manda el usuario y los métodos que lo devuelven.
 const SOURCE_TYPES: &[&str] = &[

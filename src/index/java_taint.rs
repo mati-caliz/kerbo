@@ -1,74 +1,63 @@
 use std::collections::HashMap;
 
 use super::java_project::{IndexedSummary, Project};
-use super::java_taint_reach::{Reach, Tainted, evaluate, substitute};
+use super::taint_engine::{Callees, Engine, MethodId, mentions_source};
+use crate::lint::LintFinding;
 use crate::lint::java_calls::Body;
 use crate::lint::java_owner::OwnerKind;
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_taint::tables::{constructor_sink, method_sink};
-use crate::lint::java_taint::{Atom, Flow, SinkKind, SinkReceiver, TaintCall, TaintMethod, TaintSink};
-use crate::lint::{LintFinding, LintKind};
-use crate::rules::TaintRule;
+use crate::lint::taint::{SinkReceiver, TaintCall, TaintMethod};
 
-// Las vueltas para que lo que devuelve un método llegue a quien lo llama a través de otros; alcanza
-// de sobra para las cadenas de un proyecto real y corta la recursión.
-const MAX_PASSES: usize = 16;
-
-type MethodId = (usize, usize);
 type AbstractMethods<'summary> = HashMap<(&'summary str, usize), Vec<&'summary str>>;
 
-// Adónde va una llamada: a métodos del proyecto con cuerpo, a uno abstracto que implementa un
-// framework (un repositorio de Spring Data: lo que devuelve sale de la base, no de los
-// argumentos) o a una librería, que devuelve lo que traen el receptor y los argumentos.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Callees {
-    Project(Vec<MethodId>),
-    Framework,
-    Library,
-}
-
-fn mentions_source(method: &TaintMethod) -> bool {
-    let has = |flow: &Flow| flow.atoms.iter().any(|(atom, _)| *atom == Atom::Source);
-    has(&method.returns)
-        || method
-            .calls
-            .iter()
-            .any(|call| has(&call.receiver_flow) || call.arguments.iter().any(has))
-        || method.sinks.iter().any(|sink| sink.arguments.iter().any(has))
-}
-
-struct Taints<'summary> {
-    methods: Vec<(MethodId, &'summary TaintMethod)>,
-    candidates: HashMap<MethodId, Vec<Callees>>,
-    fields: HashMap<(&'summary str, &'summary str), &'summary str>,
-    returns: HashMap<MethodId, Reach>,
-    tainted: HashMap<MethodId, Tainted>,
-}
-
-// Las consultas, comandos y rutas a los que llega algo que mandó el usuario, por archivo.
+// Las consultas, comandos, rutas y respuestas a los que llega algo que mandó el usuario, por archivo.
 pub fn tainted_sinks(files: &[IndexedSummary<'_>], project: &Project<'_>) -> Vec<Vec<LintFinding>> {
-    let mut found: Vec<Vec<LintFinding>> = files.iter().map(|_| Vec::new()).collect();
-    let any_source = files
+    if !mentions_source(files.iter().flat_map(|indexed| indexed.summary.taints.iter())) {
+        return files.iter().map(|_| Vec::new()).collect();
+    }
+    let methods: Vec<(MethodId, &TaintMethod)> = files
         .iter()
-        .flat_map(|indexed| indexed.summary.taints.iter())
-        .any(mentions_source);
-    if !any_source {
-        return found;
-    }
-    let mut taints = Taints::new(files, project);
-    taints.settle_returns();
-    taints.settle_parameters();
-    for (id, method) in &taints.methods {
-        let values = taints.call_values(*id, method);
-        for sink in &method.sinks {
-            if let Some(finding) = taints.finding(*id, sink, &values)
-                && let Some(in_file) = found.get_mut(id.0)
-            {
-                in_file.push(finding);
-            }
-        }
-    }
-    found
+        .enumerate()
+        .flat_map(|(file, indexed)| {
+            indexed
+                .summary
+                .taints
+                .iter()
+                .enumerate()
+                .map(move |(method, taint)| ((file, method), taint))
+        })
+        .collect();
+    let project_methods = Declared::new(files, &methods);
+    let candidates = methods
+        .iter()
+        .map(|(id, method)| {
+            let per_call = method
+                .calls
+                .iter()
+                .map(|call| callees(call, id.0, &project_methods, project))
+                .collect();
+            (*id, per_call)
+        })
+        .collect();
+    let fields: HashMap<(&str, &str), &str> = files
+        .iter()
+        .flat_map(|indexed| indexed.summary.fields.iter())
+        .map(|field| {
+            (
+                (field.owner.name.as_str(), field.name.as_str()),
+                field.type_name.as_str(),
+            )
+        })
+        .collect();
+    Engine::new(methods, candidates).findings(files.len(), |sink| match &sink.receiver {
+        SinkReceiver::Type(declared) => method_sink(declared, &sink.callee),
+        SinkReceiver::StaticField { owner, field } => fields
+            .get(&(owner.as_str(), field.as_str()))
+            .and_then(|declared| method_sink(declared, &sink.callee)),
+        SinkReceiver::Constructor(created) => constructor_sink(created),
+        SinkReceiver::Known(kind) => Some(*kind),
+    })
 }
 
 // Los métodos del proyecto por nombre y aridad: los que tienen cuerpo, con su clase, y los
@@ -101,180 +90,6 @@ impl<'summary> Declared<'summary> {
                 .push(declaration.owner.name.as_str());
         }
         Self { bodies, abstracts }
-    }
-}
-
-impl<'summary> Taints<'summary> {
-    fn new(files: &[IndexedSummary<'summary>], project: &Project<'_>) -> Self {
-        let methods: Vec<(MethodId, &TaintMethod)> = files
-            .iter()
-            .enumerate()
-            .flat_map(|(file, indexed)| {
-                indexed
-                    .summary
-                    .taints
-                    .iter()
-                    .enumerate()
-                    .map(move |(method, taint)| ((file, method), taint))
-            })
-            .collect();
-        let declared = Declared::new(files, &methods);
-        let candidates = methods
-            .iter()
-            .map(|(id, method)| {
-                let per_call = method
-                    .calls
-                    .iter()
-                    .map(|call| callees(call, id.0, &declared, project))
-                    .collect();
-                (*id, per_call)
-            })
-            .collect();
-        let fields = files
-            .iter()
-            .flat_map(|indexed| indexed.summary.fields.iter())
-            .map(|field| {
-                (
-                    (field.owner.name.as_str(), field.name.as_str()),
-                    field.type_name.as_str(),
-                )
-            })
-            .collect();
-        Self {
-            methods,
-            candidates,
-            fields,
-            returns: HashMap::new(),
-            tainted: HashMap::new(),
-        }
-    }
-
-    fn callees_of(&self, id: MethodId, index: usize) -> &Callees {
-        self.candidates
-            .get(&id)
-            .and_then(|per_call| per_call.get(index))
-            .unwrap_or(&Callees::Library)
-    }
-
-    // Lo que puede llevar cada llamada de un método, en orden: los argumentos de una llamada sólo
-    // usan llamadas anteriores.
-    fn call_values(&self, id: MethodId, method: &TaintMethod) -> Vec<Reach> {
-        let mut values: Vec<Reach> = Vec::with_capacity(method.calls.len());
-        for (index, call) in method.calls.iter().enumerate() {
-            let result = self.call_result(call, self.callees_of(id, index), &values);
-            values.push(result);
-        }
-        values
-    }
-
-    fn call_result(&self, call: &TaintCall, callees: &Callees, values: &[Reach]) -> Reach {
-        let arguments: Vec<Reach> = call.arguments.iter().map(|flow| evaluate(flow, values)).collect();
-        let mut result = Reach::default();
-        match callees {
-            Callees::Framework => {}
-            Callees::Project(found) => {
-                for returned in found.iter().filter_map(|callee| self.returns.get(callee)) {
-                    result.absorb(substitute(*returned, &arguments));
-                }
-            }
-            Callees::Library => {
-                result.absorb(evaluate(&call.receiver_flow, values));
-                for argument in &arguments {
-                    result.absorb(*argument);
-                }
-            }
-        }
-        result
-    }
-
-    fn settle_returns(&mut self) {
-        for _ in 0..MAX_PASSES {
-            let updated: Vec<(MethodId, Reach)> = self
-                .methods
-                .iter()
-                .map(|(id, method)| (*id, evaluate(&method.returns, &self.call_values(*id, method))))
-                .filter(|(id, returned)| self.returns.get(id) != Some(returned))
-                .collect();
-            if updated.is_empty() {
-                break;
-            }
-            self.returns.extend(updated);
-        }
-    }
-
-    // Los parámetros de otros métodos a los que este método les pasa algo del usuario, y para qué
-    // sumideros sigue siendo peligroso.
-    fn reached_parameters(&self, id: MethodId, method: &TaintMethod) -> Vec<(MethodId, usize, u8)> {
-        let values = self.call_values(id, method);
-        let tainted = self.tainted.get(&id).copied().unwrap_or_default();
-        let mut reached = Vec::new();
-        for (index, call) in method.calls.iter().enumerate() {
-            let Callees::Project(found) = self.callees_of(id, index) else {
-                continue;
-            };
-            let contaminated = call
-                .arguments
-                .iter()
-                .map(|argument| evaluate(argument, &values))
-                .enumerate()
-                .map(|(position, carried)| (position, carried.dangers(tainted)))
-                .filter(|(_, dangers)| *dangers != 0);
-            for (position, dangers) in contaminated {
-                reached.extend(found.iter().map(|callee| (*callee, position, dangers)));
-            }
-        }
-        reached
-    }
-
-    fn settle_parameters(&mut self) {
-        for _ in 0..MAX_PASSES {
-            let reached: Vec<(MethodId, usize, u8)> = self
-                .methods
-                .iter()
-                .flat_map(|(id, method)| self.reached_parameters(*id, method))
-                .collect();
-            let mut changed = false;
-            for (callee, position, dangers) in reached {
-                changed |= self.tainted.entry(callee).or_default().mark(position, dangers);
-            }
-            if !changed {
-                break;
-            }
-        }
-    }
-
-    fn finding(&self, id: MethodId, sink: &TaintSink, values: &[Reach]) -> Option<LintFinding> {
-        let kind = match &sink.receiver {
-            SinkReceiver::Type(declared) => method_sink(declared, &sink.callee),
-            SinkReceiver::StaticField { owner, field } => self
-                .fields
-                .get(&(owner.as_str(), field.as_str()))
-                .and_then(|declared| method_sink(declared, &sink.callee)),
-            SinkReceiver::Constructor(created) => constructor_sink(created),
-        }?;
-        let checked = match kind {
-            SinkKind::Sql => sink.arguments.get(..1).unwrap_or_default(),
-            SinkKind::Command | SinkKind::Path | SinkKind::Html => sink.arguments.as_slice(),
-        };
-        let tainted = self.tainted.get(&id).copied().unwrap_or_default();
-        checked
-            .iter()
-            .any(|argument| evaluate(argument, values).reaches(kind, tainted))
-            .then(|| {
-                let rule = match kind {
-                    SinkKind::Sql => TaintRule::SqlInjection,
-                    SinkKind::Command => TaintRule::CommandInjection,
-                    SinkKind::Path => TaintRule::PathTraversal,
-                    SinkKind::Html => TaintRule::CrossSiteScripting,
-                };
-                LintFinding {
-                    kind: LintKind::Taint(rule),
-                    line: sink.line,
-                    column: sink.column,
-                    subject: sink.callee.clone(),
-                    fix: None,
-                }
-            })
     }
 }
 

@@ -14,7 +14,8 @@ use super::java_resources::{ResourceCandidate, resource_candidates};
 pub use super::java_returns::{ReturnType, Returns};
 use super::java_returns::{return_type, returned};
 use super::java_switch::{rule_bodies, yields_value};
-use super::java_taint::{TaintMethod, taint_method};
+use super::java_taint::taint_method;
+use super::taint::TaintMethod;
 use crate::syntax::{descendants, named_children};
 
 pub const TYPE_DECLARATIONS: &[&str] = &[

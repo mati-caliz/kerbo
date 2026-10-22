@@ -1,4 +1,4 @@
-use crate::lint::java_taint::{Atom, Flow, SinkKind};
+use crate::lint::taint::{Atom, Flow, SinkKind};
 
 // Los parámetros, como bits: los de más allá del 64 no se siguen.
 const TRACKED_PARAMETERS: usize = 64;

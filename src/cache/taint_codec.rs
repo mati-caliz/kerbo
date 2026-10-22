@@ -1,6 +1,6 @@
 use super::codec::{Corrupt, Reader, Writer};
 use super::summary_codec::{read_receiver, write_receiver};
-use crate::lint::java_taint::{Atom, Dangers, Flow, SinkReceiver, TaintCall, TaintMethod, TaintSink};
+use crate::lint::taint::{Atom, Dangers, Flow, SinkKind, SinkReceiver, TaintCall, TaintMethod, TaintSink};
 
 const ATOM_SOURCE: u64 = 0;
 const ATOM_PARAMETER: u64 = 1;
@@ -8,6 +8,7 @@ const ATOM_CALL: u64 = 2;
 const SINK_TYPE: u64 = 0;
 const SINK_STATIC_FIELD: u64 = 1;
 const SINK_CONSTRUCTOR: u64 = 2;
+const SINK_KNOWN: u64 = 3;
 
 pub fn write_taints(writer: &mut Writer, taints: &[TaintMethod]) {
     writer.list(taints, |writer, method| {
@@ -114,6 +115,10 @@ fn write_sink_receiver(writer: &mut Writer, receiver: &SinkReceiver) {
             writer.number(SINK_CONSTRUCTOR);
             writer.text(created);
         }
+        SinkReceiver::Known(kind) => {
+            writer.number(SINK_KNOWN);
+            writer.size(kind.index());
+        }
     }
 }
 
@@ -125,6 +130,10 @@ fn read_sink_receiver(reader: &mut Reader<'_>) -> Result<SinkReceiver, Corrupt> 
             field: reader.text()?,
         }),
         SINK_CONSTRUCTOR => Ok(SinkReceiver::Constructor(reader.text()?)),
+        SINK_KNOWN => SinkKind::ALL
+            .get(reader.size()?)
+            .map(|kind| SinkReceiver::Known(*kind))
+            .ok_or(Corrupt),
         _ => Err(Corrupt),
     }
 }

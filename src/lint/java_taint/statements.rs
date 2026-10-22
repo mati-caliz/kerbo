@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use tree_sitter::Node;
 
-use super::constants::{literal_of, same_label, truth};
+use super::constants::literal_of;
 use super::receivers::sink_receiver;
-use super::values::{Flow, Literal, State, Value, join_states};
-use super::{SinkReceiver, TaintCall, TaintSink};
 use crate::lint::java::{NAME_FIELD, text};
 use crate::lint::java_receivers::{StaticImports, Variables};
+use crate::lint::taint::folding::{same_label, truth};
+use crate::lint::taint::{Flow, Literal, SinkReceiver, State, TaintCall, TaintSink, Value, join_states};
 use crate::syntax::named_children;
 
 const BLOCK: &str = "block";

@@ -14,7 +14,7 @@ use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_owner::{Owner, annotation_names};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
-use crate::lint::java_taint::TaintMethod;
+use crate::lint::taint::TaintMethod;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::JavaRule;
 use crate::syntax::descendants;
