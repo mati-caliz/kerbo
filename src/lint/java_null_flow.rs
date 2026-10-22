@@ -31,6 +31,8 @@ const FOR: &str = "for_statement";
 const ENHANCED_FOR: &str = "enhanced_for_statement";
 const TRY_STATEMENTS: &[&str] = &["try_statement", "try_with_resources_statement"];
 const CATCH: &str = "catch_clause";
+const RESOURCES: &str = "resource_specification";
+const RESOURCE: &str = "resource";
 const FINALLY: &str = "finally_clause";
 const SWITCH: &str = "switch_expression";
 const SYNCHRONIZED: &str = "synchronized_statement";
@@ -203,7 +205,21 @@ impl Analysis<'_, '_> {
         }
     }
 
-    fn try_statement(&mut self, node: Node<'_>, state: State) -> Option<State> {
+    fn try_statement(&mut self, node: Node<'_>, mut state: State) -> Option<State> {
+        for resource in named_children(node)
+            .into_iter()
+            .filter(|child| child.kind() == RESOURCES)
+            .flat_map(named_children)
+            .filter(|child| child.kind() == RESOURCE)
+        {
+            if let (Some(name), Some(value)) = (
+                resource.child_by_field_name(NAME_FIELD),
+                resource.child_by_field_name(VALUE_FIELD),
+            ) {
+                state = self.expression(value, state);
+                state = self.assign(self.text(name).to_owned(), value, state);
+            }
+        }
         let body = node
             .child_by_field_name(BODY_FIELD)
             .and_then(|body| self.statement(body, state.clone()));

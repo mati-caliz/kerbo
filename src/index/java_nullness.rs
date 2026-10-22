@@ -3,8 +3,9 @@ use std::rc::Rc;
 
 use super::java::{Declaration, JavaSummary, lint_at};
 use super::java_project::IndexedSummary;
-use crate::jvm::class_file::{ClassFile, Method};
+use crate::jvm::class_file::ClassFile;
 use crate::jvm::library::Library;
+use crate::jvm::method::Method;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::ReturnType;
 use crate::lint::java_owner::OwnerKind;

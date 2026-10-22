@@ -136,3 +136,57 @@ pub fn returned_by(class: &str, method: &str) -> Option<&'static str> {
         .find(|(owner, name, _)| *owner == class && *name == method)
         .map(|(_, _, returned)| *returned)
 }
+
+const OBJECT: &str = "java.lang.Object";
+
+// Lo que devuelven los métodos del JDK que aparecen en una cadena, y si IntelliJ los da por
+// posiblemente null: el recurso que no está, la propiedad o la variable de entorno que no existe,
+// el padre de la raíz.
+const METHODS: &[(&str, &str, usize, &str, bool)] = &[
+    (OBJECT, "getClass", 0, "java.lang.Class", false),
+    (
+        "java.lang.Class",
+        "getResourceAsStream",
+        1,
+        "java.io.InputStream",
+        true,
+    ),
+    ("java.lang.Class", "getResource", 1, "java.net.URL", true),
+    (
+        "java.lang.ClassLoader",
+        "getResourceAsStream",
+        1,
+        "java.io.InputStream",
+        true,
+    ),
+    ("java.lang.ClassLoader", "getResource", 1, "java.net.URL", true),
+    ("java.lang.Thread", "currentThread", 0, "java.lang.Thread", false),
+    (
+        "java.lang.Thread",
+        "getContextClassLoader",
+        0,
+        "java.lang.ClassLoader",
+        false,
+    ),
+    ("java.lang.System", "getProperty", 1, "java.lang.String", true),
+    ("java.lang.System", "getenv", 1, "java.lang.String", true),
+    ("java.io.File", "getParentFile", 0, "java.io.File", true),
+    ("java.io.File", "getParent", 0, "java.lang.String", true),
+    ("java.io.File", "listFiles", 0, "java.io.File[]", true),
+    ("java.io.File", "list", 0, "java.lang.String[]", true),
+];
+
+// Un método del JDK de alguna de esas clases (o de `Object`, que heredan todas): qué devuelve y si
+// puede ser null.
+pub fn jdk_method(classes: &[String], name: &str, arity: usize) -> Option<(&'static str, bool)> {
+    classes
+        .iter()
+        .map(String::as_str)
+        .chain(std::iter::once(OBJECT))
+        .find_map(|class| {
+            METHODS
+                .iter()
+                .find(|(owner, method, count, _, _)| *owner == class && *method == name && *count == arity)
+                .map(|(_, _, _, returned, nullable)| (*returned, *nullable))
+        })
+}

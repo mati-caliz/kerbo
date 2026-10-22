@@ -370,7 +370,13 @@ De las inspecciones de IntelliJ, kerbo hace:
   se chequeó antes en el método (`!= null`, `assertThat(...).isNotNull()`, `assertNotNull`,
   `requireNonNull`). También sigue variables: una asignada desde una llamada `@Nullable` y usada
   en un camino sin chequeo (`if (x == null) return;`, `x != null && ...`, `instanceof`, `hasText`,
-  los bucles, `try` y `finally` se entienden como IntelliJ).
+  los bucles, `try`, sus recursos y `finally` se entienden como IntelliJ), y un resultado
+  `@Nullable` que se desempaqueta (`return jdbc.queryForObject(...)` en un método que devuelve
+  `long`). Con sobrecargas, un argumento `Long.class` elige las que reciben un `Class`, como el
+  compilador; un varargs acepta su cantidad de parámetros o más. Del JDK, que no viene en los jars,
+  hay una tabla propia (`src/index/java_jdk.rs`) con lo que IntelliJ da por posiblemente null:
+  `getResourceAsStream` y `getResource`, `System.getProperty` y `getenv`, `File.getParentFile`,
+  `getParent`, `listFiles` y `list`. Esa parte anda sin classpath.
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` encadenado a
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` u `Optional.ofNullable(...)`.
 

@@ -1,5 +1,6 @@
 mod analysis_codec;
 mod budget;
+mod chain_codec;
 mod codec;
 mod key;
 mod lint_codec;
@@ -29,7 +30,7 @@ use crate::rules::RuleId;
 use crate::secrets::{PathProfile, SecretFinding};
 
 const FORMAT_DIRECTORY: &str = "analysis-v2";
-const FORMAT_VERSION: u64 = 22;
+const FORMAT_VERSION: u64 = 23;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisSubject<'subject> {
@@ -144,5 +145,7 @@ fn build_salt() -> u64 {
     hasher.finish()
 }
 
+#[cfg(test)]
+mod chain_tests;
 #[cfg(test)]
 mod tests;

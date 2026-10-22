@@ -279,9 +279,9 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "protected void doFilterInternal(HttpServletRequest request, ...) in a Spring 7 OncePerRequestFilter becomes doFilterInternal(@NonNull HttpServletRequest request, ...), or the package gets @NullMarked.",
     ),
     RuleText::new(
-        "Call on a result that may be null",
+        "Use of a result that may be null",
         "check for null first, or use Objects.requireNonNull with a message",
-        "The previous method in the chain is declared @Nullable in its library (like ResponseEntity's getBody()): if it returns null, this call throws NullPointerException. Like IntelliJ's DataFlowIssue.",
+        "The previous method in the chain is declared @Nullable in its library (like ResponseEntity's getBody()) or the JDK may return null (getResourceAsStream, System.getProperty): if it returns null, calling on the result or unboxing it into a primitive (return jdbc.queryForObject(...) in a long) throws NullPointerException. Like IntelliJ's DataFlowIssue.",
         "response.getBody().error() becomes Objects.requireNonNull(response.getBody()).error(), or the null is checked first.",
     ),
     RuleText::new(

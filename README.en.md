@@ -374,7 +374,13 @@ From IntelliJ's inspections, kerbo does:
   earlier in the method (`!= null`, `assertThat(...).isNotNull()`, `assertNotNull`,
   `requireNonNull`). It also follows variables: one assigned from a `@Nullable` call and used on a
   path without a check (`if (x == null) return;`, `x != null && ...`, `instanceof`, `hasText`,
-  loops, `try` and `finally` are understood as IntelliJ does).
+  loops, `try`, its resources and `finally` are understood as IntelliJ does), and a `@Nullable`
+  result that gets unboxed (`return jdbc.queryForObject(...)` in a method returning `long`). With
+  overloads, a `Long.class` argument picks the ones taking a `Class`, as the compiler does; a
+  varargs method accepts its parameter count or more. For the JDK, which does not come in the jars,
+  there is kerbo's own table (`src/index/java_jdk.rs`) of what IntelliJ treats as possibly null:
+  `getResourceAsStream` and `getResource`, `System.getProperty` and `getenv`, `File.getParentFile`,
+  `getParent`, `listFiles` and `list`. That part works without a classpath.
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` chained to
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` or `Optional.ofNullable(...)`.
 

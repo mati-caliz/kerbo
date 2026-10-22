@@ -3,6 +3,7 @@
 // parámetro (las de declaración y las de tipo, como el `@Nullable` de JSpecify).
 
 use super::annotations::{TypeTarget, annotation_list, type_annotations};
+use super::method::{ARRAY, DESCRIPTOR_CLOSE, DESCRIPTOR_OPEN, Method, OBJECT_END, OBJECT_START};
 
 const MAGIC: u32 = 0xCAFE_BABE;
 const VERSION_SIZE: usize = 4;
@@ -34,15 +35,8 @@ const VISIBLE_PARAMETER_ANNOTATIONS: &str = "RuntimeVisibleParameterAnnotations"
 const INVISIBLE_PARAMETER_ANNOTATIONS: &str = "RuntimeInvisibleParameterAnnotations";
 const VISIBLE_TYPE_ANNOTATIONS: &str = "RuntimeVisibleTypeAnnotations";
 const INVISIBLE_TYPE_ANNOTATIONS: &str = "RuntimeInvisibleTypeAnnotations";
-const ACCESS_PRIVATE: u16 = 0x0002;
-const ACCESS_STATIC: u16 = 0x0008;
 const ACCESS_SYNTHETIC: u16 = 0x1000;
 const ACCESS_BRIDGE: u16 = 0x0040;
-const DESCRIPTOR_OPEN: u8 = b'(';
-const DESCRIPTOR_CLOSE: u8 = b')';
-const OBJECT_START: u8 = b'L';
-const OBJECT_END: u8 = b';';
-const ARRAY: u8 = b'[';
 const PATH_SEPARATOR: char = '/';
 const NESTED_SEPARATOR: char = '$';
 const QUALIFIER_SEPARATOR: char = '.';
@@ -54,40 +48,6 @@ pub struct ClassFile {
     pub interfaces: Vec<String>,
     pub annotations: Vec<String>,
     pub methods: Vec<Method>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Method {
-    pub name: String,
-    pub descriptor: String,
-    pub is_private: bool,
-    pub is_static: bool,
-    pub parameter_annotations: Vec<Vec<String>>,
-    pub return_annotations: Vec<String>,
-}
-
-impl Method {
-    pub const fn parameter_count(&self) -> usize {
-        self.parameter_annotations.len()
-    }
-
-    // La clase que devuelve, si es un objeto (`Ljava/lang/String;` da `java.lang.String`).
-    pub fn return_class(&self) -> Option<String> {
-        let (_, returned) = self.descriptor.split_once(char::from(DESCRIPTOR_CLOSE))?;
-        let binary = returned
-            .strip_prefix(char::from(OBJECT_START))?
-            .strip_suffix(char::from(OBJECT_END))?;
-        Some(binary_to_source(binary))
-    }
-
-    // Si devuelve un objeto o un arreglo (lo único que puede ser null).
-    pub fn returns_reference(&self) -> bool {
-        self.descriptor
-            .bytes()
-            .skip_while(|letter| *letter != DESCRIPTOR_CLOSE)
-            .nth(1)
-            .is_some_and(|letter| letter == OBJECT_START || letter == ARRAY)
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -281,8 +241,7 @@ fn method(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Option<Method>, Malfor
     Ok((!generated).then_some(Method {
         name,
         descriptor,
-        is_private: access & ACCESS_PRIVATE != 0,
-        is_static: access & ACCESS_STATIC != 0,
+        access,
         parameter_annotations,
         return_annotations,
     }))

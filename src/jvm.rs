@@ -2,6 +2,7 @@ mod annotations;
 pub mod class_file;
 pub mod classpath;
 pub mod library;
+pub mod method;
 pub mod zip;
 
 #[cfg(test)]

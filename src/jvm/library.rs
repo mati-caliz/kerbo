@@ -3,7 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use super::class_file::{ClassFile, Method, parse};
+use super::class_file::{ClassFile, parse};
+use super::method::Method;
 use super::zip::Archive;
 
 const CLASS_EXTENSION: &str = ".class";
@@ -99,9 +100,7 @@ impl Library {
             let matching: Vec<Method> = found
                 .methods
                 .iter()
-                .filter(|method| {
-                    method.name == name && method.parameter_count() == arity && !method.is_private
-                })
+                .filter(|method| method.name == name && method.accepts(arity) && !method.is_private())
                 .cloned()
                 .collect();
             if !matching.is_empty() {
@@ -128,8 +127,8 @@ impl Library {
             if let Some(method) = found.methods.iter().find(|method| {
                 method.name == name
                     && method.parameter_count() == arity
-                    && !method.is_private
-                    && !method.is_static
+                    && !method.is_private()
+                    && !method.is_static()
             }) {
                 return Some((Rc::clone(&found), method.clone()));
             }

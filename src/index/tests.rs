@@ -183,3 +183,42 @@ fn a_private_field_that_is_only_written_is_reported() {
         .collect();
     assert_eq!(found, ["7 adjustment"]);
 }
+
+const RESOURCES: &str = "package app;\n\nimport java.io.File;\nimport java.io.InputStream;\n\nclass Loader {\n    byte[] read() throws Exception {\n        try (InputStream stream = getClass().getResourceAsStream(\"/data\")) {\n            return stream.readAllBytes();\n        }\n    }\n\n    String version(File file) {\n        file.getParentFile().mkdirs();\n        return System.getProperty(\"java.version\").trim() + file.getName().trim();\n    }\n}\n";
+
+#[test]
+fn what_the_jdk_may_return_as_null_is_known_without_a_classpath() {
+    let summary = summary_of(RESOURCES);
+    let files = [IndexedSummary {
+        summary: &summary,
+        in_tests: false,
+    }];
+    let mut found: Vec<String> = project_lints(&files, &Library::load(&[]))
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "data-flow-issue")
+        .map(|finding| format!("{} {}", finding.line, finding.subject))
+        .collect();
+    found.sort();
+    assert_eq!(found, ["14 mkdirs()", "15 trim()", "9 readAllBytes()"]);
+}
+
+const UNBOXED: &str = "package app;\n\nimport sample.web.Filter;\n\nclass Counter {\n    long count(Filter filter) {\n        return filter.find(\"a\");\n    }\n\n    Object kept(Filter filter) {\n        return filter.find(\"b\");\n    }\n\n    void local(Filter filter) {\n        int size = filter.find(\"c\");\n    }\n}\n";
+
+#[test]
+fn unboxing_a_nullable_library_result_is_reported() {
+    let jar = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/jvm/fixtures/sample.jar");
+    let library = Library::load(&[jar]);
+    let summary = summary_of(UNBOXED);
+    let files = [IndexedSummary {
+        summary: &summary,
+        in_tests: false,
+    }];
+    let found: Vec<String> = project_lints(&files, &library)
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "data-flow-issue")
+        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
+        .collect();
+    assert_eq!(found, ["7:16 find()", "15:20 find()"]);
+}

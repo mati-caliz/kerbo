@@ -22,6 +22,15 @@ const COMMENTS: &[&str] = &["line_comment", "block_comment"];
 const ASSERT_THAT: &str = "assertThat";
 const IS_NOT_NULL: &str = "isNotNull";
 const NON_NULL_CHECKS: &[&str] = &["assertNotNull", "requireNonNull", "notNull"];
+const PARENTHESIZED: &str = "parenthesized_expression";
+const CLASS_LITERAL: &str = "class_literal";
+const RETURN: &str = "return_statement";
+const LAMBDA: &str = "lambda_expression";
+const METHOD: &str = "method_declaration";
+const VARIABLE_DECLARATOR: &str = "variable_declarator";
+const TYPE_FIELD: &str = "type";
+const VOID: &str = "void";
+const PRIMITIVE_TYPES: &[&str] = &["integral_type", "floating_point_type", "boolean_type"];
 
 // De dónde sale el primer objeto de una cadena: una variable con su tipo declarado, o una clase
 // cuyo método estático se llama.
@@ -40,14 +49,17 @@ pub struct ChainStep {
     pub line: usize,
     pub column: usize,
     pub checked: bool,
+    pub class_arguments: Vec<usize>,
 }
 
-// `respuesta.getBody().error()`: la raíz y los pasos en orden. Sólo interesan las de al menos dos
-// pasos, donde el resultado de una llamada se usa para llamar a otra.
+// `respuesta.getBody().error()`: la raíz y los pasos en orden. Interesan las de al menos dos pasos,
+// donde el resultado de una llamada se usa para llamar a otra, y las que terminan desempaquetadas
+// (`return jdbc.queryForObject(...)` en un método que devuelve `long`), con dónde empiezan.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chain {
     pub root: ChainRoot,
     pub steps: Vec<ChainStep>,
+    pub unboxed: Option<(usize, usize)>,
 }
 
 // Lo que se sabe del archivo hasta el punto que se recorre: lo que ya se chequeó contra null (por
@@ -135,13 +147,47 @@ pub fn chain_of(
         return None;
     }
     let (root, steps) = walk(invocation, source, variables, facts)?;
-    (steps.len() > 1).then_some(Chain { root, steps })
+    let unboxed = unboxed_at(invocation, source);
+    (steps.len() > 1 || unboxed.is_some()).then_some(Chain { root, steps, unboxed })
+}
+
+// Si el valor de la llamada se desempaqueta: lo devuelve un método que devuelve un primitivo, o
+// inicializa una variable primitiva.
+fn unboxed_at(invocation: Node<'_>, source: &[u8]) -> Option<(usize, usize)> {
+    let mut parent = invocation.parent()?;
+    while parent.kind() == PARENTHESIZED {
+        parent = parent.parent()?;
+    }
+    let declared_type = match parent.kind() {
+        RETURN => {
+            let mut current = parent.parent();
+            while let Some(node) = current {
+                if node.kind() == LAMBDA {
+                    return None;
+                }
+                if node.kind() == METHOD {
+                    break;
+                }
+                current = node.parent();
+            }
+            current?.child_by_field_name(TYPE_FIELD)?
+        }
+        VARIABLE_DECLARATOR => parent.parent()?.child_by_field_name(TYPE_FIELD)?,
+        _ => return None,
+    };
+    let primitive = PRIMITIVE_TYPES.contains(&declared_type.kind()) && text(declared_type, source) != VOID;
+    let start = invocation.start_position();
+    primitive.then(|| (one_based(start.row), one_based(start.column)))
 }
 
 // La cadena que da valor a una variable, de un paso o más (`manager.getCache(nombre)`).
 pub fn origin_chain(invocation: Node<'_>, source: &[u8], variables: &Variables) -> Option<Chain> {
     let (root, steps) = walk(invocation, source, variables, &mut NullFacts::default())?;
-    Some(Chain { root, steps })
+    Some(Chain {
+        root,
+        steps,
+        unboxed: None,
+    })
 }
 
 fn walk(
@@ -162,6 +208,7 @@ fn walk(
             line: one_based(start.row),
             column: one_based(start.column),
             checked: facts.is_checked(current, source),
+            class_arguments: class_arguments(current),
         });
         let Some(object) = current.child_by_field_name(OBJECT_FIELD) else {
             steps.reverse();
@@ -195,6 +242,20 @@ fn walk(
         };
         return Some((root, steps));
     }
+}
+
+// Las posiciones de los argumentos que son un literal de clase (`Long.class`).
+fn class_arguments(invocation: Node<'_>) -> Vec<usize> {
+    invocation
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .iter()
+        .filter(|argument| !COMMENTS.contains(&argument.kind()))
+        .enumerate()
+        .filter(|(_, argument)| argument.kind() == CLASS_LITERAL)
+        .map(|(position, _)| position)
+        .collect()
 }
 
 fn argument_count(invocation: Node<'_>) -> usize {

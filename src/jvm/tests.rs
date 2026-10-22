@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use super::class_file::{parameter_count, parse};
+use super::method::Method;
 use super::zip::Archive;
 
 const COMPRESSED: &str = "sample.jar";
@@ -52,13 +53,13 @@ fn a_class_file_gives_its_parents_methods_and_parameter_annotations() {
         .iter()
         .find(|method| method.name == "hidden")
         .expect("hidden está");
-    assert!(hidden.is_private && !hidden.is_static);
+    assert!(hidden.is_private() && !hidden.is_static());
     assert_eq!(hidden.parameter_count(), 2);
     assert!(
         filter
             .methods
             .iter()
-            .any(|method| method.name == "describe" && method.is_static)
+            .any(|method| method.name == "describe" && method.is_static())
     );
     let package = parse(&archive.read(PACKAGE_INFO).expect("el package-info está")).expect("se lee");
     assert_eq!(package.annotations, ["sample.annotations.NullMarked"]);
@@ -96,4 +97,29 @@ fn the_classpath_comes_from_the_poms_and_survives_their_changes() {
         ask_maven(tree.path(), &saved).filter(|found| !found.is_empty()),
         None
     );
+}
+
+#[test]
+fn a_varargs_method_accepts_more_arguments_and_knows_its_class_parameters() {
+    let method = Method {
+        name: "queryForObject".to_owned(),
+        descriptor: "(Ljava/lang/String;Ljava/lang/Class;[Ljava/lang/Object;)Ljava/lang/Object;".to_owned(),
+        access: 0x0080,
+        parameter_annotations: vec![Vec::new(); 3],
+        return_annotations: Vec::new(),
+    };
+    assert!(method.accepts(3) && method.accepts(2) && method.accepts(6));
+    assert!(!method.accepts(1));
+    assert!(method.takes_class_at(1) && !method.takes_class_at(0) && !method.takes_class_at(2));
+    assert_eq!(method.return_class().as_deref(), Some("java.lang.Object"));
+    assert!(method.returns_reference());
+    assert!(!method.is_private() && !method.is_static());
+    let fixed = Method {
+        descriptor: "(IJ)V".to_owned(),
+        access: 0,
+        parameter_annotations: vec![Vec::new(); 2],
+        ..method
+    };
+    assert!(fixed.accepts(2) && !fixed.accepts(3));
+    assert!(!fixed.returns_reference() && fixed.return_class().is_none());
 }

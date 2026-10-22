@@ -1,4 +1,5 @@
 use super::java::{JavaSummary, Position, lint_at};
+use super::java_jdk::jdk_method;
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
@@ -17,24 +18,29 @@ pub fn nullable_dereferences(
     library: &Library,
     summary: &JavaSummary,
 ) -> Vec<LintFinding> {
-    if library.is_empty() {
-        return Vec::new();
-    }
     let mut findings: Vec<LintFinding> = summary
         .chains
         .iter()
         .flat_map(|chain| {
             let nullable = nullable_steps(types, library, summary, chain);
+            let unboxing = chain
+                .unboxed
+                .zip(chain.steps.last())
+                .filter(|(_, last)| {
+                    !last.checked && nullable.len() == chain.steps.len() && nullable.last() == Some(&true)
+                })
+                .map(|((line, column), last)| report(line, column, &last.name));
             chain
                 .steps
                 .windows(2)
-                .zip(nullable)
+                .zip(nullable.iter().copied())
                 .filter_map(|(pair, is_nullable)| match pair {
                     [step, next] if is_nullable && !step.checked => {
                         Some(report(next.line, next.column, &next.name))
                     }
                     _ => None,
                 })
+                .chain(unboxing)
                 .collect::<Vec<_>>()
         })
         .collect();
@@ -75,13 +81,32 @@ fn nullable_steps(
     };
     let mut nullable = Vec::new();
     for step in &chain.steps {
-        let candidates = classes
+        let overloads = classes
             .iter()
             .map(|class| library.overloads(class, &step.name, step.arity))
             .find(|found| !found.is_empty())
             .unwrap_or_default();
+        let by_class_arguments: Vec<_> = overloads
+            .iter()
+            .filter(|method| {
+                step.class_arguments
+                    .iter()
+                    .all(|position| method.takes_class_at(*position))
+            })
+            .cloned()
+            .collect();
+        let candidates = if by_class_arguments.is_empty() {
+            overloads
+        } else {
+            by_class_arguments
+        };
         let Some(first) = candidates.first() else {
-            break;
+            let Some((returned, is_nullable)) = jdk_method(&classes, &step.name, step.arity) else {
+                break;
+            };
+            nullable.push(is_nullable);
+            classes = vec![returned.to_owned()];
+            continue;
         };
         nullable.push(candidates.iter().all(|method| {
             method

@@ -1,10 +1,9 @@
+use super::chain_codec::{read_chain, read_flow, write_chain, write_flow};
 use super::codec::{Corrupt, Reader, Writer};
 use super::taint_codec::{read_taints, write_taints};
 use crate::index::java::{CallSite, Declaration, Field, JavaSummary, Parameter, Position};
 use crate::lint::java_calls::{Arity, Body, ReturnType, Returns, Visibility};
-use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::lint::java_constants::Constant;
-use crate::lint::java_null_flow::{Dereference, NullFlow};
 use crate::lint::java_owner::{Owner, OwnerKind};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
@@ -29,8 +28,6 @@ const OWNER_LOCAL: u64 = 5;
 const RETURN_TYPE_VOID: u64 = 0;
 const RETURN_TYPE_PRIMITIVE: u64 = 1;
 const RETURN_TYPE_REFERENCE: u64 = 2;
-const ROOT_INSTANCE: u64 = 0;
-const ROOT_CLASS: u64 = 1;
 const RECEIVER_UNKNOWN: u64 = 0;
 const RECEIVER_TYPE: u64 = 1;
 const RECEIVER_SCOPE: u64 = 2;
@@ -302,11 +299,11 @@ fn read_position(reader: &mut Reader<'_>) -> Result<Position, Corrupt> {
     })
 }
 
-fn write_flag(writer: &mut Writer, flag: bool) {
+pub(super) fn write_flag(writer: &mut Writer, flag: bool) {
     writer.number(if flag { YES } else { NO });
 }
 
-fn read_flag(reader: &mut Reader<'_>) -> Result<bool, Corrupt> {
+pub(super) fn read_flag(reader: &mut Reader<'_>) -> Result<bool, Corrupt> {
     match reader.number()? {
         NO => Ok(false),
         YES => Ok(true),
@@ -330,65 +327,4 @@ fn read_optional_text(reader: &mut Reader<'_>) -> Result<Option<String>, Corrupt
         PRESENT => reader.text().map(Some),
         _ => Err(Corrupt),
     }
-}
-
-fn write_chain(writer: &mut Writer, chain: &Chain) {
-    match &chain.root {
-        ChainRoot::Instance(name) => {
-            writer.number(ROOT_INSTANCE);
-            writer.text(name);
-        }
-        ChainRoot::Class(name) => {
-            writer.number(ROOT_CLASS);
-            writer.text(name);
-        }
-    }
-    writer.list(&chain.steps, |writer, step| {
-        writer.text(&step.name);
-        writer.size(step.arity);
-        writer.size(step.line);
-        writer.size(step.column);
-        write_flag(writer, step.checked);
-    });
-}
-
-fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
-    Ok(Chain {
-        root: match reader.number()? {
-            ROOT_INSTANCE => ChainRoot::Instance(reader.text()?),
-            ROOT_CLASS => ChainRoot::Class(reader.text()?),
-            _ => return Err(Corrupt),
-        },
-        steps: reader.list(|reader| {
-            Ok(ChainStep {
-                name: reader.text()?,
-                arity: reader.size()?,
-                line: reader.size()?,
-                column: reader.size()?,
-                checked: read_flag(reader)?,
-            })
-        })?,
-    })
-}
-
-fn write_flow(writer: &mut Writer, flow: &NullFlow) {
-    write_chain(writer, &flow.origin);
-    writer.list(&flow.dereferences, |writer, used| {
-        writer.text(&used.name);
-        writer.size(used.line);
-        writer.size(used.column);
-    });
-}
-
-fn read_flow(reader: &mut Reader<'_>) -> Result<NullFlow, Corrupt> {
-    Ok(NullFlow {
-        origin: read_chain(reader)?,
-        dereferences: reader.list(|reader| {
-            Ok(Dereference {
-                name: reader.text()?,
-                line: reader.size()?,
-                column: reader.size()?,
-            })
-        })?,
-    })
 }

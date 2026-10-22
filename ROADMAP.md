@@ -941,11 +941,25 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     records que llegan por JSON y valores que manda el frontend; hace falta saber qué tipos
     deserializa Jackson antes de marcar algo.
   - Clases sin usar: con la jerarquía y las mismas tablas de frameworks.
+- Nulos, tercera parte (hecho, 2026-10-22):
+  - Tabla propia del JDK (`src/index/java_jdk.rs`): qué devuelven y si pueden ser null
+    `getClass`, `getResourceAsStream`, `getResource`, `System.getProperty`/`getenv` y los de `File`.
+    Anda sin classpath. `Path.getFileName` y compañía quedaron afuera: IntelliJ no los marca (había
+    uno de más en comex).
+  - El flujo de nulos sigue las variables de un `try` con recursos.
+  - Unboxing: una cadena (también de un solo paso) cuyo resultado `@Nullable` se devuelve en un
+    método primitivo o inicializa una variable primitiva, en el principio de la expresión.
+  - Sobrecargas: el lector de `.class` guarda el bit de varargs, y un argumento `X.class` deja sólo
+    las sobrecargas que reciben un `Class` en esa posición (`queryForObject(sql, Long.class, ...)`
+    contra `queryForObject(sql, rowMapper, ...)`, que en Spring 7 no es `@Nullable`).
+  - Contra Qodana: comex pasa de 3 a 8 coincidencias (los 4 unboxing y el `getResourceAsStream`),
+    sin avisos de más en los tres servicios.
+  - Los jars de los servicios se rehicieron desde cero (Maven `dependency:go-offline` y un script de
+    Gradle que pide los archivos de `testRuntimeClasspath`) y dan exactamente lo de antes.
 - Lo que sigue en nulos: el tipo de retorno de los métodos del proyecto (para seguir cadenas que
   pasan por ellos), argumentos que pueden ser null hacia parámetros no nulos (también los que
-  IntelliJ infiere no nulos porque el método los desreferencia), unboxing, y las anotaciones del
-  JDK (`ct.sym` no las trae: hay que sumar una tabla propia de los métodos que devuelven null,
-  como `Map.get` o `getResourceAsStream`).
+  IntelliJ infiere no nulos porque el método los desreferencia), lo que devuelve una lambda
+  (`timer.record(() -> ...)` de Micrometer es `@Nullable`) y `Map.get`.
 - "Todas las implementaciones devuelven lo mismo" (hecho, 2026-10-22): `same-return-value` sobre un
   método abstracto, con la jerarquía del índice y las clases anónimas. Los 4 de Qodana en
   gastronova son proyecciones de Spring Data con stubs sólo en los tests: hace falta una
