@@ -99,6 +99,39 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 }
 "#;
 
+const CLOSURES: &str = r#"package server
+
+import (
+	"database/sql"
+	"fmt"
+	"net/http"
+)
+
+func Register(db *sql.DB) {
+	http.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
+		term := r.URL.Query().Get("term")
+		done := make(chan bool)
+		go func() {
+			db.Query("SELECT * FROM logs WHERE term = '" + term + "'")
+			done <- true
+		}()
+		shown := ""
+		apply := func() {
+			shown = term
+		}
+		apply()
+		fmt.Fprintln(w, shown)
+	})
+	http.HandleFunc("/plain", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintln(w, r.URL.Query().Get("term"))
+	})
+	http.HandleFunc("/after", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, r.URL.Query().Get("term"))
+	})
+}
+"#;
+
 fn taints_of(source: &str) -> Vec<TaintMethod> {
     let mut parser = Parser::new();
     parser
@@ -154,6 +187,21 @@ fn user_data_reaching_go_sinks_is_reported_across_packages() {
             "7 xss return",
         ]
     );
+}
+
+#[test]
+fn anonymous_functions_see_what_they_capture() {
+    let server = taints_of(CLOSURES);
+    let files = [GoFile {
+        path: "internal/server/server.go",
+        taints: &server,
+    }];
+    let found: Vec<String> = go_tainted(&files)
+        .into_iter()
+        .flatten()
+        .map(|finding| format!("{} {}", finding.line, finding.kind.rule().as_str()))
+        .collect();
+    assert_eq!(found, ["14 sql-injection", "22 xss", "29 xss"]);
 }
 
 #[test]

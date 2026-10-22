@@ -97,7 +97,8 @@ impl Interpreter<'_, '_> {
             kind if WRAPPERS.contains(&kind) => named_children(node)
                 .first()
                 .map_or_else(Value::clean, |inner| self.expression(*inner, state)),
-            FUNCTION_LITERAL | NIL => Value::clean(),
+            FUNCTION_LITERAL => self.closure(node, state),
+            NIL => Value::clean(),
             _ => Value::Data(
                 named_children(node)
                     .into_iter()

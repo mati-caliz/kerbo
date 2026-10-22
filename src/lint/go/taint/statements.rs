@@ -3,10 +3,13 @@ use tree_sitter::Node;
 use super::calls::sink_at;
 use super::expressions::literal_of;
 use super::imports::Imports;
-use super::types::Types;
+use super::tables;
+use super::types::{self, Types};
 use crate::lint::taint::folding::{same_label, truth};
 use crate::lint::taint::responses::lambda_html_body;
-use crate::lint::taint::{Flow, SinkKind, SinkReceiver, State, TaintCall, TaintSink, Value, join_states};
+use crate::lint::taint::{
+    Atom, Flow, SinkKind, SinkReceiver, State, TaintCall, TaintSink, Value, join_states,
+};
 use crate::syntax::named_children;
 
 const BLOCK: &str = "block";
@@ -42,6 +45,7 @@ const VALUE_FIELD: &str = "value";
 const LEFT_FIELD: &str = "left";
 const RIGHT_FIELD: &str = "right";
 const OPERATOR_FIELD: &str = "operator";
+const PARAMETERS_FIELD: &str = "parameters";
 const COMPOUND_PLUS: &str = "+=";
 const RETURN_SUBJECT: &str = "return";
 // Dos vueltas alcanzan para que lo que entra en una vuelta llegue a la siguiente.
@@ -81,10 +85,69 @@ impl<'source, 'context> Interpreter<'source, 'context> {
     // Si la función declara que la respuesta no es HTML, sus escrituras no son un XSS.
     pub fn run(&mut self, body: Node<'_>, state: State) {
         self.statement(body, state);
-        if self.plain_response {
-            self.sinks
-                .retain(|sink| !matches!(sink.receiver, SinkReceiver::Known(SinkKind::Html)));
+        self.drop_html_sinks_from(0);
+    }
+
+    fn drop_html_sinks_from(&mut self, first: usize) {
+        if !self.plain_response {
+            return;
         }
+        let mut position = 0;
+        self.sinks.retain(|sink| {
+            position += 1;
+            position <= first || !matches!(sink.receiver, SinkReceiver::Known(SinkKind::Html))
+        });
+    }
+
+    // Una función anónima (la de un `HandleFunc`, un `go func()` o un callback) corre en el lugar con
+    // las variables que captura; un parámetro `*http.Request` trae datos del usuario. Lo que les
+    // asigna a las de afuera puede haber pasado o no, y lo que devuelve es su valor.
+    pub(super) fn closure(&mut self, function: Node<'_>, state: &mut State) -> Value {
+        let Some(body) = function.child_by_field_name(BODY_FIELD) else {
+            return Value::clean();
+        };
+        let mut parameters = State::new();
+        let declared = function
+            .child_by_field_name(PARAMETERS_FIELD)
+            .map(types::parameters)
+            .unwrap_or_default();
+        for (name, typ) in declared {
+            let from_request = typ
+                .and_then(|typ| types::type_name(typ, self.source, self.imports))
+                .is_some_and(|written| tables::is_request_type(&written));
+            let value = if from_request {
+                Value::Data(Flow::of(Atom::Source))
+            } else {
+                Value::clean()
+            };
+            if let Some(name) = name {
+                parameters.insert(self.text(name).to_owned(), value);
+            }
+        }
+        let mut inner = state.clone();
+        inner.extend(
+            parameters
+                .iter()
+                .map(|(name, value)| (name.clone(), value.clone())),
+        );
+        let outer_returns = std::mem::take(&mut self.returns);
+        let outer_exits = std::mem::take(&mut self.exits);
+        let outer_plain = std::mem::replace(&mut self.plain_response, false);
+        let first_sink = self.sinks.len();
+        let after = self.statement(body, inner);
+        self.drop_html_sinks_from(first_sink);
+        let returned = std::mem::replace(&mut self.returns, outer_returns);
+        self.exits = outer_exits;
+        self.plain_response = outer_plain;
+        for (name, value) in after.into_iter().flatten() {
+            if parameters.contains_key(&name) {
+                continue;
+            }
+            if let Some(existing) = state.remove(&name) {
+                state.insert(name, existing.join(value));
+            }
+        }
+        Value::Data(returned)
     }
 
     fn statement(&mut self, node: Node<'_>, mut state: State) -> Option<State> {

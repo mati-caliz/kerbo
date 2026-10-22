@@ -824,7 +824,13 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     uno, falso: el gateway de dotfiles reenvía la respuesta de otro servidor con su `Content-Type`.
 - Pendientes de contaminación en Go:
   - Los campos de un struct no se siguen (`h.db.Query(...)` con `h` un handler no sabe el tipo de
-    `db`; cae en el nombre) y los valores capturados por una función anónima no llegan a ella.
+    `db`; cae en el nombre).
+- Funciones anónimas en Go (hecho, 2026-10-22): como las clausuras de JavaScript, la de un
+  `HandleFunc`, un `go func() { ... }()` o una que se guarda en una variable corre en el lugar con
+  lo que captura; un parámetro `*http.Request` trae datos del usuario, lo que les asigna a las
+  variables de afuera se junta con lo que tenían y un `Content-Type` que no es HTML sólo vale para
+  esa función. En los tests de Semgrep para Go, los mismos avisos que antes; en tus proyectos con
+  Go, ninguno.
 - Contaminación, segunda tanda (hecho, 2026-10-22):
   - Fuentes de JAX-RS, Quarkus y Micronaut (`@QueryParam`, `@PathParam`, `@RestQuery`,
     `@QueryValue`...), de Nest (`@Query()`, `@Body()`...), de Hono (`c.req.query()`) y de Next
