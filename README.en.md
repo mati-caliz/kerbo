@@ -434,6 +434,22 @@ through imports (relative ones and the ones inside a function too), the function
 visible from each one, `self` and the class a variable was created with. `os.name` is taken as
 `"posix"`: that is where the server runs.
 
+In JavaScript and TypeScript, the same four rules. Without types, sources and sinks are recognized
+by name: the request (`req`, `request`, `ctx`) and its `query`, `params`, `body`, `cookies`,
+`headers`, `url` and friends; the `event` of a Lambda handler (`(event, context)`, or a lone
+`event` in a function called `handler`); and in the browser, `location.hash`, `location.search`,
+`document.URL`, `document.referrer` and `window.name`. Sinks: `query`, `execute`, `raw` and
+`$queryRawUnsafe` on a connection (`db`, `conn`, `pool`, `client`, `knex`, `prisma`...);
+`child_process.exec` always and `spawn`/`execFile` only with `{ shell: true }`; `fs.*` and
+`res.sendFile`; and for HTML, `res.send`, `res.write` and `res.end` from Express and Node (not
+Fastify's, which sends plain text, nor when the function declares another type with
+`res.type('json')` or `writeHead(200, { 'content-type': 'application/json' })`), `innerHTML`,
+`document.write`, `insertAdjacentHTML`, `dangerouslySetInnerHTML`, jQuery (`$("<b>" + x)`,
+`.html(x)`) and the response of a Lambda handler declared as `text/html`. `DOMPurify.sanitize`,
+`sanitize-html`, `escape-html`, `$sanitize` or a project function named "escape…html" clean HTML;
+`path.basename`, the path. Every function (anonymous route handlers too) is a method for the
+engine, and across files `import` and `require` are resolved, relative ones too.
+
 To read libraries, kerbo asks for the classpath once, offline, to Maven
 (`mvn -o dependency:build-classpath`) or to Gradle (the project's `gradlew` when there is one, with
 kerbo's own init script that lists the jars of `testRuntimeClasspath`, `runtimeClasspath` and

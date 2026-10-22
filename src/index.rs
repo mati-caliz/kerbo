@@ -1,3 +1,4 @@
+pub mod ecmascript_taint;
 pub mod java;
 mod java_dereference;
 mod java_jdk;
@@ -14,6 +15,8 @@ mod taint_reach;
 pub use java_project::IndexedSummary;
 pub use java_rules::project_lints;
 
+#[cfg(test)]
+mod ecmascript_taint_tests;
 #[cfg(test)]
 mod python_taint_tests;
 #[cfg(test)]

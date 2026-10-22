@@ -784,7 +784,31 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - El código de nivel de módulo (fuera de funciones) no se recorre.
   - La herencia entre clases y los métodos de clases que llegan como parámetro no se resuelven.
   - Plantillas (`Markup`, `|safe` en Jinja) y el XSS de una respuesta de Lambda.
-  - TypeScript y Go.
+  - Go.
+- Contaminación en JavaScript y TypeScript (hecho, 2026-10-22): un intérprete
+  (`src/lint/ecmascript/taint/`) con constantes, `switch`, plantillas de texto, objetos y arreglos
+  por clave y posición (`push`/`pop`/`shift`), y la resolución entre archivos por `import` y
+  `require` (`src/index/ecmascript_taint.rs`: el módulo sale de la ruta sin extensión ni `/index`).
+  Como en las demás reglas de proyecto, sólo corre si el análisis abarca el proyecto entero.
+  - Contra los tests de las reglas de taint de Semgrep para JavaScript: 16 de 21 SQL y 18 de 33
+    XSS. Los 6 "de más" son desacuerdos: uno es una inyección real marcada `ok` porque es de otra
+    regla, y cuatro son `res.send("message: " + x)` de Express, que manda `text/html` (Semgrep sólo
+    avisa si el texto tiene una etiqueta). Lo que falta, explicado: las reglas `audit` de Semgrep
+    toman cualquier parámetro como fuente y `path.join` como sumidero (comandos 1 de 8, rutas 0 de
+    13, y en TypeScript las de MCP y `DomSanitizer` de Angular); algunas marcan la línea donde se
+    arma el texto y kerbo la del sumidero.
+  - En tus proyectos con JS/TS (gastronova, chirola, lantix, atlas, respondi, ritmo, conseguilo,
+    halo, portfolio, bender, finarg, propmetrics, soma y tradeagent): ningún aviso. La primera
+    versión daba 13, todos falsos: `reply.send` de Fastify (texto plano o JSON), respuestas que
+    declaran JSON con `writeHead` y un `escapeHtml` propio.
+- Pendientes de contaminación en JavaScript y TypeScript:
+  - Las clausuras no se siguen: un dato del usuario que entra a un callback (`.then`, `.map`) se
+    pierde, y el código de nivel de módulo no se recorre.
+  - Sin tipos, las conexiones y los objetos del pedido se reconocen por el nombre de la variable;
+    con el chequeo de tipos de TypeScript se podría mirar el tipo.
+  - Fuentes de otros frameworks (Next con `searchParams`, Nest con `@Query`, Hono) y plantillas
+    (EJS con `<%-`, Handlebars con `{{{`).
+  - Inyección de argumentos sin shell (`spawn(cmd)` con el programa elegido por el usuario).
 - **Renombres de columnas y tablas que el código desplegado todavía usa** (viene de la etapa 12).
   Sin compilar no hay forma confiable: los nombres pasan por los mapeos del ORM (`@map` de
   Prisma, `name=` de SQLAlchemy, los nombres de drizzle), cambian de caso y coinciden con palabras

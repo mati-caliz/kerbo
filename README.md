@@ -432,6 +432,22 @@ módulos, las llamadas se resuelven por los imports (también los relativos y lo
 función), las funciones y clases que se ven desde cada una, `self` y la clase con que se creó una
 variable. `os.name` se toma como `"posix"`: es donde corre el servidor.
 
+En JavaScript y TypeScript, las mismas cuatro reglas. Sin tipos, las fuentes y los sumideros se
+reconocen por el nombre: el pedido (`req`, `request`, `ctx`) y sus `query`, `params`, `body`,
+`cookies`, `headers`, `url` y compañía; el `event` de un handler de Lambda (`(event, context)`, o
+un único `event` en una función que se llama `handler`); y en el navegador, `location.hash`,
+`location.search`, `document.URL`, `document.referrer` y `window.name`. Los sumideros: `query`,
+`execute`, `raw` y `$queryRawUnsafe` sobre una conexión (`db`, `conn`, `pool`, `client`, `knex`,
+`prisma`...); `child_process.exec` siempre y `spawn`/`execFile` sólo con `{ shell: true }`;
+`fs.*` y `res.sendFile`; y para HTML, `res.send`, `res.write` y `res.end` de Express y Node (no
+los de Fastify, que manda texto plano, ni si la función declara otro tipo con `res.type('json')`
+o `writeHead(200, { 'content-type': 'application/json' })`), `innerHTML`, `document.write`,
+`insertAdjacentHTML`, `dangerouslySetInnerHTML`, jQuery (`$("<b>" + x)`, `.html(x)`) y la
+respuesta de un handler de Lambda que se declara `text/html`. `DOMPurify.sanitize`,
+`sanitize-html`, `escape-html`, `$sanitize` o una función propia que se llame "escape…html"
+limpian el HTML; `path.basename`, la ruta. Cada función (también las anónimas de una ruta) es un
+método del motor, y entre archivos se resuelven `import` y `require`, también los relativos.
+
 Para leer las librerías, kerbo le pide el classpath una sola vez, sin red, a Maven
 (`mvn -o dependency:build-classpath`) o a Gradle (el `gradlew` del proyecto si está, con un script
 de inicio propio que lista los jars de `testRuntimeClasspath`, `runtimeClasspath` y

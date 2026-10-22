@@ -1,4 +1,4 @@
-mod ecmascript;
+pub mod ecmascript;
 mod final_class;
 mod final_parameters;
 mod go;

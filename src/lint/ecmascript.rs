@@ -11,6 +11,7 @@ mod repair;
 mod scope;
 mod statements;
 mod strings;
+pub mod taint;
 mod tokens;
 mod typescript;
 mod unused;

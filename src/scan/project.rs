@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::analysis::FileAnalysis;
+use crate::index::ecmascript_taint::{ScriptModule, ecmascript_tainted};
 use crate::index::java::JavaSummary;
 use crate::index::python_taint::{PythonModule, python_tainted};
 use crate::index::{IndexedSummary, project_lints};
@@ -17,12 +18,20 @@ const LIBRARY_RULES: [JavaRule; 3] = [
     JavaRule::AutoCloseableResource,
 ];
 
-// Un archivo de Python con lo que hacen sus funciones con los datos.
+// Un archivo de Python, JavaScript o TypeScript con lo que hacen sus funciones con los datos.
 #[derive(Debug)]
-pub struct PythonFile {
+pub struct TaintedFile {
     pub identity: FileIdentity,
     pub limits: Limits,
+    pub family: TaintFamily,
     pub taints: Vec<TaintMethod>,
+}
+
+// Los archivos que se cruzan entre sí: los de un lenguaje sólo se llaman entre ellos.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaintFamily {
+    Python,
+    Ecmascript,
 }
 
 #[derive(Debug)]
@@ -74,8 +83,17 @@ pub fn diagnostics(files: &[IndexedFile], root: &Path) -> Vec<Diagnostic> {
         .collect()
 }
 
-// Lo que llega del usuario a las consultas, comandos, rutas y respuestas de los archivos de Python.
-pub fn python_diagnostics(files: &[PythonFile]) -> Vec<Diagnostic> {
+// Lo que llega del usuario a las consultas, comandos, rutas y respuestas, lenguaje por lenguaje.
+pub fn tainted_diagnostics(files: &[TaintedFile]) -> Vec<Diagnostic> {
+    let of_family = |family: TaintFamily| -> Vec<&TaintedFile> {
+        files.iter().filter(|file| file.family == family).collect()
+    };
+    let mut found = python_diagnostics(&of_family(TaintFamily::Python));
+    found.extend(ecmascript_diagnostics(&of_family(TaintFamily::Ecmascript)));
+    found
+}
+
+fn python_diagnostics(files: &[&TaintedFile]) -> Vec<Diagnostic> {
     let modules: Vec<PythonModule<'_>> = files
         .iter()
         .map(|file| PythonModule {
@@ -83,7 +101,52 @@ pub fn python_diagnostics(files: &[PythonFile]) -> Vec<Diagnostic> {
             taints: &file.taints,
         })
         .collect();
-    python_tainted(&modules)
+    kept_diagnostics(python_tainted(&modules), files)
+}
+
+// Lo que el archivo aporta a las reglas que miran el proyecto entero.
+pub fn summaries(
+    identity: &FileIdentity,
+    in_tests: bool,
+    analysis: &mut FileAnalysis,
+    limits: Limits,
+) -> (Option<IndexedFile>, Option<TaintedFile>) {
+    let indexed = analysis.java_summary.take().map(|summary| IndexedFile {
+        identity: identity.clone(),
+        limits,
+        summary,
+        in_tests,
+    });
+    let tainted = |family, taints| TaintedFile {
+        identity: identity.clone(),
+        limits,
+        family,
+        taints,
+    };
+    let python = analysis
+        .python_taints
+        .take()
+        .map(|taints| tainted(TaintFamily::Python, taints));
+    let ecmascript = analysis
+        .ecmascript_taints
+        .take()
+        .map(|taints| tainted(TaintFamily::Ecmascript, taints));
+    (indexed, python.or(ecmascript))
+}
+
+fn ecmascript_diagnostics(files: &[&TaintedFile]) -> Vec<Diagnostic> {
+    let modules: Vec<ScriptModule<'_>> = files
+        .iter()
+        .map(|file| ScriptModule {
+            path: &file.identity.relative,
+            taints: &file.taints,
+        })
+        .collect();
+    kept_diagnostics(ecmascript_tainted(&modules), files)
+}
+
+fn kept_diagnostics(found: Vec<Vec<LintFinding>>, files: &[&TaintedFile]) -> Vec<Diagnostic> {
+    found
         .into_iter()
         .zip(files)
         .flat_map(|(findings, file)| {
@@ -94,25 +157,4 @@ pub fn python_diagnostics(files: &[PythonFile]) -> Vec<Diagnostic> {
             finding_diagnostics(&file.identity, &kept).collect::<Vec<_>>()
         })
         .collect()
-}
-
-// Lo que el archivo aporta a las reglas que miran el proyecto entero.
-pub fn summaries(
-    identity: &FileIdentity,
-    in_tests: bool,
-    analysis: &mut FileAnalysis,
-    limits: Limits,
-) -> (Option<IndexedFile>, Option<PythonFile>) {
-    let indexed = analysis.java_summary.take().map(|summary| IndexedFile {
-        identity: identity.clone(),
-        limits,
-        summary,
-        in_tests,
-    });
-    let python = analysis.python_taints.take().map(|taints| PythonFile {
-        identity: identity.clone(),
-        limits,
-        taints,
-    });
-    (indexed, python)
 }

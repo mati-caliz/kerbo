@@ -5,6 +5,7 @@ use super::taint_codec::{read_taints, write_taints};
 use crate::analysis::FileAnalysis;
 use crate::deploy::Violation;
 use crate::duplicates::{CpdToken, DuplicateUnits, RepeatedBlock, RepeatedKind, SyntaxNode};
+use crate::lint::taint::TaintMethod;
 use crate::metrics::FunctionMetrics;
 use crate::metrics::commented::CommentedCode;
 use crate::metrics::magic::MagicNumber;
@@ -50,12 +51,14 @@ pub fn encode(analysis: &FileAnalysis) -> Vec<u8> {
         write_fix(writer, found.fix.as_ref());
     });
     write_summary(&mut writer, analysis.java_summary.as_ref());
-    match &analysis.python_taints {
-        Some(taints) => {
-            writer.number(PRESENT);
-            write_taints(&mut writer, taints);
+    for taints in [&analysis.python_taints, &analysis.ecmascript_taints] {
+        match taints {
+            Some(taints) => {
+                writer.number(PRESENT);
+                write_taints(&mut writer, taints);
+            }
+            None => writer.number(ABSENT),
         }
-        None => writer.number(ABSENT),
     }
     writer.into_bytes()
 }
@@ -105,11 +108,8 @@ pub fn decode(bytes: &[u8]) -> Result<FileAnalysis, Corrupt> {
             })
         })?,
         java_summary: read_summary(&mut reader)?,
-        python_taints: match reader.number()? {
-            ABSENT => None,
-            PRESENT => Some(read_taints(&mut reader)?),
-            _ => return Err(Corrupt),
-        },
+        python_taints: read_optional_taints(&mut reader)?,
+        ecmascript_taints: read_optional_taints(&mut reader)?,
     };
     if reader.is_empty() {
         Ok(analysis)
@@ -232,4 +232,12 @@ fn read_repeated_block(reader: &mut Reader<'_>) -> Result<RepeatedBlock, Corrupt
         lines: reader.size()?,
         content: reader.fixed()?,
     })
+}
+
+fn read_optional_taints(reader: &mut Reader<'_>) -> Result<Option<Vec<TaintMethod>>, Corrupt> {
+    match reader.number()? {
+        ABSENT => Ok(None),
+        PRESENT => Ok(Some(read_taints(reader)?)),
+        _ => Err(Corrupt),
+    }
 }
