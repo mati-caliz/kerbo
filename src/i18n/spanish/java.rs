@@ -320,6 +320,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Algo que mandó el usuario llega sin limpiar a un File, un FileInputStream o Paths.get: con ../ puede leer o pisar cualquier archivo que vea el proceso. Como PATH_TRAVERSAL_IN de FindSecBugs.",
         "new File(base, nombre) se vuelve base.resolve(nombre).normalize() con un chequeo de que empiece con base.",
     ),
+    RuleText::new(
+        "Campo que se asigna pero nunca se lee",
+        "borralo junto con sus asignaciones, o usá el valor donde haga falta",
+        "El código de su archivo sólo le escribe valores: nadie los lee, así que el campo y cada asignación sobran. Como el unused de IntelliJ (\"Field is assigned but never accessed\"), sin los campos que lee un framework (@Column, @Data, @JsonProperty).",
+        "private final boolean notaDeAjuste; asignado en el constructor de un enum y nunca leído se borra junto con el parámetro.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

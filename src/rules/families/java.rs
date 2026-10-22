@@ -53,6 +53,7 @@ rule_family!(JavaRule {
     SqlInjection => "sql-injection",
     CommandInjection => "command-injection",
     PathTraversal => "path-traversal",
+    UnreadField => "unread-field",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {

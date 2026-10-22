@@ -329,7 +329,11 @@ De las inspecciones de IntelliJ, kerbo hace:
   se mira por archivo; lo de paquete y protegido, sobre el proyecto entero (IntelliJ no marca lo
   público).
 - `UnusedReturnValue` (`unused-return-value`): un método que devuelve algo que ninguna llamada usa.
-- `SameReturnValue` (`same-return-value`): todos los `return` devuelven el mismo literal.
+- `SameReturnValue` (`same-return-value`): todos los `return` devuelven el mismo literal. En un
+  método abstracto, todas sus implementaciones (también las clases anónimas); hace falta al menos
+  una fuera de los tests, porque una proyección de Spring Data sólo tiene stubs de prueba y la
+  implementación real la arma Spring. Una interfaz con un solo método abstracto se salta: puede
+  tener implementaciones por lambda que no se ven.
 - `unused` para métodos (`unused-method`): ninguna llamada, referencia (`::nombre`) ni texto
   (`"nombre"`, como en `@MethodSource`) del proyecto lo nombra, y ningún framework conocido lo
   llama. Los frameworks son tablas de datos en `src/index/java_unused.rs`: un método con una
@@ -339,6 +343,10 @@ De las inspecciones de IntelliJ, kerbo hace:
   (`get`/`is`/`set`, que usan Jackson y JPA) y los que llama el JDK por nombre. Lo público y lo
   protegido sólo se marca en una aplicación (`@SpringBootApplication`, `@QuarkusMain`,
   `@MicronautApplication`): en una librería es su API.
+- `unused` para campos que se asignan pero nunca se leen (`unread-field`): un campo privado que el
+  código de su archivo sólo escribe. Un parámetro o una variable local con el mismo nombre no lo
+  lee (`this.total = total`); un `+=` o un `++`, sí. Las tablas de frameworks son las mismas de
+  `unused-field`.
 - `unused` para campos (`unused-field`): ningún código ni texto del proyecto nombra el campo (lo
   privado se mira en su archivo). Un texto que inicializa a una constante de su mismo nombre
   (`PAGADO = "PAGADO"`) no cuenta como uso. Las anotaciones de inyección (`@Autowired`, `@Inject`,

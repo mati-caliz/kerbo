@@ -4,7 +4,7 @@ use super::java_nullness::{ProjectTypes, unannotated_overrides};
 use super::java_project::{IndexedSummary, Project, key_of};
 use super::java_resources::unclosed_resources;
 use super::java_taint::tainted_sinks;
-use super::java_unused::{Usage, unused_field, unused_method};
+use super::java_unused::{Usage, unread_field, unused_field, unused_method};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body, Returns, Visibility};
@@ -32,6 +32,12 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
                     .iter()
                     .filter_map(|field| unused_field(&project, field, file, &usage)),
             );
+            in_file.extend(
+                summary
+                    .fields
+                    .iter()
+                    .filter_map(|field| unread_field(field, file)),
+            );
             in_file.extend(summary.declarations.iter().flat_map(|declaration| {
                 let mut found = Vec::new();
                 if usage.sees_callers_of(declaration.visibility) {
@@ -39,6 +45,9 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
                     found.extend(unused_return_value(&project, declaration));
                 }
                 found.extend(same_return_value(&project, summary, declaration));
+                if usage.sees_callers_of(declaration.visibility) {
+                    found.extend(same_implemented_value(&project, declaration));
+                }
                 found.extend(unused_method(&project, declaration, file, &usage));
                 found.extend(unannotated_overrides(&types, library, summary, declaration));
                 found
@@ -145,6 +154,34 @@ fn same_return_value<'summary>(
             format!("{}() = {}", declaration.name, shown(value)),
         )
     })
+}
+
+// SameReturnValue para un método abstracto: todas sus implementaciones devuelven la misma constante.
+// Hace falta al menos una en el código de producción: las proyecciones de Spring Data sólo tienen
+// las de los tests, y su implementación real la arma Spring.
+fn same_implemented_value(project: &Project<'_>, declaration: &Declaration) -> Option<LintFinding> {
+    if declaration.body != Body::Abstract || project.may_be_functional(&declaration.owner.name) {
+        return None;
+    }
+    let implementations = project.implementations(declaration);
+    if implementations.iter().all(|(_, in_tests)| *in_tests) {
+        return None;
+    }
+    let mut returned = implementations
+        .iter()
+        .map(|(implementation, _)| &implementation.returns);
+    let Some(Returns::Always(value)) = returned.next() else {
+        return None;
+    };
+    returned
+        .all(|other| matches!(other, Returns::Always(same) if same == value))
+        .then(|| {
+            lint_at(
+                JavaRule::SameReturnValue,
+                &declaration.position,
+                format!("{}() = {}", declaration.name, shown(value)),
+            )
+        })
 }
 
 // IntelliJ muestra el texto de un literal de cadena sin las comillas.

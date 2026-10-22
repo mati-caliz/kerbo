@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use super::java::{CallSite, Declaration, JavaSummary};
-use crate::lint::java_calls::Visibility;
+use crate::lint::java_calls::{Body, Visibility};
+use crate::lint::java_owner::OwnerKind;
 use crate::lint::java_receivers::Receiver;
 
 const QUALIFIER_SEPARATOR: char = '.';
@@ -37,6 +38,8 @@ pub struct Project<'summary> {
     named: HashSet<&'summary str>,
     referenced: HashSet<&'summary str>,
     identifiers: HashSet<&'summary str>,
+    bodies: HashMap<Key<'summary>, Vec<(&'summary Declaration, bool)>>,
+    interface_methods: HashMap<&'summary str, usize>,
     constants: HashMap<(&'summary str, &'summary str), Vec<Reach<'summary>>>,
 }
 
@@ -50,6 +53,8 @@ impl<'summary> Project<'summary> {
             named: HashSet::new(),
             referenced: HashSet::new(),
             identifiers: HashSet::new(),
+            bodies: HashMap::new(),
+            interface_methods: HashMap::new(),
             constants: HashMap::new(),
         };
         let mut parents: HashMap<&str, Vec<&str>> = HashMap::new();
@@ -82,6 +87,18 @@ impl<'summary> Project<'summary> {
                 .entry(key_of(declaration))
                 .or_default()
                 .push(declaration);
+            if declaration.body == Body::Abstract && declaration.owner.kind == OwnerKind::Interface {
+                *self
+                    .interface_methods
+                    .entry(declaration.owner.name.as_str())
+                    .or_default() += 1;
+            }
+            if declaration.body == Body::Written {
+                self.bodies
+                    .entry(key_of(declaration))
+                    .or_default()
+                    .push((declaration, file.in_tests));
+            }
         }
         for call in &summary.calls {
             self.calls
@@ -163,6 +180,32 @@ impl<'summary> Project<'summary> {
                     && self.is_ancestor(&declaration.owner.name, &twin.owner.name)
             })
         })
+    }
+
+    // Los métodos con cuerpo que implementan o redefinen a uno abstracto, con si están en los tests.
+    pub fn implementations(&self, declaration: &Declaration) -> Vec<(&'summary Declaration, bool)> {
+        self.bodies
+            .get(&key_of(declaration))
+            .map(|found| {
+                found
+                    .iter()
+                    .copied()
+                    .filter(|(candidate, _)| {
+                        let anonymous = candidate.owner.kind == OwnerKind::Local
+                            && candidate.owner.name == declaration.owner.name;
+                        anonymous
+                            || (candidate.owner.name != declaration.owner.name
+                                && self.is_ancestor(&declaration.owner.name, &candidate.owner.name))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    // Una interfaz con un solo método abstracto se puede implementar con una lambda, que no deja
+    // rastro en el resumen.
+    pub fn may_be_functional(&self, interface: &str) -> bool {
+        self.interface_methods.get(interface) == Some(&1)
     }
 
     pub fn calls_to(&self, declaration: &'summary Declaration) -> Vec<&'summary CallSite> {

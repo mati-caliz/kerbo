@@ -320,6 +320,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Something the user sent reaches a File, a FileInputStream or Paths.get unsanitized: with ../ they can read or overwrite any file the process can see. Like FindSecBugs' PATH_TRAVERSAL_IN.",
         "new File(base, name) becomes base.resolve(name).normalize() with a check that it starts with base.",
     ),
+    RuleText::new(
+        "Field that is assigned but never read",
+        "delete it along with its assignments, or use the value where it is needed",
+        "The code in its file only writes values to it: nobody reads them, so the field and every assignment are dead weight. Like IntelliJ's unused (\"Field is assigned but never accessed\"), without the fields a framework reads (@Column, @Data, @JsonProperty).",
+        "private final boolean adjustmentNote; assigned in an enum constructor and never read is deleted along with the parameter.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

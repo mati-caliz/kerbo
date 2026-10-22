@@ -208,7 +208,19 @@ pub fn unused_field(
     file: &IndexedSummary<'_>,
     usage: &Usage,
 ) -> Option<LintFinding> {
-    let unused = !SERIALIZATION_FIELDS.contains(&field.name.as_str())
+    let unused = framework_ignores(field)
+        && if field.visibility == Visibility::Private || field.owner.kind == OwnerKind::Local {
+            !file_mentions(file, &field.name)
+        } else {
+            usage.sees_callers_of(field.visibility) && !project.mentions_identifier(&field.name)
+        };
+    unused.then(|| lint_at(JavaRule::UnusedField, &field.position, field.name.clone()))
+}
+
+// Si ningún framework conocido lee el campo: ni la serialización, ni por una anotación propia, ni
+// por una de su clase.
+fn framework_ignores(field: &Field) -> bool {
+    !SERIALIZATION_FIELDS.contains(&field.name.as_str())
         && field
             .annotations
             .iter()
@@ -217,12 +229,20 @@ pub fn unused_field(
             || field.owner.annotations.iter().all(|annotation| {
                 is_passive(annotation) || FIELD_BLIND_OWNERS.contains(&annotation.as_str())
             }))
-        && if field.visibility == Visibility::Private || field.owner.kind == OwnerKind::Local {
-            !file_mentions(file, &field.name)
-        } else {
-            usage.sees_callers_of(field.visibility) && !project.mentions_identifier(&field.name)
-        };
-    unused.then(|| lint_at(JavaRule::UnusedField, &field.position, field.name.clone()))
+}
+
+// Un campo privado que el código de su archivo sólo escribe: el valor no se usa nunca. Las mismas
+// tablas que `unused_field` deciden si lo lee un framework.
+pub fn unread_field(field: &Field, file: &IndexedSummary<'_>) -> Option<LintFinding> {
+    let summary = file.summary;
+    let unread = (field.visibility == Visibility::Private || field.owner.kind == OwnerKind::Local)
+        && framework_ignores(field)
+        && summary
+            .written_only
+            .binary_search_by(|name| name.as_str().cmp(&field.name))
+            .is_ok()
+        && !summary.mentioned.contains(&field.name);
+    unread.then(|| lint_at(JavaRule::UnreadField, &field.position, field.name.clone()))
 }
 
 fn is_passive(annotation: &str) -> bool {

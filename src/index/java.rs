@@ -8,7 +8,7 @@ use crate::lint::java_calls::{
 };
 use crate::lint::java_chains::Chain;
 use crate::lint::java_constants::{Constant, declared_constants};
-use crate::lint::java_fields::{DeclaredField, declared_fields, used_identifiers};
+use crate::lint::java_fields::{DeclaredField, declared_fields, used_identifiers, written_only_identifiers};
 use crate::lint::java_inference::unconditionally_dereferenced;
 use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_owner::{Owner, annotation_names};
@@ -104,6 +104,7 @@ pub struct JavaSummary {
     pub resources: Vec<ResourceCandidate>,
     pub fields: Vec<Field>,
     pub identifiers: Vec<String>,
+    pub written_only: Vec<String>,
     pub taints: Vec<TaintMethod>,
 }
 
@@ -164,6 +165,9 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
             .fields
             .extend(declared_fields(&nodes, source).into_iter().map(field_of));
         summary.identifiers.extend(used_identifiers(&nodes, source));
+        summary
+            .written_only
+            .extend(written_only_identifiers(&nodes, source));
     }
     summary.identifiers.sort_unstable();
     summary.identifiers.dedup();

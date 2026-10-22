@@ -22,6 +22,7 @@ pub const TYPE_DECLARATIONS: &[&str] = &[
     "enum_declaration",
     "record_declaration",
     "interface_declaration",
+    "annotation_type_declaration",
 ];
 const ENUM: &str = "enum_declaration";
 const RECORD: &str = "record_declaration";

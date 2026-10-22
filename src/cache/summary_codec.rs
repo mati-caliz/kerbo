@@ -83,6 +83,7 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
         write_owner(writer, &field.owner);
     });
     writer.list(&summary.identifiers, |writer, name| writer.text(name));
+    writer.list(&summary.written_only, |writer, name| writer.text(name));
     write_taints(writer, &summary.taints);
 }
 
@@ -136,6 +137,7 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
             })
         })?,
         identifiers: reader.list(Reader::text)?,
+        written_only: reader.list(Reader::text)?,
         taints: read_taints(reader)?,
     }))
 }

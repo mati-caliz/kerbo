@@ -140,4 +140,46 @@ fn a_field_nobody_names_is_reported_unless_a_framework_uses_it() {
         ["7 MAX_PAGE", "10 mailer", "13 auditor"],
         "en una librería lo público es su API"
     );
+    assert_eq!(unused_fields(&[APPLICATION, TOP_LEVEL_ANNOTATION]), ["4 NONE"]);
+}
+
+const TOP_LEVEL_ANNOTATION: &str = "package app;\n\n@interface Top {\n    String NONE = \"\";\n}\n";
+
+const PRICING: &str = "package app;\n\ninterface Pricing {\n    int rate();\n    int fee();\n}\n\ninterface Flag {\n    boolean on();\n}\n\nclass Retail implements Pricing, Flag {\n    @Override public int rate() { return 4; }\n    @Override public int fee() { return 1; }\n    @Override public boolean on() { return true; }\n}\n\nclass Wholesale implements Pricing {\n    @Override public int rate() { return 4; }\n    @Override public int fee() { return 2; }\n    Pricing promo() {\n        return new Pricing() {\n            @Override public int rate() { return 4; }\n            @Override public int fee() { return 3; }\n        };\n    }\n}\n";
+
+#[test]
+fn an_abstract_method_whose_implementations_all_return_the_same_is_reported() {
+    let summaries = [summary_of(APPLICATION), summary_of(PRICING)];
+    let files: Vec<IndexedSummary<'_>> = summaries
+        .iter()
+        .map(|summary| IndexedSummary {
+            summary,
+            in_tests: false,
+        })
+        .collect();
+    let found: Vec<String> = project_lints(&files, &Library::load(&[]))
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "same-return-value")
+        .map(|finding| format!("{} {}", finding.line, finding.subject))
+        .collect();
+    assert_eq!(found, ["4 rate() = 4"]);
+}
+
+const UNREAD: &str = "package app;\n\nenum Kind {\n    A(1, true);\n\n    private final int code;\n    private final boolean adjustment;\n    private int total;\n    private boolean seen;\n\n    Kind(int code, boolean adjustment) {\n        this.code = code;\n        this.adjustment = adjustment;\n        total += code;\n        Runnable check = new Runnable() {\n            public void run() {\n                if (seen) {\n                    return;\n                }\n                seen = true;\n            }\n        };\n    }\n\n    int code() {\n        return code;\n    }\n}\n";
+
+#[test]
+fn a_private_field_that_is_only_written_is_reported() {
+    let summary = summary_of(UNREAD);
+    let files = [IndexedSummary {
+        summary: &summary,
+        in_tests: false,
+    }];
+    let found: Vec<String> = project_lints(&files, &Library::load(&[]))
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "unread-field")
+        .map(|finding| format!("{} {}", finding.line, finding.subject))
+        .collect();
+    assert_eq!(found, ["7 adjustment"]);
 }

@@ -917,12 +917,20 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - En Guava y commons-lang (librerías: sólo lo no público): 64 y 42. Son constantes sin uso, los
     campos de relleno de `Striped64` contra el false sharing y, en commons-lang, campos que los
     tests leen por reflexión recorriendo todos los de la clase. IntelliJ también los marca.
+- Más código muerto (hecho, 2026-10-22):
+  - `unread-field`: un campo privado que su archivo sólo escribe ("Field is assigned but never
+    accessed" de Qodana). Cada archivo guarda los nombres que sólo aparecen como destino de una
+    asignación simple; un parámetro o una variable local del método o la lambda más cercana tapa al
+    campo del mismo nombre, sin mirar adentro de las clases anidadas. Contra Qodana: el único caso
+    real (`InvoiceType.adjustmentNote` en gastronova) coincide y no sobra nada; los otros 5 son
+    `@Column`, que lee JPA. En Guava, 4 (los tres revisados son campos asignados que nadie lee); en
+    commons-lang, 18, casi todos de tests que leen por reflexión los `*Builder`.
+  - Un `@interface` de nivel superior entra al resumen como los anidados.
 - Pendientes de código muerto:
-  - Un `@interface` de nivel superior no entra al resumen (`TYPE_DECLARATIONS` de `java_calls` no
-    lo incluye): sus constantes no se miran. Los anidados sí.
   - Resolver el dueño de cada uso de un campo (como los receptores de las llamadas): hoy un nombre
     usado en cualquier clase salva a todos los campos que se llaman igual.
-  - "Asignado pero nunca leído" (Qodana lo marca aparte): pide distinguir lectura de escritura.
+  - "Asignado pero nunca leído" para lo que no es privado: pide juntar los nombres sólo escritos de
+    todo el proyecto.
   - Constructores y constantes de enum sin uso: casi todo lo que marca Qodana es inyección de Spring,
     records que llegan por JSON y valores que manda el frontend; hace falta saber qué tipos
     deserializa Jackson antes de marcar algo.
@@ -932,8 +940,13 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   IntelliJ infiere no nulos porque el método los desreferencia), unboxing, y las anotaciones del
   JDK (`ct.sym` no las trae: hay que sumar una tabla propia de los métodos que devuelven null,
   como `Map.get` o `getResourceAsStream`).
-- Lo que sigue en el índice: "todas las implementaciones devuelven lo mismo" con la jerarquía, y
-  lo que queda de código muerto (arriba).
+- "Todas las implementaciones devuelven lo mismo" (hecho, 2026-10-22): `same-return-value` sobre un
+  método abstracto, con la jerarquía del índice y las clases anónimas. Los 4 de Qodana en
+  gastronova son proyecciones de Spring Data con stubs sólo en los tests: hace falta una
+  implementación de producción, así que kerbo no los marca, a propósito. Una interfaz con un solo
+  método abstracto se salta (puede tener lambdas). En los servicios y las librerías no aparece
+  ninguno: queda fijado en un test.
+- Lo que sigue en el índice: lo que queda de código muerto (arriba).
 
 ### 10. Go, Python, TypeScript y shell completos
 
