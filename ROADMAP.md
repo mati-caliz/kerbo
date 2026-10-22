@@ -740,9 +740,15 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     una entidad leída por id parecía armada por el usuario.
   - En los tres servicios, Guava, commons-lang y junit4: ningún aviso. Sin fuentes en el proyecto
     (una librería), el cruce no corre: Guava sigue en 0,9 s con caché y 6,8 s sin caché.
+  - Java hacia HTML (hecho, 2026-10-22): `xss`. Cada flujo lleva aparte lo que pasó por un escape
+    de HTML, que no cuenta para un XSS pero sí para una consulta o una ruta, y cada método guarda
+    qué parámetros reciben algo crudo y cuáles algo escapado. Los sumideros son los métodos de
+    escritura de lo que devuelve `response.getWriter()` o `getOutputStream()`, encadenado o en una
+    variable. Contra el Benchmark: 246 de 246 y ningún falso positivo de 209; Semgrep, 82 % con
+    52 % de falsos positivos (+30 %). En los repos reales, ningún aviso.
 - Pendientes de contaminación:
-  - HTML (XSS): ahí sí importan los limpiadores (`encodeForHTML`, `HtmlUtils.htmlEscape`), que
-    hoy propagan como cualquier otra llamada.
+  - Un `PrintWriter` que llega como parámetro o campo no se reconoce como la respuesta; tampoco las
+    plantillas (Thymeleaf con `th:utext`, JSP con `<%= %>`) ni `@ResponseBody` que devuelve HTML.
   - FindSecBugs como segunda referencia: pide compilar el Benchmark con Maven.
   - Los campos no se siguen: un dato del usuario guardado en `this.x` y leído en otro método se
     pierde. Tampoco lambdas ni clases anónimas.

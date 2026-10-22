@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use super::java::{Position, lint_at};
 use super::java_project::{IndexedSummary, Project};
+use super::java_taint_reach::{Reach, Tainted, evaluate, substitute};
 use crate::lint::LintFinding;
 use crate::lint::java_calls::Body;
 use crate::lint::java_owner::OwnerKind;
@@ -27,40 +28,8 @@ enum Callees {
     Library,
 }
 
-// Los parámetros, como bits: los de más allá del 64 no se siguen.
-const TRACKED_PARAMETERS: usize = 64;
-
-fn parameter_bit(position: usize) -> u64 {
-    u32::try_from(position)
-        .ok()
-        .and_then(|shift| 1_u64.checked_shl(shift))
-        .unwrap_or_default()
-}
-
-// Qué puede llevar un valor: algo del usuario, o lo que traen ciertos parámetros del método.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct Reach {
-    source: bool,
-    parameters: u64,
-}
-
-impl Reach {
-    const fn absorb(&mut self, other: Self) {
-        self.source |= other.source;
-        self.parameters |= other.parameters;
-    }
-
-    const fn reaches_user(self, tainted: u64) -> bool {
-        self.source || self.parameters & tainted != 0
-    }
-
-    fn positions(self) -> impl Iterator<Item = usize> {
-        (0..TRACKED_PARAMETERS).filter(move |position| self.parameters & parameter_bit(*position) != 0)
-    }
-}
-
 fn mentions_source(method: &TaintMethod) -> bool {
-    let has = |flow: &Flow| flow.atoms.contains(&Atom::Source);
+    let has = |flow: &Flow| flow.atoms.contains(&Atom::Source) || flow.escaped.contains(&Atom::Source);
     has(&method.returns)
         || method
             .calls
@@ -74,7 +43,7 @@ struct Taints<'summary> {
     candidates: HashMap<MethodId, Vec<Callees>>,
     fields: HashMap<(&'summary str, &'summary str), &'summary str>,
     returns: HashMap<MethodId, Reach>,
-    tainted: HashMap<MethodId, u64>,
+    tainted: HashMap<MethodId, Tainted>,
 }
 
 // Las consultas, comandos y rutas a los que llega algo que mandó el usuario, por archivo.
@@ -206,11 +175,7 @@ impl<'summary> Taints<'summary> {
             Callees::Framework => {}
             Callees::Project(found) => {
                 for returned in found.iter().filter_map(|callee| self.returns.get(callee)) {
-                    result.source |= returned.source;
-                    returned
-                        .positions()
-                        .filter_map(|position| arguments.get(position))
-                        .for_each(|argument| result.absorb(*argument));
+                    result.absorb(substitute(*returned, &arguments));
                 }
             }
             Callees::Library => {
@@ -238,8 +203,9 @@ impl<'summary> Taints<'summary> {
         }
     }
 
-    // Los parámetros de otros métodos a los que este método les pasa algo del usuario.
-    fn reached_parameters(&self, id: MethodId, method: &TaintMethod) -> Vec<(MethodId, usize)> {
+    // Los parámetros de otros métodos a los que este método les pasa algo del usuario, y si va sin
+    // escapar.
+    fn reached_parameters(&self, id: MethodId, method: &TaintMethod) -> Vec<(MethodId, usize, bool)> {
         let values = self.call_values(id, method);
         let tainted = self.tainted.get(&id).copied().unwrap_or_default();
         let mut reached = Vec::new();
@@ -250,10 +216,12 @@ impl<'summary> Taints<'summary> {
             let contaminated = call
                 .arguments
                 .iter()
+                .map(|argument| evaluate(argument, &values))
                 .enumerate()
-                .filter(|(_, argument)| evaluate(argument, &values).reaches_user(tainted));
-            for (position, _) in contaminated {
-                reached.extend(found.iter().map(|callee| (*callee, position)));
+                .filter(|(_, carried)| carried.any_user(tainted));
+            for (position, carried) in contaminated {
+                let raw = carried.raw_user(tainted);
+                reached.extend(found.iter().map(|callee| (*callee, position, raw)));
             }
         }
         reached
@@ -261,17 +229,14 @@ impl<'summary> Taints<'summary> {
 
     fn settle_parameters(&mut self) {
         for _ in 0..MAX_PASSES {
-            let reached: Vec<(MethodId, usize)> = self
+            let reached: Vec<(MethodId, usize, bool)> = self
                 .methods
                 .iter()
                 .flat_map(|(id, method)| self.reached_parameters(*id, method))
                 .collect();
             let mut changed = false;
-            for (callee, position) in reached {
-                let bits = self.tainted.entry(callee).or_default();
-                let before = *bits;
-                *bits |= parameter_bit(position);
-                changed |= *bits != before;
+            for (callee, position, raw) in reached {
+                changed |= self.tainted.entry(callee).or_default().mark(position, raw);
             }
             if !changed {
                 break;
@@ -290,17 +255,25 @@ impl<'summary> Taints<'summary> {
         }?;
         let checked = match kind {
             SinkKind::Sql => sink.arguments.get(..1).unwrap_or_default(),
-            SinkKind::Command | SinkKind::Path => sink.arguments.as_slice(),
+            SinkKind::Command | SinkKind::Path | SinkKind::Html => sink.arguments.as_slice(),
         };
         let tainted = self.tainted.get(&id).copied().unwrap_or_default();
         checked
             .iter()
-            .any(|argument| evaluate(argument, values).reaches_user(tainted))
+            .any(|argument| {
+                let carried = evaluate(argument, values);
+                if kind == SinkKind::Html {
+                    carried.raw_user(tainted)
+                } else {
+                    carried.any_user(tainted)
+                }
+            })
             .then(|| {
                 let rule = match kind {
                     SinkKind::Sql => JavaRule::SqlInjection,
                     SinkKind::Command => JavaRule::CommandInjection,
                     SinkKind::Path => JavaRule::PathTraversal,
+                    SinkKind::Html => JavaRule::CrossSiteScripting,
                 };
                 let position = Position {
                     line: sink.line,
@@ -309,24 +282,6 @@ impl<'summary> Taints<'summary> {
                 lint_at(rule, &position, sink.callee.clone())
             })
     }
-}
-
-fn evaluate(flow: &Flow, values: &[Reach]) -> Reach {
-    let mut reach = Reach::default();
-    for atom in &flow.atoms {
-        match atom {
-            Atom::Source => reach.source = true,
-            Atom::Parameter(position) => {
-                reach.parameters |= parameter_bit(*position);
-            }
-            Atom::Call(index) => {
-                if let Some(value) = values.get(*index) {
-                    reach.absorb(*value);
-                }
-            }
-        }
-    }
-    reach
 }
 
 // Los métodos del proyecto a los que puede ir una llamada: los de su tipo, los que hereda y los que

@@ -382,14 +382,19 @@ De las inspecciones de IntelliJ, kerbo hace:
   de quien lo da (el contenedor o el pool).
 
 Y de seguridad, lo que llega del usuario sin limpiar a una consulta (`sql-injection`), a un
-comando (`command-injection`) o a una ruta de archivo (`path-traversal`). Las fuentes son los
+comando (`command-injection`), a una ruta de archivo (`path-traversal`) o a la respuesta HTML
+(`xss`). Las fuentes son los
 métodos de `HttpServletRequest` que devuelven lo que mandó el usuario (`getParameter`,
 `getHeader`, `getCookies`, `getQueryString`...) y los parámetros con `@RequestParam`,
 `@PathVariable`, `@RequestBody` y el resto de las anotaciones web de Spring. Los sumideros son
 `Statement`, `Connection`, `JdbcTemplate`, `EntityManager` y `JdbcClient` (en una consulta sólo
 cuenta el texto: los argumentos con `?` son seguros), `Runtime.exec` y `ProcessBuilder`, y
 `File`, `FileInputStream`, `FileOutputStream`, `FileReader`, `FileWriter`, `RandomAccessFile`,
-`Paths.get` y `Path.of`. Todo es tabla de datos en `src/lint/java_taint/tables.rs`.
+`Paths.get` y `Path.of`, y lo que se escribe con `response.getWriter()` o `getOutputStream()`
+(encadenado o guardado en una variable). Un escape de HTML (`encodeForHTML` de ESAPI,
+`HtmlUtils.htmlEscape`, `escapeHtml4`, `Encode.forHtml`...) protege la respuesta pero no una
+consulta ni una ruta: el dato escapado se sigue aparte. Todo es tabla de datos en
+`src/lint/java_taint/tables.rs`.
 
 Cada método se recorre como un intérprete: sabe qué variables son constantes y decide con ellas los
 `if`, los `switch` y los ternarios (`(7 * 42) - 86 > 200 ? "fijo" : dato` toma siempre la misma

@@ -3,7 +3,7 @@ use super::tests::summary_of;
 use super::{IndexedSummary, project_lints};
 use crate::jvm::library::Library;
 
-const TAINT_RULES: &[&str] = &["sql-injection", "command-injection", "path-traversal"];
+const TAINT_RULES: &[&str] = &["sql-injection", "command-injection", "path-traversal", "xss"];
 
 const USERS: &str = r#"package app;
 
@@ -162,6 +162,33 @@ fn lists_and_maps_are_followed_by_position_and_key() {
             "Lists:11 path-traversal File",
             "Lists:21 path-traversal File",
             "Lists:27 path-traversal File",
+        ]
+    );
+}
+
+const GREET: &str = r#"package app;
+
+class Greet extends HttpServlet {
+    void doGet(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        String name = request.getParameter("name");
+        response.getWriter().print("Hola " + name);
+        response.getWriter().print(HtmlUtils.htmlEscape(name));
+        java.io.PrintWriter out = response.getWriter();
+        out.format("%s", name);
+        String escaped = HtmlUtils.htmlEscape(name);
+        new java.io.File(escaped);
+    }
+}
+"#;
+
+#[test]
+fn an_html_escape_protects_the_response_but_not_a_path() {
+    assert_eq!(
+        tainted(&[("Greet", GREET)]),
+        [
+            "Greet:6 xss print",
+            "Greet:9 xss format",
+            "Greet:11 path-traversal File",
         ]
     );
 }

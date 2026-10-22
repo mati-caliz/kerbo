@@ -9,21 +9,46 @@ pub enum Atom {
     Call(usize),
 }
 
+// Lo que puede llevar un valor, separado en lo que llega tal cual y lo que pasó por un escape de
+// HTML: escapado no sirve para un XSS, pero sigue armando una consulta o una ruta.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Flow {
     pub atoms: Vec<Atom>,
+    pub escaped: Vec<Atom>,
+}
+
+fn insert_sorted(atoms: &mut Vec<Atom>, atom: Atom) {
+    if let Err(position) = atoms.binary_search(&atom) {
+        atoms.insert(position, atom);
+    }
 }
 
 impl Flow {
     pub fn of(atom: Atom) -> Self {
-        Self { atoms: vec![atom] }
+        Self {
+            atoms: vec![atom],
+            escaped: Vec::new(),
+        }
     }
 
     pub fn absorb(&mut self, other: &Self) {
         for atom in &other.atoms {
-            if let Err(position) = self.atoms.binary_search(atom) {
-                self.atoms.insert(position, *atom);
-            }
+            insert_sorted(&mut self.atoms, *atom);
+        }
+        for atom in &other.escaped {
+            insert_sorted(&mut self.escaped, *atom);
+        }
+    }
+
+    // El mismo valor después de un escape de HTML.
+    pub fn escaped_for_html(&self) -> Self {
+        let mut escaped = self.escaped.clone();
+        for atom in &self.atoms {
+            insert_sorted(&mut escaped, *atom);
+        }
+        Self {
+            atoms: Vec::new(),
+            escaped,
         }
     }
 

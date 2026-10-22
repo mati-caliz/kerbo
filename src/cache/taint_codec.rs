@@ -60,7 +60,12 @@ pub fn read_taints(reader: &mut Reader<'_>) -> Result<Vec<TaintMethod>, Corrupt>
 }
 
 fn write_flow(writer: &mut Writer, flow: &Flow) {
-    writer.list(&flow.atoms, |writer, atom| match atom {
+    writer.list(&flow.atoms, write_atom);
+    writer.list(&flow.escaped, write_atom);
+}
+
+fn write_atom(writer: &mut Writer, atom: &Atom) {
+    match atom {
         Atom::Source => writer.number(ATOM_SOURCE),
         Atom::Parameter(position) => {
             writer.number(ATOM_PARAMETER);
@@ -70,18 +75,23 @@ fn write_flow(writer: &mut Writer, flow: &Flow) {
             writer.number(ATOM_CALL);
             writer.size(*index);
         }
-    });
+    }
 }
 
 fn read_flow(reader: &mut Reader<'_>) -> Result<Flow, Corrupt> {
     Ok(Flow {
-        atoms: reader.list(|reader| match reader.number()? {
-            ATOM_SOURCE => Ok(Atom::Source),
-            ATOM_PARAMETER => Ok(Atom::Parameter(reader.size()?)),
-            ATOM_CALL => Ok(Atom::Call(reader.size()?)),
-            _ => Err(Corrupt),
-        })?,
+        atoms: reader.list(read_atom)?,
+        escaped: reader.list(read_atom)?,
     })
+}
+
+fn read_atom(reader: &mut Reader<'_>) -> Result<Atom, Corrupt> {
+    match reader.number()? {
+        ATOM_SOURCE => Ok(Atom::Source),
+        ATOM_PARAMETER => Ok(Atom::Parameter(reader.size()?)),
+        ATOM_CALL => Ok(Atom::Call(reader.size()?)),
+        _ => Err(Corrupt),
+    }
 }
 
 fn write_sink_receiver(writer: &mut Writer, receiver: &SinkReceiver) {

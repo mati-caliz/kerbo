@@ -143,10 +143,42 @@ const METHOD_SINKS: &[(&[&str], &[&str], SinkKind)] = &[
     (SQL_CLIENTS, SQL_CLIENT_METHODS, SinkKind::Sql),
     (COMMAND_RUNTIMES, COMMAND_RUNTIME_METHODS, SinkKind::Command),
     (COMMAND_BUILDERS, COMMAND_BUILDER_METHODS, SinkKind::Command),
+    (RESPONSE_WRITERS, RESPONSE_WRITER_METHODS, SinkKind::Html),
     (PATH_FACTORIES, PATH_FACTORY_METHODS, SinkKind::Path),
 ];
 const RUNTIME_FACTORY: &str = "getRuntime";
 const RUNTIME: &str = "Runtime";
+// Lo que escribe en la respuesta HTTP: `response.getWriter()` o `response.getOutputStream()`.
+const RESPONSE_TYPES: &[&str] = &[
+    "HttpServletResponse",
+    "ServletResponse",
+    "HttpServletResponseWrapper",
+];
+const RESPONSE_STREAMS: &[&str] = &["getWriter", "getOutputStream"];
+const RESPONSE_WRITER: &str = "ResponseWriter";
+const RESPONSE_WRITERS: &[&str] = &[RESPONSE_WRITER];
+const RESPONSE_WRITER_METHODS: &[&str] = &["print", "println", "printf", "format", "write", "append"];
+// Los escapes de HTML de ESAPI, Spring, commons-text, commons-lang y el encoder de OWASP: lo que
+// devuelven ya no sirve para un XSS.
+const HTML_ESCAPES: &[&str] = &[
+    "encodeForHTML",
+    "encodeForHTMLAttribute",
+    "encodeForJavaScript",
+    "encodeForXML",
+    "encodeForXMLAttribute",
+    "htmlEscape",
+    "escapeHtml",
+    "escapeHtml3",
+    "escapeHtml4",
+    "escapeXml",
+    "escapeXml10",
+    "escapeXml11",
+    "escapeEcmaScript",
+    "forHtml",
+    "forHtmlContent",
+    "forHtmlAttribute",
+    "forJavaScript",
+];
 
 pub fn is_source(receiver_type: &str, method: &str) -> bool {
     SOURCE_TYPES.contains(&receiver_type) && SOURCE_METHODS.contains(&method)
@@ -192,7 +224,18 @@ pub fn constructor_sink(created: &str) -> Option<SinkKind> {
     }
 }
 
-// `Runtime.getRuntime().exec(...)`: el receptor es lo que devuelve la fábrica de `Runtime`.
+// `Runtime.getRuntime().exec(...)` y `response.getWriter().print(...)`: el receptor es lo que
+// devuelve la fábrica.
 pub fn factory_type(owner: &str, method: &str) -> Option<&'static str> {
-    (owner == RUNTIME && method == RUNTIME_FACTORY).then_some(RUNTIME)
+    if owner == RUNTIME && method == RUNTIME_FACTORY {
+        Some(RUNTIME)
+    } else if RESPONSE_TYPES.contains(&owner) && RESPONSE_STREAMS.contains(&method) {
+        Some(RESPONSE_WRITER)
+    } else {
+        None
+    }
+}
+
+pub fn escapes_html(method: &str) -> bool {
+    HTML_ESCAPES.contains(&method)
 }

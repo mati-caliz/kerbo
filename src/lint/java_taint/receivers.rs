@@ -43,6 +43,12 @@ pub(super) fn declared_type(interpreter: &Interpreter<'_, '_>, object: Node<'_>)
 
 // Sobre qué tipo se llama un posible sumidero, si se sabe sin compilar.
 pub(super) fn sink_receiver(interpreter: &Interpreter<'_, '_>, object: Node<'_>) -> Option<SinkReceiver> {
+    if let Some(made) = (object.kind() == IDENTIFIER)
+        .then(|| interpreter.factory_variables.get(interpreter.text(object)))
+        .flatten()
+    {
+        return Some(SinkReceiver::Type(made.clone()));
+    }
     if let Some(declared) = declared_type(interpreter, object) {
         return Some(SinkReceiver::Type(declared));
     }
@@ -70,11 +76,10 @@ pub(super) fn sink_receiver(interpreter: &Interpreter<'_, '_>, object: Node<'_>)
         INVOCATION => {
             let owner = object.child_by_field_name(OBJECT_FIELD)?;
             let method = object.child_by_field_name(NAME_FIELD)?;
-            tables::factory_type(
-                &simple_type_name(interpreter.text(owner)),
-                interpreter.text(method),
-            )
-            .map(|known| SinkReceiver::Type(known.to_owned()))
+            let owner_type = declared_type(interpreter, owner)
+                .unwrap_or_else(|| simple_type_name(interpreter.text(owner)));
+            tables::factory_type(&owner_type, interpreter.text(method))
+                .map(|known| SinkReceiver::Type(known.to_owned()))
         }
         CREATION => object
             .child_by_field_name(TYPE_FIELD)

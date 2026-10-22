@@ -6,6 +6,7 @@ mod java_project;
 mod java_resources;
 mod java_rules;
 mod java_taint;
+mod java_taint_reach;
 mod java_unused;
 
 pub use java_project::IndexedSummary;

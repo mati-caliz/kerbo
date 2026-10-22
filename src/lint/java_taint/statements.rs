@@ -1,13 +1,17 @@
+use std::collections::HashMap;
+
 use tree_sitter::Node;
 
 use super::constants::{literal_of, same_label, truth};
+use super::receivers::sink_receiver;
 use super::values::{Flow, Literal, State, Value, join_states};
-use super::{TaintCall, TaintSink};
+use super::{SinkReceiver, TaintCall, TaintSink};
 use crate::lint::java::{NAME_FIELD, text};
 use crate::lint::java_receivers::{StaticImports, Variables};
 use crate::syntax::named_children;
 
 const BLOCK: &str = "block";
+const INVOCATION: &str = "method_invocation";
 const LOCAL: &str = "local_variable_declaration";
 const VARIABLE_DECLARATOR: &str = "variable_declarator";
 const EXPRESSION_STATEMENT: &str = "expression_statement";
@@ -52,6 +56,7 @@ pub struct Interpreter<'source, 'context> {
     pub(super) returns: Flow,
     pub(super) calls: Vec<TaintCall>,
     pub(super) sinks: Vec<TaintSink>,
+    pub(super) factory_variables: HashMap<String, String>,
     exits: Vec<Option<State>>,
 }
 
@@ -68,6 +73,7 @@ impl<'source, 'context> Interpreter<'source, 'context> {
             returns: Flow::default(),
             calls: Vec::new(),
             sinks: Vec::new(),
+            factory_variables: HashMap::new(),
             exits: Vec::new(),
         }
     }
@@ -164,7 +170,13 @@ impl<'source, 'context> Interpreter<'source, 'context> {
                 continue;
             };
             let assigned = self.expression(value, state);
-            state.insert(self.text(name).to_owned(), assigned);
+            let variable = self.text(name).to_owned();
+            if value.kind() == INVOCATION
+                && let Some(SinkReceiver::Type(known)) = sink_receiver(self, value)
+            {
+                self.factory_variables.insert(variable.clone(), known);
+            }
+            state.insert(variable, assigned);
         }
     }
 

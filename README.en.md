@@ -385,15 +385,18 @@ From IntelliJ's inspections, kerbo does:
   project method declares, or from kerbo's own JDK table; what a `get...` returns belongs to whoever
   gives it (the container or the pool).
 
-And for security, what reaches a query (`sql-injection`), a command (`command-injection`) or a
-file path (`path-traversal`) from the user unsanitized. Sources are the `HttpServletRequest`
+And for security, what reaches a query (`sql-injection`), a command (`command-injection`), a file
+path (`path-traversal`) or the HTML response (`xss`) from the user unsanitized. Sources are the `HttpServletRequest`
 methods that return what the user sent (`getParameter`, `getHeader`, `getCookies`,
 `getQueryString`...) and parameters with `@RequestParam`, `@PathVariable`, `@RequestBody` and the
 other Spring web annotations. Sinks are `Statement`, `Connection`, `JdbcTemplate`,
 `EntityManager` and `JdbcClient` (in a query only the text counts: `?` arguments are safe),
 `Runtime.exec` and `ProcessBuilder`, and `File`, `FileInputStream`, `FileOutputStream`,
-`FileReader`, `FileWriter`, `RandomAccessFile`, `Paths.get` and `Path.of`. All of it is a data
-table in `src/lint/java_taint/tables.rs`.
+`FileReader`, `FileWriter`, `RandomAccessFile`, `Paths.get` and `Path.of`, and what is written
+through `response.getWriter()` or `getOutputStream()` (chained or kept in a variable). An HTML
+escape (ESAPI's `encodeForHTML`, `HtmlUtils.htmlEscape`, `escapeHtml4`, `Encode.forHtml`...)
+protects the response but not a query or a path: escaped data is followed separately. All of it is
+a data table in `src/lint/java_taint/tables.rs`.
 
 Each method is walked like an interpreter: it knows which variables are constants and uses them to
 decide `if`, `switch` and ternaries (`(7 * 42) - 86 > 200 ? "fixed" : data` always takes the same

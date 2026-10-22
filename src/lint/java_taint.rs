@@ -28,6 +28,7 @@ pub enum SinkKind {
     Sql,
     Command,
     Path,
+    Html,
 }
 
 // Sobre qué se llama un posible sumidero: un tipo conocido, un campo estático de otra clase (cuyo

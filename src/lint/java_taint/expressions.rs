@@ -232,6 +232,10 @@ impl Interpreter<'_, '_> {
         if tables::gives_clean_result(written_owner, name) {
             return Value::clean();
         }
+        if tables::escapes_html(name) {
+            let carried = argument_flows.iter().fold(Flow::default(), Flow::union);
+            return Value::Data(carried.escaped_for_html());
+        }
         let call_receiver = match object {
             Some(inner) if inner.kind() == CREATION => inner
                 .child_by_field_name(TYPE_FIELD)

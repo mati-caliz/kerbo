@@ -326,6 +326,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "El código de su archivo sólo le escribe valores: nadie los lee, así que el campo y cada asignación sobran. Como el unused de IntelliJ (\"Field is assigned but never accessed\"), sin los campos que lee un framework (@Column, @Data, @JsonProperty).",
         "private final boolean notaDeAjuste; asignado en el constructor de un enum y nunca leído se borra junto con el parámetro.",
     ),
+    RuleText::new(
+        "Respuesta HTML armada con datos del usuario",
+        "escapalo antes de escribirlo (HtmlUtils.htmlEscape, Encode.forHtml o el escape de tu plantilla)",
+        "Algo que mandó el usuario llega sin escapar a lo que se escribe en la respuesta: con un <script> puede correr código en el navegador de otro usuario y robarle la sesión. Como XSS_SERVLET de FindSecBugs.",
+        "response.getWriter().print(\"Hola \" + nombre) se vuelve response.getWriter().print(\"Hola \" + HtmlUtils.htmlEscape(nombre)).",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {
