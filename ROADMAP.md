@@ -762,6 +762,15 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   comunes (`name`, `status`), así que buscar el nombre viejo en el código da falsos positivos y
   negativos. Con el índice del proyecto se puede leer el esquema del ORM y cruzarlo con la
   migración; mientras tanto, como squawk, todo renombre se marca.
+  - Revisado (2026-10-22) con los 3 renombres de `V1__initial_schema.sql` de gastronova: por texto,
+    `ingredientName` aparece en 18 archivos Java que son DTOs y excepciones sin relación con la
+    columna, y `rated_at` en 3 con consultas de otras tablas. Además, el código que rompe un
+    renombre es el desplegado, la versión de antes del cambio; el de la revisión actual suele venir
+    ya renombrado junto con la migración. Hacerlo bien pide dos cosas que todavía no hay: indexar la
+    revisión base en `--diff` (el resumen de cada archivo de esa revisión, de la caché por
+    contenido) y leer el mapeo de JPA (`@Table` y `@Column(name = ...)`, o el nombre de la
+    clase y del campo en snake_case como Spring) para saber qué entidad usa cada tabla y columna.
+    Queda para la etapa de despliegue, junto con Prisma, SQLAlchemy y drizzle.
 - Paridad contra Qodana con el perfil `Default`, inspección por inspección. Donde Qodana se
   equivoca por no conocer el framework, la diferencia queda fijada en un test como mejora, no
   como desvío.
@@ -950,6 +959,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     records que llegan por JSON y valores que manda el frontend; hace falta saber qué tipos
     deserializa Jackson antes de marcar algo.
   - Clases sin usar: con la jerarquía y las mismas tablas de frameworks.
+  - Revisado (2026-10-22): en los tres servicios no hay ningún caso real de tipo, constructor o
+    constante de enum sin usar. Los dos "Enum is never used" de Qodana (`RowOutcome` en comex,
+    `PrintDocumentType` en gastronova) son enums privados que se usan desde métodos que Qodana da
+    por inalcanzables; los constructores son de beans de Spring y de records que llegan por JSON.
+    Sin un caso para medir, estas reglas no se hacen todavía.
 - Nulos, tercera parte (hecho, 2026-10-22):
   - Tabla propia del JDK (`src/index/java_jdk.rs`): qué devuelven y si pueden ser null
     `getClass`, `getResourceAsStream`, `getResource`, `System.getProperty`/`getenv` y los de `File`.
@@ -969,6 +983,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   pasan por ellos), argumentos que pueden ser null hacia parámetros no nulos (también los que
   IntelliJ infiere no nulos porque el método los desreferencia), lo que devuelve una lambda
   (`timer.record(() -> ...)` de Micrometer es `@Nullable`) y `Map.get`.
+  - Revisado (2026-10-22): de los 3 "Passing 'null' argument to parameter annotated as non-null"
+    de Qodana, dos pasan por `Map.get` sobre un genérico (sin tipos genéricos no se sigue) y uno es
+    un `null` dentro de un `assertThatThrownBy` hacia un parámetro que el método desreferencia: pide
+    calcular la inferencia de no nulo para todos los métodos (hoy sólo para los `@Override`) y
+    guardar la posición de cada argumento `null`.
 - "Todas las implementaciones devuelven lo mismo" (hecho, 2026-10-22): `same-return-value` sobre un
   método abstracto, con la jerarquía del índice y las clases anónimas. Los 4 de Qodana en
   gastronova son proyecciones de Spring Data con stubs sólo en los tests: hace falta una
