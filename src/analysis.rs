@@ -17,17 +17,13 @@ use crate::metrics::names::{ShortName, find_short_names};
 use crate::metrics::nesting::{NestingFinding, find_deep_nesting};
 use crate::metrics::{FunctionMetrics, measure_clippy_functions, measure_functions};
 use crate::profile::MetricsStyle;
-use crate::rules::{JavaRule, RuleId};
+use crate::rules::{JavaRule, RuleId, TaintRule};
 use crate::shell;
 use crate::syntax::rust_parse_text;
 
 // Las reglas de Java que miran el proyecto entero: sin ninguna prendida, no hace falta el resumen.
-const PROJECT_RULES: [JavaRule; 13] = [
-    JavaRule::CrossSiteScripting,
+const PROJECT_RULES: [JavaRule; 9] = [
     JavaRule::UnreadField,
-    JavaRule::SqlInjection,
-    JavaRule::CommandInjection,
-    JavaRule::PathTraversal,
     JavaRule::AutoCloseableResource,
     JavaRule::UnusedField,
     JavaRule::DataFlowIssue,
@@ -157,9 +153,12 @@ pub fn analyze_unit(
             Vec::new()
         },
         java_summary: (language == Language::Java
-            && PROJECT_RULES
+            && (PROJECT_RULES
                 .iter()
-                .any(|rule| limits.get(RuleId::Java(*rule)).is_some()))
+                .any(|rule| limits.get(RuleId::Java(*rule)).is_some())
+                || TaintRule::ALL
+                    .iter()
+                    .any(|rule| limits.get(RuleId::Taint(*rule)).is_some())))
         .then(|| summarize(root, source)),
     })
 }

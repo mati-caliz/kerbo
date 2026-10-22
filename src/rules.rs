@@ -16,6 +16,7 @@ pub use lints::finding_diagnostics;
 
 pub use families::{
     ComposeRule, DockerfileRule, EslintRule, GoRule, JavaRule, MigrationRule, PythonRule, ShellRule,
+    TaintRule,
 };
 pub use id::RuleId;
 
@@ -302,7 +303,8 @@ fn message(finding: &Finding<'_>, name: &str) -> Message {
         | RuleId::Eslint(_)
         | RuleId::Shell(_)
         | RuleId::Go(_)
-        | RuleId::Java(_) => Message::Rule(finding.rule),
+        | RuleId::Java(_)
+        | RuleId::Taint(_) => Message::Rule(finding.rule),
     }
 }
 

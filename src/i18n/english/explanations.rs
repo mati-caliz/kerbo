@@ -135,5 +135,6 @@ pub fn explanation(rule: RuleId) -> Explanation {
         RuleId::Shell(rule) => super::shell::shell(rule).explanation,
         RuleId::Go(rule) => super::go::go(rule).explanation,
         RuleId::Java(rule) => super::java::java(rule).explanation,
+        RuleId::Taint(rule) => super::taint::taint(rule).explanation,
     }
 }

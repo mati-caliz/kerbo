@@ -303,34 +303,10 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "private static final int MAX_PAGINA = 50; que nadie lee se borra.",
     ),
     RuleText::new(
-        "Consulta SQL armada con datos del usuario",
-        "pasá el dato como parámetro (? con setString, o los argumentos de JdbcTemplate)",
-        "Algo que mandó el usuario (un parámetro, un header, una cookie, un @RequestParam) llega sin limpiar al texto de una consulta: con una comilla puede cambiarla y leer o borrar datos ajenos. Como SQL_INJECTION de FindSecBugs y las reglas de inyección de Semgrep.",
-        "statement.executeQuery(\"SELECT * FROM usuarios WHERE nombre = '\" + nombre + \"'\") se vuelve prepareStatement(\"SELECT * FROM usuarios WHERE nombre = ?\") con setString(1, nombre).",
-    ),
-    RuleText::new(
-        "Comando del sistema armado con datos del usuario",
-        "no pases datos del usuario al comando; si hace falta, validalos contra una lista cerrada",
-        "Algo que mandó el usuario llega sin limpiar a Runtime.exec o a un ProcessBuilder: con un ; o un && puede correr cualquier comando en el servidor. Como COMMAND_INJECTION de FindSecBugs.",
-        "Runtime.getRuntime().exec(\"ping \" + host) se vuelve un ProcessBuilder con host validado contra los valores permitidos.",
-    ),
-    RuleText::new(
-        "Ruta de archivo armada con datos del usuario",
-        "resolvé la ruta contra un directorio fijo y verificá que no se salga de él",
-        "Algo que mandó el usuario llega sin limpiar a un File, un FileInputStream o Paths.get: con ../ puede leer o pisar cualquier archivo que vea el proceso. Como PATH_TRAVERSAL_IN de FindSecBugs.",
-        "new File(base, nombre) se vuelve base.resolve(nombre).normalize() con un chequeo de que empiece con base.",
-    ),
-    RuleText::new(
         "Campo que se asigna pero nunca se lee",
         "borralo junto con sus asignaciones, o usá el valor donde haga falta",
         "El código de su archivo sólo le escribe valores: nadie los lee, así que el campo y cada asignación sobran. Como el unused de IntelliJ (\"Field is assigned but never accessed\"), sin los campos que lee un framework (@Column, @Data, @JsonProperty).",
         "private final boolean notaDeAjuste; asignado en el constructor de un enum y nunca leído se borra junto con el parámetro.",
-    ),
-    RuleText::new(
-        "Respuesta HTML armada con datos del usuario",
-        "escapalo antes de escribirlo (HtmlUtils.htmlEscape, Encode.forHtml o el escape de tu plantilla)",
-        "Algo que mandó el usuario llega sin escapar a lo que se escribe en la respuesta: con un <script> puede correr código en el navegador de otro usuario y robarle la sesión. Como XSS_SERVLET de FindSecBugs.",
-        "response.getWriter().print(\"Hola \" + nombre) se vuelve response.getWriter().print(\"Hola \" + HtmlUtils.htmlEscape(nombre)).",
     ),
 ];
 

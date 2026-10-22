@@ -16,6 +16,7 @@ mod shell;
 const ANONYMOUS_FUNCTION: &str = "(anónima)";
 mod python;
 mod security;
+mod taint;
 
 #[derive(Debug)]
 pub struct Spanish;
@@ -130,6 +131,7 @@ impl Catalog for Spanish {
             RuleId::Shell(rule) => shell::shell(rule).description,
             RuleId::Go(rule) => go::go(rule).description,
             RuleId::Java(rule) => java::java(rule).description,
+            RuleId::Taint(rule) => taint::taint(rule).description,
         }
     }
 
@@ -225,6 +227,7 @@ impl Catalog for Spanish {
             LintKind::Python(rule) => with_subject(python::python(rule).description, subject),
             LintKind::Go(rule) => with_subject(go::go(rule).description, subject),
             LintKind::Java(rule) => with_subject(java::java(rule).description, subject),
+            LintKind::Taint(rule) => with_subject(taint::taint(rule).description, subject),
         }
     }
 

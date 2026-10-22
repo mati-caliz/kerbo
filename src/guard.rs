@@ -260,7 +260,8 @@ fn marker_message(rule: RuleId, marker: &Marker) -> Message {
         | RuleId::Eslint(_)
         | RuleId::Shell(_)
         | RuleId::Go(_)
-        | RuleId::Java(_) => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
+        | RuleId::Java(_)
+        | RuleId::Taint(_) => Message::Cheat(Cheat::SuppressionAdded { marker: text }),
     }
 }
 

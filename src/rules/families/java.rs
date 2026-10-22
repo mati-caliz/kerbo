@@ -50,11 +50,7 @@ rule_family!(JavaRule {
     OptionalGetWithoutIsPresent => "optional-get-without-is-present",
     AutoCloseableResource => "auto-closeable-resource",
     UnusedField => "unused-field",
-    SqlInjection => "sql-injection",
-    CommandInjection => "command-injection",
-    PathTraversal => "path-traversal",
     UnreadField => "unread-field",
-    CrossSiteScripting => "xss",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {

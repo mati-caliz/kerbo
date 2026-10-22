@@ -1,15 +1,14 @@
 use std::collections::HashMap;
 
-use super::java::{Position, lint_at};
 use super::java_project::{IndexedSummary, Project};
 use super::java_taint_reach::{Reach, Tainted, evaluate, substitute};
-use crate::lint::LintFinding;
 use crate::lint::java_calls::Body;
 use crate::lint::java_owner::OwnerKind;
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_taint::tables::{constructor_sink, method_sink};
 use crate::lint::java_taint::{Atom, Flow, SinkKind, SinkReceiver, TaintCall, TaintMethod, TaintSink};
-use crate::rules::JavaRule;
+use crate::lint::{LintFinding, LintKind};
+use crate::rules::TaintRule;
 
 // Las vueltas para que lo que devuelve un método llegue a quien lo llama a través de otros; alcanza
 // de sobra para las cadenas de un proyecto real y corta la recursión.
@@ -270,16 +269,18 @@ impl<'summary> Taints<'summary> {
             })
             .then(|| {
                 let rule = match kind {
-                    SinkKind::Sql => JavaRule::SqlInjection,
-                    SinkKind::Command => JavaRule::CommandInjection,
-                    SinkKind::Path => JavaRule::PathTraversal,
-                    SinkKind::Html => JavaRule::CrossSiteScripting,
+                    SinkKind::Sql => TaintRule::SqlInjection,
+                    SinkKind::Command => TaintRule::CommandInjection,
+                    SinkKind::Path => TaintRule::PathTraversal,
+                    SinkKind::Html => TaintRule::CrossSiteScripting,
                 };
-                let position = Position {
+                LintFinding {
+                    kind: LintKind::Taint(rule),
                     line: sink.line,
                     column: sink.column,
-                };
-                lint_at(rule, &position, sink.callee.clone())
+                    subject: sink.callee.clone(),
+                    fix: None,
+                }
             })
     }
 }

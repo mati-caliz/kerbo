@@ -303,34 +303,10 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "private static final int MAX_PAGE = 50; that nobody reads gets deleted.",
     ),
     RuleText::new(
-        "SQL query built from user data",
-        "pass the value as a parameter (? with setString, or JdbcTemplate arguments)",
-        "Something the user sent (a parameter, a header, a cookie, a @RequestParam) reaches the text of a query unsanitized: with a quote they can change it and read or delete other people's data. Like FindSecBugs' SQL_INJECTION and Semgrep's injection rules.",
-        "statement.executeQuery(\"SELECT * FROM users WHERE name = '\" + name + \"'\") becomes prepareStatement(\"SELECT * FROM users WHERE name = ?\") with setString(1, name).",
-    ),
-    RuleText::new(
-        "System command built from user data",
-        "do not pass user data to the command; if needed, check it against a closed list",
-        "Something the user sent reaches Runtime.exec or a ProcessBuilder unsanitized: with a ; or a && they can run any command on the server. Like FindSecBugs' COMMAND_INJECTION.",
-        "Runtime.getRuntime().exec(\"ping \" + host) becomes a ProcessBuilder with host checked against the allowed values.",
-    ),
-    RuleText::new(
-        "File path built from user data",
-        "resolve the path against a fixed directory and check it does not leave it",
-        "Something the user sent reaches a File, a FileInputStream or Paths.get unsanitized: with ../ they can read or overwrite any file the process can see. Like FindSecBugs' PATH_TRAVERSAL_IN.",
-        "new File(base, name) becomes base.resolve(name).normalize() with a check that it starts with base.",
-    ),
-    RuleText::new(
         "Field that is assigned but never read",
         "delete it along with its assignments, or use the value where it is needed",
         "The code in its file only writes values to it: nobody reads them, so the field and every assignment are dead weight. Like IntelliJ's unused (\"Field is assigned but never accessed\"), without the fields a framework reads (@Column, @Data, @JsonProperty).",
         "private final boolean adjustmentNote; assigned in an enum constructor and never read is deleted along with the parameter.",
-    ),
-    RuleText::new(
-        "HTML response built from user data",
-        "escape it before writing it (HtmlUtils.htmlEscape, Encode.forHtml or your template's escaping)",
-        "Something the user sent reaches what is written to the response unescaped: with a <script> they can run code in another user's browser and steal their session. Like FindSecBugs' XSS_SERVLET.",
-        "response.getWriter().print(\"Hi \" + name) becomes response.getWriter().print(\"Hi \" + HtmlUtils.htmlEscape(name)).",
     ),
 ];
 

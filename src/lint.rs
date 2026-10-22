@@ -45,7 +45,7 @@ use crate::fix::Fix;
 use crate::language::Language;
 use crate::limits::{Limits, Preset};
 use crate::profile::LintStyle;
-use crate::rules::{EslintRule, GoRule, JavaRule, PythonRule, RuleId};
+use crate::rules::{EslintRule, GoRule, JavaRule, PythonRule, RuleId, TaintRule};
 use crate::syntax::one_based;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,6 +67,7 @@ pub enum LintKind {
     Eslint(EslintRule),
     Go(GoRule),
     Java(JavaRule),
+    Taint(TaintRule),
 }
 
 impl LintKind {
@@ -82,6 +83,7 @@ impl LintKind {
             Self::Python(rule) => RuleId::Python(rule),
             Self::Go(rule) => RuleId::Go(rule),
             Self::Java(rule) => RuleId::Java(rule),
+            Self::Taint(rule) => RuleId::Taint(rule),
         }
     }
 }
