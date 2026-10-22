@@ -5,6 +5,7 @@ use crate::index::ecmascript_taint::{ScriptModule, ecmascript_tainted};
 use crate::index::go_taint::{GoFile, go_tainted};
 use crate::index::java::JavaSummary;
 use crate::index::python_taint::{PythonModule, python_tainted};
+use crate::index::templates::Templates;
 use crate::index::{IndexedSummary, project_lints};
 use crate::jvm::classpath;
 use crate::jvm::library::Library;
@@ -79,12 +80,16 @@ pub fn diagnostics(files: &[IndexedFile], root: &Path) -> Vec<Diagnostic> {
 }
 
 // Lo que llega del usuario a las consultas, comandos, rutas y respuestas, lenguaje por lenguaje.
-pub fn tainted_diagnostics(files: &[TaintedFile]) -> Vec<Diagnostic> {
+pub fn tainted_diagnostics(files: &[TaintedFile], root: &Path) -> Vec<Diagnostic> {
     let of_family = |family: TaintFamily| -> Vec<&TaintedFile> {
         files.iter().filter(|file| file.family == family).collect()
     };
-    let mut found = python_diagnostics(&of_family(TaintFamily::Python));
-    found.extend(ecmascript_diagnostics(&of_family(TaintFamily::Ecmascript)));
+    let templates = Templates::load(root, files.iter().flat_map(|file| file.taints.iter()));
+    let mut found = python_diagnostics(&of_family(TaintFamily::Python), &templates);
+    found.extend(ecmascript_diagnostics(
+        &of_family(TaintFamily::Ecmascript),
+        &templates,
+    ));
     found.extend(go_diagnostics(&of_family(TaintFamily::Go)));
     found
 }
@@ -100,7 +105,7 @@ fn go_diagnostics(files: &[&TaintedFile]) -> Vec<Diagnostic> {
     kept_diagnostics(go_tainted(&packages), files)
 }
 
-fn python_diagnostics(files: &[&TaintedFile]) -> Vec<Diagnostic> {
+fn python_diagnostics(files: &[&TaintedFile], templates: &Templates) -> Vec<Diagnostic> {
     let modules: Vec<PythonModule<'_>> = files
         .iter()
         .map(|file| PythonModule {
@@ -108,7 +113,7 @@ fn python_diagnostics(files: &[&TaintedFile]) -> Vec<Diagnostic> {
             taints: &file.taints,
         })
         .collect();
-    kept_diagnostics(python_tainted(&modules), files)
+    kept_diagnostics(python_tainted(&modules, templates), files)
 }
 
 // Lo que el archivo aporta a las reglas que miran el proyecto entero.
@@ -136,7 +141,7 @@ pub fn summaries(
     (indexed, tainted)
 }
 
-fn ecmascript_diagnostics(files: &[&TaintedFile]) -> Vec<Diagnostic> {
+fn ecmascript_diagnostics(files: &[&TaintedFile], templates: &Templates) -> Vec<Diagnostic> {
     let modules: Vec<ScriptModule<'_>> = files
         .iter()
         .map(|file| ScriptModule {
@@ -144,7 +149,7 @@ fn ecmascript_diagnostics(files: &[&TaintedFile]) -> Vec<Diagnostic> {
             taints: &file.taints,
         })
         .collect();
-    kept_diagnostics(ecmascript_tainted(&modules), files)
+    kept_diagnostics(ecmascript_tainted(&modules, templates), files)
 }
 
 fn kept_diagnostics(found: Vec<Vec<LintFinding>>, files: &[&TaintedFile]) -> Vec<Diagnostic> {

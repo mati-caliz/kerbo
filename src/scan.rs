@@ -129,7 +129,10 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
         outcome
             .diagnostics
             .extend(project::diagnostics(&indexed, &project_root(request.config)));
-        outcome.diagnostics.extend(project::tainted_diagnostics(&tainted));
+        outcome.diagnostics.extend(project::tainted_diagnostics(
+            &tainted,
+            &project_root(request.config),
+        ));
     }
     outcome.diagnostics.sort_by(|left, right| {
         (&left.path, left.line, left.column, left.rule).cmp(&(

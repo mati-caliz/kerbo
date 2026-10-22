@@ -786,8 +786,6 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     scripts y herramientas.
   - El código de nivel de módulo (fuera de funciones) no se recorre.
   - La herencia entre clases y los métodos de clases que llegan como parámetro no se resuelven.
-  - Plantillas en archivos (`|safe` en Jinja): pide leer el template y cruzarlo con lo que se le
-    pasa a `render_template`.
 - Contaminación en JavaScript y TypeScript (hecho, 2026-10-22): un intérprete
   (`src/lint/ecmascript/taint/`) con constantes, `switch`, plantillas de texto, objetos y arreglos
   por clave y posición (`push`/`pop`/`shift`), y la resolución entre archivos por `import` y
@@ -808,7 +806,20 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - El código de nivel de módulo no se recorre.
   - Sin tipos, las conexiones y los objetos del pedido se reconocen por el nombre de la variable;
     con el chequeo de tipos de TypeScript se podría mirar el tipo.
-  - Plantillas en archivos (EJS con `<%-`, Handlebars con `{{{`): como en Python.
+- Plantillas en archivos, Python y JavaScript (hecho, 2026-10-22; estaba a medias en un stash y se
+  terminó): `render_template` de Flask, `render` y `render_to_response` de Django y `res.render` de
+  Express dejan un sumidero por cada variable que le pasan a la plantilla, con su nombre. Si alguien
+  renderiza una, el índice lee las plantillas del proyecto (`.html`, `.jinja`, `.j2`, `.ejs`, `.hbs`,
+  `.mustache`, `.pug`, sin `node_modules`; si nadie renderiza, no camina el disco) y sólo avisa si esa
+  variable sale sin escapar: `{{ x|safe }}` y `{% autoescape false %}` en Jinja, `<%- x %>` en EJS,
+  `{{{ x }}}` en Handlebars y Mustache, `!{x}` en Pug. La plantilla se busca por ruta, por sufijo o
+  por nombre sin extensión (`res.render('pagina')`).
+  - Medido: los benchmarks de Java y Python siguen en 100 % sin falsos positivos, los tests de Semgrep
+    de JS y Python dan lo mismo y en tus proyectos no hay avisos. Ninguno de esos corpus tiene
+    plantillas que el arnés cuente (las de Semgrep son `.html` sueltos), así que lo nuevo sólo está
+    probado con los tests unitarios: falta un caso real.
+  - Faltan Thymeleaf (`th:utext`) y JSP (`<%= %>`) en Java, y `html/template` vs `text/template` de
+    archivo en Go.
 - Clausuras en JavaScript y TypeScript (hecho, 2026-10-22): una función escrita dentro de otra (el
   callback de `.then`, `.map`, `.forEach` o de una ruta registrada dentro de una función) corre en
   el lugar con las variables de afuera. Los parámetros de los callbacks de `.then`, `.map`,

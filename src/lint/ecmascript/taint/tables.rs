@@ -237,6 +237,13 @@ pub fn response_sink(receiver: &str, method: &str) -> Option<SinkKind> {
     }
 }
 
+// `res.render('pagina', { nombre })`: la plantilla decide qué escapa.
+const RENDER_METHOD: &str = "render";
+
+pub fn renders_template(receiver: &str, method: &str) -> bool {
+    HTML_RESPONSE_OBJECTS.contains(&receiver) && method == RENDER_METHOD
+}
+
 pub fn is_html_property(name: &str) -> bool {
     HTML_PROPERTIES.contains(&name)
 }

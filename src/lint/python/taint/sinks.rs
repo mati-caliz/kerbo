@@ -4,6 +4,7 @@ use super::calls::{Arguments, Site, qualified};
 use super::expressions::{response_body, sink_at};
 use super::statements::Interpreter;
 use super::tables;
+use crate::lint::taint::responses::template_sinks;
 use crate::lint::taint::{Flow, Literal, SinkKind, Value};
 use crate::syntax::named_children;
 
@@ -85,6 +86,42 @@ pub(super) fn response(
     Some(body)
 }
 
+// Lo que renderiza una plantilla de archivo, y en qué posición recibe su nombre.
+const TEMPLATE_RENDERERS: &[(&str, usize)] = &[
+    ("flask.render_template", 0),
+    ("django.shortcuts.render", 1),
+    ("django.shortcuts.render_to_response", 0),
+];
+
+fn template_position(qualified: &str) -> Option<usize> {
+    TEMPLATE_RENDERERS
+        .iter()
+        .find(|(renderer, _)| *renderer == qualified)
+        .map(|(_, position)| *position)
+}
+
+// `render_template('pagina.html', nombre=x)` de Flask o `render(request, 'pagina.html', {...})` de
+// Django: cada variable va a la plantilla, que decide si la escapa.
+fn record_template(interpreter: &mut Interpreter<'_, '_>, site: &Site<'_, '_>, arguments: &Arguments<'_>) {
+    let Some(position) = site.qualified.as_deref().and_then(template_position) else {
+        return;
+    };
+    let Some(Literal::Text(template)) = arguments.positional.get(position).and_then(Value::literal) else {
+        return;
+    };
+    let mut variables: Vec<(String, Value)> = arguments
+        .keywords
+        .iter()
+        .map(|(name, value)| ((*name).to_owned(), value.clone()))
+        .collect();
+    if let Some(Value::Map(context)) = arguments.positional.get(position.saturating_add(1)) {
+        variables.extend(context.iter().cloned());
+    }
+    interpreter
+        .sinks
+        .extend(template_sinks(site.function, template, &variables));
+}
+
 // Sin shell, lo peligroso es el programa: el primero de la lista. Un texto suelto es el nombre del
 // programa entero (`"grep -R {}".format(x)` no corre nada), así que no cuenta.
 fn program_of(command: Option<&Value>) -> Flow {
@@ -100,6 +137,7 @@ pub(super) fn record_sinks(
     site: &Site<'_, '_>,
     arguments: &Arguments<'_>,
 ) -> Vec<Flow> {
+    record_template(interpreter, site, arguments);
     let mut carried = arguments.flows();
     let at = site
         .function

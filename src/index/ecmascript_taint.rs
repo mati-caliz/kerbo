@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
 use super::taint_engine::{Callees, Engine, MethodId, mentions_source};
+use super::templates::Templates;
 use crate::lint::LintFinding;
 use crate::lint::java_receivers::Receiver;
-use crate::lint::taint::{SinkReceiver, TaintCall, TaintMethod};
+use crate::lint::taint::responses::known_or_template;
+use crate::lint::taint::{TaintCall, TaintMethod};
 
 const LOCAL_PREFIX: char = '@';
 const MEMBER_SEPARATOR: char = '#';
@@ -80,7 +82,7 @@ fn callees(call: &TaintCall, caller_module: &str, declared: &HashMap<String, Met
 }
 
 // Las consultas, comandos, rutas y respuestas a los que llega algo que mandó el usuario, por archivo.
-pub fn ecmascript_tainted(files: &[ScriptModule<'_>]) -> Vec<Vec<LintFinding>> {
+pub fn ecmascript_tainted(files: &[ScriptModule<'_>], templates: &Templates) -> Vec<Vec<LintFinding>> {
     if !mentions_source(files.iter().flat_map(|file| file.taints.iter())) {
         return files.iter().map(|_| Vec::new()).collect();
     }
@@ -115,8 +117,7 @@ pub fn ecmascript_tainted(files: &[ScriptModule<'_>]) -> Vec<Vec<LintFinding>> {
             (*id, per_call)
         })
         .collect();
-    Engine::new(methods, candidates).findings(files.len(), |sink| match sink.receiver {
-        SinkReceiver::Known(kind) => Some(kind),
-        SinkReceiver::Type(_) | SinkReceiver::StaticField { .. } | SinkReceiver::Constructor(_) => None,
+    Engine::new(methods, candidates).findings(files.len(), |sink| {
+        known_or_template(sink, |template| templates.is_raw(template))
     })
 }

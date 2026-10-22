@@ -5,6 +5,7 @@ use super::statements::Interpreter;
 use super::tables;
 use crate::lint::java_receivers::Receiver;
 use crate::lint::taint::folding::fold_text_method;
+use crate::lint::taint::responses::template_sinks;
 use crate::lint::taint::{
     Atom, Flow, Literal, SinkKind, SinkReceiver, State, TaintCall, TaintSink, Value, element,
 };
@@ -248,6 +249,12 @@ fn record_sinks(
         receiver,
     } = *site;
     let at = function.child_by_field_name(PROPERTY_FIELD).unwrap_or(function);
+    if tables::renders_template(receiver, method)
+        && let (Some(Literal::Text(template)), Some(Value::Map(variables))) =
+            (arguments.first().and_then(Value::literal), arguments.get(1))
+    {
+        interpreter.sinks.extend(template_sinks(at, template, variables));
+    }
     let function_kind = qualified.and_then(tables::function_sink);
     let shell = qualified.is_some_and(tables::always_shell) || with_shell(arguments);
     if function_kind == Some(SinkKind::Command) && !shell {

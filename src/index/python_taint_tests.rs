@@ -1,6 +1,7 @@
 use tree_sitter::Parser;
 
 use super::python_taint::{PythonModule, module_name, python_tainted};
+use super::templates::Templates;
 use crate::language::Language;
 use crate::lint::python::taint::python_taints;
 use crate::lint::taint::TaintMethod;
@@ -68,7 +69,7 @@ fn user_data_reaching_python_sinks_is_reported_across_modules() {
             taints: &wrapper,
         },
     ];
-    let found: Vec<String> = python_tainted(&modules)
+    let found: Vec<String> = python_tainted(&modules, &Templates::default())
         .into_iter()
         .flatten()
         .map(|finding| {
@@ -107,12 +108,68 @@ fn a_lambda_response_declared_html_is_a_sink() {
         path: "handler.py",
         taints: &handler,
     }];
-    let found: Vec<String> = python_tainted(&modules)
+    let found: Vec<String> = python_tainted(&modules, &Templates::default())
         .into_iter()
         .flatten()
         .map(|finding| format!("{} {}", finding.line, finding.kind.rule().as_str()))
         .collect();
     assert_eq!(found, ["8 xss"]);
+}
+
+const RENDERED: &str = r#"from flask import request, render_template
+
+def init(app):
+    @app.route('/hello')
+    def hello():
+        name = request.args.get("name")
+        render_template("hello.html", name=name)
+        return render_template("escaped.html", name=name)
+"#;
+
+#[test]
+fn a_variable_a_template_writes_raw_is_a_sink() {
+    let views = taints_of(RENDERED);
+    let modules = [PythonModule {
+        path: "app/views.py",
+        taints: &views,
+    }];
+    let templates = Templates::of(vec![
+        (
+            "app/templates/hello.html".to_owned(),
+            "<p>{{ name|safe }}</p>".to_owned(),
+        ),
+        (
+            "app/templates/escaped.html".to_owned(),
+            "<p>{{ name }}</p>".to_owned(),
+        ),
+    ]);
+    let found: Vec<String> = python_tainted(&modules, &templates)
+        .into_iter()
+        .flatten()
+        .map(|finding| {
+            format!(
+                "{} {} {}",
+                finding.line,
+                finding.kind.rule().as_str(),
+                finding.subject
+            )
+        })
+        .collect();
+    assert_eq!(found, ["7 xss hello.html"]);
+}
+
+#[test]
+fn raw_outputs_are_recognized_in_each_template_language() {
+    let names = |text: &str| {
+        let mut found: Vec<String> = super::templates::raw_variables(text).into_iter().collect();
+        found.sort();
+        found
+    };
+    assert_eq!(
+        names("{{ a|safe }} {{ b }} <%- c %> <%= d %> {{{ e }}} !{f} #{g}"),
+        ["a", "c", "e", "f"]
+    );
+    assert_eq!(names("{% autoescape false %}{{ a }}{% endautoescape %}"), ["a"]);
 }
 
 #[test]
@@ -190,7 +247,7 @@ fn constants_branches_and_collections_decide_what_reaches_a_sink() {
         path: "views.py",
         taints: &views,
     }];
-    let found: Vec<String> = python_tainted(&modules)
+    let found: Vec<String> = python_tainted(&modules, &Templates::default())
         .into_iter()
         .flatten()
         .map(|finding| format!("{} {}", finding.line, finding.kind.rule().as_str()))

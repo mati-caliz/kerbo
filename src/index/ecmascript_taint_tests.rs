@@ -1,6 +1,7 @@
 use tree_sitter::Parser;
 
 use super::ecmascript_taint::{ScriptModule, ecmascript_tainted, module_name};
+use super::templates::Templates;
 use crate::language::Language;
 use crate::lint::ecmascript::taint::ecmascript_taints;
 use crate::lint::taint::TaintMethod;
@@ -145,7 +146,11 @@ fn taints_in(language: Language, source: &str) -> Vec<TaintMethod> {
 }
 
 fn found(modules: &[ScriptModule<'_>]) -> Vec<String> {
-    ecmascript_tainted(modules)
+    found_with(modules, &Templates::default())
+}
+
+fn found_with(modules: &[ScriptModule<'_>], templates: &Templates) -> Vec<String> {
+    ecmascript_tainted(modules, templates)
         .into_iter()
         .flatten()
         .map(|finding| {
@@ -216,6 +221,25 @@ fn nest_decorated_parameters_come_from_the_user() {
         taints: &controller,
     }];
     assert_eq!(found(&modules), ["7 sql-injection query"]);
+}
+
+const VIEWS: &str = r"app.get('/hello', (req, res) => {
+  res.render('hello', { name: req.query.name, title: 'fijo' });
+});
+";
+
+#[test]
+fn express_templates_decide_what_is_raw() {
+    let views = taints_of(VIEWS);
+    let modules = [ScriptModule {
+        path: "src/views.js",
+        taints: &views,
+    }];
+    let templates = Templates::of(vec![(
+        "views/hello.ejs".to_owned(),
+        "<h1><%- title %></h1><p><%- name %></p>".to_owned(),
+    )]);
+    assert_eq!(found_with(&modules, &templates), ["2 xss hello"]);
 }
 
 #[test]

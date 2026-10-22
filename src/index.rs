@@ -12,6 +12,7 @@ mod java_unused;
 pub mod python_taint;
 mod taint_engine;
 mod taint_reach;
+pub mod templates;
 
 pub use java_project::IndexedSummary;
 pub use java_rules::project_lints;
