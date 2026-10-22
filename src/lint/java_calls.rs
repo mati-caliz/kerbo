@@ -5,8 +5,11 @@ use tree_sitter::Node;
 use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, PRIVATE, children, modifiers, text};
 use super::java_chains::{Chain, NullFacts, chain_of};
 use super::java_constants::{Constants, constant_value, constants_in};
+use super::java_null_flow::{NullFlow, null_flows};
 use super::java_owner::{Owner, annotation_names, mentioned_name, owner_of};
-use super::java_receivers::{Receiver, StaticImports, simple_type_name, supertypes, variable_types};
+use super::java_receivers::{
+    Receiver, StaticImports, Variables, simple_type_name, supertypes, variable_types,
+};
 pub use super::java_returns::{ReturnType, Returns};
 use super::java_returns::{return_type, returned};
 use super::java_switch::{rule_bodies, yields_value};
@@ -101,6 +104,7 @@ pub struct Extracted<'tree> {
     pub mentioned: Vec<String>,
     pub hierarchy: Vec<(String, Vec<String>)>,
     pub chains: Vec<Chain>,
+    pub null_flows: Vec<NullFlow>,
 }
 
 // Lo que declara y lo que llama una clase de nivel superior, con sus clases anidadas.
@@ -117,11 +121,20 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
         mentioned: Vec::new(),
         hierarchy: Vec::new(),
         chains: Vec::new(),
+        null_flows: Vec::new(),
     };
     let mut facts = NullFacts::default();
-    let variables = variable_types(&nodes, source);
+    let file_variables = variable_types(&nodes, source);
+    let mut scopes: Vec<(usize, Variables)> = Vec::new();
     let imported = StaticImports::of(top_level, source);
     for &node in &nodes {
+        while scopes.last().is_some_and(|(end, _)| *end <= node.start_byte()) {
+            scopes.pop();
+        }
+        if node.kind() == METHOD || node.kind() == CONSTRUCTOR {
+            scopes.push((node.end_byte(), method_variables(node, source, &file_variables)));
+        }
+        let variables = scopes.last().map_or(&file_variables, |(_, scoped)| scoped);
         facts.observe(node, source);
         if TYPE_DECLARATIONS.contains(&node.kind())
             && let Some(name) = node.child_by_field_name(NAME_FIELD)
@@ -132,7 +145,13 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
                 .push((text(name, source).to_owned(), supertypes(node, source)));
         }
         match node.kind() {
-            METHOD | CONSTRUCTOR => extracted.callables.extend(callable(node, source)),
+            METHOD | CONSTRUCTOR => {
+                facts.enter_method();
+                extracted.callables.extend(callable(node, source));
+                if let Some(body) = node.child_by_field_name(BODY_FIELD) {
+                    extracted.null_flows.extend(null_flows(body, source, variables));
+                }
+            }
             ENUM => extracted
                 .callables
                 .extend(implicit_enum_constructor(node, source)),
@@ -145,9 +164,9 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
                 if node.kind() == INVOCATION {
                     extracted
                         .chains
-                        .extend(chain_of(node, source, &variables, &mut facts));
+                        .extend(chain_of(node, source, variables, &mut facts));
                 }
-                let receiver = || imported.receiver(node, source, &variables);
+                let receiver = || imported.receiver(node, source, variables);
                 extracted.calls.extend(
                     call(node, source, &constants, !discarded.contains(&node.id())).map(|found| Call {
                         receiver: if node.kind() == INVOCATION {
@@ -169,6 +188,14 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
         }
     }
     extracted
+}
+
+// Los tipos de las variables vistos desde un método: lo que declara él manda sobre lo del resto
+// del archivo (el mismo nombre puede ser de otro tipo en otro método).
+fn method_variables(method: Node<'_>, source: &[u8], file_variables: &Variables) -> Variables {
+    let mut scoped = file_variables.clone();
+    scoped.extend(variable_types(&descendants(method), source));
+    scoped
 }
 
 fn callable<'tree>(declaration: Node<'tree>, source: &[u8]) -> Option<Callable<'tree>> {

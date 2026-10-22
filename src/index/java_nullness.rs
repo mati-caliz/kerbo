@@ -157,6 +157,25 @@ fn overridden(
     None
 }
 
+// Las clases de librería de las que hereda un tipo del proyecto, de la más cercana a la más lejana.
+pub fn library_ancestors(types: &ProjectTypes<'_>, library: &Library, name: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    let mut pending = vec![name.to_owned()];
+    let mut seen = HashSet::new();
+    while let Some(current) = pending.pop() {
+        if !seen.insert(current.clone()) {
+            continue;
+        }
+        for parent in parents_of(types, library, &current) {
+            match parent {
+                Resolved::Library(class) => found.push(class),
+                Resolved::Project(project) => pending.push(project),
+            }
+        }
+    }
+    found
+}
+
 fn parents_of(types: &ProjectTypes<'_>, library: &Library, name: &str) -> Vec<Resolved> {
     types
         .declared

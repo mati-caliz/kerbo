@@ -3,6 +3,7 @@ use crate::index::java::{CallSite, Declaration, JavaSummary, Parameter, Position
 use crate::lint::java_calls::{Arity, Body, ReturnType, Returns, Visibility};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::lint::java_constants::Constant;
+use crate::lint::java_null_flow::{Dereference, NullFlow};
 use crate::lint::java_owner::{Owner, OwnerKind};
 use crate::lint::java_receivers::Receiver;
 
@@ -58,25 +59,8 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     });
     writer.list(&summary.imports, |writer, path| writer.text(path));
     writer.list(&summary.package_annotations, |writer, name| writer.text(name));
-    writer.list(&summary.chains, |writer, chain| {
-        match &chain.root {
-            ChainRoot::Instance(name) => {
-                writer.number(ROOT_INSTANCE);
-                writer.text(name);
-            }
-            ChainRoot::Class(name) => {
-                writer.number(ROOT_CLASS);
-                writer.text(name);
-            }
-        }
-        writer.list(&chain.steps, |writer, step| {
-            writer.text(&step.name);
-            writer.size(step.arity);
-            writer.size(step.line);
-            writer.size(step.column);
-            write_flag(writer, step.checked);
-        });
-    });
+    writer.list(&summary.chains, write_chain);
+    writer.list(&summary.null_flows, write_flow);
     writer.list(&summary.constants, |writer, constant| {
         writer.text(&constant.owner);
         writer.text(&constant.name);
@@ -106,24 +90,8 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         hierarchy: reader.list(|reader| Ok((reader.text()?, reader.list(Reader::text)?)))?,
         imports: reader.list(Reader::text)?,
         package_annotations: reader.list(Reader::text)?,
-        chains: reader.list(|reader| {
-            Ok(Chain {
-                root: match reader.number()? {
-                    ROOT_INSTANCE => ChainRoot::Instance(reader.text()?),
-                    ROOT_CLASS => ChainRoot::Class(reader.text()?),
-                    _ => return Err(Corrupt),
-                },
-                steps: reader.list(|reader| {
-                    Ok(ChainStep {
-                        name: reader.text()?,
-                        arity: reader.size()?,
-                        line: reader.size()?,
-                        column: reader.size()?,
-                        checked: read_flag(reader)?,
-                    })
-                })?,
-            })
-        })?,
+        chains: reader.list(read_chain)?,
+        null_flows: reader.list(read_flow)?,
         constants: reader.list(|reader| {
             Ok(Constant {
                 owner: reader.text()?,
@@ -312,4 +280,65 @@ fn read_optional_text(reader: &mut Reader<'_>) -> Result<Option<String>, Corrupt
         PRESENT => reader.text().map(Some),
         _ => Err(Corrupt),
     }
+}
+
+fn write_chain(writer: &mut Writer, chain: &Chain) {
+    match &chain.root {
+        ChainRoot::Instance(name) => {
+            writer.number(ROOT_INSTANCE);
+            writer.text(name);
+        }
+        ChainRoot::Class(name) => {
+            writer.number(ROOT_CLASS);
+            writer.text(name);
+        }
+    }
+    writer.list(&chain.steps, |writer, step| {
+        writer.text(&step.name);
+        writer.size(step.arity);
+        writer.size(step.line);
+        writer.size(step.column);
+        write_flag(writer, step.checked);
+    });
+}
+
+fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
+    Ok(Chain {
+        root: match reader.number()? {
+            ROOT_INSTANCE => ChainRoot::Instance(reader.text()?),
+            ROOT_CLASS => ChainRoot::Class(reader.text()?),
+            _ => return Err(Corrupt),
+        },
+        steps: reader.list(|reader| {
+            Ok(ChainStep {
+                name: reader.text()?,
+                arity: reader.size()?,
+                line: reader.size()?,
+                column: reader.size()?,
+                checked: read_flag(reader)?,
+            })
+        })?,
+    })
+}
+
+fn write_flow(writer: &mut Writer, flow: &NullFlow) {
+    write_chain(writer, &flow.origin);
+    writer.list(&flow.dereferences, |writer, used| {
+        writer.text(&used.name);
+        writer.size(used.line);
+        writer.size(used.column);
+    });
+}
+
+fn read_flow(reader: &mut Reader<'_>) -> Result<NullFlow, Corrupt> {
+    Ok(NullFlow {
+        origin: read_chain(reader)?,
+        dereferences: reader.list(|reader| {
+            Ok(Dereference {
+                name: reader.text()?,
+                line: reader.size()?,
+                column: reader.size()?,
+            })
+        })?,
+    })
 }

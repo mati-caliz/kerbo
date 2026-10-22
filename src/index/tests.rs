@@ -69,3 +69,24 @@ fn a_call_on_a_nullable_library_result_is_reported_unless_checked_before() {
         .collect();
     assert_eq!(found, ["7:41 toString()"]);
 }
+
+const FLOW: &str = "package app;\n\nimport sample.web.Filter;\n\nclass Flow {\n    void unchecked(Filter filter) {\n        Object found = filter.find(\"a\");\n        found.hashCode();\n    }\n\n    void guarded(Filter filter) {\n        Object found = filter.find(\"b\");\n        if (found == null) {\n            return;\n        }\n        found.hashCode();\n        Object other = filter.find(\"c\");\n        if (other != null && other.hashCode() > 0) {\n            other.toString();\n        }\n    }\n\n    int cast(Filter filter) {\n        String text = (String) filter.find(\"d\");\n        try {\n            return text.length();\n        } finally {\n            text.trim();\n        }\n    }\n}\n";
+
+#[test]
+fn a_variable_from_a_nullable_call_is_reported_where_no_path_checks_it() {
+    let jar = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/jvm/fixtures/sample.jar");
+    let library = Library::load(&[jar]);
+    let summary = summary_of(FLOW);
+    let files = [IndexedSummary {
+        summary: &summary,
+        in_tests: false,
+    }];
+    let mut found: Vec<String> = project_lints(&files, &library)
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "data-flow-issue")
+        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
+        .collect();
+    found.sort();
+    assert_eq!(found, ["26:25 length()", "28:18 trim()", "8:15 hashCode()"]);
+}

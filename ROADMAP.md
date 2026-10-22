@@ -849,10 +849,23 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     IntelliJ trae aparte).
   - `optional-get-without-is-present` (por archivo, sin librerías): `get()` encadenado a lo que
     crea el `Optional`. Las 3 de Qodana, exactas.
-- Lo que sigue en nulos: un grafo de control por método para seguir variables (asignada de algo
-  `@Nullable`, chequeada o no antes de usarla), argumentos que pueden ser null hacia parámetros no
-  nulos, y las anotaciones del JDK (`ct.sym` no las trae: hay que sumar una tabla propia de los
-  métodos que devuelven null, como `Map.get`).
+- Nulos, segunda parte: variables (hecho, 2026-10-21). `src/lint/java_null_flow.rs` recorre cada
+  método como un intérprete abstracto sobre el árbol (sin grafo explícito: Java es estructurado):
+  el estado son las variables que podrían ser null y la asignación que lo causó; `if`, `&&`,
+  `||`, `!`, ternarios, `instanceof`, `== null` con salida, `hasText`/`isNull`, `requireNonNull`
+  y `assertThat(x).isNotNull()` parten el estado por camino; los caminos que salen (`return`,
+  `throw`, `break`) no se juntan; el `finally` arranca también desde la entrada del `try`. Como la
+  nulabilidad de la llamada sólo se sabe con los jars, cada archivo guarda por variable la cadena
+  que le dio valor y los usos sin chequeo, y el índice los reporta si esa cadena termina en algo
+  `@Nullable` (también cuando la raíz es una clase del proyecto que hereda el método de una
+  librería, y a través de un cast). Los tipos de las variables se miran por método: el mismo
+  nombre puede ser de otro tipo en otro método. Los chequeos por texto valen dentro del método.
+  - Contra Qodana: 17 coincidencias, ningún aviso de más.
+- Lo que sigue en nulos: el tipo de retorno de los métodos del proyecto (para seguir cadenas que
+  pasan por ellos), argumentos que pueden ser null hacia parámetros no nulos (también los que
+  IntelliJ infiere no nulos porque el método los desreferencia), unboxing, y las anotaciones del
+  JDK (`ct.sym` no las trae: hay que sumar una tabla propia de los métodos que devuelven null,
+  como `Map.get` o `getResourceAsStream`).
 - Lo que sigue en el índice: "todas las implementaciones devuelven lo mismo" con la jerarquía, y
   campos, constructores y clases sin usar con las tablas de JPA, Jackson y la inyección.
 

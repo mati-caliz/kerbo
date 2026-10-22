@@ -57,6 +57,11 @@ pub struct NullFacts {
 }
 
 impl NullFacts {
+    // Un chequeo vale dentro del método donde está: al entrar en otro se olvida.
+    pub fn enter_method(&mut self) {
+        self.checked.clear();
+    }
+
     // Se llama en orden de recorrido: un chequeo cuenta para lo que viene después.
     pub fn observe(&mut self, node: Node<'_>, source: &[u8]) {
         if let Some(checked) = checked_expression(node, source) {
@@ -129,6 +134,12 @@ pub fn chain_of(
     }
     let (root, steps) = walk(invocation, source, variables, facts)?;
     (steps.len() > 1).then_some(Chain { root, steps })
+}
+
+// La cadena que da valor a una variable, de un paso o más (`manager.getCache(nombre)`).
+pub fn origin_chain(invocation: Node<'_>, source: &[u8], variables: &Variables) -> Option<Chain> {
+    let (root, steps) = walk(invocation, source, variables, &mut NullFacts::default())?;
+    Some(Chain { root, steps })
 }
 
 fn walk(

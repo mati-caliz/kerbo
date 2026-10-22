@@ -12,6 +12,8 @@ mod java_design;
 mod java_flow;
 mod java_hidden;
 pub mod java_inference;
+mod java_null_conditions;
+pub mod java_null_flow;
 mod java_optional;
 mod java_order;
 pub mod java_owner;

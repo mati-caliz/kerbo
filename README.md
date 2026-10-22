@@ -351,8 +351,10 @@ De las inspecciones de IntelliJ, kerbo hace:
   un método que su librería declara `@Nullable`, en la misma expresión
   (`respuesta.getBody().error()`, `SecurityContextHolder.getContext().getAuthentication().getName()`).
   El tipo de cada paso sale de la firma del anterior en los jars. No marca si ese mismo resultado
-  se chequeó antes en el archivo (`!= null`, `assertThat(...).isNotNull()`, `assertNotNull`,
-  `requireNonNull`).
+  se chequeó antes en el método (`!= null`, `assertThat(...).isNotNull()`, `assertNotNull`,
+  `requireNonNull`). También sigue variables: una asignada desde una llamada `@Nullable` y usada
+  en un camino sin chequeo (`if (x == null) return;`, `x != null && ...`, `instanceof`, `hasText`,
+  los bucles, `try` y `finally` se entienden como IntelliJ).
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` encadenado a
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` u `Optional.ofNullable(...)`.
 
