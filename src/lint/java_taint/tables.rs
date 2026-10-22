@@ -105,6 +105,46 @@ const ABSORBING_METHODS: &[&str] = &[
     "addLast",
     "addElement",
 ];
+// Los métodos cuya lambda recibe lo que trae el receptor: cada elemento de un stream o una
+// colección, el valor de un `Optional` o lo que resuelve un `CompletableFuture`.
+const RECEIVER_CALLBACKS: &[&str] = &[
+    "map",
+    "flatMap",
+    "forEach",
+    "forEachOrdered",
+    "filter",
+    "peek",
+    "anyMatch",
+    "allMatch",
+    "noneMatch",
+    "reduce",
+    "ifPresent",
+    "ifPresentOrElse",
+    "thenApply",
+    "thenAccept",
+    "thenCompose",
+    "replaceAll",
+    "removeIf",
+    "computeIfPresent",
+    "mapToObj",
+    "takeWhile",
+    "dropWhile",
+];
+// Los métodos cuyo resultado es lo que devuelve su lambda.
+const RESULT_CALLBACKS: &[&str] = &[
+    "map",
+    "flatMap",
+    "mapToObj",
+    "reduce",
+    "thenApply",
+    "thenCompose",
+    "orElseGet",
+    "computeIfAbsent",
+    "computeIfPresent",
+    "compute",
+    "merge",
+    "or",
+];
 const SQL_STATEMENTS: &[&str] = &["Statement", "PreparedStatement", "CallableStatement"];
 const SQL_STATEMENT_METHODS: &[&str] = &[
     "execute",
@@ -228,6 +268,14 @@ pub fn gives_clean_result(receiver: Option<&str>, method: &str) -> bool {
     CLEAN_RESULTS.contains(&method)
         || receiver
             .is_some_and(|written| NUMERIC_TYPES.contains(&written) && NUMERIC_CONVERSIONS.contains(&method))
+}
+
+pub fn passes_receiver_to_callback(method: &str) -> bool {
+    RECEIVER_CALLBACKS.contains(&method)
+}
+
+pub fn keeps_callback_result(method: &str) -> bool {
+    RESULT_CALLBACKS.contains(&method)
 }
 
 pub fn absorbs_arguments(method: &str) -> bool {

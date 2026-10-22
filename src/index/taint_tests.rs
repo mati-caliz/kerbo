@@ -221,3 +221,52 @@ fn an_html_escape_protects_the_response_but_not_a_path() {
         ]
     );
 }
+
+const REPORTS: &str = r#"package app;
+
+@RestController
+class Reports {
+    private final JdbcTemplate jdbcTemplate;
+
+    void byNames(@RequestParam List<String> names) {
+        names.forEach(name -> jdbcTemplate.queryForList("SELECT * FROM r WHERE n = '" + name + "'"));
+    }
+
+    void captured(@RequestParam String owner, List<String> tables) {
+        tables.forEach(table -> {
+            jdbcTemplate.execute("DELETE FROM " + table + " WHERE owner = '" + owner + "'");
+        });
+    }
+
+    void joined(@RequestParam List<String> ids) {
+        String where = ids.stream().map(id -> "id = " + id).collect(Collectors.joining(" OR "));
+        jdbcTemplate.execute("DELETE FROM r WHERE " + where);
+    }
+
+    void later(@RequestParam String owner) {
+        Runnable task = new Runnable() {
+            public void run() {
+                jdbcTemplate.execute("DELETE FROM r WHERE owner = '" + owner + "'");
+            }
+        };
+        task.run();
+    }
+
+    void constant(List<String> tables) {
+        tables.forEach(table -> jdbcTemplate.execute("DELETE FROM " + table));
+    }
+}
+"#;
+
+#[test]
+fn lambdas_and_anonymous_classes_see_what_they_capture() {
+    assert_eq!(
+        tainted(&[("Reports", REPORTS)]),
+        [
+            "Reports:8 sql-injection queryForList",
+            "Reports:13 sql-injection execute",
+            "Reports:19 sql-injection execute",
+            "Reports:25 sql-injection execute",
+        ]
+    );
+}

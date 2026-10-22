@@ -140,7 +140,12 @@ pub(super) fn call(interpreter: &mut Interpreter<'_, '_>, node: Node<'_>, state:
         .collect();
     let carried: Vec<Flow> = arguments.iter().map(Value::flow).collect();
     let Some(target) = call_target(interpreter, node) else {
-        return Value::Data(carried.iter().fold(Flow::default(), Flow::union));
+        let called = node
+            .child_by_field_name(FUNCTION_FIELD)
+            .map(|function| interpreter.expression(function, state))
+            .map(|value| value.flow())
+            .unwrap_or_default();
+        return Value::Data(carried.iter().fold(called, Flow::union));
     };
     let receiver = target
         .receiver

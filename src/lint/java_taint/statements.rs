@@ -57,7 +57,7 @@ pub struct Interpreter<'source, 'context> {
     pub(super) calls: Vec<TaintCall>,
     pub(super) sinks: Vec<TaintSink>,
     pub(super) factory_variables: HashMap<String, String>,
-    exits: Vec<Option<State>>,
+    pub(super) exits: Vec<Option<State>>,
 }
 
 impl<'source, 'context> Interpreter<'source, 'context> {
@@ -86,7 +86,7 @@ impl<'source, 'context> Interpreter<'source, 'context> {
         self.statement(body, state);
     }
 
-    fn statement(&mut self, node: Node<'_>, mut state: State) -> Option<State> {
+    pub(super) fn statement(&mut self, node: Node<'_>, mut state: State) -> Option<State> {
         let field = |name: &str| node.child_by_field_name(name);
         match node.kind() {
             BLOCK => self.sequence(&named_children(node), state),

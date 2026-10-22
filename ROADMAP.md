@@ -751,7 +751,14 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     plantillas (Thymeleaf con `th:utext`, JSP con `<%= %>`) ni `@ResponseBody` que devuelve HTML.
   - FindSecBugs como segunda referencia: pide compilar el Benchmark con Maven.
   - Los campos no se siguen: un dato del usuario guardado en `this.x` y leído en otro método se
-    pierde. Tampoco lambdas ni clases anónimas.
+    pierde.
+  - Lambdas y clases anónimas (hecho, 2026-10-22): corren en el lugar con lo que capturan. Los
+    parámetros de la lambda de `forEach`, `map`, `filter`, `ifPresent`, `thenApply` y parecidos valen
+    lo que trae el receptor, y lo que devuelve sólo sale como resultado en los métodos que lo usan
+    así (`map`, `reduce`, `orElseGet`, `computeIfAbsent`...). Con `orElseThrow` no: la primera
+    versión daba 2 falsos en gastronova porque el mensaje de la excepción, armado con el id del
+    pedido, contaminaba la entidad que devolvía el repositorio. En el Benchmark sigue en 100 % sin
+    falsos positivos; en los tres servicios, Guava, commons-lang y junit4, ningún aviso.
   - Los sumideros con receptor desconocido (una cadena `a.b().query(...)`) no se miran.
   - Sumideros de MyBatis (`${}` en los mapeos XML y en `@Select`).
 - Contaminación en Python (hecho, 2026-10-22): las cuatro reglas pasan a una familia propia
@@ -798,11 +805,18 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     versión daba 13, todos falsos: `reply.send` de Fastify (texto plano o JSON), respuestas que
     declaran JSON con `writeHead` y un `escapeHtml` propio.
 - Pendientes de contaminación en JavaScript y TypeScript:
-  - Las clausuras no se siguen: un dato del usuario que entra a un callback (`.then`, `.map`) se
-    pierde, y el código de nivel de módulo no se recorre.
+  - El código de nivel de módulo no se recorre.
   - Sin tipos, las conexiones y los objetos del pedido se reconocen por el nombre de la variable;
     con el chequeo de tipos de TypeScript se podría mirar el tipo.
   - Plantillas en archivos (EJS con `<%-`, Handlebars con `{{{`): como en Python.
+- Clausuras en JavaScript y TypeScript (hecho, 2026-10-22): una función escrita dentro de otra (el
+  callback de `.then`, `.map`, `.forEach` o de una ruta registrada dentro de una función) corre en
+  el lugar con las variables de afuera. Los parámetros de los callbacks de `.then`, `.map`,
+  `.filter`, `.reduce` y parecidos valen lo que trae el receptor; los de cualquier otro, nada
+  conocido. Lo que el callback les asigna a las variables de afuera se junta con lo que tenían (puede
+  no haber corrido), lo que devuelve es el valor del argumento, y un `res.type('json')` adentro sólo
+  vale para ese callback. En los tests de Semgrep y en tus proyectos con JS/TS, lo mismo que antes
+  (ninguno de los que faltan es por clausuras); el tiempo sobre gastronova sin caché no cambia.
 - Contaminación en Go (hecho, 2026-10-22): un intérprete (`src/lint/go/taint/`) que usa los tipos
   declarados para las fuentes y los sumideros, con constantes, `switch`, `range`, mapas por clave y
   `strings.Builder`, y la resolución entre paquetes por carpeta (`src/index/go_taint.rs`). Los
@@ -817,7 +831,13 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     uno, falso: el gateway de dotfiles reenvía la respuesta de otro servidor con su `Content-Type`.
 - Pendientes de contaminación en Go:
   - Los campos de un struct no se siguen (`h.db.Query(...)` con `h` un handler no sabe el tipo de
-    `db`; cae en el nombre) y los valores capturados por una función anónima no llegan a ella.
+    `db`; cae en el nombre).
+- Funciones anónimas en Go (hecho, 2026-10-22): como las clausuras de JavaScript, la de un
+  `HandleFunc`, un `go func() { ... }()` o una que se guarda en una variable corre en el lugar con
+  lo que captura; un parámetro `*http.Request` trae datos del usuario, lo que les asigna a las
+  variables de afuera se junta con lo que tenían y un `Content-Type` que no es HTML sólo vale para
+  esa función. En los tests de Semgrep para Go, los mismos avisos que antes; en tus proyectos con
+  Go, ninguno.
 - Contaminación, segunda tanda (hecho, 2026-10-22):
   - Fuentes de JAX-RS, Quarkus y Micronaut (`@QueryParam`, `@PathParam`, `@RestQuery`,
     `@QueryValue`...), de Nest (`@Query()`, `@Body()`...), de Hono (`c.req.query()`) y de Next

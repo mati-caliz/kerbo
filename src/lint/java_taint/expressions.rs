@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::closures::{Callback, anonymous_class, argument, lambda};
 use super::collections::{collection_call, empty_collection};
 use super::constants::literal_of;
 use super::receivers::{chain_root, declared_type, sink_at, sink_receiver};
@@ -22,8 +23,8 @@ const INVOCATION: &str = "method_invocation";
 const CREATION: &str = "object_creation_expression";
 const ARRAY_ACCESS: &str = "array_access";
 const SWITCH_RULE: &str = "switch_rule";
+const LAMBDA: &str = "lambda_expression";
 const CLEAN_EXPRESSIONS: &[&str] = &[
-    "lambda_expression",
     "method_reference",
     "class_literal",
     "this",
@@ -99,6 +100,7 @@ impl Interpreter<'_, '_> {
                 Value::Data(array.flow())
             }
             SWITCH => self.switch_value(node, state),
+            LAMBDA => lambda(self, node, state, &Value::clean()),
             kind if CLEAN_EXPRESSIONS.contains(&kind) => Value::clean(),
             _ => Value::Data(self.all_children(node, state)),
         }
@@ -168,13 +170,13 @@ impl Interpreter<'_, '_> {
         assigned
     }
 
-    fn arguments(&mut self, node: Node<'_>, state: &mut State) -> Vec<Value> {
+    fn arguments(&mut self, node: Node<'_>, state: &mut State, callback: &Callback) -> Vec<Value> {
         node.child_by_field_name(ARGUMENTS_FIELD)
             .map(named_children)
             .unwrap_or_default()
             .into_iter()
             .filter(|argument| !COMMENTS.contains(&argument.kind()))
-            .map(|argument| self.expression(argument, state))
+            .map(|written| argument(self, written, state, callback))
             .collect()
     }
 
@@ -185,7 +187,14 @@ impl Interpreter<'_, '_> {
             .unwrap_or_default();
         let object = node.child_by_field_name(OBJECT_FIELD);
         let receiver = object.map(|inner| self.expression(inner, state));
-        let arguments = self.arguments(node, state);
+        let callback = Callback {
+            input: receiver
+                .as_ref()
+                .filter(|_| tables::passes_receiver_to_callback(name))
+                .map_or_else(Value::clean, |value| Value::Data(value.flow())),
+            keeps_result: tables::keeps_callback_result(name),
+        };
+        let arguments = self.arguments(node, state, &callback);
         let followed = object
             .filter(|inner| inner.kind() == IDENTIFIER)
             .map(|inner| self.text(inner))
@@ -258,11 +267,12 @@ impl Interpreter<'_, '_> {
             .child_by_field_name(TYPE_FIELD)
             .map(|written| simple_type_name(self.text(written)))
             .unwrap_or_default();
-        let arguments = self.arguments(node, state);
-        if named_children(node)
-            .iter()
-            .any(|child| child.kind() == CLASS_BODY)
+        let arguments = self.arguments(node, state, &Callback::opaque());
+        if let Some(body) = named_children(node)
+            .into_iter()
+            .find(|child| child.kind() == CLASS_BODY)
         {
+            anonymous_class(self, body, state);
             return Value::clean();
         }
         if tables::constructor_sink(&created).is_some() {
