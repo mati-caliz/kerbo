@@ -108,6 +108,7 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
     };
     let mut pooled = Vec::new();
     let mut indexed = Vec::new();
+    let mut python = Vec::new();
     for result in results {
         match result {
             Ok(checked) => {
@@ -115,6 +116,7 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
                 outcome.suppressed.extend(checked.suppressed);
                 pooled.extend(checked.pooled);
                 indexed.extend(checked.indexed);
+                python.extend(checked.python);
             }
             Err(failure) => failures.push(failure),
         }
@@ -127,6 +129,7 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
         outcome
             .diagnostics
             .extend(project::diagnostics(&indexed, &project_root(request.config)));
+        outcome.diagnostics.extend(project::python_diagnostics(&python));
     }
     outcome.diagnostics.sort_by(|left, right| {
         (&left.path, left.line, left.column, left.rule).cmp(&(
@@ -189,6 +192,7 @@ struct Checked {
     suppressed: Vec<Suppressed>,
     pooled: Option<(Stack, PooledFile)>,
     indexed: Option<project::IndexedFile>,
+    python: Option<project::PythonFile>,
 }
 
 fn pooled_file(identity: &FileIdentity, analysis: &mut FileAnalysis, limits: Limits) -> Option<PooledFile> {
@@ -307,6 +311,7 @@ fn check_file(
             suppressed: Vec::new(),
             pooled: None,
             indexed: None,
+            python: None,
         });
     };
     let source = fs::read(&file.identity.absolute).map_err(|error| failure(error.to_string()))?;
@@ -348,12 +353,7 @@ fn check_file(
             }
         })?;
     let pooled = pooled_file(&file.identity, &mut analysis, limits);
-    let indexed = analysis.java_summary.take().map(|summary| project::IndexedFile {
-        identity: file.identity.clone(),
-        limits,
-        summary,
-        in_tests: file.is_test,
-    });
+    let (indexed, python) = project::summaries(&file.identity, file.is_test, &mut analysis, limits);
     let mut diagnostics = evaluate(&file.identity, &analysis, limits);
     if let Some(profile) = secret_scan::profile(&file.identity, request.config, Some(limits)) {
         diagnostics.extend(secret_scan::diagnostics(
@@ -369,6 +369,7 @@ fn check_file(
         suppressed,
         pooled: pooled.map(|pooled| (language.stack(), pooled)),
         indexed,
+        python,
     })
 }
 

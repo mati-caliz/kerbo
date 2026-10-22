@@ -32,7 +32,7 @@ mod java_text;
 mod java_tokens;
 mod java_wrap;
 mod modifiers;
-mod python;
+pub mod python;
 mod recovered;
 mod references;
 pub mod taint;

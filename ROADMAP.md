@@ -756,6 +756,35 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Fuentes de otros frameworks (JAX-RS `@QueryParam`, Micronaut, Quarkus) y sumideros de
     MyBatis (`${}` en los mapeos) y de jOOQ (`DSL.sql`).
   - Python, TypeScript y Go.
+- Contaminación en Python (hecho, 2026-10-22): las cuatro reglas pasan a una familia propia
+  (`TaintRule`, los mismos nombres) y el motor queda compartido (`src/lint/taint/`,
+  `src/index/taint_engine.rs`); cada dato lleva un bit por tipo de sumidero para el que sigue siendo
+  peligroso, así un escape de HTML, un chequeo de `../` o un `shlex.quote` limpian sólo lo suyo.
+  Python tiene su intérprete (`src/lint/python/taint/`), con constantes, `match`, `elif`, `with`,
+  listas, diccionarios y `ConfigParser` por clave, tuplas, f-strings y `split` plegado, y su
+  resolución entre módulos (`src/index/python_taint.rs`): el nombre de módulo sale de la ruta, y
+  con un `src/` adelante se busca por sufijo.
+  - Contra el OWASP Benchmark for Python 0.1: las cuatro categorías detectan todo (5, 13, 65 y 31)
+    y ningún falso positivo (de 11, 7, 103 y 58). Semgrep 1.140 con `p/python`: 0 %, 46 % con
+    100 % de falsos, 3 % y 0 %.
+  - Contra los tests de las reglas de taint de Semgrep para Python (las líneas `# ruleid:` y
+    `# ok:`, sin las reglas cuya fuente es `os.environ` o `sys.argv`): ningún aviso de más;
+    detecta 39 de 71 comandos, 14 de 16 SQL y 16 de 29 XSS. Lo que falta, explicado: las reglas de
+    Semgrep no coinciden entre sí sobre `subprocess` sin shell (la de Django lo cuenta como
+    inyección, la de Lambda como seguro), y kerbo sólo lo cuenta con shell; el XSS de Lambda
+    (devolver HTML desde un handler) no se mira.
+  - En tus proyectos con Python (finarg, propmetrics, soma y comex-ai): ningún aviso. La primera
+    versión daba 84, todos falsos: el `return` de una ruta de FastAPI es JSON, no HTML, y las
+    sentencias de SQLAlchemy Core van con parámetros ligados.
+- Pendientes de contaminación en Python:
+  - Inyección de argumentos: un programa o argumentos elegidos por el usuario sin shell
+    (`subprocess.run([cmd, ...])`).
+  - Fuentes de línea de comandos (`sys.argv`, `os.environ`, `input()`), apagadas para no marcar
+    scripts y herramientas.
+  - El código de nivel de módulo (fuera de funciones) no se recorre.
+  - La herencia entre clases y los métodos de clases que llegan como parámetro no se resuelven.
+  - Plantillas (`Markup`, `|safe` en Jinja) y el XSS de una respuesta de Lambda.
+  - TypeScript y Go.
 - **Renombres de columnas y tablas que el código desplegado todavía usa** (viene de la etapa 12).
   Sin compilar no hay forma confiable: los nombres pasan por los mapeos del ORM (`@map` de
   Prisma, `name=` de SQLAlchemy, los nombres de drizzle), cambian de caso y coinciden con palabras

@@ -9,6 +9,8 @@ use crate::index::java::{JavaSummary, summarize};
 use crate::language::Language;
 use crate::limits::Limits;
 use crate::lines::LineMap;
+use crate::lint::python::taint::python_taints;
+use crate::lint::taint::TaintMethod;
 use crate::lint::{LintFinding, find_lints};
 use crate::macro_rules::{CrateMacros, MacroScope};
 use crate::metrics::commented::{CommentedCode, find_commented_code};
@@ -46,6 +48,7 @@ pub struct FileAnalysis {
     pub lints: Vec<LintFinding>,
     pub violations: Vec<Violation>,
     pub java_summary: Option<JavaSummary>,
+    pub python_taints: Option<Vec<TaintMethod>>,
 }
 
 impl FileAnalysis {
@@ -61,6 +64,7 @@ impl FileAnalysis {
             lints: Vec::new(),
             violations,
             java_summary: None,
+            python_taints: None,
         }
     }
 }
@@ -160,5 +164,10 @@ pub fn analyze_unit(
                     .iter()
                     .any(|rule| limits.get(RuleId::Taint(*rule)).is_some())))
         .then(|| summarize(root, source)),
+        python_taints: (language == Language::Python
+            && TaintRule::ALL
+                .iter()
+                .any(|rule| limits.get(RuleId::Taint(*rule)).is_some()))
+        .then(|| python_taints(root, source)),
     })
 }

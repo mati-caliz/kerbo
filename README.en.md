@@ -416,6 +416,24 @@ the database, not from its arguments. A library call returns what its receiver a
 bring, except the ones that give a number, a boolean or a UUID (`parseInt`, `length`, `equals`,
 `UUID.fromString`...).
 
+In Python, the same four rules with the same engine. Sources are Flask's `request.args`, `.form`,
+`.cookies`, `.headers`, `.values`, `.files`, `.json`, `.get_json()` and friends, Django's (`GET`,
+`POST`, `COOKIES`, `META`, `body`) and Pyramid's (`params`, `matchdict`), the parameters of a route
+function (`@app.route`, `@router.get`...) and the `event` of a Lambda handler. Sinks: `.execute`,
+`.executemany` and `.executescript`, `text()` and the SQLAlchemy `Query` methods that take SQL as
+text; `os.system`, `os.popen` and `os.exec*`/`spawn*` always, and `subprocess.*` only with
+`shell=True` or when what it runs is a shell with `-c` (without a shell, a built string is not
+interpreted); `open`, `codecs.open`, `os.remove`, `os.path.exists`, `shutil.*`, `send_file` and the
+methods of a `pathlib` object; and the response body: what a Flask view returns (not when it
+returns a dict or uses `jsonify`; in FastAPI it is JSON), `make_response` and
+`render_template_string`. An `if '..' in path: return` validates the path; an HTML escape
+(`html.escape`, `markupsafe.escape`, `render_template` or a project function named "escape…html"),
+`shlex.quote` and `secure_filename` clean for their sink; what builds a SQLAlchemy statement
+(`select`, `insert(...).values(...)`) uses bound parameters. Across modules, calls are resolved
+through imports (relative ones and the ones inside a function too), the functions and classes
+visible from each one, `self` and the class a variable was created with. `os.name` is taken as
+`"posix"`: that is where the server runs.
+
 To read libraries, kerbo asks for the classpath once, offline, to Maven
 (`mvn -o dependency:build-classpath`) or to Gradle (the project's `gradlew` when there is one, with
 kerbo's own init script that lists the jars of `testRuntimeClasspath`, `runtimeClasspath` and

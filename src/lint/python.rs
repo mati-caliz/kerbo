@@ -11,6 +11,7 @@ mod names;
 mod noqa;
 mod semantic;
 mod statements;
+pub mod taint;
 
 use std::path::Path;
 

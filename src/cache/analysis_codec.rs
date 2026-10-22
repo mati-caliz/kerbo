@@ -1,6 +1,7 @@
 use super::codec::{Corrupt, Reader, Writer};
 use super::lint_codec::{read_fix, read_lint, write_fix, write_lint};
 use super::summary_codec::{read_summary, write_summary};
+use super::taint_codec::{read_taints, write_taints};
 use crate::analysis::FileAnalysis;
 use crate::deploy::Violation;
 use crate::duplicates::{CpdToken, DuplicateUnits, RepeatedBlock, RepeatedKind, SyntaxNode};
@@ -9,6 +10,9 @@ use crate::metrics::commented::CommentedCode;
 use crate::metrics::magic::MagicNumber;
 use crate::metrics::names::ShortName;
 use crate::metrics::nesting::NestingFinding;
+
+const ABSENT: u64 = 0;
+const PRESENT: u64 = 1;
 
 const NO_UNITS: u64 = 0;
 const TOKEN_UNITS: u64 = 1;
@@ -46,6 +50,13 @@ pub fn encode(analysis: &FileAnalysis) -> Vec<u8> {
         write_fix(writer, found.fix.as_ref());
     });
     write_summary(&mut writer, analysis.java_summary.as_ref());
+    match &analysis.python_taints {
+        Some(taints) => {
+            writer.number(PRESENT);
+            write_taints(&mut writer, taints);
+        }
+        None => writer.number(ABSENT),
+    }
     writer.into_bytes()
 }
 
@@ -94,6 +105,11 @@ pub fn decode(bytes: &[u8]) -> Result<FileAnalysis, Corrupt> {
             })
         })?,
         java_summary: read_summary(&mut reader)?,
+        python_taints: match reader.number()? {
+            ABSENT => None,
+            PRESENT => Some(read_taints(&mut reader)?),
+            _ => return Err(Corrupt),
+        },
     };
     if reader.is_empty() {
         Ok(analysis)

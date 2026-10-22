@@ -414,6 +414,24 @@ sale de la base, no de sus argumentos. Una llamada a una librería devuelve lo q
 y los argumentos, salvo las que dan un número, un booleano o un UUID (`parseInt`, `length`,
 `equals`, `UUID.fromString`...).
 
+En Python, las mismas cuatro reglas con el mismo motor. Las fuentes son `request.args`, `.form`,
+`.cookies`, `.headers`, `.values`, `.files`, `.json`, `.get_json()` y compañía de Flask, Django
+(`GET`, `POST`, `COOKIES`, `META`, `body`) y Pyramid (`params`, `matchdict`), los parámetros de una
+función de ruta (`@app.route`, `@router.get`...) y el `event` de un handler de Lambda. Los
+sumideros: `.execute`, `.executemany` y `.executescript`, `text()` y los métodos de un `Query` de
+SQLAlchemy que reciben SQL en texto; `os.system`, `os.popen` y `os.exec*`/`spawn*` siempre, y
+`subprocess.*` sólo con `shell=True` o si lo que corre es una shell con `-c` (sin shell, un texto
+armado no se interpreta); `open`, `codecs.open`, `os.remove`, `os.path.exists`, `shutil.*`,
+`send_file` y los métodos de un objeto de `pathlib`; y el cuerpo de la respuesta: lo que devuelve
+una vista de Flask (no si devuelve un diccionario o usa `jsonify`; en FastAPI es JSON),
+`make_response` y `render_template_string`. Un `if '..' in ruta: return` valida la ruta; un escape
+de HTML (`html.escape`, `markupsafe.escape`, `render_template` o una función propia que se llame
+"escape…html"), `shlex.quote` y `secure_filename` limpian para su sumidero; lo que arma una
+sentencia de SQLAlchemy (`select`, `insert(...).values(...)`) va con parámetros ligados. Entre
+módulos, las llamadas se resuelven por los imports (también los relativos y los de adentro de una
+función), las funciones y clases que se ven desde cada una, `self` y la clase con que se creó una
+variable. `os.name` se toma como `"posix"`: es donde corre el servidor.
+
 Para leer las librerías, kerbo le pide el classpath una sola vez, sin red, a Maven
 (`mvn -o dependency:build-classpath`) o a Gradle (el `gradlew` del proyecto si está, con un script
 de inicio propio que lista los jars de `testRuntimeClasspath`, `runtimeClasspath` y
