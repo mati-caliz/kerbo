@@ -14,6 +14,7 @@ use super::java_resources::{ResourceCandidate, resource_candidates};
 pub use super::java_returns::{ReturnType, Returns};
 use super::java_returns::{return_type, returned};
 use super::java_switch::{rule_bodies, yields_value};
+use super::java_taint::{TaintMethod, taint_method};
 use crate::syntax::{descendants, named_children};
 
 pub const TYPE_DECLARATIONS: &[&str] = &[
@@ -109,6 +110,7 @@ pub struct Extracted<'tree> {
     pub chains: Vec<Chain>,
     pub null_flows: Vec<NullFlow>,
     pub resources: Vec<ResourceCandidate>,
+    pub taints: Vec<TaintMethod>,
 }
 
 // Lo que declara y lo que llama una clase de nivel superior, con sus clases anidadas.
@@ -149,6 +151,9 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
                         .resources
                         .extend(resource_candidates(body, source, variables));
                 }
+                extracted
+                    .taints
+                    .extend(taint_method(node, source, variables, &imported));
             }
             ENUM => extracted
                 .callables

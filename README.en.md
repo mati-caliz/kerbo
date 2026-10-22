@@ -377,6 +377,28 @@ From IntelliJ's inspections, kerbo does:
   project method declares, or from kerbo's own JDK table; what a `get...` returns belongs to whoever
   gives it (the container or the pool).
 
+And for security, what reaches a query (`sql-injection`), a command (`command-injection`) or a
+file path (`path-traversal`) from the user unsanitized. Sources are the `HttpServletRequest`
+methods that return what the user sent (`getParameter`, `getHeader`, `getCookies`,
+`getQueryString`...) and parameters with `@RequestParam`, `@PathVariable`, `@RequestBody` and the
+other Spring web annotations. Sinks are `Statement`, `Connection`, `JdbcTemplate`,
+`EntityManager` and `JdbcClient` (in a query only the text counts: `?` arguments are safe),
+`Runtime.exec` and `ProcessBuilder`, and `File`, `FileInputStream`, `FileOutputStream`,
+`FileReader`, `FileWriter`, `RandomAccessFile`, `Paths.get` and `Path.of`. All of it is a data
+table in `src/lint/java_taint/tables.rs`.
+
+Each method is walked like an interpreter: it knows which variables are constants and uses them to
+decide `if`, `switch` and ternaries (`(7 * 42) - 86 > 200 ? "fixed" : data` always takes the same
+branch), and it follows the lists it builds position by position and its maps key by key (taking
+`list.get(1)` when the data went into slot 0 is not tainted). Across methods and files, each one
+leaves a summary (what it returns depending on its parameters and what reaches each sink) and the
+index combines them: a call goes to the methods of its type, to the ones it inherits and to its
+implementations; a type in the same file shadows same-named ones elsewhere. What an abstract
+method of an interface nobody implements in the code returns (a Spring Data repository) comes from
+the database, not from its arguments. A library call returns what its receiver and arguments
+bring, except the ones that give a number, a boolean or a UUID (`parseInt`, `length`, `equals`,
+`UUID.fromString`...).
+
 To read libraries, kerbo asks Maven for the classpath once, offline
 (`mvn -o dependency:build-classpath`), and stores it with the fingerprint of the `pom.xml` files;
 from the jars it reads only the index and the classes it needs, no bytecode. With Gradle or any

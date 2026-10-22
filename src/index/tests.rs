@@ -9,7 +9,7 @@ use crate::language::Language;
 
 const FILTER: &str = "package app;\n\nimport java.util.List;\nimport sample.web.Filter;\n\nclass AuditFilter extends Filter {\n    @Override\n    protected void handle(String request, Object handler, List<String> names) {\n        if (names.isEmpty()) {\n            return;\n        }\n    }\n\n    @Override\n    public int compareTo(Filter other) {\n        return 0;\n    }\n\n    @Override\n    public String name() {\n        return \"audit\";\n    }\n\n    @Override\n    public Object find(String key) {\n        return null;\n    }\n}\n";
 
-fn summary_of(source: &str) -> JavaSummary {
+pub(super) fn summary_of(source: &str) -> JavaSummary {
     let mut parser = Parser::new();
     parser
         .set_language(&Language::Java.grammar().expect("tiene gramática"))

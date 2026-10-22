@@ -14,6 +14,7 @@ use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_owner::{Owner, annotation_names};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
+use crate::lint::java_taint::TaintMethod;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::JavaRule;
 use crate::syntax::descendants;
@@ -71,6 +72,7 @@ pub struct Field {
     pub position: Position,
     pub visibility: Visibility,
     pub is_static: bool,
+    pub type_name: String,
     pub annotations: Vec<String>,
     pub owner: Owner,
 }
@@ -102,6 +104,7 @@ pub struct JavaSummary {
     pub resources: Vec<ResourceCandidate>,
     pub fields: Vec<Field>,
     pub identifiers: Vec<String>,
+    pub taints: Vec<TaintMethod>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -155,6 +158,7 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.chains.extend(extracted.chains);
         summary.null_flows.extend(extracted.null_flows);
         summary.resources.extend(extracted.resources);
+        summary.taints.extend(extracted.taints);
         summary.constants.extend(declared_constants(&nodes, source));
         summary
             .fields
@@ -252,6 +256,7 @@ fn field_of(field: DeclaredField<'_>) -> Field {
         position: position_of(field.name_node),
         visibility: field.visibility,
         is_static: field.is_static,
+        type_name: field.type_name,
         annotations: field.annotations,
         owner: field.owner,
     }

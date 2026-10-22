@@ -27,6 +27,7 @@ mod java_shapes;
 mod java_spacing;
 mod java_style;
 mod java_switch;
+pub mod java_taint;
 mod java_text;
 mod java_tokens;
 mod java_wrap;

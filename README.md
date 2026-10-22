@@ -373,6 +373,28 @@ De las inspecciones de IntelliJ, kerbo hace:
   que declara un método del proyecto o de una tabla propia del JDK; lo que devuelve un `get...` es
   de quien lo da (el contenedor o el pool).
 
+Y de seguridad, lo que llega del usuario sin limpiar a una consulta (`sql-injection`), a un
+comando (`command-injection`) o a una ruta de archivo (`path-traversal`). Las fuentes son los
+métodos de `HttpServletRequest` que devuelven lo que mandó el usuario (`getParameter`,
+`getHeader`, `getCookies`, `getQueryString`...) y los parámetros con `@RequestParam`,
+`@PathVariable`, `@RequestBody` y el resto de las anotaciones web de Spring. Los sumideros son
+`Statement`, `Connection`, `JdbcTemplate`, `EntityManager` y `JdbcClient` (en una consulta sólo
+cuenta el texto: los argumentos con `?` son seguros), `Runtime.exec` y `ProcessBuilder`, y
+`File`, `FileInputStream`, `FileOutputStream`, `FileReader`, `FileWriter`, `RandomAccessFile`,
+`Paths.get` y `Path.of`. Todo es tabla de datos en `src/lint/java_taint/tables.rs`.
+
+Cada método se recorre como un intérprete: sabe qué variables son constantes y decide con ellas los
+`if`, los `switch` y los ternarios (`(7 * 42) - 86 > 200 ? "fijo" : dato` toma siempre la misma
+rama), y sigue posición por posición las listas y clave por clave los mapas que arma (sacar
+`lista.get(1)` cuando el dato entró en la 0 no es contaminarse). Entre métodos y entre archivos,
+cada uno deja un resumen (qué devuelve según sus parámetros y qué llega a cada sumidero) y el
+índice los cruza: una llamada va a los métodos de su tipo, a los que hereda y a sus
+implementaciones; un tipo del mismo archivo tapa a los homónimos de otros. Lo que devuelve un
+método abstracto de una interfaz que nadie implementa en el código (un repositorio de Spring Data)
+sale de la base, no de sus argumentos. Una llamada a una librería devuelve lo que traen el receptor
+y los argumentos, salvo las que dan un número, un booleano o un UUID (`parseInt`, `length`,
+`equals`, `UUID.fromString`...).
+
 Para leer las librerías, kerbo le pide a Maven el classpath una sola vez, sin red
 (`mvn -o dependency:build-classpath`), y lo guarda con la huella de los `pom.xml`; de los jars lee
 sólo el índice y las clases que necesita, sin bytecode. Con Gradle u otra herramienta, la lista de

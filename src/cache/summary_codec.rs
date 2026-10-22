@@ -1,4 +1,5 @@
 use super::codec::{Corrupt, Reader, Writer};
+use super::taint_codec::{read_taints, write_taints};
 use crate::index::java::{CallSite, Declaration, Field, JavaSummary, Parameter, Position};
 use crate::lint::java_calls::{Arity, Body, ReturnType, Returns, Visibility};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
@@ -77,10 +78,12 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
         write_position(writer, &field.position);
         write_visibility(writer, field.visibility);
         write_flag(writer, field.is_static);
+        writer.text(&field.type_name);
         writer.list(&field.annotations, |writer, name| writer.text(name));
         write_owner(writer, &field.owner);
     });
     writer.list(&summary.identifiers, |writer, name| writer.text(name));
+    write_taints(writer, &summary.taints);
 }
 
 pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corrupt> {
@@ -127,11 +130,13 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
                 position: read_position(reader)?,
                 visibility: read_visibility(reader)?,
                 is_static: read_flag(reader)?,
+                type_name: reader.text()?,
                 annotations: reader.list(Reader::text)?,
                 owner: read_owner(reader)?,
             })
         })?,
         identifiers: reader.list(Reader::text)?,
+        taints: read_taints(reader)?,
     }))
 }
 
@@ -260,7 +265,7 @@ fn read_visibility(reader: &mut Reader<'_>) -> Result<Visibility, Corrupt> {
     }
 }
 
-fn write_receiver(writer: &mut Writer, receiver: &Receiver) {
+pub(super) fn write_receiver(writer: &mut Writer, receiver: &Receiver) {
     match receiver {
         Receiver::Unknown => writer.number(RECEIVER_UNKNOWN),
         Receiver::Type(name) => {
@@ -274,7 +279,7 @@ fn write_receiver(writer: &mut Writer, receiver: &Receiver) {
     }
 }
 
-fn read_receiver(reader: &mut Reader<'_>) -> Result<Receiver, Corrupt> {
+pub(super) fn read_receiver(reader: &mut Reader<'_>) -> Result<Receiver, Corrupt> {
     match reader.number()? {
         RECEIVER_UNKNOWN => Ok(Receiver::Unknown),
         RECEIVER_TYPE => Ok(Receiver::Type(reader.text()?)),

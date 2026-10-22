@@ -725,6 +725,31 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   cerrar y excepciones tragadas (en Qodana los nulos son 145 y los recursos 10).
 - Contaminación de entradas hacia SQL, comandos, rutas y HTML, en todos los lenguajes, sobre el
   mismo grafo.
+  - Java hacia SQL, comandos y rutas (hecho, 2026-10-22): `sql-injection`, `command-injection` y
+    `path-traversal` (`src/lint/java_taint/`, `src/index/java_taint.rs`). Un intérprete por
+    método con constantes (para decidir `if`, `switch` y ternarios), listas por posición y mapas por
+    clave, y un resumen por método que el índice cruza hasta un punto fijo: qué devuelve según sus
+    parámetros y qué parámetros reciben algo del usuario desde alguna llamada.
+  - Medido contra el OWASP Benchmark 1.2 (la verdad de cada caso, no otra herramienta): en las tres
+    categorías detecta todos los casos vulnerables (272, 126 y 133) y ningún falso positivo (de 232,
+    125 y 135). Semgrep 1.140 con `p/java` sobre los mismos casos: 86 %, 89 % y 90 % detectados
+    con 62 %, 77 % y 79 % de falsos positivos (puntaje +24 %, +12 % y +12 %).
+  - Lo que hizo falta para llegar a cero: un tipo del archivo de quien llama tapa a los homónimos
+    (cada caso tiene su clase interna `Test`) y lo que devuelve un método abstracto de una
+    interfaz que nadie implementa (Spring Data) no arrastra sus argumentos: sin eso, en gastronova
+    una entidad leída por id parecía armada por el usuario.
+  - En los tres servicios, Guava, commons-lang y junit4: ningún aviso. Sin fuentes en el proyecto
+    (una librería), el cruce no corre: Guava sigue en 0,9 s con caché y 6,8 s sin caché.
+- Pendientes de contaminación:
+  - HTML (XSS): ahí sí importan los limpiadores (`encodeForHTML`, `HtmlUtils.htmlEscape`), que
+    hoy propagan como cualquier otra llamada.
+  - FindSecBugs como segunda referencia: pide compilar el Benchmark con Maven.
+  - Los campos no se siguen: un dato del usuario guardado en `this.x` y leído en otro método se
+    pierde. Tampoco lambdas ni clases anónimas.
+  - Los sumideros con receptor desconocido (una cadena `a.b().query(...)`) no se miran.
+  - Fuentes de otros frameworks (JAX-RS `@QueryParam`, Micronaut, Quarkus) y sumideros de
+    MyBatis (`${}` en los mapeos) y de jOOQ (`DSL.sql`).
+  - Python, TypeScript y Go.
 - **Renombres de columnas y tablas que el código desplegado todavía usa** (viene de la etapa 12).
   Sin compilar no hay forma confiable: los nombres pasan por los mapeos del ORM (`@map` de
   Prisma, `name=` de SQLAlchemy, los nombres de drizzle), cambian de caso y coinciden con palabras

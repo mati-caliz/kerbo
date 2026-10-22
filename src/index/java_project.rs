@@ -103,7 +103,7 @@ impl<'summary> Project<'summary> {
             .extend(summary.identifiers.iter().map(String::as_str));
     }
 
-    fn is_ancestor(&self, ancestor: &str, of: &str) -> bool {
+    pub fn is_ancestor(&self, ancestor: &str, of: &str) -> bool {
         ancestor == of
             || self
                 .ancestors
