@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::taint_reach::{Reach, Tainted, evaluate, substitute};
 use crate::lint::taint::{Atom, Flow, SinkKind, TaintCall, TaintMethod, TaintSink};
@@ -76,6 +76,11 @@ impl<'summary> Engine<'summary> {
             if let Some(in_file) = found.get_mut(id.0) {
                 in_file.extend(reported);
             }
+        }
+        // Un sumidero dentro de un bucle se mira en cada vuelta: avisa una sola vez.
+        for in_file in &mut found {
+            let mut seen = HashSet::new();
+            in_file.retain(|finding| seen.insert((finding.line, finding.column, finding.kind.rule())));
         }
         found
     }

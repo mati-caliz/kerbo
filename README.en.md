@@ -450,6 +450,22 @@ Fastify's, which sends plain text, nor when the function declares another type w
 `path.basename`, the path. Every function (anonymous route handlers too) is a method for the
 engine, and across files `import` and `require` are resolved, relative ones too.
 
+In Go, the same four rules, and since Go declares types, sources and sinks come from them: a
+`*http.Request` parameter or a Lambda event (`events.APIGatewayProxyRequest`) brings everything
+from the user, and from a `*gin.Context` or an `echo.Context` only what reads the request
+(`Query`, `Param`, `PostForm`...). Sinks: `Query`, `QueryRow`, `Exec` and `Prepare` (and their
+`...Context` variants, with the query after `ctx`) on `*sql.DB`, `sqlx` and `pgx`, and gorm's
+`Raw`, `Where`, `Order` and friends, following the type along the chain
+(`db.Table("x").Order(field)`); `exec.Command` with a shell and `-c`; `os.Open`, `os.ReadFile`,
+`os.Remove` and friends and `http.ServeFile`; and `w.Write`, `fmt.Fprintf(w, ...)`,
+`io.WriteString(w, ...)` on an `http.ResponseWriter` (not when the function sets a `Content-Type`
+that is not HTML), `template.HTML` and a Lambda response declared as `text/html`.
+`html.EscapeString`, `template.HTMLEscapeString` and `json.Marshal` (it escapes `<` and `>`) clean
+HTML; `filepath.Base` and `path.Clean("/" + path)`, the path; `strconv.Atoi` and friends give a
+number. What is written into a `strings.Builder` stays in it. Anonymous functions (the `func(w, r)`
+of a `HandleFunc`) see the types of the variables of the functions that contain them, and across
+packages calls are resolved by directory: the import path ends like the package's directory.
+
 To read libraries, kerbo asks for the classpath once, offline, to Maven
 (`mvn -o dependency:build-classpath`) or to Gradle (the project's `gradlew` when there is one, with
 kerbo's own init script that lists the jars of `testRuntimeClasspath`, `runtimeClasspath` and

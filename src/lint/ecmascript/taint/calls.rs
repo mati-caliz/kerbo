@@ -1,11 +1,12 @@
 use tree_sitter::Node;
 
-use super::expressions::element;
 use super::statements::Interpreter;
 use super::tables;
 use crate::lint::java_receivers::Receiver;
 use crate::lint::taint::folding::fold_text_method;
-use crate::lint::taint::{Atom, Flow, Literal, SinkKind, SinkReceiver, State, TaintCall, TaintSink, Value};
+use crate::lint::taint::{
+    Atom, Flow, Literal, SinkKind, SinkReceiver, State, TaintCall, TaintSink, Value, element,
+};
 use crate::syntax::{named_children, one_based};
 
 const MEMBER: &str = "member_expression";

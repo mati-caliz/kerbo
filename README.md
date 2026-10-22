@@ -448,6 +448,22 @@ respuesta de un handler de Lambda que se declara `text/html`. `DOMPurify.sanitiz
 limpian el HTML; `path.basename`, la ruta. Cada función (también las anónimas de una ruta) es un
 método del motor, y entre archivos se resuelven `import` y `require`, también los relativos.
 
+En Go, las mismas cuatro reglas, y como Go declara los tipos, las fuentes y los sumideros salen de
+ellos: un parámetro `*http.Request` o un evento de Lambda (`events.APIGatewayProxyRequest`) trae
+todo del usuario, y de un `*gin.Context` o un `echo.Context` sólo lo que lee el pedido (`Query`,
+`Param`, `PostForm`...). Los sumideros: `Query`, `QueryRow`, `Exec` y `Prepare` (y sus
+`...Context`, con la consulta después del `ctx`) de `*sql.DB`, `sqlx` y `pgx`, y `Raw`, `Where`,
+`Order` y compañía de gorm, siguiendo el tipo por la cadena (`db.Table("x").Order(campo)`);
+`exec.Command` con una shell y `-c`; `os.Open`, `os.ReadFile`, `os.Remove` y compañía y
+`http.ServeFile`; y `w.Write`, `fmt.Fprintf(w, ...)`, `io.WriteString(w, ...)` sobre un
+`http.ResponseWriter` (no si la función pone un `Content-Type` que no es HTML), `template.HTML` y
+la respuesta de Lambda que se declara `text/html`. `html.EscapeString`, `template.HTMLEscapeString`
+y `json.Marshal` (escapa `<` y `>`) limpian el HTML; `filepath.Base` y `path.Clean("/" + ruta)`, la
+ruta; `strconv.Atoi` y compañía dan un número. Lo escrito en un `strings.Builder` queda en él. Las
+funciones anónimas (el `func(w, r)` de un `HandleFunc`) ven los tipos de las variables de las que
+las contienen, y entre paquetes las llamadas se resuelven por la carpeta: la ruta del import
+termina como la carpeta del paquete.
+
 Para leer las librerías, kerbo le pide el classpath una sola vez, sin red, a Maven
 (`mvn -o dependency:build-classpath`) o a Gradle (el `gradlew` del proyecto si está, con un script
 de inicio propio que lista los jars de `testRuntimeClasspath`, `runtimeClasspath` y

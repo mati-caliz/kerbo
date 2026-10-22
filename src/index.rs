@@ -1,4 +1,5 @@
 pub mod ecmascript_taint;
+pub mod go_taint;
 pub mod java;
 mod java_dereference;
 mod java_jdk;
@@ -17,6 +18,8 @@ pub use java_rules::project_lints;
 
 #[cfg(test)]
 mod ecmascript_taint_tests;
+#[cfg(test)]
+mod go_taint_tests;
 #[cfg(test)]
 mod python_taint_tests;
 #[cfg(test)]

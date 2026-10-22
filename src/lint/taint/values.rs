@@ -141,6 +141,28 @@ impl Value {
     }
 }
 
+// `coleccion[indice]` y `objeto.propiedad`: con la posición o la clave constante, lo que tiene; si no,
+// todo junto.
+pub fn element(collection: &Value, index: &Value) -> Value {
+    match (collection, index.literal()) {
+        (Value::List(items), Some(Literal::Integer(position))) => usize::try_from(*position)
+            .ok()
+            .and_then(|position| items.get(position))
+            .cloned()
+            .unwrap_or_else(Value::clean),
+        (Value::Map(entries), Some(Literal::Text(key)))
+            if entries.iter().all(|(name, _)| !name.is_empty()) =>
+        {
+            entries
+                .iter()
+                .find(|(name, _)| name == key)
+                .map_or_else(Value::clean, |(_, value)| value.clone())
+        }
+        (Value::Constant(_), _) => Value::clean(),
+        _ => Value::Data(collection.flow()),
+    }
+}
+
 pub type State = HashMap<String, Value>;
 
 pub fn join_states(first: Option<State>, second: Option<State>) -> Option<State> {

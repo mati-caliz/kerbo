@@ -3,6 +3,7 @@ mod generated;
 mod ineffassign;
 mod nolint;
 mod resolver;
+pub mod taint;
 
 use tree_sitter::Node;
 

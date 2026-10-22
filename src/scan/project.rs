@@ -2,14 +2,16 @@ use std::path::{Path, PathBuf};
 
 use crate::analysis::FileAnalysis;
 use crate::index::ecmascript_taint::{ScriptModule, ecmascript_tainted};
+use crate::index::go_taint::{GoFile, go_tainted};
 use crate::index::java::JavaSummary;
 use crate::index::python_taint::{PythonModule, python_tainted};
 use crate::index::{IndexedSummary, project_lints};
 use crate::jvm::classpath;
 use crate::jvm::library::Library;
+use crate::language::Language;
 use crate::limits::Limits;
 use crate::lint::LintFinding;
-use crate::lint::taint::TaintMethod;
+use crate::lint::taint::{TaintFamily, TaintMethod};
 use crate::rules::{Diagnostic, FileIdentity, JavaRule, RuleId, finding_diagnostics};
 
 const LIBRARY_RULES: [JavaRule; 3] = [
@@ -25,13 +27,6 @@ pub struct TaintedFile {
     pub limits: Limits,
     pub family: TaintFamily,
     pub taints: Vec<TaintMethod>,
-}
-
-// Los archivos que se cruzan entre sí: los de un lenguaje sólo se llaman entre ellos.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TaintFamily {
-    Python,
-    Ecmascript,
 }
 
 #[derive(Debug)]
@@ -90,7 +85,19 @@ pub fn tainted_diagnostics(files: &[TaintedFile]) -> Vec<Diagnostic> {
     };
     let mut found = python_diagnostics(&of_family(TaintFamily::Python));
     found.extend(ecmascript_diagnostics(&of_family(TaintFamily::Ecmascript)));
+    found.extend(go_diagnostics(&of_family(TaintFamily::Go)));
     found
+}
+
+fn go_diagnostics(files: &[&TaintedFile]) -> Vec<Diagnostic> {
+    let packages: Vec<GoFile<'_>> = files
+        .iter()
+        .map(|file| GoFile {
+            path: &file.identity.relative,
+            taints: &file.taints,
+        })
+        .collect();
+    kept_diagnostics(go_tainted(&packages), files)
 }
 
 fn python_diagnostics(files: &[&TaintedFile]) -> Vec<Diagnostic> {
@@ -117,21 +124,16 @@ pub fn summaries(
         summary,
         in_tests,
     });
-    let tainted = |family, taints| TaintedFile {
-        identity: identity.clone(),
-        limits,
-        family,
-        taints,
-    };
-    let python = analysis
-        .python_taints
-        .take()
-        .map(|taints| tainted(TaintFamily::Python, taints));
-    let ecmascript = analysis
-        .ecmascript_taints
-        .take()
-        .map(|taints| tainted(TaintFamily::Ecmascript, taints));
-    (indexed, python.or(ecmascript))
+    let tainted = Language::from_path(Path::new(&identity.relative))
+        .and_then(TaintFamily::of)
+        .zip(analysis.taints.take())
+        .map(|(family, taints)| TaintedFile {
+            identity: identity.clone(),
+            limits,
+            family,
+            taints,
+        });
+    (indexed, tainted)
 }
 
 fn ecmascript_diagnostics(files: &[&TaintedFile]) -> Vec<Diagnostic> {

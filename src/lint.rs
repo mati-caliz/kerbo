@@ -1,7 +1,7 @@
 pub mod ecmascript;
 mod final_class;
 mod final_parameters;
-mod go;
+pub mod go;
 mod imports;
 pub mod java;
 pub mod java_calls;

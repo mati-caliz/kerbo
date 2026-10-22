@@ -3,12 +3,11 @@ use std::collections::HashMap;
 use tree_sitter::Node;
 
 use super::calls::sink_at;
-use super::expressions::element;
 use super::imports::Imports;
 use super::tables;
 use crate::lint::taint::folding::{same_label, truth};
 use crate::lint::taint::{
-    Flow, Literal, SinkKind, SinkReceiver, State, TaintCall, TaintSink, Value, join_states,
+    Flow, Literal, SinkKind, SinkReceiver, State, TaintCall, TaintSink, Value, element, join_states,
 };
 use crate::syntax::named_children;
 

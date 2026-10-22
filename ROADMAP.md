@@ -755,7 +755,6 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Los sumideros con receptor desconocido (una cadena `a.b().query(...)`) no se miran.
   - Fuentes de otros frameworks (JAX-RS `@QueryParam`, Micronaut, Quarkus) y sumideros de
     MyBatis (`${}` en los mapeos) y de jOOQ (`DSL.sql`).
-  - Python, TypeScript y Go.
 - Contaminación en Python (hecho, 2026-10-22): las cuatro reglas pasan a una familia propia
   (`TaintRule`, los mismos nombres) y el motor queda compartido (`src/lint/taint/`,
   `src/index/taint_engine.rs`); cada dato lleva un bit por tipo de sumidero para el que sigue siendo
@@ -784,7 +783,6 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - El código de nivel de módulo (fuera de funciones) no se recorre.
   - La herencia entre clases y los métodos de clases que llegan como parámetro no se resuelven.
   - Plantillas (`Markup`, `|safe` en Jinja) y el XSS de una respuesta de Lambda.
-  - Go.
 - Contaminación en JavaScript y TypeScript (hecho, 2026-10-22): un intérprete
   (`src/lint/ecmascript/taint/`) con constantes, `switch`, plantillas de texto, objetos y arreglos
   por clave y posición (`push`/`pop`/`shift`), y la resolución entre archivos por `import` y
@@ -809,6 +807,23 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Fuentes de otros frameworks (Next con `searchParams`, Nest con `@Query`, Hono) y plantillas
     (EJS con `<%-`, Handlebars con `{{{`).
   - Inyección de argumentos sin shell (`spawn(cmd)` con el programa elegido por el usuario).
+- Contaminación en Go (hecho, 2026-10-22): un intérprete (`src/lint/go/taint/`) que usa los tipos
+  declarados para las fuentes y los sumideros, con constantes, `switch`, `range`, mapas por clave y
+  `strings.Builder`, y la resolución entre paquetes por carpeta (`src/index/go_taint.rs`). Los
+  archivos con contaminación llevan una sola lista en el análisis y su familia sale del lenguaje.
+  Un sumidero dentro de un bucle avisa una sola vez (antes, uno por vuelta).
+  - Contra los tests de las reglas de taint de Semgrep para Go: detecta todo (10 SQL, 2 rutas y 4
+    XSS; tres caen unas líneas más abajo, en el sumidero, y no en donde se arma el texto). Dos "de
+    más" son desacuerdos: un texto que Semgrep no cuenta como SQL porque no empieza con una palabra
+    de SQL (`FAKE DELETE ...`), y `filepath.Join(raiz, strings.Trim(r.URL.Path, "/"))` sin `Clean`,
+    que es un recorrido de carpetas salvo que el router limpie la ruta.
+  - En tus proyectos con Go (atlas, despe, dotfiles y soma): ningún aviso. La primera versión daba
+    uno, falso: el gateway de dotfiles reenvía la respuesta de otro servidor con su `Content-Type`.
+- Pendientes de contaminación en Go:
+  - Los campos de un struct no se siguen (`h.db.Query(...)` con `h` un handler no sabe el tipo de
+    `db`; cae en el nombre) y los valores capturados por una función anónima no llegan a ella.
+  - Plantillas (`text/template` escribiendo HTML) y `c.Data(..., "text/html", ...)` de gin.
+  - Inyección de argumentos sin shell (`exec.Command(programa)` con el programa del usuario).
 - **Renombres de columnas y tablas que el código desplegado todavía usa** (viene de la etapa 12).
   Sin compilar no hay forma confiable: los nombres pasan por los mapeos del ORM (`@map` de
   Prisma, `name=` de SQLAlchemy, los nombres de drizzle), cambian de caso y coinciden con palabras

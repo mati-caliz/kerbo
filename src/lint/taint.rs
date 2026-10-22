@@ -1,9 +1,34 @@
 pub mod folding;
 mod values;
 
-pub use values::{Atom, Dangers, Flow, Literal, State, Value, join_states};
+pub use values::{Atom, Dangers, Flow, Literal, State, Value, element, join_states};
 
 use super::java_receivers::Receiver;
+use crate::language::Language;
+
+// Los lenguajes cuyos archivos se cruzan entre sí: los de uno sólo se llaman entre ellos.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaintFamily {
+    Python,
+    Ecmascript,
+    Go,
+}
+
+impl TaintFamily {
+    pub const fn of(language: Language) -> Option<Self> {
+        match language {
+            Language::Python => Some(Self::Python),
+            Language::JavaScript | Language::TypeScript | Language::Tsx => Some(Self::Ecmascript),
+            Language::Go => Some(Self::Go),
+            Language::Java
+            | Language::Rust
+            | Language::Sql
+            | Language::Dockerfile
+            | Language::Compose
+            | Language::Shell => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SinkKind {

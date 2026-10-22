@@ -10,8 +10,9 @@ use crate::language::Language;
 use crate::limits::Limits;
 use crate::lines::LineMap;
 use crate::lint::ecmascript::taint::ecmascript_taints;
+use crate::lint::go::taint::go_taints;
 use crate::lint::python::taint::python_taints;
-use crate::lint::taint::TaintMethod;
+use crate::lint::taint::{TaintFamily, TaintMethod};
 use crate::lint::{LintFinding, find_lints};
 use crate::macro_rules::{CrateMacros, MacroScope};
 use crate::metrics::commented::{CommentedCode, find_commented_code};
@@ -49,8 +50,7 @@ pub struct FileAnalysis {
     pub lints: Vec<LintFinding>,
     pub violations: Vec<Violation>,
     pub java_summary: Option<JavaSummary>,
-    pub python_taints: Option<Vec<TaintMethod>>,
-    pub ecmascript_taints: Option<Vec<TaintMethod>>,
+    pub taints: Option<Vec<TaintMethod>>,
 }
 
 impl FileAnalysis {
@@ -66,8 +66,7 @@ impl FileAnalysis {
             lints: Vec::new(),
             violations,
             java_summary: None,
-            python_taints: None,
-            ecmascript_taints: None,
+            taints: None,
         }
     }
 }
@@ -167,17 +166,19 @@ pub fn analyze_unit(
                     .iter()
                     .any(|rule| limits.get(RuleId::Taint(*rule)).is_some())))
         .then(|| summarize(root, source)),
-        python_taints: (language == Language::Python
-            && TaintRule::ALL
-                .iter()
-                .any(|rule| limits.get(RuleId::Taint(*rule)).is_some()))
-        .then(|| python_taints(root, source)),
-        ecmascript_taints: (matches!(
-            language,
-            Language::JavaScript | Language::TypeScript | Language::Tsx
-        ) && TaintRule::ALL
+        taints: TaintRule::ALL
             .iter()
-            .any(|rule| limits.get(RuleId::Taint(*rule)).is_some()))
-        .then(|| ecmascript_taints(root, source)),
+            .any(|rule| limits.get(RuleId::Taint(*rule)).is_some())
+            .then(|| taints_of(language, root, source))
+            .flatten(),
+    })
+}
+
+// Lo que hacen con los datos las funciones de los lenguajes que se cruzan por contaminación.
+fn taints_of(language: Language, root: tree_sitter::Node<'_>, source: &[u8]) -> Option<Vec<TaintMethod>> {
+    Some(match TaintFamily::of(language)? {
+        TaintFamily::Python => python_taints(root, source),
+        TaintFamily::Ecmascript => ecmascript_taints(root, source),
+        TaintFamily::Go => go_taints(root, source),
     })
 }

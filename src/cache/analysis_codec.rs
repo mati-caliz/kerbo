@@ -51,8 +51,8 @@ pub fn encode(analysis: &FileAnalysis) -> Vec<u8> {
         write_fix(writer, found.fix.as_ref());
     });
     write_summary(&mut writer, analysis.java_summary.as_ref());
-    for taints in [&analysis.python_taints, &analysis.ecmascript_taints] {
-        match taints {
+    {
+        match &analysis.taints {
             Some(taints) => {
                 writer.number(PRESENT);
                 write_taints(&mut writer, taints);
@@ -108,8 +108,7 @@ pub fn decode(bytes: &[u8]) -> Result<FileAnalysis, Corrupt> {
             })
         })?,
         java_summary: read_summary(&mut reader)?,
-        python_taints: read_optional_taints(&mut reader)?,
-        ecmascript_taints: read_optional_taints(&mut reader)?,
+        taints: read_optional_taints(&mut reader)?,
     };
     if reader.is_empty() {
         Ok(analysis)
