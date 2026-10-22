@@ -42,15 +42,8 @@ const WRAPPERS: &[&str] = &[
     "non_null_expression",
     "type_assertion",
 ];
-const FUNCTIONS: &[&str] = &[
-    "arrow_function",
-    "function_expression",
-    "function",
-    "class",
-    "regex",
-    "null",
-    "undefined",
-];
+pub(super) const CLOSURES: &[&str] = &["arrow_function", "function_expression", "function"];
+const OPAQUE: &[&str] = &["class", "regex", "null", "undefined"];
 const OBJECT_FIELD: &str = "object";
 const PROPERTY_FIELD: &str = "property";
 const INDEX_FIELD: &str = "index";
@@ -148,7 +141,8 @@ impl Interpreter<'_, '_> {
             kind if WRAPPERS.contains(&kind) => named_children(node)
                 .first()
                 .map_or_else(Value::clean, |inner| self.expression(*inner, state)),
-            kind if FUNCTIONS.contains(&kind) => Value::clean(),
+            kind if CLOSURES.contains(&kind) => self.closure(node, state, &Value::clean()),
+            kind if OPAQUE.contains(&kind) => Value::clean(),
             _ => Value::Data(
                 named_children(node)
                     .into_iter()

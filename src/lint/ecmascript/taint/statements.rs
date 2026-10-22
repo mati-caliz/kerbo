@@ -4,6 +4,7 @@ use tree_sitter::Node;
 
 use super::calls::sink_at;
 use super::imports::Imports;
+use super::parameter_patterns;
 use crate::lint::taint::folding::{same_label, truth};
 use crate::lint::taint::responses::lambda_html_body;
 use crate::lint::taint::{Flow, SinkKind, SinkReceiver, State, TaintCall, TaintSink, Value, join_states};
@@ -88,18 +89,70 @@ impl<'source, 'context> Interpreter<'source, 'context> {
 
     // Una función de flecha con una expresión como cuerpo devuelve esa expresión. Si la función
     // declara que la respuesta no es HTML, sus escrituras no son un XSS.
-    pub fn run(&mut self, body: Node<'_>, mut state: State) {
+    pub fn run(&mut self, body: Node<'_>, state: State) {
+        self.walk_body(body, state);
+        self.drop_html_sinks_from(0);
+    }
+
+    fn walk_body(&mut self, body: Node<'_>, mut state: State) -> Option<State> {
         if body.kind() == BLOCK {
-            self.statement(body, state);
-        } else {
-            let returned = self.expression(body, &mut state).flow();
-            self.returns.absorb(&returned);
+            return self.statement(body, state);
         }
-        if self.plain_response {
-            self.sinks.retain(|sink| {
-                !matches!(sink.receiver, SinkReceiver::Known(SinkKind::Html)) || sink.callee == DANGEROUS_HTML
-            });
+        let returned = self.expression(body, &mut state).flow();
+        self.returns.absorb(&returned);
+        Some(state)
+    }
+
+    fn drop_html_sinks_from(&mut self, first: usize) {
+        if !self.plain_response {
+            return;
         }
+        let mut position = 0;
+        self.sinks.retain(|sink| {
+            position += 1;
+            position <= first
+                || !matches!(sink.receiver, SinkReceiver::Known(SinkKind::Html))
+                || sink.callee == DANGEROUS_HTML
+        });
+    }
+
+    // Una función escrita dentro de otra (un callback de `.then`, `.map` o de una ruta) corre en el
+    // lugar con lo que ve de afuera; sus parámetros valen `arguments`. Lo que les asigna a las
+    // variables de afuera puede haber pasado o no, y lo que devuelve es su valor.
+    pub(super) fn closure(&mut self, function: Node<'_>, state: &mut State, arguments: &Value) -> Value {
+        let Some(body) = function.child_by_field_name(BODY_FIELD) else {
+            return Value::clean();
+        };
+        let mut parameters = State::new();
+        for parameter in parameter_patterns(function) {
+            self.bind(parameter, arguments, &mut parameters);
+        }
+        let mut inner = state.clone();
+        inner.extend(
+            parameters
+                .iter()
+                .map(|(name, value)| (name.clone(), value.clone())),
+        );
+        let outer_returns = std::mem::take(&mut self.returns);
+        let outer_exits = std::mem::take(&mut self.exits);
+        let outer_lambda = std::mem::replace(&mut self.lambda, false);
+        let outer_plain = std::mem::replace(&mut self.plain_response, false);
+        let first_sink = self.sinks.len();
+        let after = self.walk_body(body, inner);
+        self.drop_html_sinks_from(first_sink);
+        let returned = std::mem::replace(&mut self.returns, outer_returns);
+        self.exits = outer_exits;
+        self.lambda = outer_lambda;
+        self.plain_response = outer_plain;
+        for (name, value) in after.into_iter().flatten() {
+            if parameters.contains_key(&name) {
+                continue;
+            }
+            if let Some(existing) = state.remove(&name) {
+                state.insert(name, existing.join(value));
+            }
+        }
+        Value::Data(returned)
     }
 
     fn statement(&mut self, node: Node<'_>, mut state: State) -> Option<State> {

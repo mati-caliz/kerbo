@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::expressions::CLOSURES;
 use super::statements::Interpreter;
 use super::tables;
 use crate::lint::java_receivers::Receiver;
@@ -22,6 +23,20 @@ const QUALIFIER_SEPARATOR: char = '.';
 const NAME_SEPARATORS: &[char] = &['_', '$', '.'];
 const ABSORBING_METHODS: &[&str] = &["push", "unshift", "set", "append"];
 const LIST_METHODS: &[&str] = &["push", "pop", "shift"];
+// Los callbacks que reciben lo que trae el receptor: cada elemento, o lo que resuelve la promesa.
+const RECEIVER_CALLBACKS: &[&str] = &[
+    "then",
+    "map",
+    "flatMap",
+    "forEach",
+    "filter",
+    "find",
+    "findLast",
+    "some",
+    "every",
+    "reduce",
+    "reduceRight",
+];
 
 pub fn sink_at(node: Node<'_>, callee: &str, kind: SinkKind, arguments: Vec<Flow>) -> TaintSink {
     let start = node.start_position();
@@ -108,14 +123,11 @@ pub(super) fn call(interpreter: &mut Interpreter<'_, '_>, node: Node<'_>, state:
         _ => interpreter.text(function),
     };
     let receiver = object.map(|inner| interpreter.expression(inner, state));
-    let arguments: Vec<Value> = node
-        .child_by_field_name(ARGUMENTS_FIELD)
-        .map(named_children)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|argument| argument.kind() != COMMENT)
-        .map(|argument| interpreter.expression(argument, state))
-        .collect();
+    let callback_input = receiver
+        .as_ref()
+        .filter(|_| RECEIVER_CALLBACKS.contains(&method))
+        .map_or_else(Value::clean, |value| Value::Data(value.flow()));
+    let arguments = call_arguments(interpreter, node, &callback_input, state);
     let list = object
         .filter(|inner| inner.kind() == IDENTIFIER)
         .map(|inner| interpreter.text(inner));
@@ -169,6 +181,28 @@ pub(super) fn call(interpreter: &mut Interpreter<'_, '_>, node: Node<'_>, state:
         arguments: carried,
     });
     Value::Data(Flow::of(Atom::Call(interpreter.calls.len().saturating_sub(1))))
+}
+
+// Los callbacks que se pasan corren en el lugar y reciben `callback_input`.
+fn call_arguments(
+    interpreter: &mut Interpreter<'_, '_>,
+    node: Node<'_>,
+    callback_input: &Value,
+    state: &mut State,
+) -> Vec<Value> {
+    node.child_by_field_name(ARGUMENTS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|argument| argument.kind() != COMMENT)
+        .map(|argument| {
+            if CLOSURES.contains(&argument.kind()) {
+                interpreter.closure(argument, state, callback_input)
+            } else {
+                interpreter.expression(argument, state)
+            }
+        })
+        .collect()
 }
 
 // `lista.push(x)`, `lista.pop()` y `lista.shift()` sobre un arreglo que se sigue por posición.

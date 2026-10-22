@@ -798,11 +798,18 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     versión daba 13, todos falsos: `reply.send` de Fastify (texto plano o JSON), respuestas que
     declaran JSON con `writeHead` y un `escapeHtml` propio.
 - Pendientes de contaminación en JavaScript y TypeScript:
-  - Las clausuras no se siguen: un dato del usuario que entra a un callback (`.then`, `.map`) se
-    pierde, y el código de nivel de módulo no se recorre.
+  - El código de nivel de módulo no se recorre.
   - Sin tipos, las conexiones y los objetos del pedido se reconocen por el nombre de la variable;
     con el chequeo de tipos de TypeScript se podría mirar el tipo.
   - Plantillas en archivos (EJS con `<%-`, Handlebars con `{{{`): como en Python.
+- Clausuras en JavaScript y TypeScript (hecho, 2026-10-22): una función escrita dentro de otra (el
+  callback de `.then`, `.map`, `.forEach` o de una ruta registrada dentro de una función) corre en
+  el lugar con las variables de afuera. Los parámetros de los callbacks de `.then`, `.map`,
+  `.filter`, `.reduce` y parecidos valen lo que trae el receptor; los de cualquier otro, nada
+  conocido. Lo que el callback les asigna a las variables de afuera se junta con lo que tenían (puede
+  no haber corrido), lo que devuelve es el valor del argumento, y un `res.type('json')` adentro sólo
+  vale para ese callback. En los tests de Semgrep y en tus proyectos con JS/TS, lo mismo que antes
+  (ninguno de los que faltan es por clausuras); el tiempo sobre gastronova sin caché no cambia.
 - Contaminación en Go (hecho, 2026-10-22): un intérprete (`src/lint/go/taint/`) que usa los tipos
   declarados para las fuentes y los sumideros, con constantes, `switch`, `range`, mapas por clave y
   `strings.Builder`, y la resolución entre paquetes por carpeta (`src/index/go_taint.rs`). Los

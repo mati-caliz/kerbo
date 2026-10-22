@@ -103,6 +103,34 @@ export class ItemsController {
 }
 ";
 
+const CLOSURES: &str = r"function register(app) {
+  app.get('/search', (req, res) => {
+    const term = req.query.term;
+    db.query('SELECT 1').then(() => {
+      db.query(`SELECT * FROM logs WHERE term = '${term}'`);
+    });
+    const names = [term].map((name) => '<b>' + name + '</b>');
+    let html = '';
+    ['a', 'b'].forEach((term) => {
+      html += term;
+    });
+    res.send(names.join(''));
+    res.send(html + term);
+  });
+  app.get('/plain', (req, res) => {
+    res.type('json');
+    res.send(req.query.term);
+  });
+  app.get('/after', (req, res) => {
+    let shown = '';
+    [req.query.term].forEach((item) => {
+      shown += item;
+    });
+    res.send(shown);
+  });
+}
+";
+
 fn taints_of(source: &str) -> Vec<TaintMethod> {
     taints_in(Language::JavaScript, source)
 }
@@ -188,6 +216,24 @@ fn nest_decorated_parameters_come_from_the_user() {
         taints: &controller,
     }];
     assert_eq!(found(&modules), ["7 sql-injection query"]);
+}
+
+#[test]
+fn callbacks_see_what_the_enclosing_function_sees() {
+    let routes = taints_of(CLOSURES);
+    let modules = [ScriptModule {
+        path: "src/routes.js",
+        taints: &routes,
+    }];
+    assert_eq!(
+        found(&modules),
+        [
+            "5 sql-injection query",
+            "12 xss send",
+            "13 xss send",
+            "24 xss send",
+        ]
+    );
 }
 
 #[test]
