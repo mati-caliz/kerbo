@@ -4,7 +4,7 @@ use super::super::ast::{Decl, FieldList, FuncDecl, GenDecl, ImportSpec, Spec, Ty
 use super::super::position::Pos;
 use super::super::token::Token;
 use super::expressions::{expr_list, field_expr, optional_expr};
-use super::statements::{block};
+use super::statements::block;
 use super::types::{field_list, signature};
 use super::{Converter, Missing, last_token, named, named_field, start, token};
 
@@ -75,7 +75,6 @@ pub fn spec(converter: &Converter<'_>, node: Node<'_>) -> Option<Spec> {
             name: node.child_by_field_name("name").map(|name| converter.ident(name)),
             path: converter.literal(node.child_by_field_name("path")?, Token::String),
             end_pos: Pos::NONE,
-            comment: converter.line_comment(node),
         })),
         "const_spec" | "var_spec" => Some(Spec::Value(ValueSpec {
             names: named_field(node, "name")

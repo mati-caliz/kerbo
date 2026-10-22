@@ -19,7 +19,7 @@ enum State {
 pub struct Trimmer {
     state: State,
     space: Vec<u8>,
-    pub output: Vec<u8>,
+    output: Vec<u8>,
 }
 
 impl Trimmer {
@@ -28,6 +28,18 @@ impl Trimmer {
             state: State::Space,
             space: Vec::new(),
             output: Vec::new(),
+        }
+    }
+
+    pub fn into_output(self) -> Vec<u8> {
+        self.output
+    }
+
+    fn in_escape(&mut self, data: &[u8], (mark, index): (usize, usize), byte: u8) {
+        if byte == ESCAPE {
+            self.output
+                .extend_from_slice(data.get(mark..index).unwrap_or_default());
+            self.reset_space();
         }
     }
 
@@ -42,13 +54,7 @@ impl Trimmer {
             let byte = if original == VERTICAL_TAB { TAB } else { original };
             match self.state {
                 State::Space => mark = self.in_space(index, byte).unwrap_or(mark),
-                State::Escape => {
-                    if byte == ESCAPE {
-                        self.output
-                            .extend_from_slice(data.get(mark..index).unwrap_or_default());
-                        self.reset_space();
-                    }
-                }
+                State::Escape => self.in_escape(data, (mark, index), byte),
                 State::Text => mark = self.in_text(data, (mark, index), byte),
             }
         }

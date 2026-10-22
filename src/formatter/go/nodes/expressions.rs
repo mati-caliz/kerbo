@@ -169,7 +169,7 @@ fn index_expr(printer: &mut Printer<'_, '_>, index: &Index, depth: i64) {
     expr1(printer, &index.x, HIGHEST_PRECEDENCE, 1);
     printer.set_pos(index.lbrack);
     printer.token(Token::Lbrack);
-    expr0(printer, &index.index, depth.saturating_add(1));
+    expr0(printer, &index.subscript, depth.saturating_add(1));
     printer.set_pos(index.rbrack);
     printer.token(Token::Rbrack);
 }

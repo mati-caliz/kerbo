@@ -106,14 +106,14 @@ fn control_clause(printer: &mut Printer<'_, '_>, clause: &Clause<'_>) {
 }
 
 fn indent_list(printer: &Printer<'_, '_>, list: &[Expr]) -> bool {
-    let (Some(first), Some(last)) = (list.first(), list.last()) else {
+    let (Some(first), Some(final_expr)) = (list.first(), list.last()) else {
         return false;
     };
     if list.len() < 2 {
         return false;
     }
     let begin = printer.line_for(first.pos());
-    let end = printer.line_for(last.end());
+    let end = printer.line_for(final_expr.end());
     if !(0 < begin && begin < end) {
         return false;
     }

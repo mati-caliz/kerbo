@@ -41,12 +41,6 @@ pub struct Position {
 }
 
 impl Position {
-    pub const INFINITE: Self = Self {
-        offset: INFINITY,
-        line: INFINITY,
-        column: 0,
-    };
-
     pub const fn start() -> Self {
         Self {
             offset: 0,

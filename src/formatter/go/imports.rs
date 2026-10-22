@@ -27,23 +27,31 @@ pub fn sort(file: &mut File, lines: &LineTable) {
         if !decl.lparen.is_valid() {
             continue;
         }
-        let mut start = 0;
-        for index in 1..=decl.specs.len() {
-            let breaks_run = decl
-                .specs
-                .get(index)
-                .zip(decl.specs.get(index.saturating_sub(1)))
-                .is_none_or(|(current, previous)| {
-                    lines.line(current.pos()) > lines.line(previous.end()).saturating_add(1)
-                });
-            if breaks_run {
-                if let Some(run) = decl.specs.get_mut(start..index) {
-                    sort_run(run, comments, lines);
-                }
-                start = index;
+        for (start, end) in runs(&decl.specs, lines) {
+            if let Some(run) = decl.specs.get_mut(start..end) {
+                sort_run(run, comments, lines);
             }
         }
     }
+}
+
+// Las tandas de imports en líneas seguidas: una línea en blanco corta la tanda.
+fn runs(specs: &[Spec], lines: &LineTable) -> Vec<(usize, usize)> {
+    let mut found = Vec::new();
+    let mut start = 0;
+    for index in 1..=specs.len() {
+        let breaks_run = specs
+            .get(index)
+            .zip(specs.get(index.saturating_sub(1)))
+            .is_none_or(|(current, previous)| {
+                lines.line(current.pos()) > lines.line(previous.end()).saturating_add(1)
+            });
+        if breaks_run {
+            found.push((start, index));
+            start = index;
+        }
+    }
+    found
 }
 
 fn sort_run(specs: &mut [Spec], comments: &mut [CommentGroup], lines: &LineTable) {
@@ -143,11 +151,15 @@ fn reorder(
         }
         for assignment in assignments.iter().filter(|assignment| assignment.spec == *source) {
             let slash = if assignment.left { start.back(1) } else { *end };
-            if let Some(group) = comments.get_mut(assignment.group) {
-                for comment in &mut group.list {
-                    comment.slash = slash;
-                }
-            }
+            move_group(comments, assignment.group, slash);
+        }
+    }
+}
+
+fn move_group(comments: &mut [CommentGroup], group: usize, slash: Pos) {
+    if let Some(found) = comments.get_mut(group) {
+        for comment in &mut found.list {
+            comment.slash = slash;
         }
     }
 }

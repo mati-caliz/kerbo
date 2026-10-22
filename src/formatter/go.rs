@@ -43,8 +43,8 @@ fn parse(source: &str) -> Option<Tree> {
     if renamed == source {
         return None;
     }
-    let tree = parser.parse(renamed.as_ref(), None)?;
-    (!tree.root_node().has_error()).then_some(tree)
+    let renamed_tree = parser.parse(renamed.as_ref(), None)?;
+    (!renamed_tree.root_node().has_error()).then_some(renamed_tree)
 }
 
 #[cfg(test)]

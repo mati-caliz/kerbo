@@ -23,7 +23,12 @@ pub fn typ(converter: &Converter<'_>, node: Node<'_>) -> Option<Expr> {
         }))),
         "generic_type" => {
             let arguments = node.child_by_field_name("type_arguments")?;
-            instantiate(converter, field_expr(converter, node, "type")?, arguments, &named(arguments))
+            instantiate(
+                converter,
+                field_expr(converter, node, "type")?,
+                arguments,
+                &named(arguments),
+            )
         }
         "pointer_type" => Some(Expr::Star(Box::new(Star {
             star: start(node),
@@ -49,7 +54,12 @@ pub fn typ(converter: &Converter<'_>, node: Node<'_>) -> Option<Expr> {
             value: field_expr(converter, node, "value")?,
         }))),
         "channel_type" => channel(converter, node),
-        "function_type" => Some(Expr::Func(Box::new(signature(converter, node, start(node), None)?))),
+        "function_type" => Some(Expr::Func(Box::new(signature(
+            converter,
+            node,
+            start(node),
+            None,
+        )?))),
         "negated_type" => Some(Expr::Unary(Box::new(Unary {
             op_pos: start(node),
             op: Token::Tilde,
@@ -87,7 +97,12 @@ pub fn channel(converter: &Converter<'_>, node: Node<'_>) -> Option<Expr> {
     })))
 }
 
-pub fn signature(converter: &Converter<'_>, node: Node<'_>, func: Pos, type_params: Option<FieldList>) -> Option<FuncType> {
+pub fn signature(
+    converter: &Converter<'_>,
+    node: Node<'_>,
+    func: Pos,
+    type_params: Option<FieldList>,
+) -> Option<FuncType> {
     Some(FuncType {
         func,
         type_params,
@@ -139,18 +154,18 @@ pub fn parameter(converter: &Converter<'_>, node: Node<'_>) -> Option<Field> {
         .into_iter()
         .map(|name| converter.ident(name))
         .collect();
-    let converted = expr(converter, typ)?;
-    let typ = if node.kind() == VARIADIC_PARAMETER {
+    let written = expr(converter, typ)?;
+    let declared = if node.kind() == VARIADIC_PARAMETER {
         Expr::Ellipsis(Box::new(Ellipsis {
             pos: token(node, "..."),
-            elt: Some(converted),
+            elt: Some(written),
         }))
     } else {
-        converted
+        written
     };
     Some(Field {
         names,
-        typ,
+        typ: declared,
         tag: None,
         comment: None,
     })

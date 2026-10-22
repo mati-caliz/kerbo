@@ -40,7 +40,7 @@ pub fn file(root: Node<'_>, source: &str, lines: &LineTable) -> Option<File> {
         package: start(package),
         name,
         decls,
-        comments: comments.groups,
+        comments: comments.into_groups(),
     })
 }
 

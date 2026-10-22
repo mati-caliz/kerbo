@@ -6,7 +6,7 @@ use super::super::ast::{
 };
 use super::super::position::Pos;
 use super::super::token::Token;
-use super::declarations::{gen_decl};
+use super::declarations::gen_decl;
 use super::expressions::{expr, expr_list, field_expr, optional_expr};
 use super::{Converter, Missing, children, last_token, named, named_field, start, token};
 
@@ -33,7 +33,10 @@ pub fn statement_list(converter: &Converter<'_>, parent: Node<'_>) -> Option<Vec
     else {
         return Some(Vec::new());
     };
-    named(list).into_iter().map(|child| stmt(converter, child)).collect()
+    named(list)
+        .into_iter()
+        .map(|child| stmt(converter, child))
+        .collect()
 }
 
 pub fn stmt(converter: &Converter<'_>, node: Node<'_>) -> Option<Stmt> {
@@ -56,10 +59,10 @@ pub fn stmt(converter: &Converter<'_>, node: Node<'_>) -> Option<Stmt> {
                 .first()
                 .map_or_else(|| Some(Vec::new()), |list| expr_list(converter, *list))?,
         }))),
-        "break_statement" => branch(converter, node, Token::Break),
-        "continue_statement" => branch(converter, node, Token::Continue),
-        "goto_statement" => branch(converter, node, Token::Goto),
-        "fallthrough_statement" => branch(converter, node, Token::Fallthrough),
+        "break_statement" => Some(branch(converter, node, Token::Break)),
+        "continue_statement" => Some(branch(converter, node, Token::Continue)),
+        "goto_statement" => Some(branch(converter, node, Token::Goto)),
+        "fallthrough_statement" => Some(branch(converter, node, Token::Fallthrough)),
         "block" => Some(Stmt::Block(Box::new(block(converter, node)?))),
         "if_statement" => if_stmt(converter, node),
         "for_statement" => for_stmt(converter, node),
@@ -72,7 +75,11 @@ pub fn stmt(converter: &Converter<'_>, node: Node<'_>) -> Option<Stmt> {
     }
 }
 
-pub fn optional_stmt(converter: &Converter<'_>, node: Node<'_>, field: &str) -> Result<Option<Stmt>, Missing> {
+pub fn optional_stmt(
+    converter: &Converter<'_>,
+    node: Node<'_>,
+    field: &str,
+) -> Result<Option<Stmt>, Missing> {
     node.child_by_field_name(field)
         .map(|child| stmt(converter, child).ok_or(Missing))
         .transpose()
@@ -127,12 +134,12 @@ pub fn call_stmt(converter: &Converter<'_>, node: Node<'_>) -> Option<CallStmt> 
     })
 }
 
-pub fn branch(converter: &Converter<'_>, node: Node<'_>, tok: Token) -> Option<Stmt> {
-    Some(Stmt::Branch(Box::new(BranchStmt {
+pub fn branch(converter: &Converter<'_>, node: Node<'_>, tok: Token) -> Stmt {
+    Stmt::Branch(Box::new(BranchStmt {
         tok_pos: start(node),
         tok,
         label: named(node).first().map(|label| converter.ident(*label)),
-    })))
+    }))
 }
 
 pub fn if_stmt(converter: &Converter<'_>, node: Node<'_>) -> Option<Stmt> {
@@ -156,7 +163,9 @@ pub fn for_stmt(converter: &Converter<'_>, node: Node<'_>) -> Option<Stmt> {
         body,
     };
     match header {
-        Some(clause) if clause.kind() == RANGE_CLAUSE => return range(converter, node, clause, statement.body),
+        Some(clause) if clause.kind() == RANGE_CLAUSE => {
+            return range(converter, node, clause, statement.body);
+        }
         Some(clause) if clause.kind() == FOR_CLAUSE => {
             statement.init = optional_stmt(converter, clause, INITIALIZER).ok()?;
             statement.cond = optional_expr(converter, clause, "condition").ok()?;

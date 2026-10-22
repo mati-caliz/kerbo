@@ -86,11 +86,12 @@ fn multiline_list(printer: &mut Printer<'_, '_>, request: &ExprList<'_>, first_l
     } else {
         Whitespace::Indent
     };
-    let mut prev_break: Option<usize> = None;
-    if prev.is_valid() && prev.line < first_line && printer.linebreak(section(first_line, ws, true)) > 0 {
+    let broke_before =
+        prev.is_valid() && prev.line < first_line && printer.linebreak(section(first_line, ws, true)) > 0;
+    if broke_before {
         ws = Whitespace::Ignore;
-        prev_break = Some(0);
     }
+    let mut prev_break: Option<usize> = broke_before.then_some(0);
     let mut alignment = Alignment {
         size: 0,
         log2_sum: 0.0,
@@ -108,21 +109,21 @@ fn multiline_list(printer: &mut Printer<'_, '_>, request: &ExprList<'_>, first_l
                 printer.set_pos(element.pos());
             }
             printer.token(Token::Comma);
-            let mut needs_blank = true;
-            if needs_linebreak {
-                let after_previous = prev_break.map_or(0, |previous| previous.saturating_add(1));
-                let breaks = printer.linebreak(section(line, ws, use_formfeed || after_previous < index));
-                if breaks > 0 {
-                    ws = Whitespace::Ignore;
-                    prev_break = Some(index);
-                    needs_blank = false;
-                }
-                if breaks > 1 {
-                    alignment.log2_sum = 0.0;
-                    alignment.count = 0;
-                }
+            let after_previous = prev_break.map_or(0, |previous| previous.saturating_add(1));
+            let breaks = if needs_linebreak {
+                printer.linebreak(section(line, ws, use_formfeed || after_previous < index))
+            } else {
+                0
+            };
+            if breaks > 0 {
+                ws = Whitespace::Ignore;
+                prev_break = Some(index);
             }
-            if needs_blank {
+            if breaks > 1 {
+                alignment.log2_sum = 0.0;
+                alignment.count = 0;
+            }
+            if breaks == 0 {
                 printer.ws(Whitespace::Blank);
             }
         }
@@ -211,14 +212,14 @@ fn log2ish(value: i64) -> f64 {
     for _ in 0..exponent {
         fraction /= 2.0;
     }
-    f64::from(exponent) + 2.0 * (fraction - 1.0)
+    2.0f64.mul_add(fraction - 1.0, f64::from(exponent))
 }
 
 fn exp2ish(value: f64) -> f64 {
     let whole = value.floor();
     let mut result = 1.0 + (value - whole);
     let mut remaining = whole;
-    while remaining >= 1.0 {
+    while remaining.total_cmp(&1.0).is_ge() {
         result *= 2.0;
         remaining -= 1.0;
     }

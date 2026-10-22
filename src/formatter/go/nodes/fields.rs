@@ -122,7 +122,7 @@ fn struct_fields(printer: &mut Printer<'_, '_>, list: &[Field]) {
             });
         }
         printer.record_line(slot);
-        let mut extra_tabs = if field.names.is_empty() {
+        let untagged_tabs = if field.names.is_empty() {
             expr(printer, &field.typ);
             EMBEDDED_FIELD_TABS
         } else {
@@ -131,14 +131,14 @@ fn struct_fields(printer: &mut Printer<'_, '_>, list: &[Field]) {
             expr(printer, &field.typ);
             NAMED_FIELD_TABS
         };
-        if let Some(tag) = &field.tag {
+        let extra_tabs = field.tag.as_ref().map_or(untagged_tabs, |tag| {
             if !field.names.is_empty() && separator == Whitespace::Vtab {
                 printer.ws(separator);
             }
             printer.ws(separator);
             basic_lit(printer, tag);
-            extra_tabs = 0;
-        }
+            0
+        });
         if field.comment.is_some() {
             for _ in 0..extra_tabs {
                 printer.ws(separator);

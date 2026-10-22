@@ -110,7 +110,7 @@ struct Parser<'text> {
     size: usize,
 }
 
-impl<'text> Parser<'text> {
+impl Parser<'_> {
     fn or(&mut self) -> Option<Constraint> {
         let mut left = self.and()?;
         while self.token == OR {

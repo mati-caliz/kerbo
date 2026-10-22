@@ -88,7 +88,6 @@ pub struct ImportSpec {
     pub name: Option<Ident>,
     pub path: BasicLit,
     pub end_pos: Pos,
-    pub comment: Option<usize>,
 }
 
 impl ImportSpec {

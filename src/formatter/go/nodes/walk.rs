@@ -29,12 +29,11 @@ fn is_type_name(x: &Expr) -> bool {
 
 fn named_literal_in(x: &Expr) -> bool {
     match x {
-        Expr::Paren(_) => false,
+        Expr::Paren(_) | Expr::Ident(_) | Expr::BasicLit(_) => false,
         Expr::Composite(literal) => literal.typ.as_ref().is_some_and(is_type_name),
-        Expr::Ident(_) | Expr::BasicLit(_) => false,
         Expr::FuncLit(literal) => in_func_type(&literal.typ) || in_block(&literal.body),
         Expr::Selector(selector) => named_literal_in(&selector.x),
-        Expr::Index(index) => named_literal_in(&index.x) || named_literal_in(&index.index),
+        Expr::Index(index) => named_literal_in(&index.x) || named_literal_in(&index.subscript),
         Expr::IndexList(index) => named_literal_in(&index.x) || index.indices.iter().any(named_literal_in),
         Expr::Slice(slice) => {
             named_literal_in(&slice.x)
@@ -88,7 +87,6 @@ fn in_exprs(list: &[Expr]) -> bool {
 fn in_stmt(statement: &Stmt) -> bool {
     match statement {
         Stmt::Decl(decl) => in_gen_decl(decl),
-        Stmt::Empty(_) => false,
         Stmt::Labeled(labeled) => in_stmt(&labeled.stmt),
         Stmt::Expr(x) => named_literal_in(x),
         Stmt::Send(send) => named_literal_in(&send.chan) || named_literal_in(&send.value),
@@ -96,7 +94,7 @@ fn in_stmt(statement: &Stmt) -> bool {
         Stmt::Assign(assign) => in_exprs(&assign.lhs) || in_exprs(&assign.rhs),
         Stmt::Go(statement) | Stmt::Defer(statement) => named_literal_in(&statement.call),
         Stmt::Return(statement) => in_exprs(&statement.results),
-        Stmt::Branch(_) => false,
+        Stmt::Empty(_) | Stmt::Branch(_) => false,
         Stmt::Block(body) => in_block(body),
         Stmt::If(statement) => {
             in_optional(statement.init.as_ref())

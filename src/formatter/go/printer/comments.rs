@@ -49,7 +49,7 @@ fn have_newline(printer: &Printer<'_, '_>, list: &[Comment]) -> bool {
     })
 }
 
-pub fn comment_before(printer: &Printer<'_, '_>, next: Position) -> bool {
+pub const fn comment_before(printer: &Printer<'_, '_>, next: Position) -> bool {
     printer.cursor.offset < next.offset && (!printer.implied_semi || !printer.cursor.has_newline)
 }
 
@@ -96,12 +96,12 @@ fn intersperse_comments(printer: &mut Printer<'_, '_>, next: Position, tok: Toke
             && printer.last_tok != Token::Import
             && printer.pos_for(group.pos()).column == 1
             && printer.pos_for(group.end().shifted(1)) == next;
-        let list = if is_doc {
+        let shown = if is_doc {
             format_doc_comment(&group.list)
         } else {
             group.list.clone()
         };
-        for current in list {
+        for current in shown {
             let spot = Spot {
                 pos: printer.pos_for(current.slash),
                 next,
@@ -189,7 +189,8 @@ fn consume_blanks_before_comment(printer: &mut Printer<'_, '_>) -> bool {
             Some(Whitespace::Blank) => set_ignored(printer, index),
             Some(Whitespace::Vtab) => has_separator = true,
             Some(Whitespace::Indent) => {}
-            Some(Whitespace::Ignore | Whitespace::Newline | Whitespace::Formfeed | Whitespace::Unindent) | None => {
+            Some(Whitespace::Ignore | Whitespace::Newline | Whitespace::Formfeed | Whitespace::Unindent)
+            | None => {
                 stop = index;
                 break;
             }

@@ -44,7 +44,7 @@ pub fn align(text: &[u8]) -> Vec<u8> {
     };
     writer.write(text);
     writer.flush();
-    writer.sink.output
+    writer.sink.into_output()
 }
 
 fn rune_count(bytes: &[u8]) -> usize {
@@ -95,34 +95,46 @@ impl TabWriter {
 
     fn write(&mut self, text: &[u8]) {
         let mut start = 0;
-        for (index, byte) in text.iter().copied().enumerate() {
-            if self.escaping {
-                if byte == ESCAPE {
-                    self.append(text.get(start..=index).unwrap_or_default());
-                    start = index.saturating_add(1);
-                    self.end_escape();
-                }
-                continue;
-            }
-            if matches!(byte, TAB | VERTICAL_TAB | NEWLINE | FORMFEED) {
-                self.append(text.get(start..index).unwrap_or_default());
-                self.update_width();
-                start = index.saturating_add(1);
-                let cells = self.terminate_cell(byte == TAB);
-                if byte == NEWLINE || byte == FORMFEED {
-                    self.lines.push(Vec::new());
-                    if byte == FORMFEED || cells == 1 {
-                        self.flush();
-                    }
-                }
-            } else if byte == ESCAPE {
-                self.append(text.get(start..index).unwrap_or_default());
-                self.update_width();
-                start = index;
-                self.escaping = true;
-            }
+        for index in 0..text.len() {
+            start = self.consume(text, index, start);
         }
         self.append(text.get(start..).unwrap_or_default());
+    }
+
+    // Un byte del texto: devuelve desde dónde queda texto por agregar a la celda.
+    fn consume(&mut self, text: &[u8], index: usize, start: usize) -> usize {
+        let byte = text.get(index).copied().unwrap_or_default();
+        if self.escaping {
+            if byte == ESCAPE {
+                self.append(text.get(start..=index).unwrap_or_default());
+                self.end_escape();
+                return index.saturating_add(1);
+            }
+            return start;
+        }
+        if matches!(byte, TAB | VERTICAL_TAB | NEWLINE | FORMFEED) {
+            self.append(text.get(start..index).unwrap_or_default());
+            self.update_width();
+            let cells = self.terminate_cell(byte == TAB);
+            self.end_line_if_needed(byte, cells);
+            return index.saturating_add(1);
+        }
+        if byte == ESCAPE {
+            self.append(text.get(start..index).unwrap_or_default());
+            self.update_width();
+            self.escaping = true;
+            return index;
+        }
+        start
+    }
+
+    fn end_line_if_needed(&mut self, byte: u8, cells: usize) {
+        if byte == NEWLINE || byte == FORMFEED {
+            self.lines.push(Vec::new());
+            if byte == FORMFEED || cells == 1 {
+                self.flush();
+            }
+        }
     }
 
     fn flush(&mut self) {
@@ -149,25 +161,29 @@ impl TabWriter {
             }
             pos = self.write_lines(pos, first, this);
             first = this;
-            let mut width = 0;
-            let mut discardable = true;
-            while this < end_line && self.cell_count(this) > column.saturating_add(1) {
-                let cell = self.cell_at(this, column);
-                width = width.max(cell.width.saturating_add(PADDING));
-                if cell.width > 0 || cell.htab {
-                    discardable = false;
-                }
-                this = this.saturating_add(1);
-            }
-            if discardable {
-                width = 0;
-            }
+            let (width, block_end) = self.column_width(this, end_line, column);
+            this = block_end;
             self.widths.push(width);
             pos = self.format(pos, first, this);
             self.widths.pop();
             first = this;
         }
         self.write_lines(pos, first, end_line)
+    }
+
+    // El ancho de la columna en el bloque de líneas que la tienen, y dónde termina ese bloque. Si
+    // ninguna celda tiene texto ni tabulador, la columna no ocupa lugar.
+    fn column_width(&self, start: usize, end_line: usize, column: usize) -> (usize, usize) {
+        let mut this = start;
+        let mut width = 0;
+        let mut discardable = true;
+        while this < end_line && self.cell_count(this) > column.saturating_add(1) {
+            let cell = self.cell_at(this, column);
+            width = width.max(cell.width.saturating_add(PADDING));
+            discardable = discardable && cell.width == 0 && !cell.htab;
+            this = this.saturating_add(1);
+        }
+        (if discardable { 0 } else { width }, this)
     }
 
     fn cell_count(&self, line: usize) -> usize {
@@ -182,28 +198,31 @@ impl TabWriter {
             .unwrap_or_default()
     }
 
-    fn write_lines(&mut self, pos: usize, first_line: usize, end_line: usize) -> usize {
+    // Las celdas de una línea con su relleno: hasta la primera con texto, el relleno va con tabs.
+    fn write_cells(&mut self, line: usize, pos: usize) -> usize {
         let mut pos = pos;
-        for line in first_line..end_line {
-            let cells = self.lines.get(line).cloned().unwrap_or_default();
-            let mut use_tabs = true;
-            for (column, cell) in cells.iter().enumerate() {
-                let column_width = self.widths.get(column).copied();
-                if cell.size == 0 {
-                    if let Some(width) = column_width {
-                        self.write_padding(cell.width, width, use_tabs);
-                    }
-                    continue;
-                }
+        let cells = self.lines.get(line).cloned().unwrap_or_default();
+        let mut use_tabs = true;
+        for (column, cell) in cells.iter().enumerate() {
+            let column_width = self.widths.get(column).copied();
+            if cell.size > 0 {
                 use_tabs = false;
                 let end = pos.saturating_add(cell.size);
                 let text = self.buf.get(pos..end).unwrap_or_default().to_vec();
                 self.sink.write(&text);
                 pos = end;
-                if let Some(width) = column_width {
-                    self.write_padding(cell.width, width, false);
-                }
             }
+            if let Some(width) = column_width {
+                self.write_padding(cell.width, width, use_tabs);
+            }
+        }
+        pos
+    }
+
+    fn write_lines(&mut self, pos: usize, first_line: usize, end_line: usize) -> usize {
+        let mut pos = pos;
+        for line in first_line..end_line {
+            pos = self.write_cells(line, pos);
             if line.saturating_add(1) == self.lines.len() {
                 let end = pos.saturating_add(self.cell.size);
                 let text = self.buf.get(pos..end).unwrap_or_default().to_vec();

@@ -174,7 +174,7 @@ impl<'context, 'sizes> Printer<'context, 'sizes> {
         }
     }
 
-    pub fn lines_from(&self, line: i64) -> i64 {
+    pub const fn lines_from(&self, line: i64) -> i64 {
         self.out.line.saturating_sub(line)
     }
 

@@ -65,7 +65,7 @@ struct Scanned {
 // grupo es el comentario de línea de una declaración.
 #[derive(Debug)]
 pub struct Comments {
-    pub groups: Vec<CommentGroup>,
+    groups: Vec<CommentGroup>,
     scanned: Vec<Scanned>,
     group_at: HashMap<usize, usize>,
 }
@@ -270,6 +270,10 @@ fn comment_end_line(comment: &Comment, lines: &LineTable) -> i64 {
 }
 
 impl Comments {
+    pub fn into_groups(self) -> Vec<CommentGroup> {
+        self.groups
+    }
+
     // El comentario que go/parser le asigna a un campo o a una especificación que termina en
     // `end`: el que sigue en la misma línea, si después viene el punto y coma.
     pub fn line_comment(&self, end: usize) -> Option<usize> {

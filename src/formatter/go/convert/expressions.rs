@@ -6,7 +6,7 @@ use super::super::ast::{
 };
 use super::super::position::Pos;
 use super::super::token::Token;
-use super::statements::{block};
+use super::statements::block;
 use super::types::{field_list, results, typ};
 use super::{Converter, Missing, children, last_token, named, start, token};
 
@@ -51,14 +51,21 @@ pub fn field_expr(converter: &Converter<'_>, node: Node<'_>, field: &str) -> Opt
     expr(converter, node.child_by_field_name(field)?)
 }
 
-pub fn optional_expr(converter: &Converter<'_>, node: Node<'_>, field: &str) -> Result<Option<Expr>, Missing> {
+pub fn optional_expr(
+    converter: &Converter<'_>,
+    node: Node<'_>,
+    field: &str,
+) -> Result<Option<Expr>, Missing> {
     node.child_by_field_name(field)
         .map(|child| expr(converter, child).ok_or(Missing))
         .transpose()
 }
 
 pub fn expr_list(converter: &Converter<'_>, node: Node<'_>) -> Option<Vec<Expr>> {
-    named(node).into_iter().map(|child| expr(converter, child)).collect()
+    named(node)
+        .into_iter()
+        .map(|child| expr(converter, child))
+        .collect()
 }
 
 pub fn paren(converter: &Converter<'_>, node: Node<'_>) -> Option<Expr> {
@@ -124,26 +131,31 @@ pub fn instantiation(converter: &Converter<'_>, node: Node<'_>) -> Option<Expr> 
     instantiate(converter, expr(converter, typ)?, node, &indices)
 }
 
-pub fn instantiate(converter: &Converter<'_>, x: Expr, brackets: Node<'_>, indices: &[Node<'_>]) -> Option<Expr> {
+pub fn instantiate(
+    converter: &Converter<'_>,
+    x: Expr,
+    brackets: Node<'_>,
+    indices: &[Node<'_>],
+) -> Option<Expr> {
     let lbrack = token(brackets, "[");
     let rbrack = last_token(brackets, "]");
-    let mut converted = indices
+    let mut subscripts = indices
         .iter()
         .map(|index| expr(converter, *index))
         .collect::<Option<Vec<_>>>()?;
-    if converted.len() == 1 {
-        let index = converted.pop()?;
+    if subscripts.len() == 1 {
+        let subscript = subscripts.pop()?;
         return Some(Expr::Index(Box::new(Index {
             x,
             lbrack,
-            index,
+            subscript,
             rbrack,
         })));
     }
     Some(Expr::IndexList(Box::new(IndexList {
         x,
         lbrack,
-        indices: converted,
+        indices: subscripts,
         rbrack,
     })))
 }
@@ -159,7 +171,7 @@ pub fn index(converter: &Converter<'_>, node: Node<'_>) -> Option<Expr> {
     Some(Expr::Index(Box::new(Index {
         x: field_expr(converter, node, OPERAND)?,
         lbrack: token(node, "["),
-        index: field_expr(converter, node, "index")?,
+        subscript: field_expr(converter, node, "index")?,
         rbrack: last_token(node, "]"),
     })))
 }

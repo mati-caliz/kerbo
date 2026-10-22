@@ -48,21 +48,52 @@ fn reads_new_with_an_expression_from_go_1_26() {
 }
 
 #[test]
-#[ignore = "depuración local"]
-fn debug_files() {
-    let list = std::env::var("KERBO_FMT_LIST")
-        .ok()
-        .and_then(|path| std::fs::read_to_string(path).ok())
-        .unwrap_or_default();
-    for path in list.split(':').filter(|path| !path.is_empty()) {
-        let source = std::fs::read_to_string(path).unwrap();
-        eprintln!("FILE {path}");
-        let _ = format(&source);
-    }
-}
-
-#[test]
 fn leaves_files_with_syntax_errors_untouched() {
     assert_eq!(format("package main\nfunc {\n"), Err(Unparsable));
     assert_eq!(format("x := 1\n"), Err(Unparsable));
+}
+
+// gofmt saca los paréntesis de una condición salvo que adentro haya un literal compuesto con nombre
+// de tipo, aunque esté dentro de una función anónima.
+const KEPT_PARENS: &str = "package main
+
+func main() {
+	if (func() bool {
+		var a = T{}
+		a.x++
+		ch <- 1
+		go f()
+		defer f()
+		for i := 0; i < 1; i++ {
+		}
+		for range xs {
+		}
+		switch {
+		case true:
+		}
+		switch v := y.(type) {
+		case int:
+			_ = v
+		}
+		select {
+		case <-ch:
+		}
+		{
+		}
+		if true {
+		} else {
+		}
+		return a.x[0] == T{}.x && xs[1:2] != nil
+	}()) {
+	}
+	if (x) {
+	}
+}
+";
+
+#[test]
+fn keeps_the_parentheses_that_protect_a_composite_literal() {
+    let formatted = format(KEPT_PARENS).expect("se formatea");
+    assert!(formatted.contains("\tif (func() bool {\n"), "{formatted}");
+    assert!(formatted.contains("\tif x {\n"), "{formatted}");
 }

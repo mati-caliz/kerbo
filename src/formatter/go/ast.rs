@@ -196,7 +196,7 @@ pub struct Selector {
 pub struct Index {
     pub x: Expr,
     pub lbrack: Pos,
-    pub index: Expr,
+    pub subscript: Expr,
     pub rbrack: Pos,
 }
 

@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, Write};
+use std::io;
 use std::path::Path;
 
 use rayon::prelude::*;
@@ -109,3 +109,6 @@ fn format_file(file: &FileIdentity, write: bool) -> Result<Formatted, ScanFailur
     }
     Ok(Formatted::Changed)
 }
+
+#[cfg(test)]
+mod tests;
