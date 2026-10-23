@@ -12,9 +12,11 @@ mod escapes;
 mod flow;
 mod formats;
 mod fstrings;
+mod imports;
 mod loops;
 mod modern;
 mod names;
+mod natural;
 mod negations;
 mod noqa;
 mod rewrites;
@@ -112,7 +114,14 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     let mut reports = if root.has_error() {
         Vec::new()
     } else {
-        semantic::reports(root, source, file)
+        let import_file = imports::ImportFile {
+            source,
+            path,
+            stub: file.stub,
+        };
+        let mut found = semantic::reports(root, source, file);
+        found.extend(imports::reports(root, &nodes, &import_file));
+        found
     };
     reports.extend(compound::reports(root, source));
     reports.extend(statements::reports(&nodes, source));

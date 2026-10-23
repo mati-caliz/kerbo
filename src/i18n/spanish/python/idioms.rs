@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: modismos de pylint, refurb, flake8-logging y
 // compañía.
-pub const IDIOM_TEXTS: [(PythonRule, RuleText); 12] = [
+pub const IDIOM_TEXTS: [(PythonRule, RuleText); 13] = [
     (
         PythonRule::FURB167,
         RuleText::new(
@@ -110,6 +110,15 @@ pub const IDIOM_TEXTS: [(PythonRule, RuleText); 12] = [
             "usá la conversión de la f-string: !s, !r o !a",
             "La f-string ya sabe convertir el valor; la llamada explícita es más larga y más lenta.",
             "f\"{repr(x)}\" pasa a f\"{x!r}\".",
+        ),
+    ),
+    (
+        PythonRule::I001,
+        RuleText::new(
+            "El bloque de imports no está ordenado o formateado",
+            "ordenalo por secciones (estándar, terceros, del proyecto, relativos) y alfabéticamente, con una línea en blanco entre secciones",
+            "Un orden fijo de imports se revisa de un vistazo, evita duplicados y elimina los conflictos de merge por reordenamientos.",
+            "import sys\nimport os pasa a import os\nimport sys.",
         ),
     ),
 ];

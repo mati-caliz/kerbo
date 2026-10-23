@@ -94,6 +94,7 @@ rule_family!(PythonRule {
     FLY002 => "fly002",
     PIE804 => "pie804",
     RUF010 => "ruf010",
+    I001 => "i001",
     E401 => "e401",
     E402 => "e402",
     E701 => "e701",

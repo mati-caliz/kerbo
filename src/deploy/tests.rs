@@ -118,7 +118,7 @@ fn scans_migrations_dockerfiles_and_compose_files_through_the_cache() {
     tree.write("compose.yaml", "services:\n  api:\n    build: ./api\n");
     tree.write(
         "alembic/versions/1_drop.py",
-        "from alembic import op\n\ndef upgrade():\n    op.drop_table('old')\n",
+        "from alembic import op\n\n\ndef upgrade():\n    op.drop_table('old')\n",
     );
     tree.write("seeds/data.sql", "DROP TABLE users;\n");
     let config = Config::load(None, tree.path()).expect("la configuración es válida");

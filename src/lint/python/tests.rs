@@ -9,7 +9,7 @@ use crate::limits::{Limits, Preset};
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::{PythonRule, RuleId};
 
-const FIXTURES: [(&str, &str, &str); 17] = [
+const FIXTURES: [(&str, &str, &str); 19] = [
     (
         "scopes.py",
         include_str!("fixtures/scopes.py"),
@@ -91,6 +91,16 @@ const FIXTURES: [(&str, &str, &str); 17] = [
         include_str!("fixtures/idioms.ruff"),
     ),
     (
+        "isort.py",
+        include_str!("fixtures/isort.py"),
+        include_str!("fixtures/isort.ruff"),
+    ),
+    (
+        "isort_unsorted.py",
+        include_str!("fixtures/isort_unsorted.py"),
+        include_str!("fixtures/isort_unsorted.ruff"),
+    ),
+    (
         "package/__init__.py",
         include_str!("fixtures/package_init.py"),
         include_str!("fixtures/package_init.ruff"),
@@ -169,7 +179,10 @@ fn every_fix_removes_its_own_problem() {
                 .unwrap_or_default();
             let after = apply(&edits, source).expect("el arreglo cae dentro del archivo");
             let still = lints_at(path, &after, strict()).into_iter().any(|other| {
-                other.kind == finding.kind && other.line == finding.line && other.column == finding.column
+                other.kind == finding.kind
+                    && other.line == finding.line
+                    && other.column == finding.column
+                    && other.subject == finding.subject
             });
             assert!(!still, "{path}: el arreglo de {finding:?} no lo resuelve");
         }
@@ -232,7 +245,7 @@ fn mechanical_fixes_rewrite_only_what_the_rule_points_at() {
 #[test]
 fn imports_sharing_a_line_or_in_a_package_have_no_fix() {
     let shared = lints("import os; x = 1\n");
-    assert_eq!(rendered(&shared), ["1:10 E702", "1:8 F401"]);
+    assert_eq!(rendered(&shared), ["1:1 I001", "1:10 E702", "1:8 F401"]);
     assert!(shared.iter().all(|finding| finding.fix.is_none()));
     let package = lints_at("pkg/__init__.py", "import os\n", strict());
     assert_eq!(rendered(&package), ["1:8 F401"]);
@@ -252,7 +265,7 @@ fn noqa_directives_silence_like_ruff() {
     );
     assert_eq!(
         rendered(&lints("# flake8: noqa: F401\nimport os\nx = 1;\n")),
-        ["3:6 E703"]
+        ["2:1 I001", "3:6 E703"]
     );
 }
 
@@ -266,9 +279,15 @@ fn files_tree_sitter_cannot_parse_keep_only_the_local_rules() {
 fn presets_and_switches_turn_rules_off() {
     let source = "import os\nx = 1;\n";
     let minimal = Preset::Minimal.limits(Language::Python, false);
-    assert_eq!(rendered(&lints_at("module.py", source, minimal)), ["1:8 F401"]);
+    assert_eq!(
+        rendered(&lints_at("module.py", source, minimal)),
+        ["1:1 I001", "1:8 F401"]
+    );
     let without = strict().with_rule(RuleId::Python(PythonRule::F401), None);
-    assert_eq!(rendered(&lints_at("module.py", source, without)), ["2:6 E703"]);
+    assert_eq!(
+        rendered(&lints_at("module.py", source, without)),
+        ["1:1 I001", "2:6 E703"]
+    );
     let everything_off = PythonRule::ALL.into_iter().fold(strict(), |limits, rule| {
         limits.with_rule(RuleId::Python(rule), None)
     });
@@ -284,11 +303,14 @@ fn reports_name_the_offending_symbol() {
         .iter()
         .map(|finding| (finding.kind.rule().as_str(), finding.subject.as_str()))
         .collect();
-    assert_eq!(subjects, [("f401", "os.path"), ("f821", "missing")]);
+    assert_eq!(subjects, [("i001", ""), ("f401", "os.path"), ("f821", "missing")]);
 }
 
 #[test]
 fn columns_count_bytes_like_the_rest_of_the_rules() {
     let found = lints("x = \"ñ\"; import os\n");
-    assert_eq!(rendered(&found), ["1:11 E402", "1:18 F401", "1:9 E702"]);
+    assert_eq!(
+        rendered(&found),
+        ["1:11 E402", "1:11 I001", "1:18 F401", "1:9 E702"]
+    );
 }

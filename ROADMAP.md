@@ -1335,7 +1335,19 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Hechas FLY002 (`" ".join([...])` fijo, con las reglas de flynt sobre qué elementos entran en
     una f-string y las comillas), PIE804 (`f(**{"a": 1})`) y RUF010 (`str()`, `repr()` o `ascii()`
     adentro de una f-string). Paridad: 242 de 242, 102 de 102 y 105 de 105.
-  - Siguiente: I001 (6.736 avisos, el bloque más grande), UP032 (1.920), RUF100 (1.437) y la cola
+  - Hecha I001 (bloque de imports sin ordenar o formatear), con un port del isort de ruff: arma el
+    bloque esperado (secciones de futuro, estándar, terceros, del proyecto y relativos; imports del
+    mismo módulo fusionados; comentarios arriba, en línea y al final de cada nombre; corte a 88
+    columnas con la coma mágica) y lo compara con el texto, sin mirar la sangría. Respeta
+    `# isort: skip_file`, `off`/`on`, `skip` y `split`, las líneas que siguen al bloque (dos antes
+    de una `def` o `class`, una en los stubs) y los bloques que comparten línea con otra sentencia.
+    La lista de la biblioteca estándar sale de ruff para 3.11 (`imports/stdlib.rs`) y lo propio se
+    decide como ruff con la configuración por defecto: el paquete del archivo o un módulo que
+    existe bajo `.` o `src`. Paridad contra `--isolated`: 6.917 de 7.021, sin avisos de más. Lo que
+    falta: 64 archivos de CPython con `lazy import`, los que tree-sitter no parsea, la carpeta
+    oculta `.ci` de sympy y un `.pyi` de pydantic-core sin explicar todavía. Los casos quedaron en
+    `fixtures/isort.py` y `fixtures/isort_unsorted.py`.
+  - Siguiente: UP032 (1.920), RUF100 (1.437) y la cola
     de reglas chicas: UP044, UP037, SIM103, SIM905, FURB157, N999, UP034, RUF046, RUF013 y
     siguientes.
 - Pendientes de Python contra ruff:
@@ -1348,8 +1360,12 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece
     como suprimido con su motivo.
   - `short-name` de Python marca los mismos `l`, `O` e `I` que `e741`: hoy salen los dos.
-  - Arreglos que ruff tiene y kerbo todavía no: E401 (partir el import), F811 (borrar la definición
-    pisada), F504/F522/F523 (sacar los argumentos de más) y E731 (pasar la lambda a `def`).
+  - I001: el aviso que falta en `pydantic-core/python/pydantic_core/_pydantic_core/__init__.pyi`
+    (ruff lo da y kerbo no; sospecha: cómo se clasifica `pydantic_core` desde un paquete que sólo
+    tiene `__init__.pyi`).
+  - Arreglos que ruff tiene y kerbo todavía no: I001 (reescribir el bloque ordenado), E401 (partir
+    el import), F811 (borrar la definición pisada), F504/F522/F523 (sacar los argumentos de más) y
+    E731 (pasar la lambda a `def`).
   - El arnés de esta paridad (ruff en JSON contra kerbo en JSON con la conversión de columnas)
     quedó fuera del repo, como los anteriores.
 - TypeScript y JavaScript contra ESLint (empezada, 2026-10-21): 20 reglas de `@eslint/js`

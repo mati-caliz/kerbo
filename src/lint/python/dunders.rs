@@ -1,5 +1,3 @@
-mod natural;
-
 use std::cmp::Ordering;
 
 use tree_sitter::Node;
@@ -11,8 +9,8 @@ use super::ast::{
     SET, TUPLE, is_bytes, is_f_string, is_string, named, text, unparenthesized,
 };
 use super::escapes::text_value;
+use super::natural::{isort_compare, natural_compare};
 use crate::rules::PythonRule;
-use natural::{isort_compare, natural_compare};
 
 const ALL: &str = "__all__";
 const SLOTS: &str = "__slots__";

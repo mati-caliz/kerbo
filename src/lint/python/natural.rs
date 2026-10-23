@@ -29,7 +29,7 @@ fn member_kind(value: &str) -> MemberKind {
     }
 }
 
-fn is_cased_uppercase(value: &str) -> bool {
+pub fn is_cased_uppercase(value: &str) -> bool {
     !value.chars().any(char::is_lowercase) && value.chars().any(char::is_uppercase)
 }
 
