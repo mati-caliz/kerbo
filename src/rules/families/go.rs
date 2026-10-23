@@ -2,7 +2,20 @@ use super::{ComposeRule, DockerfileRule, EslintRule, MigrationRule, PythonRule, 
 
 rule_family!(GoRule {
     Ineffassign => "ineffassign",
+    St1005 => "st1005",
 });
+
+const STATICCHECK: &str = "staticcheck";
+
+impl GoRule {
+    // El linter de golangci-lint que la reporta: es el nombre que silencia un `//nolint`.
+    pub const fn linter(self) -> &'static str {
+        match self {
+            Self::Ineffassign => self.as_str(),
+            Self::St1005 => STATICCHECK,
+        }
+    }
+}
 
 pub const fn wrap_go<'slots>(slots: &'slots mut [RuleId], rules: &[GoRule]) -> &'slots mut [RuleId] {
     match (slots, rules) {

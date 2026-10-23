@@ -1350,10 +1350,29 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     archivos. tailscale queda afuera: `go list` no lista sus archivos con el Go de la imagen.
   - Lo que no se ve a simple vista quedó en `src/lint/go/fixtures/`, con la salida de golangci-lint
     al lado.
+- staticcheck ST1005 (hecho, 2026-10-22): `st1005`, mensajes de `errors.New` y `fmt.Errorf` (por la
+  ruta del import, con alias) que terminan en `.`, `:`, `!` o salto de línea, o que empiezan con
+  mayúscula. El mensaje tiene que ser constante: literales, sumas de literales y constantes del mismo
+  archivo, con los escapes de Go. Como staticcheck, no avisa con una sola palabra, con una sigla o un
+  nombre compuesto (`HTTP`, `ReadAll`), con un `(`, ni si la primera palabra es el nombre de una
+  función, tipo, variable o método del paquete (también `Tipo.Metodo`); las constantes no eximen. En
+  los `_test.go` sólo mira lo de fuera de las funciones (la inicialización de las variables del
+  paquete). `//nolint:staticcheck` la silencia.
+  - Lo que pide el paquete entero se resuelve así: cada archivo marca todos sus mensajes con mayúscula
+    (y pasan por `//nolint` como cualquier aviso) y guarda en la caché su paquete, lo que declara y
+    dónde están; al final del escaneo se descartan los que nombran algo del paquete (carpeta y
+    nombre de `package`) y los de dentro de funciones de test. Los archivos generados no avisan pero
+    sus nombres cuentan, como en golangci-lint.
+  - Paridad contra golangci-lint (la corrida guardada del conjunto por defecto, en los archivos de
+    linux/amd64): 1.073 coincidencias por archivo y línea, ninguno de más y 10 de menos, todos de
+    terraform con el mensaje en una constante de otro archivo del paquete (`EnvInvalidName`,
+    `errInitConfigError`). consul 840 de 840, hugo, golang/tools y fzf completos; caddy, chi, cobra,
+    etcd, gin y prometheus sin avisos en los dos.
 - Pendientes de Go contra golangci-lint:
-  - staticcheck ST1005 (844, mensajes de error con mayúscula o puntuación al final): reconoce
-    `errors.New` y `fmt.Errorf` por el import, sin tipos; es la siguiente. Después, las de
-    staticcheck que tampoco piden tipos: QF1004, QF1001 y QF1003.
+  - ST1005 con el mensaje en una constante de otro archivo del paquete: pide guardar las constantes
+    de texto de cada archivo y evaluar el mensaje en la pasada por paquete. Tampoco se verificó si las
+    variables del paquete eximen (en el corpus no hubo caso; se eximen, como los tipos).
+  - Las de staticcheck que tampoco piden tipos: QF1004, QF1001 y QF1003.
   - errcheck, SA1019, QF1008, QF1012, unused y govet: piden los tipos del compilador. Es el grueso
     del volumen (errcheck solo es el 75 %) y hay que decidir cómo traerlos sin reimplementar el
     chequeo de tipos de Go.

@@ -1,4 +1,5 @@
 use super::codec::{Corrupt, Reader, Writer};
+use super::go_package_codec::{read_go_package, write_go_package};
 use super::lint_codec::{read_fix, read_lint, write_fix, write_lint};
 use super::summary_codec::{read_summary, write_summary};
 use super::taint_codec::{read_taints, write_taints};
@@ -60,6 +61,7 @@ pub fn encode(analysis: &FileAnalysis) -> Vec<u8> {
             None => writer.number(ABSENT),
         }
     }
+    write_go_package(&mut writer, analysis.go_package.as_ref());
     writer.into_bytes()
 }
 
@@ -109,6 +111,7 @@ pub fn decode(bytes: &[u8]) -> Result<FileAnalysis, Corrupt> {
         })?,
         java_summary: read_summary(&mut reader)?,
         taints: read_optional_taints(&mut reader)?,
+        go_package: read_go_package(&mut reader)?,
     };
     if reader.is_empty() {
         Ok(analysis)

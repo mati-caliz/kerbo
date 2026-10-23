@@ -84,6 +84,8 @@ impl Directive {
                 || self.codes.iter().any(|code| {
                     diagnostic.rule.as_str().eq_ignore_ascii_case(code)
                         || (self.scope == Scope::ShellStatement && shell::disables(code, diagnostic.rule))
+                        || (self.scope == Scope::GoNolint
+                            && matches!(diagnostic.rule, RuleId::Go(rule) if rule.linter() == code))
                 }))
     }
 

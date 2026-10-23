@@ -12,12 +12,14 @@ use crate::config::Config;
 use crate::duplicates::{PooledFile, find_duplicates};
 use crate::i18n::Problem;
 use crate::language::{Language, Stack};
-use crate::limits::{LimitOverride, Limits};
+use crate::limits::LimitOverride;
 use crate::macro_rules::MacroIndex;
-use crate::rules::{Diagnostic, FileIdentity, RuleId, evaluate};
+use crate::rules::{Diagnostic, FileIdentity, evaluate};
 use crate::shell;
 use crate::suppressions::{Suppressed, split};
 
+mod go_packages;
+mod pooling;
 mod project;
 mod walk;
 
@@ -109,6 +111,7 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
     let mut pooled = Vec::new();
     let mut indexed = Vec::new();
     let mut tainted = Vec::new();
+    let mut go_packages = Vec::new();
     for result in results {
         match result {
             Ok(checked) => {
@@ -117,6 +120,7 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
                 pooled.extend(checked.pooled);
                 indexed.extend(checked.indexed);
                 tainted.extend(checked.tainted);
+                go_packages.extend(checked.go_package);
             }
             Err(failure) => failures.push(failure),
         }
@@ -124,7 +128,8 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
     if let Some(cache) = request.cache {
         cache.persist();
     }
-    outcome.diagnostics.extend(duplicate_diagnostics(pooled));
+    outcome.diagnostics.extend(pooling::duplicate_diagnostics(pooled));
+    go_packages::drop_package_names(&mut outcome.diagnostics, &go_packages);
     if project::covers_project(request.roots, &project_root(request.config)) {
         outcome
             .diagnostics
@@ -182,7 +187,7 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
         crate_macros: crate_macros.as_ref(),
     };
     let mut analysis = analyze_unit(&mut parser, unit, limits).ok()?;
-    let pooled = pooled_file(&file.identity, &mut analysis, limits);
+    let pooled = pooling::pooled_file(&file.identity, &mut analysis, limits);
     diagnostics.extend(evaluate(&file.identity, &analysis, limits));
     let (mut diagnostics, _suppressed) = split(source, diagnostics);
     diagnostics.extend(find_duplicates(pooled.into_iter().collect()));
@@ -196,31 +201,7 @@ struct Checked {
     pooled: Option<(Stack, PooledFile)>,
     indexed: Option<project::IndexedFile>,
     tainted: Option<project::TaintedFile>,
-}
-
-fn pooled_file(identity: &FileIdentity, analysis: &mut FileAnalysis, limits: Limits) -> Option<PooledFile> {
-    Some(PooledFile {
-        identity: identity.clone(),
-        limit: limits.get(RuleId::DuplicateCode)?,
-        units: analysis.duplicate_units.take()?,
-    })
-}
-
-type PoolScope = (Stack, Option<PathBuf>);
-
-fn duplicate_diagnostics(pooled: Vec<(Stack, PooledFile)>) -> Vec<Diagnostic> {
-    let mut by_scope: Vec<(PoolScope, Vec<PooledFile>)> = Vec::new();
-    for (stack, file) in pooled {
-        let scope = (stack, file.package_scope().map(Path::to_path_buf));
-        match by_scope.iter_mut().find(|(known, _)| *known == scope) {
-            Some((_, files)) => files.push(file),
-            None => by_scope.push((scope, vec![file])),
-        }
-    }
-    by_scope
-        .into_iter()
-        .flat_map(|(_, files)| find_duplicates(files))
-        .collect()
+    go_package: Option<go_packages::GoPackageFile>,
 }
 
 fn collect_files(roots: &[PathBuf], project_root: &Path) -> (Vec<SourceFile>, Vec<ScanFailure>) {
@@ -315,6 +296,7 @@ fn check_file(
             pooled: None,
             indexed: None,
             tainted: None,
+            go_package: None,
         });
     };
     let source = fs::read(&file.identity.absolute).map_err(|error| failure(error.to_string()))?;
@@ -355,8 +337,9 @@ fn check_file(
                 },
             }
         })?;
-    let pooled = pooled_file(&file.identity, &mut analysis, limits);
+    let pooled = pooling::pooled_file(&file.identity, &mut analysis, limits);
     let (indexed, tainted) = project::summaries(&file.identity, file.is_test, &mut analysis, limits);
+    let go_package = go_packages::package_file(&file.identity, &mut analysis);
     let mut diagnostics = evaluate(&file.identity, &analysis, limits);
     if let Some(profile) = secret_scan::profile(&file.identity, request.config, Some(limits)) {
         diagnostics.extend(secret_scan::diagnostics(
@@ -373,6 +356,7 @@ fn check_file(
         pooled: pooled.map(|pooled| (language.stack(), pooled)),
         indexed,
         tainted,
+        go_package,
     })
 }
 

@@ -108,3 +108,76 @@ var x = 1 //nolint:ineffassign,ErrCheck // lo pide la API
     assert_eq!(range.reason, "lo pide la API");
     assert_eq!((range.line, range.last_line), (3, 3));
 }
+
+const ERROR_STRINGS: &str = r#"package store
+
+import (
+	"errors"
+	format "fmt"
+)
+
+const notFound = "Not found in the store"
+
+type Store struct{}
+
+func (s *Store) Close() error { return nil }
+
+func Load(name string) error {
+	if name == "" {
+		return errors.New("Missing name")
+	}
+	if len(name) > 10 {
+		return format.Errorf("name %q is too long.", name)
+	}
+	_ = errors.New("Load failed: " + name)
+	_ = errors.New("HTTP request failed")
+	_ = errors.New("Failed")
+	_ = errors.New("Done.\n")
+	_ = errors.New("ok\n")
+	_ = format.Errorf(`Raw text`)
+	return errors.New(notFound)
+}
+"#;
+
+#[test]
+fn error_strings_follow_staticcheck_st1005() {
+    let found: Vec<String> = lints(ERROR_STRINGS)
+        .iter()
+        .filter(|finding| finding.kind.rule().as_str() == "st1005")
+        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            "16:10 Missing",
+            "19:10 fmt.Errorf",
+            "24:6 errors.New",
+            "25:6 errors.New",
+            "26:6 Raw",
+            "27:9 Not",
+        ]
+    );
+}
+
+#[test]
+fn package_facts_keep_the_declared_names_and_the_capitalized_words() {
+    let mut parser = Parser::new();
+    parser
+        .set_language(&tree_sitter_go::LANGUAGE.into())
+        .expect("la gramática de Go carga");
+    let tree = parser.parse(ERROR_STRINGS, None).expect("el archivo se parsea");
+    let facts = super::package_facts(
+        tree.root_node(),
+        ERROR_STRINGS.as_bytes(),
+        Preset::Strict.limits(Language::Go, false),
+    )
+    .expect("ST1005 está prendida");
+    assert_eq!(facts.package, "store");
+    assert_eq!(facts.declared, ["Store", "Store.Close", "Close", "Load"]);
+    let words: Vec<&str> = facts
+        .capitalized
+        .iter()
+        .map(|found| found.word.as_str())
+        .collect();
+    assert_eq!(words, ["Missing", "Raw", "Not"]);
+}

@@ -11,6 +11,7 @@ use crate::limits::Limits;
 use crate::lines::LineMap;
 use crate::lint::ecmascript::taint::ecmascript_taints;
 use crate::lint::go::taint::go_taints;
+use crate::lint::go::{GoPackageFacts, package_facts};
 use crate::lint::python::taint::python_taints;
 use crate::lint::taint::{TaintFamily, TaintMethod};
 use crate::lint::{LintFinding, find_lints};
@@ -51,6 +52,7 @@ pub struct FileAnalysis {
     pub violations: Vec<Violation>,
     pub java_summary: Option<JavaSummary>,
     pub taints: Option<Vec<TaintMethod>>,
+    pub go_package: Option<GoPackageFacts>,
 }
 
 impl FileAnalysis {
@@ -67,6 +69,7 @@ impl FileAnalysis {
             violations,
             java_summary: None,
             taints: None,
+            go_package: None,
         }
     }
 }
@@ -170,6 +173,9 @@ pub fn analyze_unit(
             .iter()
             .any(|rule| limits.get(RuleId::Taint(*rule)).is_some())
             .then(|| taints_of(language, root, source))
+            .flatten(),
+        go_package: (language == Language::Go)
+            .then(|| package_facts(root, source, limits))
             .flatten(),
     })
 }
