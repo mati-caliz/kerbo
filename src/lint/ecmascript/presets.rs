@@ -6,6 +6,9 @@ const CHECKED_BY_TYPESCRIPT: &[EslintRule] = &[
     EslintRule::NoDupeKeys,
     EslintRule::NoRedeclare,
     EslintRule::NoFuncAssign,
+    EslintRule::NoConstAssign,
+    EslintRule::NoClassAssign,
+    EslintRule::NoImportAssign,
 ];
 const STRICT_ONLY: &[EslintRule] = &[EslintRule::NoNonNullAssertion];
 const SUGGESTIONS: &[EslintRule] = &[

@@ -8,6 +8,7 @@
 10:7 prefer-const
 12:6 prefer-const
 12:11 prefer-const
+13:5 no-unassigned-vars
 14:5 prefer-const
 17:41 no-empty
 18:10 prefer-const

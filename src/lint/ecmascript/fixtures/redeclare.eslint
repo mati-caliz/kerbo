@@ -3,6 +3,7 @@
 2:5 no-redeclare
 5:1 no-var
 5:5 no-redeclare
+5:5 no-unassigned-vars
 8:3 no-var
 8:7 no-redeclare
 13:8 no-var

@@ -7,14 +7,20 @@
 10:5 prefer-const
 10:12 no-wrapper-object-types
 11:5 prefer-const
+12:5 no-unassigned-vars
 12:13 no-wrapper-object-types
+13:5 no-unassigned-vars
 13:10 no-wrapper-object-types
 14:5 prefer-const
 14:13 no-wrapper-object-types
 15:5 prefer-const
 15:17 no-wrapper-object-types
+16:5 no-unassigned-vars
 16:21 no-wrapper-object-types
+17:5 no-unassigned-vars
 17:15 no-unsafe-function-type
+18:5 no-unassigned-vars
+19:5 no-unassigned-vars
 21:11 no-empty-object-type
 21:11 no-unused-vars
 21:28 no-unsafe-function-type
@@ -30,4 +36,5 @@
 39:53 no-wrapper-object-types
 43:7 no-unused-vars
 44:10 no-unused-vars
+45:7 no-unassigned-vars
 45:14 no-wrapper-object-types

@@ -21,6 +21,12 @@
 76:5 prefer-const
 77:5 prefer-const
 77:20 no-empty-object-type
+78:5 no-unassigned-vars
+79:5 no-unassigned-vars
+80:5 no-unassigned-vars
+81:5 no-unassigned-vars
+82:5 no-unassigned-vars
+83:5 no-unassigned-vars
 91:7 no-unused-vars
 94:18 no-unused-vars
 96:1 no-unused-expressions

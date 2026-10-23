@@ -1,6 +1,7 @@
 1:1 no-var
 2:1 no-var
 3:1 no-var
+3:5 no-unassigned-vars
 4:1 no-var
 5:1 no-var
 5:5 no-redeclare
@@ -12,6 +13,7 @@
 20:6 no-var
 23:6 no-var
 27:3 no-var
+27:7 no-unassigned-vars
 28:3 no-var
 31:3 no-var
 35:3 no-var
@@ -25,3 +27,4 @@
 67:29 prefer-rest-params
 67:55 prefer-rest-params
 71:16 prefer-rest-params
+73:19 no-shadow-restricted-names

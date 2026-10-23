@@ -90,5 +90,6 @@
 67:12 no-constant-condition
 67:15 no-empty
 72:10 no-unused-vars
+72:17 no-shadow-restricted-names
 73:18 no-empty
 74:19 no-empty

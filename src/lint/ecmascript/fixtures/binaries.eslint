@@ -78,3 +78,4 @@
 47:7 no-unused-vars
 48:7 no-unused-vars
 50:10 no-unused-vars
+50:22 no-shadow-restricted-names

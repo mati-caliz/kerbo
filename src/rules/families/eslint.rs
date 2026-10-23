@@ -30,6 +30,12 @@ rule_family!(EslintRule {
     PreferSpread => "prefer-spread",
     NoConstantCondition => "no-constant-condition",
     NoConstantBinaryExpression => "no-constant-binary-expression",
+    NoConstAssign => "no-const-assign",
+    NoClassAssign => "no-class-assign",
+    NoImportAssign => "no-import-assign",
+    NoGlobalAssign => "no-global-assign",
+    NoShadowRestrictedNames => "no-shadow-restricted-names",
+    NoUnassignedVars => "no-unassigned-vars",
 });
 
 pub const fn wrap_eslint<'slots>(slots: &'slots mut [RuleId], rules: &[EslintRule]) -> &'slots mut [RuleId] {

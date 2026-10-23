@@ -1350,6 +1350,18 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   `yield` del mismo generador adentro (en un `for`, el de la inicialización no cuenta, como en
   ESLint). Paridad en express, zod, react, vscode y next.js: 155 de 155 y 27 de 27, sin avisos de
   más. Los casos quedaron en `fixtures/conditions.js` y `fixtures/binaries.js`.
+- `no-const-assign`, `no-class-assign`, `no-import-assign`, `no-global-assign`,
+  `no-shadow-restricted-names` y `no-unassigned-vars` (hecho, 2026-10-23), sobre el motor de
+  alcances: las escrituras que no inicializan (una por identificador, como
+  `getModifyingReferences`), los miembros de un `import * as` que se pisan, se borran, se iteran o
+  pasan por `Object.assign`/`Reflect.set` y compañía, los globales de ECMAScript de sólo lectura
+  (la misma lista que ESLint) y los `let`/`var` sin valor que se leen y nunca se escriben (no los
+  de `declare`). Las tres primeras se apagan en TypeScript, como en typescript-eslint. Paridad en
+  express, zod, react, vscode y next.js: 11 de 11, 2 de 2, 3 de 3, 1 de 1, 34 de 36 y 11 de 23, sin
+  avisos de más. Faltan los de dos archivos que tree-sitter no parsea (`base-server.ts` y
+  `router.ts` de next.js) y 12 de una salida de tests de next.js que redeclara cuatro veces el mismo
+  import como `const` (código inválido). Los casos quedaron en `fixtures/assignments.js` y
+  `fixtures/declared.ts`.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
   - `no-useless-assignment` (1.778), `no-fallthrough` (700), `no-unreachable` (104) y
     `no-unassigned-vars` (59): piden el grafo de control de ESLint (`code-path-analysis`); armarlo

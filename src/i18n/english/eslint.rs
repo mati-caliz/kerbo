@@ -10,7 +10,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "ESLint reports it in its recommended set.",
     "See the ESLint documentation.",
 );
-const TEXTS: [(EslintRule, RuleText); 29] = [
+const TEXTS: [(EslintRule, RuleText); 35] = [
     (
         EslintRule::NoVar,
         RuleText::new(
@@ -270,6 +270,60 @@ const TEXTS: [(EslintRule, RuleText); 29] = [
             "check the precedence or the operand that never changes",
             "It is almost always a precedence mistake or a literal nobody meant to compare: a + b ?? c never uses c.",
             "list === [] becomes list.length === 0; a + b ?? 0 becomes a + (b ?? 0).",
+        ),
+    ),
+    (
+        EslintRule::NoConstAssign,
+        RuleText::new(
+            "Something is assigned to a constant",
+            "use let if the value has to change, or store it in another variable",
+            "Assigning to a const throws a TypeError when that line runs: the bug stays hidden until then.",
+            "const total = 0; total += 1; becomes let total = 0; total += 1;.",
+        ),
+    ),
+    (
+        EslintRule::NoClassAssign,
+        RuleText::new(
+            "Something is assigned to a class name",
+            "store the value in another variable",
+            "After the assignment the name is no longer the class: whoever instantiates it further down gets something else.",
+            "class Order {} Order = other; becomes const AlternativeOrder = other;.",
+        ),
+    ),
+    (
+        EslintRule::NoImportAssign,
+        RuleText::new(
+            "Something is assigned to an import",
+            "copy the value to a local variable",
+            "Imports are read-only: assigning to one throws, and so does mutating an imported namespace.",
+            "import { limit } from './config'; limit = 10; becomes let localLimit = limit; localLimit = 10;.",
+        ),
+    ),
+    (
+        EslintRule::NoGlobalAssign,
+        RuleText::new(
+            "Something is assigned to a JavaScript global",
+            "use another name",
+            "Overwriting undefined, Object or Math breaks every piece of code that relies on them, and in strict mode it throws.",
+            "undefined = 1; or Object = {}; is deleted or uses another name.",
+        ),
+    ),
+    (
+        EslintRule::NoShadowRestrictedNames,
+        RuleText::new(
+            "A declaration named after a restricted global",
+            "pick another name",
+            "Shadowing undefined, NaN, Infinity, arguments, eval or globalThis confuses the reader and can change what the code does.",
+            "function f(undefined) {} becomes function f(value) {}.",
+        ),
+    ),
+    (
+        EslintRule::NoUnassignedVars,
+        RuleText::new(
+            "A variable that is read but never gets a value",
+            "assign it a value or delete it",
+            "It is always undefined: the assignment is almost always missing or the code is a leftover.",
+            "let total; return total; becomes let total = compute(); return total;.",
         ),
     ),
 ];

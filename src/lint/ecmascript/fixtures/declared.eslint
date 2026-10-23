@@ -1,0 +1,7 @@
+5:5 no-unassigned-vars
+7:6 no-unused-vars
+10:1 no-unused-vars
+12:1 no-unused-vars
+14:10 no-unused-vars
+15:16 no-unused-vars
+16:6 no-unused-vars

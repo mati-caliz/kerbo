@@ -1,3 +1,4 @@
+mod assignments;
 mod comments;
 mod constant_binary;
 mod constant_condition;
@@ -13,6 +14,7 @@ mod prefer_const;
 mod presets;
 mod redeclare;
 mod repair;
+mod restricted;
 mod scope;
 mod spread;
 mod statements;
@@ -78,6 +80,15 @@ const CHECKS: &[(EslintRule, Check)] = &[
         EslintRule::NoConstantBinaryExpression,
         constant_binary::constant_binary_expressions,
     ),
+    (EslintRule::NoConstAssign, assignments::constant_assignments),
+    (EslintRule::NoClassAssign, assignments::class_assignments),
+    (EslintRule::NoImportAssign, assignments::import_assignments),
+    (EslintRule::NoGlobalAssign, assignments::global_assignments),
+    (
+        EslintRule::NoShadowRestrictedNames,
+        restricted::restricted_shadows,
+    ),
+    (EslintRule::NoUnassignedVars, restricted::unassigned_variables),
 ];
 
 #[derive(Debug, Clone, Copy)]
