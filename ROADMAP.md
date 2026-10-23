@@ -688,7 +688,7 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
     pasa las columnas de Checkstyle a bytes. Una regla nueva se suma con una entrada en
     `SHAPE_RULES`. Sobre commons-lang, junit4 y Guava: cero diferencias en 41.400 avisos.
 
-### 9. Inspecciones de IntelliJ propias y flujo de datos sin compilar (empezada)
+### 9. Inspecciones de IntelliJ propias y flujo de datos sin compilar (cerrada)
 
 Lo que Qodana tarda de 6 a 13 minutos y 5 GB en hacer por repo, en segundos y dentro de la meta
 de memoria de siempre, medido sobre los mismos tres servicios y Guava. Casi todo el tiempo de
@@ -1155,7 +1155,35 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   `@InjectMocks`, `@TempDir`...) ni en una clase con `@Data` o `@Setter`. Contra Qodana: 12 de 12,
   sin avisos de más. `CanBeFinal` (14) marca los mismos campos más los dos `@Spy` de gastronova, que
   esa inspección global no excluye: no se calca aparte.
-- Lo que sigue en el índice: lo que queda de código muerto (arriba).
+- Cierre (2026-10-22). Contra Qodana con el perfil `Default` en los tres servicios (62 inspecciones,
+  5.479 avisos), kerbo calca sin avisos de más: `SameParameterValue`, `UnusedReturnValue`,
+  `SameReturnValue`, el `unused` de métodos, campos y parámetros, `NullableProblems`, `DataFlowIssue`,
+  `OptionalGetWithoutIsPresent`, `AutoCloseableResource`, `ClassEscapesItsScope`,
+  `BooleanMethodIsAlwaysInverted` y `FieldMayBeFinal`. Lo que quedó abierto se repartió así:
+  - A la etapa 16 (tipos y firmas completas), porque pide infraestructura nueva: `RedundantThrows`
+    (el atributo `Exceptions` de las firmas de las librerías), el JDK desde `ct.sym`, `Map.get` y lo
+    que devuelve una lambda en nulos (tipos genéricos), el tipo de retorno de los métodos del
+    proyecto y los argumentos null hacia parámetros no nulos (la inferencia para todos los métodos),
+    y en JS/TS reconocer conexiones y pedidos por el tipo de TypeScript en vez del nombre.
+  - A "cuando aparezca un caso real" (abajo), porque sin un caso no hay paridad que medir.
+  - A la etapa 15 lo de modernización y redundancias de Qodana (`SequencedCollectionMethodCanBeUsed`,
+    `Java9CollectionFactory`, `DefaultAnnotationParam`, `UnnecessaryUnicodeEscape`, `MathClamp`,
+    bloques de texto, `RedundantTypeArguments`, `Convert2MethodRef` y compañía).
+  - Fuera de alcance: las de Lombok (`LombokGetterMayBeUsed`, `LombokSetterMayBeUsed`), las de XML,
+    Maven y Gradle, `ExtractMethodRecommender` y `CanBeFinal` (los mismos campos que
+    `FieldMayBeFinal` más los que escribe Mockito).
+  - Los renombres de columnas y tablas, a la etapa de despliegue (ya estaba dicho arriba).
+- Cuando aparezca un caso real (sin uno en los servicios, las librerías ni los corpus, no se hace):
+  - Contaminación en Java: un `PrintWriter` que llega como parámetro o campo, Thymeleaf
+    (`th:utext`) y JSP (`<%= %>`), datos guardados en `this.x` y leídos en otro método, cadenas con
+    receptor desconocido (`a.b().query(...)`) y MyBatis (`${}`); FindSecBugs como segunda referencia.
+  - Contaminación en Python: la herencia entre clases y los métodos de clases que llegan como
+    parámetro. Las fuentes de línea de comandos siguen apagadas a propósito, y con ellas no hace falta
+    recorrer el nivel de módulo.
+  - Contaminación en Go: `html/template` contra `text/template` cuando la plantilla está en un archivo.
+  - Código muerto: el dueño de cada uso de un campo, "asignado pero nunca leído" para lo no privado,
+    y constructores, constantes de enum y clases sin usar.
+  - La variante "Parameter is not used in any implementation" de un método de interfaz.
 
 ### 10. Go, Python, TypeScript y shell completos
 
@@ -1764,3 +1792,17 @@ Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_check
 - Por lo que más aparece en Qodana: la API nueva que reemplaza a la vieja (`getFirst()`,
   `List.of`, `Math.clamp`, bloques de texto) y las redundancias (valor por defecto repetido en una
   anotación, escapes Unicode de más).
+
+### 16. Tipos y firmas completas
+
+Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y el índice.
+
+- Las excepciones de las firmas (`Exceptions` de cada método de los `.class`) y, con eso,
+  `RedundantThrows` de IntelliJ (28 en Qodana, casi todos `throws Exception` en tests).
+- El JDK desde `ct.sym` para el `release` del proyecto, en vez de la tabla propia.
+- Tipos genéricos: `Map.get` y lo que devuelve una lambda en el flujo de nulos.
+- El tipo de retorno de los métodos del proyecto, para seguir cadenas que pasan por ellos, y la
+  inferencia de parámetros no nulos para todos los métodos (hoy sólo los `@Override`), para avisar
+  de un `null` pasado a uno.
+- En JS/TS, los tipos del compilador de TypeScript para reconocer conexiones y objetos del pedido
+  sin depender del nombre de la variable.
