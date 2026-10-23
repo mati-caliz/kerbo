@@ -87,9 +87,14 @@ fn unused_locals(visitor: &Visitor<'_>, scope: ScopeId, latest: &[(&str, Binding
             }
             let reported = UNUSED_KINDS.contains(&binding.kind)
                 && !uses_locals
-                && !binding.has(GLOBAL | NONLOCAL | UNPACKED)
+                && !binding.has(GLOBAL | NONLOCAL)
                 && !TRACEBACK_NAMES.contains(&name);
-            reported.then(|| Report::at_point(PythonRule::F841, binding.site.at, name))
+            let rule = if binding.has(UNPACKED) {
+                PythonRule::RUF059
+            } else {
+                PythonRule::F841
+            };
+            reported.then(|| Report::at_point(rule, binding.site.at, name))
         })
         .collect()
 }

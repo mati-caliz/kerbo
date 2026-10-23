@@ -73,6 +73,7 @@ rule_family!(PythonRule {
     B006 => "b006",
     B008 => "b008",
     RUF012 => "ruf012",
+    RUF059 => "ruf059",
     E401 => "e401",
     E402 => "e402",
     E701 => "e701",

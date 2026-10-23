@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 32] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 33] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -290,6 +290,15 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 32] = [
             "annotate it with ClassVar if it's shared on purpose, or create it in __init__",
             "The value is created once and shared by every instance: modifying it from one changes it for all.",
             "items = [] becomes items: ClassVar[list[str]] = [], or self.items = [] in __init__.",
+        ),
+    ),
+    (
+        PythonRule::RUF059,
+        RuleText::new(
+            "An unpacked variable that is never used",
+            "prefix it with _, or replace it with _",
+            "A name that is unpacked and never read suggests the value matters, and hides typos.",
+            "name, age = person with age unused becomes name, _age = person.",
         ),
     ),
 ];

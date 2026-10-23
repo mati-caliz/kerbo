@@ -1294,7 +1294,10 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     msgspec y sqlmodel (también heredados de una clase del archivo) y el `_fields_` de ctypes.
     Paridad: 4.009 de 4.039, sin avisos de más; lo que falta está en archivos que tree-sitter no
     parsea. Los casos quedaron en `fixtures/classes.py`.
-  - Siguiente: RUF059, UP032, UP035, SIM115, B023, RUF022, RUF023, SIM114 y TRY004.
+  - Hecha RUF059 (variable desempaquetada sin usar): son los mismos candidatos que F841, con los
+    bindings desempaquetados que F841 descarta. Paridad: 4.511 de 4.549, sin avisos de más; lo que
+    falta está en archivos que tree-sitter no parsea.
+  - Siguiente: UP032, UP035, SIM115, B023, RUF022, RUF023, SIM114 y TRY004.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

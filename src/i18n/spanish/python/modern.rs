@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 32] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 33] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -290,6 +290,15 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 32] = [
             "anotalo con ClassVar si es compartido a propósito, o crealo en __init__",
             "El valor se crea una sola vez y lo comparten todas las instancias: modificarlo desde una lo cambia para todas.",
             "items = [] pasa a items: ClassVar[list[str]] = [], o a self.items = [] en __init__.",
+        ),
+    ),
+    (
+        PythonRule::RUF059,
+        RuleText::new(
+            "Una variable desempaquetada que no se usa",
+            "renombrala con un _ adelante, o reemplazala por _",
+            "Un nombre que se desempaqueta y nunca se lee hace pensar que el valor importa, y esconde errores de tipeo.",
+            "nombre, edad = persona con edad sin usar pasa a nombre, _edad = persona.",
         ),
     ),
 ];

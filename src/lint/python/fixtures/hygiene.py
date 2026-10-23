@@ -118,3 +118,14 @@ def formats(first, second, values):
         "{0}".format(first, second),
         "{0.real} {1[0]}".format(first, second),
     ]
+
+
+def unpacking(pair, rows):
+    first, second = pair
+    (third, fourth), fifth = pair, rows
+    _, sixth = pair
+    for key, value in rows:
+        print(key)
+    with open(pair) as (handle, other):
+        print(handle)
+    return first, third
