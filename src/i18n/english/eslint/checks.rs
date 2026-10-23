@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 23] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 25] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -207,6 +207,24 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 23] = [
             "use the [ ] literal",
             "With a single number it creates an array of that length and with several, one with those elements: the literal has no such trap.",
             "new Array(1, 2) becomes [1, 2].",
+        ),
+    ),
+    (
+        EslintRule::NoUnreachable,
+        RuleText::new(
+            "Code that never runs",
+            "delete it or check the return, throw, break or continue that cuts it off",
+            "What follows a return or a throw never runs: either it is left over or the exit is in the wrong place.",
+            "return total; log(total); becomes log(total); return total;.",
+        ),
+    ),
+    (
+        EslintRule::NoFallthrough,
+        RuleText::new(
+            "A case that falls through to the next one",
+            "add break, or a // falls through comment if it is intended",
+            "Falling through silently is one of the most common switch bugs: the next case's code runs too.",
+            "case 1: load(); case 2: ... becomes case 1: load(); break; case 2: ...",
         ),
     ),
 ];

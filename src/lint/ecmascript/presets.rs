@@ -10,6 +10,7 @@ const CHECKED_BY_TYPESCRIPT: &[EslintRule] = &[
     EslintRule::NoClassAssign,
     EslintRule::NoImportAssign,
     EslintRule::NoSetterReturn,
+    EslintRule::NoUnreachable,
 ];
 const STRICT_ONLY: &[EslintRule] = &[EslintRule::NoNonNullAssertion];
 const SUGGESTIONS: &[EslintRule] = &[

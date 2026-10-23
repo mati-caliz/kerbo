@@ -9,7 +9,7 @@ use crate::profile::LintStyle;
 use crate::rules::{EslintRule, RuleId};
 
 const FATAL_MARK: &str = "FATAL";
-const FIXTURES: [(&str, Language, &str, &str); 27] = [
+const FIXTURES: [(&str, Language, &str, &str); 28] = [
     (
         "hashbang",
         Language::JavaScript,
@@ -105,6 +105,12 @@ const FIXTURES: [(&str, Language, &str, &str); 27] = [
         Language::TypeScript,
         include_str!("fixtures/namespaces.ts"),
         include_str!("fixtures/namespaces.eslint"),
+    ),
+    (
+        "reachability",
+        Language::JavaScript,
+        include_str!("fixtures/reachability.js"),
+        include_str!("fixtures/reachability.eslint"),
     ),
     (
         "requires",

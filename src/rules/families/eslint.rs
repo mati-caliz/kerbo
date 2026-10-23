@@ -53,6 +53,8 @@ rule_family!(EslintRule {
     NoExtraBooleanCast => "no-extra-boolean-cast",
     NoNamespace => "no-namespace",
     NoArrayConstructor => "no-array-constructor",
+    NoUnreachable => "no-unreachable",
+    NoFallthrough => "no-fallthrough",
 });
 
 pub const fn wrap_eslint<'slots>(slots: &'slots mut [RuleId], rules: &[EslintRule]) -> &'slots mut [RuleId] {

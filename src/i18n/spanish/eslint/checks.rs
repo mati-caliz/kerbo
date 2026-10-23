@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 23] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 25] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -207,6 +207,24 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 23] = [
             "usá el literal [ ]",
             "Con un solo número crea un arreglo de ese largo y con varios, uno con esos elementos: el literal no tiene esa trampa.",
             "new Array(1, 2) se vuelve [1, 2].",
+        ),
+    ),
+    (
+        EslintRule::NoUnreachable,
+        RuleText::new(
+            "Código que nunca corre",
+            "borralo o revisá el return, throw, break o continue que lo corta",
+            "Lo que sigue a un return o un throw no se ejecuta nunca: o sobra o el corte está mal puesto.",
+            "return total; registrar(total); se vuelve registrar(total); return total;.",
+        ),
+    ),
+    (
+        EslintRule::NoFallthrough,
+        RuleText::new(
+            "Un case que sigue de largo al siguiente",
+            "agregá break o un comentario // falls through si es a propósito",
+            "Seguir de largo sin avisar es uno de los errores más comunes de un switch: corre el código del case siguiente.",
+            "case 1: cargar(); case 2: ... se vuelve case 1: cargar(); break; case 2: ...",
         ),
     ),
 ];

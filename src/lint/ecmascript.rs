@@ -12,12 +12,14 @@ mod duplicates;
 mod errors;
 mod escapes;
 mod expressions;
+mod fallthrough;
 mod finally;
 mod members;
 mod modules;
 mod no_var;
 mod nodes;
 mod optional_chains;
+mod paths;
 mod prefer_const;
 mod presets;
 mod redeclare;
@@ -29,9 +31,11 @@ mod spread;
 mod statements;
 mod strings;
 pub mod taint;
+mod token_index;
 mod tokens;
 mod triple_slash;
 mod typescript;
+mod unreachable;
 mod unused;
 mod wrappers;
 
@@ -39,6 +43,7 @@ use std::cell::OnceCell;
 
 use tree_sitter::Node;
 
+use self::paths::Reachability;
 use self::scope::ScopeTree;
 use super::{LintFinding, LintKind, finding};
 use crate::fix::Fix;
@@ -127,6 +132,8 @@ const CHECKS: &[(EslintRule, Check)] = &[
     (EslintRule::NoExtraBooleanCast, casts::extra_boolean_casts),
     (EslintRule::NoNamespace, typescript::namespaces),
     (EslintRule::NoArrayConstructor, typescript::array_constructors),
+    (EslintRule::NoUnreachable, unreachable::unreachable_code),
+    (EslintRule::NoFallthrough, fallthrough::fallthroughs),
 ];
 
 #[derive(Debug, Clone, Copy)]
@@ -141,6 +148,7 @@ pub struct Context<'tree, 'source> {
     pub root: Node<'tree>,
     pub declaration_file: bool,
     pub scopes: OnceCell<ScopeTree<'tree>>,
+    pub paths: OnceCell<Reachability>,
 }
 
 impl<'tree> Context<'tree, '_> {
@@ -156,6 +164,11 @@ impl<'tree> Context<'tree, '_> {
 
     pub fn text(&self, node: Node<'_>) -> &str {
         node.utf8_text(self.source).unwrap_or_default()
+    }
+
+    pub fn paths(&self) -> &Reachability {
+        self.paths
+            .get_or_init(|| paths::reachability(self.root, self.source))
     }
 
     pub fn scopes(&self) -> &ScopeTree<'tree> {
@@ -187,6 +200,7 @@ fn checked(root: Node<'_>, file: SourceFile<'_>, enabled: &dyn Fn(EslintRule) ->
         root,
         declaration_file: file.declaration_file,
         scopes: OnceCell::new(),
+        paths: OnceCell::new(),
     };
     if context.nodes.iter().any(|node| repair::is_flow_syntax(*node)) {
         return Vec::new();
