@@ -121,6 +121,7 @@ const CHECKS: &[(EslintRule, Check)] = &[
     (EslintRule::NoUnusedLabels, blocks::unused_labels),
     (EslintRule::NoSelfAssign, self_assign::self_assignments),
     (EslintRule::NoSetterReturn, accessors::setter_returns),
+    (EslintRule::GetterReturn, accessors::getter_returns),
     (
         EslintRule::NoUnsafeOptionalChaining,
         optional_chains::unsafe_optional_chains,

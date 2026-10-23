@@ -14,6 +14,7 @@ const METHOD: &str = "method_definition";
 const PAIR: &str = "pair";
 const OBJECT: &str = "object";
 const SET: &str = "set";
+const GET: &str = "get";
 const RETURN: &str = "return_statement";
 const ARROW: &str = "arrow_function";
 const FUNCTION_VALUES: &[&str] = &["function_expression", "function", ARROW];
@@ -41,28 +42,29 @@ const DESCRIPTOR_MAP_CALLS: &[(&str, &str, usize)] = &[
 pub fn setter_returns(context: &Context<'_, '_>) -> Vec<LintFinding> {
     let constants = Constants::new(context);
     let mut found = Vec::new();
-    for setter in context
-        .of_kind(&[METHOD])
-        .filter(|method| is_setter_method(*method))
-    {
+    for setter in context.of_kind(&[METHOD]).filter(|method| {
+        is_accessor_method(*method, SET) || is_descriptor_accessor_method(*method, SET, &constants, context)
+    }) {
         if let Some(body) = setter.child_by_field_name(BODY_FIELD) {
-            found.extend(returns_with_value(body));
-        }
-    }
-    for method in context
-        .of_kind(&[METHOD])
-        .filter(|method| is_descriptor_set_method(*method, &constants, context))
-    {
-        if let Some(body) = method.child_by_field_name(BODY_FIELD) {
-            found.extend(returns_with_value(body));
+            found.extend(
+                own_returns(body)
+                    .into_iter()
+                    .filter(|statement| has_value(*statement)),
+            );
         }
     }
     for function in context
         .of_kind(FUNCTION_VALUES)
-        .filter(|function| is_descriptor_setter(*function, &constants, context))
+        .filter(|function| is_descriptor_accessor(*function, SET, &constants, context))
     {
         match function.child_by_field_name(BODY_FIELD) {
-            Some(body) if body.kind() == STATEMENT_BLOCK => found.extend(returns_with_value(body)),
+            Some(body) if body.kind() == STATEMENT_BLOCK => {
+                found.extend(
+                    own_returns(body)
+                        .into_iter()
+                        .filter(|statement| has_value(*statement)),
+                );
+            }
             Some(body) => found.push(body),
             None => {}
         }
@@ -73,31 +75,71 @@ pub fn setter_returns(context: &Context<'_, '_>) -> Vec<LintFinding> {
         .collect()
 }
 
-fn is_setter_method(method: Node<'_>) -> bool {
+// `getter-return`: un getter que puede terminar sin devolver nada, o con un `return;` vacío.
+pub fn getter_returns(context: &Context<'_, '_>) -> Vec<LintFinding> {
+    let constants = Constants::new(context);
+    let flow = context.paths();
+    let methods = context
+        .of_kind(&[METHOD])
+        .filter(|method| {
+            is_accessor_method(*method, GET)
+                || is_descriptor_accessor_method(*method, GET, &constants, context)
+        })
+        .map(|method| (method, method));
+    let functions = context
+        .of_kind(FUNCTION_VALUES)
+        .filter(|function| is_descriptor_accessor(*function, GET, &constants, context))
+        .filter_map(|function| parent_without_parentheses(function).map(|pair| (function, pair)));
+    let mut found = Vec::new();
+    for (function, head) in methods.chain(functions) {
+        let Some(body) = function
+            .child_by_field_name(BODY_FIELD)
+            .filter(|body| body.kind() == STATEMENT_BLOCK)
+        else {
+            continue;
+        };
+        found.extend(
+            own_returns(body)
+                .into_iter()
+                .filter(|statement| !has_value(*statement)),
+        );
+        if flow.reachable_at_exit(function) {
+            found.push(head);
+        }
+    }
+    found
+        .into_iter()
+        .map(|node| report(EslintRule::GetterReturn, node, ""))
+        .collect()
+}
+
+fn is_accessor_method(method: Node<'_>, keyword: &str) -> bool {
     let mut cursor = method.walk();
     method
         .children(&mut cursor)
-        .any(|child| child.kind() == SET && !child.is_named())
+        .any(|child| child.kind() == keyword && !child.is_named())
 }
 
-fn is_descriptor_set_method(
+fn is_descriptor_accessor_method(
     method: Node<'_>,
+    keyword: &str,
     constants: &Constants<'_, '_, '_>,
     context: &Context<'_, '_>,
 ) -> bool {
-    !is_setter_method(method)
+    !is_accessor_method(method, keyword)
         && method
             .child_by_field_name(NAME_FIELD)
             .and_then(|name| static_key_name(name, context.source))
-            .is_some_and(|name| name == SET)
+            .is_some_and(|name| name == keyword)
         && method
             .parent()
             .filter(|object| object.kind() == OBJECT)
             .is_some_and(|object| is_property_descriptor(object, constants, context))
 }
 
-fn is_descriptor_setter(
+fn is_descriptor_accessor(
     function: Node<'_>,
+    keyword: &str,
     constants: &Constants<'_, '_, '_>,
     context: &Context<'_, '_>,
 ) -> bool {
@@ -108,12 +150,12 @@ fn is_descriptor_setter(
         .child_by_field_name(VALUE_FIELD)
         .map(without_parentheses)
         .is_some_and(|value| value.id() == function.id());
-    let named_set = pair
+    let named = pair
         .child_by_field_name(KEY_FIELD)
         .and_then(|key| static_key_name(key, context.source))
-        .is_some_and(|name| name == SET);
+        .is_some_and(|name| name == keyword);
     is_value
-        && named_set
+        && named
         && pair
             .parent()
             .filter(|object| object.kind() == OBJECT)
@@ -192,15 +234,12 @@ fn argument_values(arguments: Node<'_>) -> Vec<Node<'_>> {
         .collect()
 }
 
-fn returns_with_value(body: Node<'_>) -> Vec<Node<'_>> {
+// Los `return` del cuerpo, sin los de funciones anidadas.
+fn own_returns(body: Node<'_>) -> Vec<Node<'_>> {
     let mut found = Vec::new();
     let mut pending = vec![body];
     while let Some(current) = pending.pop() {
-        if current.kind() == RETURN
-            && current
-                .named_child(0)
-                .is_some_and(|child| child.kind() != COMMENT)
-        {
+        if current.kind() == RETURN {
             found.push(current);
         }
         let mut cursor = current.walk();
@@ -211,4 +250,11 @@ fn returns_with_value(body: Node<'_>) -> Vec<Node<'_>> {
         );
     }
     found
+}
+
+fn has_value(statement: Node<'_>) -> bool {
+    let mut cursor = statement.walk();
+    statement
+        .named_children(&mut cursor)
+        .any(|child| child.kind() != COMMENT)
 }

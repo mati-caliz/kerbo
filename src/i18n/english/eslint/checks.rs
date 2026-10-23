@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 26] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 27] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -234,6 +234,15 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 26] = [
             "delete the assignment or use the value",
             "The value is overwritten or discarded before anyone reads it: either the assignment is left over or a use is missing.",
             "let total = 0; total = compute(); becomes let total = compute();.",
+        ),
+    ),
+    (
+        EslintRule::GetterReturn,
+        RuleText::new(
+            "A getter that can finish without returning anything",
+            "return a value on every path",
+            "Whoever reads the property gets undefined on that path, almost always by accident.",
+            "get total() { if (list) return sum(list); } becomes get total() { return list ? sum(list) : 0; }.",
         ),
     ),
 ];

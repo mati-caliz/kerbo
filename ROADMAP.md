@@ -1402,9 +1402,12 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   599 de 602, sin avisos de más; los tres que faltan están en archivos que tree-sitter no parsea. La
   frecuencia de arriba contaba el código compilado que next.js ignora. Los casos quedaron en
   `fixtures/assigned.js`.
+- `getter-return` (hecho, 2026-10-23): getters de clases y objetos y los de los descriptores de
+  `Object.defineProperty` y compañía (como `no-setter-return`), con el `return;` vacío y la salida
+  alcanzable del análisis de caminos. Se apaga en TypeScript. Paridad: 11 de 11. Los casos quedaron
+  en `fixtures/getters.js`.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
-  - Sobre el análisis de caminos que ya está: `getter-return` (43), `no-this-before-super` (9) y
-    `constructor-super` (7).
+  - Sobre el análisis de caminos que ya está: `no-this-before-super` (9) y `constructor-super` (7).
   - `no-misleading-character-class` (290), `no-control-regex` (138), `getter-return` (43),
     `no-loss-of-precision` (14), `no-irregular-whitespace` (10),
     `no-unused-private-class-members` (10), `no-unexpected-multiline` (2) y las que no aparecieron

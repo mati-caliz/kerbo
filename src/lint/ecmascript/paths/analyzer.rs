@@ -149,10 +149,12 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
             self.forward();
             self.visit_children(method, field, function);
             self.forward();
+            self.flow.at_exit.insert(method.id(), self.reachable());
             self.end_path();
-        } else {
-            self.visit_children(method, field, function);
+            self.forward();
+            return;
         }
+        self.visit_children(method, field, function);
         self.forward();
         self.flow.at_exit.insert(method.id(), self.reachable());
     }
