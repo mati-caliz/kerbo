@@ -1341,12 +1341,20 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     react-devtools con anotaciones). La frecuencia de abajo contaba también el código compilado
     que next.js ignora; por eso daba más. Los casos quedaron en `fixtures/wrappers.ts`,
     `finally.js`, `spread.js` y `applies.ts`.
+- `no-constant-condition` y `no-constant-binary-expression` (hecho, 2026-10-23), sobre un port de
+  `isConstant` y `isLogicalIdentity` de ESLint (`src/lint/ecmascript/constants.rs`) que mira el
+  árbol como ESTree: sin paréntesis, `&&`, `||` y `??` como expresiones lógicas, `as`, `!` y
+  `satisfies` como lo que no es constante, y las llamadas opcionales (`Boolean?.(x)`) como cadenas.
+  `undefined`, `Boolean`, `String` y compañía cuentan como globales si ninguna declaración los
+  tapa. `no-constant-condition` va con `checkLoops: "allExceptWhileTrue"` y perdona un loop con un
+  `yield` del mismo generador adentro (en un `for`, el de la inicialización no cuenta, como en
+  ESLint). Paridad en express, zod, react, vscode y next.js: 155 de 155 y 27 de 27, sin avisos de
+  más. Los casos quedaron en `fixtures/conditions.js` y `fixtures/binaries.js`.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
   - `no-useless-assignment` (1.778), `no-fallthrough` (700), `no-unreachable` (104) y
     `no-unassigned-vars` (59): piden el grafo de control de ESLint (`code-path-analysis`); armarlo
     sobre tree-sitter es el paso siguiente.
-  - `no-misleading-character-class` (290), `no-constant-condition` (248),
-    `no-constant-binary-expression` (154), `no-control-regex` (138), `preserve-caught-error` (92),
+  - `no-misleading-character-class` (290), `no-control-regex` (138), `preserve-caught-error` (92),
     `getter-return` (43), `no-extra-boolean-cast` (38) y el resto con menos de 30.
   - `no-undef`: pide las variables globales de cada entorno (navegador, Node, Jest).
   - `no-useless-escape` no mira las expresiones regulares con el flag `v`.

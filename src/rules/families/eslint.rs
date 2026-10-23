@@ -28,6 +28,8 @@ rule_family!(EslintRule {
     TripleSlashReference => "triple-slash-reference",
     NoUnsafeFinally => "no-unsafe-finally",
     PreferSpread => "prefer-spread",
+    NoConstantCondition => "no-constant-condition",
+    NoConstantBinaryExpression => "no-constant-binary-expression",
 });
 
 pub const fn wrap_eslint<'slots>(slots: &'slots mut [RuleId], rules: &[EslintRule]) -> &'slots mut [RuleId] {

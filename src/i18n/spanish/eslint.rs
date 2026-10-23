@@ -10,7 +10,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "ESLint la marca en su conjunto recomendado.",
     "Mirá la documentación de ESLint.",
 );
-const TEXTS: [(EslintRule, RuleText); 27] = [
+const TEXTS: [(EslintRule, RuleText); 29] = [
     (
         EslintRule::NoVar,
         RuleText::new(
@@ -252,6 +252,24 @@ const TEXTS: [(EslintRule, RuleText); 27] = [
             "llamá a la función con ...args",
             "El spread dice lo mismo sin repetir el this y sin que quien lee tenga que acordarse qué hace apply.",
             "Math.max.apply(Math, numeros) se vuelve Math.max(...numeros).",
+        ),
+    ),
+    (
+        EslintRule::NoConstantCondition,
+        RuleText::new(
+            "Una condición que siempre da lo mismo",
+            "usá una condición que dependa de algo o sacá la rama que nunca corre",
+            DEAD_BRANCH_WHY,
+            "if (1) { ... } se vuelve el bloque solo; while (x = 0) se vuelve while (x === 0).",
+        ),
+    ),
+    (
+        EslintRule::NoConstantBinaryExpression,
+        RuleText::new(
+            "Una comparación o un operador lógico que siempre da el mismo resultado",
+            "revisá la precedencia o el operando que no cambia",
+            "Casi siempre es un error de precedencia o un literal que no se quería comparar: a + b ?? c nunca usa c.",
+            "lista === [] se vuelve lista.length === 0; a + b ?? 0 se vuelve a + (b ?? 0).",
         ),
     ),
 ];

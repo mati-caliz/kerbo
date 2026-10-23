@@ -1,4 +1,7 @@
 mod comments;
+mod constant_binary;
+mod constant_condition;
+mod constants;
 mod duplicates;
 mod escapes;
 mod expressions;
@@ -67,6 +70,14 @@ const CHECKS: &[(EslintRule, Check)] = &[
     ),
     (EslintRule::NoUnsafeFinally, finally::unsafe_finally),
     (EslintRule::PreferSpread, spread::spread_calls),
+    (
+        EslintRule::NoConstantCondition,
+        constant_condition::constant_conditions,
+    ),
+    (
+        EslintRule::NoConstantBinaryExpression,
+        constant_binary::constant_binary_expressions,
+    ),
 ];
 
 #[derive(Debug, Clone, Copy)]
