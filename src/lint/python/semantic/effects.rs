@@ -56,7 +56,9 @@ pub fn useless_expression<'tree>(
     if parts.len() == 1 && is_exempt(value, source) {
         return None;
     }
-    let effect = parts.iter().any(|part| has_effect(*part, source, is_builtin));
+    let effect = parts
+        .iter()
+        .any(|part| contains_effect(*part, source, is_builtin));
     (!effect || value.kind() == ATTRIBUTE).then_some(value)
 }
 
@@ -84,7 +86,7 @@ fn is_exempt(value: Node<'_>, source: &[u8]) -> bool {
 }
 
 // `contains_effect` de ruff: alguna subexpresión puede tener efectos.
-fn has_effect(node: Node<'_>, source: &[u8], is_builtin: &dyn Fn(Node<'_>) -> bool) -> bool {
+pub fn contains_effect(node: Node<'_>, source: &[u8], is_builtin: &dyn Fn(Node<'_>) -> bool) -> bool {
     let mut pending = vec![node];
     while let Some(current) = pending.pop() {
         if is_effect(current, source, is_builtin) {

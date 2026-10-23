@@ -43,6 +43,7 @@ rule_family!(PythonRule {
     F901 => "f901",
     C408 => "c408",
     UP031 => "up031",
+    UP032 => "up032",
     UP004 => "up004",
     UP005 => "up005",
     UP009 => "up009",

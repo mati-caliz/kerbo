@@ -37,7 +37,8 @@ use crate::syntax::descendants;
 
 const PACKAGE_INIT_STEM: &str = "__init__";
 const STUB_EXTENSION: &str = "pyi";
-const MINIMAL_OFF: [PythonRule; 15] = [
+const MINIMAL_OFF: [PythonRule; 16] = [
+    PythonRule::I001,
     PythonRule::E401,
     PythonRule::E402,
     PythonRule::E701,

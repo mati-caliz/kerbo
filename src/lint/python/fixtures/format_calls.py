@@ -1,0 +1,82 @@
+from django.utils.translation import gettext, gettext_lazy as lazy
+
+name = "mundo"
+items = [1, 2]
+values = {"a": 1}
+
+
+def compute():
+    return 1
+
+
+"{}".format(name)
+"{} {}".format(name, items)
+"{0} {1}".format(name, items)
+"{1} {0}".format(name, items)
+"{a} {b}".format(a=name, b=items)
+"{a}".format(a=name, b=items)
+"{.real}".format(1)
+"{[0]}".format(items)
+"{0[a]}".format(values)
+"{!r:>10}".format(name)
+"{:{width}}".format(name, width=3)
+"{}".format(*items)
+"{a}".format(**values)
+"{}".format("x")
+"{}".format(values["a"])
+"{}".format(
+    name
+)
+"{}".format(name,
+            items)
+"{}".format()
+"".format(name)
+"sin campos".format(name)
+"{} {}".format(name)
+"{x}".format(y=name)
+"{0} {0}".format(compute())
+"{0} {0}".format(name)
+"{a} {a}".format(a=list())
+"{}{}".format(compute(), compute())
+"{".format(name)
+"}".format(name)
+"{0!rr}".format(name)
+"{a.}".format(a=name)
+"{a[}".format(a=name)
+"{a[0]x}".format(a=name)
+"{:[x}".format(name)
+u"{}".format(name)
+r"{}\n".format(name)
+"\N{BULLET} {}".format(name)
+r"\N{BULLET} {}".format(name)
+"""{}""".format(name)
+("{}" "{}").format(name, items)
+("{}"
+ "{}").format(name, items)
+("{" "}").format(name)
+b"{}".format(name)
+f"{name} {{}}".format(items)
+("{}" f"{name}").format(items)
+"{}".format(x for x in items)
+"{}".format(name if name else items)
+"{}".format(lambda: name)
+"{}".format(await_value := name)
+gettext("{}".format(name))
+lazy("{}".format(name))
+print(gettext("{} {}".format(name, items)))
+"{} {}".format(name, items).upper()
+x = "{0}".format(name) + "{1}".format(name, items)
+
+
+def translated():
+    from django.utils import translation
+
+    return translation.gettext("{}".format(name))
+
+
+def shadowed(gettext):
+    return gettext("{}".format(name))
+
+
+def inner():
+    return (lambda: "{}".format(name))()

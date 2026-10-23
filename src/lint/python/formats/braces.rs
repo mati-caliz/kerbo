@@ -1,3 +1,6 @@
+use super::template::named_escape_end;
+
+const BACKSLASH: char = '\\';
 const OPENING: char = '{';
 const CLOSING: char = '}';
 const SPEC_SEPARATOR: char = ':';
@@ -49,7 +52,14 @@ impl BraceSummary {
 fn fields(format: &str) -> Option<Vec<Field>> {
     let mut found = Vec::new();
     let mut rest = format;
+    let mut pending_escape = false;
     while let Some(first) = rest.chars().next() {
+        if pending_escape && let Some(after) = named_escape_end(rest) {
+            rest = after;
+            pending_escape = false;
+            continue;
+        }
+        pending_escape = first == BACKSLASH && !pending_escape;
         let doubled = rest.chars().nth(1) == Some(first);
         if first == OPENING && !doubled {
             let (field, after) = bracketed(rest)?;

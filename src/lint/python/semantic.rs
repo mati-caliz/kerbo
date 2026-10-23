@@ -9,6 +9,7 @@ mod defaults;
 mod definitions;
 mod effects;
 mod expressions;
+mod format_calls;
 mod handlers;
 mod idioms;
 mod imports;

@@ -9,7 +9,7 @@ use crate::limits::{Limits, Preset};
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::{PythonRule, RuleId};
 
-const FIXTURES: [(&str, &str, &str); 19] = [
+const FIXTURES: [(&str, &str, &str); 20] = [
     (
         "scopes.py",
         include_str!("fixtures/scopes.py"),
@@ -99,6 +99,11 @@ const FIXTURES: [(&str, &str, &str); 19] = [
         "isort_unsorted.py",
         include_str!("fixtures/isort_unsorted.py"),
         include_str!("fixtures/isort_unsorted.ruff"),
+    ),
+    (
+        "format_calls.py",
+        include_str!("fixtures/format_calls.py"),
+        include_str!("fixtures/format_calls.ruff"),
     ),
     (
         "package/__init__.py",
@@ -279,10 +284,7 @@ fn files_tree_sitter_cannot_parse_keep_only_the_local_rules() {
 fn presets_and_switches_turn_rules_off() {
     let source = "import os\nx = 1;\n";
     let minimal = Preset::Minimal.limits(Language::Python, false);
-    assert_eq!(
-        rendered(&lints_at("module.py", source, minimal)),
-        ["1:1 I001", "1:8 F401"]
-    );
+    assert_eq!(rendered(&lints_at("module.py", source, minimal)), ["1:8 F401"]);
     let without = strict().with_rule(RuleId::Python(PythonRule::F401), None);
     assert_eq!(
         rendered(&lints_at("module.py", source, without)),

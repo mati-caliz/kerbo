@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: modismos de pylint, refurb, flake8-logging y
 // compañía.
-pub const IDIOM_TEXTS: [(PythonRule, RuleText); 13] = [
+pub const IDIOM_TEXTS: [(PythonRule, RuleText); 14] = [
     (
         PythonRule::FURB167,
         RuleText::new(
@@ -119,6 +119,15 @@ pub const IDIOM_TEXTS: [(PythonRule, RuleText); 13] = [
             "sort it by section (standard, third party, first party, relative) and alphabetically, with a blank line between sections",
             "A fixed import order can be reviewed at a glance, avoids duplicates and removes merge conflicts from reorderings.",
             "import sys\nimport os becomes import os\nimport sys.",
+        ),
+    ),
+    (
+        PythonRule::UP032,
+        RuleText::new(
+            "str.format call that can be an f-string",
+            "write it as an f-string",
+            "An f-string puts each value where it is printed, so it reads in one pass and cannot pair a placeholder with the wrong argument.",
+            "\"hello {}\".format(name) becomes f\"hello {name}\".",
         ),
     ),
 ];
