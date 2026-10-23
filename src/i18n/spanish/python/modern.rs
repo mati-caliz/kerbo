@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 13] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 16] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -119,6 +119,33 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 13] = [
             "escribí X | None",
             "Desde Python 3.10 X | None dice lo mismo sin importar Optional.",
             "Optional[int] pasa a int | None.",
+        ),
+    ),
+    (
+        PythonRule::SIM102,
+        RuleText::new(
+            "Un if cuyo único contenido es otro if",
+            "juntá las dos condiciones con and",
+            "Dos if anidados sin nada más suman un nivel de sangría que no aporta: una sola condición se lee mejor.",
+            "if a:\n    if b: pasa a if a and b:.",
+        ),
+    ),
+    (
+        PythonRule::SIM117,
+        RuleText::new(
+            "Un with cuyo único contenido es otro with",
+            "abrí los dos contextos en el mismo with",
+            "Un with por contexto suma sangría sin necesidad: with a, b: dice lo mismo.",
+            "with abrir(x) as a:\n    with abrir(y) as b: pasa a with abrir(x) as a, abrir(y) as b:.",
+        ),
+    ),
+    (
+        PythonRule::BLE001,
+        RuleText::new(
+            "Un except que atrapa Exception sin volver a lanzarla ni registrarla",
+            "atrapá la excepción concreta que esperás, o registrala con logging.exception",
+            "Atrapar Exception a ciegas esconde errores de programación y fallas que no se esperaban: el programa sigue como si nada.",
+            "except Exception: pass pasa a except ValueError: pass, o a except Exception: logger.exception(\"falló\").",
         ),
     ),
 ];

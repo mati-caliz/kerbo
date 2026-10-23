@@ -1,7 +1,9 @@
 use tree_sitter::Node;
 
+use super::handlers::blind_except;
 use super::model::{BindingKind, Resolution, ScopeKind, Site, UNPACKED};
 use super::{Mode, Visitor};
+use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ASSIGNMENT, ATTRIBUTE, CLASS, FUNCTION, IDENTIFIER, LEFT_FIELD, LIST, OBJECT_FIELD, PARENTHESIZED,
     RIGHT_FIELD, SET, STRING, SUBSCRIPT, TUPLE, TYPE_FIELD, VALUE_FIELD, is_f_string, named, unparenthesized,
@@ -10,6 +12,7 @@ use crate::lint::python::semantic::annotations::Annotations;
 use crate::lint::python::semantic::checks::Exports;
 use crate::lint::python::semantic::expressions::Expressions;
 use crate::lint::python::semantic::statements::Statements;
+use crate::rules::PythonRule;
 
 const DUNDER_ALL: &str = "__all__";
 const SEQUENCE_TARGETS: [&str; 5] = ["pattern_list", "tuple_pattern", "list_pattern", TUPLE, LIST];
@@ -248,6 +251,9 @@ impl<'tree> Targets<'tree> for Visitor<'tree> {
         };
         if let Some(exception_type) = exception_type {
             self.expression(exception_type, Mode::Value);
+        }
+        if let Some(blind) = blind_except(&self.model, self.source, handler) {
+            self.reports.push(Report::at(PythonRule::BLE001, blind, ""));
         }
         self.clause_body(handler);
         if let Some((bound_name, previous, id)) = bound {

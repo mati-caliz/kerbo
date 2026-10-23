@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 13] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 16] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -119,6 +119,33 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 13] = [
             "write X | None",
             "Since Python 3.10 X | None says the same without importing Optional.",
             "Optional[int] becomes int | None.",
+        ),
+    ),
+    (
+        PythonRule::SIM102,
+        RuleText::new(
+            "An if whose only content is another if",
+            "join both conditions with and",
+            "Two nested ifs with nothing else add an indentation level for nothing: a single condition reads better.",
+            "if a:\n    if b: becomes if a and b:.",
+        ),
+    ),
+    (
+        PythonRule::SIM117,
+        RuleText::new(
+            "A with whose only content is another with",
+            "open both contexts in the same with",
+            "One with per context adds indentation for nothing: with a, b: says the same.",
+            "with open(x) as a:\n    with open(y) as b: becomes with open(x) as a, open(y) as b:.",
+        ),
+    ),
+    (
+        PythonRule::BLE001,
+        RuleText::new(
+            "An except that catches Exception without re-raising or logging it",
+            "catch the specific exception you expect, or log it with logging.exception",
+            "Blindly catching Exception hides programming errors and unexpected failures: the program carries on as if nothing happened.",
+            "except Exception: pass becomes except ValueError: pass, or except Exception: logger.exception(\"failed\").",
         ),
     ),
 ];

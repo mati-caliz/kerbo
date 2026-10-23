@@ -4,6 +4,7 @@ mod checks;
 mod definitions;
 mod effects;
 mod expressions;
+mod handlers;
 mod imports;
 mod model;
 mod patterns;

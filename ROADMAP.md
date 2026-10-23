@@ -1263,9 +1263,15 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     la 3.11, así que las tres valen en todo el código. Paridad: 4.006 de 4.025, 1.404 de 1.410 y 4.371
     de 4.371, sin avisos de más; lo que falta está en CPython sin parsear y en carpetas ocultas. Los
     casos quedaron en `fixtures/pep604.py`.
+  - Hechas en una cuarta tanda: SIM102 (`if` anidados que se juntan con `and`, salvo chequeos de
+    `sys.version_info`/`sys.platform` con cualquier alias, `TYPE_CHECKING` y `__main__`), SIM117
+    (`with` anidados, salvo los de timeout de asyncio, anyio y trio) y BLE001 (`except Exception`
+    sin `raise` ni registro con `logging.exception` o `exc_info=`, con la heurística de loggers de
+    ruff). Paridad: 708 de 708, 1.535 de 1.535 y 1.304 de 1.367, sin avisos de más; los 63 que faltan
+    están en archivos de CPython con `lazy import`. Los casos quedaron en `fixtures/simplify.py`.
   - Siguiente: RUF012 (atributos de clase mutables, con las anotaciones inmutables de ruff, la
     jerarquía de clases del mismo archivo, dataclasses, attrs y pydantic), RUF059, UP032, UP035,
-    SIM117 y SIM102.
+    UP008, UP017, UP018, UP030, TRY002, PLC0414, S102, S110 y SIM118.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

@@ -11,6 +11,7 @@ mod modern;
 mod names;
 mod noqa;
 mod semantic;
+mod simplify;
 mod statements;
 pub mod taint;
 
@@ -114,6 +115,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(formats::reports(&nodes, source));
     reports.extend(dicts::reports(&nodes, source));
     reports.extend(modern::reports(root, &nodes, source));
+    reports.extend(simplify::reports(&nodes, source));
     let suppressions = noqa::Suppressions::new(root, source);
     let mut found: Vec<LintFinding> = reports
         .into_iter()
