@@ -1305,7 +1305,12 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     mismos (`open` dentro de `gzip.py`): ruff conoce el nombre del módulo de cada archivo y resuelve
     esas definiciones como `gzip.open`; kerbo no lo calcula. Los casos quedaron en
     `fixtures/resources.py`.
-  - Siguiente: UP032, UP035, B023, RUF022, RUF023 y SIM114.
+  - Hecha UP035 (imports de módulos de los que el nombre se mudó): las tablas de
+    `deprecated/tables.rs` salen del fuente de ruff para Python 3.11, que es la versión por defecto
+    de ruff 0.17 (lo confirma que `typing_extensions.override`, de 3.12, no se reporta). Un aviso
+    por destino y uno por cada miembro de `typing` que cambió de nombre, como ruff. Paridad: 1.168 de
+    1.169, sin avisos de más; el que falta es un `lazy from` de CPython.
+  - Siguiente: UP032, B023, RUF022, RUF023 y SIM114.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 35] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 36] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -317,6 +317,15 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 35] = [
             "lanzá TypeError",
             "Si el problema es el tipo del valor, TypeError es lo que espera quien llama; una excepción genérica lo confunde.",
             "if not isinstance(x, int): raise ValueError(...) pasa a raise TypeError(...).",
+        ),
+    ),
+    (
+        PythonRule::UP035,
+        RuleText::new(
+            "Un import desde un módulo del que ese nombre ya se mudó",
+            "importalo desde su módulo actual",
+            "Los nombres viejos de typing, typing_extensions o collections siguen ahí por compatibilidad, pero están deprecados y algunos ya no existen.",
+            "from typing import Callable pasa a from collections.abc import Callable.",
         ),
     ),
 ];
