@@ -6,6 +6,7 @@ use super::roles::{
 };
 use super::segments::Graph;
 use super::state::State;
+use crate::lint::ecmascript::nodes::PARENTHESIZED;
 
 const WHILE: &str = "while_statement";
 const DO: &str = "do_statement";
@@ -84,4 +85,22 @@ pub fn case_statements(case: Node<'_>) -> Vec<Node<'_>> {
         .filter(|(_, field)| *field != Some(VALUE_FIELD))
         .map(|(child, _)| child)
         .collect()
+}
+
+// El padre como lo ve ESTree, salteando paréntesis, y el campo que ocupa el nodo en él.
+pub fn estree_place<'tree>(
+    ancestors: &[(Node<'tree>, Option<&'tree str>)],
+    field: Option<&'tree str>,
+) -> Place<'tree> {
+    let mut field = field;
+    for (ancestor, own_field) in ancestors.iter().rev() {
+        if ancestor.kind() != PARENTHESIZED {
+            return Place {
+                parent: Some(*ancestor),
+                field,
+            };
+        }
+        field = *own_field;
+    }
+    Place::default()
 }

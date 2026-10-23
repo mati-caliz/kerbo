@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 25] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 26] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -225,6 +225,15 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 25] = [
             "agregá break o un comentario // falls through si es a propósito",
             "Seguir de largo sin avisar es uno de los errores más comunes de un switch: corre el código del case siguiente.",
             "case 1: cargar(); case 2: ... se vuelve case 1: cargar(); break; case 2: ...",
+        ),
+    ),
+    (
+        EslintRule::NoUselessAssignment,
+        RuleText::new(
+            "Un valor asignado que nunca se lee",
+            "borrá la asignación o usá el valor",
+            "El valor se pisa o se descarta antes de leerse: o la asignación sobra o falta usarlo en algún lado.",
+            "let total = 0; total = calcular(); se vuelve let total = calcular();.",
         ),
     ),
 ];

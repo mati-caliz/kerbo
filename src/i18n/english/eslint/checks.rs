@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 25] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 26] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -225,6 +225,15 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 25] = [
             "add break, or a // falls through comment if it is intended",
             "Falling through silently is one of the most common switch bugs: the next case's code runs too.",
             "case 1: load(); case 2: ... becomes case 1: load(); break; case 2: ...",
+        ),
+    ),
+    (
+        EslintRule::NoUselessAssignment,
+        RuleText::new(
+            "An assigned value that is never read",
+            "delete the assignment or use the value",
+            "The value is overwritten or discarded before anyone reads it: either the assignment is left over or a use is missing.",
+            "let total = 0; total = compute(); becomes let total = compute();.",
         ),
     ),
 ];

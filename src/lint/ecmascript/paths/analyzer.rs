@@ -2,7 +2,7 @@ use tree_sitter::Node;
 
 use super::flow::{self, CaseBody};
 use super::loops;
-use super::reachability::Reachability;
+use super::reachability::{Flow, PathRecord, segment_changes};
 use super::roles::{
     CODE_PATH_FUNCTIONS, LABELED, METHOD, NEW, Place, STATIC_BLOCK, SWITCH_CASES, SWITCH_DEFAULT,
     children_with_fields, first_argument, forks_by_result, is_chain_root, is_field_value, is_identifier,
@@ -11,11 +11,11 @@ use super::roles::{
 };
 use super::segments::Graph;
 use super::shapes::{
-    LoopPart, case_statements, has_case, is_first_case, is_pattern_with_default, labeled_body_is_breakable,
-    preprocess_loop,
+    LoopPart, case_statements, estree_place, has_case, is_first_case, is_pattern_with_default,
+    labeled_body_is_breakable, preprocess_loop,
 };
 use super::state::{ChoiceKind, State};
-use crate::lint::ecmascript::nodes::{CALL, COMMENT, MEMBER, PARENTHESIZED, PROGRAM, SUBSCRIPT, text};
+use crate::lint::ecmascript::nodes::{CALL, COMMENT, MEMBER, PROGRAM, SUBSCRIPT, text};
 
 const IF: &str = "if_statement";
 const TERNARY: &str = "ternary_expression";
@@ -50,21 +50,24 @@ pub struct Analyzer<'tree, 'source> {
     source: &'source [u8],
     graph: Graph,
     paths: Vec<State>,
-    reachability: Reachability,
+    records: Vec<PathRecord<'tree>>,
+    flow: Flow<'tree>,
     ancestors: Vec<(Node<'tree>, Option<&'tree str>)>,
 }
 
 impl<'tree, 'source> Analyzer<'tree, 'source> {
-    pub fn analyze(root: Node<'tree>, source: &'source [u8]) -> Reachability {
+    pub fn analyze(root: Node<'tree>, source: &'source [u8]) -> Flow<'tree> {
         let mut analyzer = Self {
             source,
             graph: Graph::default(),
             paths: Vec::new(),
-            reachability: Reachability::default(),
+            records: Vec::new(),
+            flow: Flow::default(),
             ancestors: Vec::new(),
         };
         analyzer.visit(root, None);
-        analyzer.reachability
+        analyzer.flow.successors = analyzer.graph.successor_lists();
+        analyzer.flow
     }
 
     fn state(&mut self) -> Option<(&mut State, &mut Graph)> {
@@ -82,29 +85,6 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
             parent: self.ancestors.last().map(|(parent, _)| *parent),
             field,
         }
-    }
-
-    // El padre como lo ve ESTree, salteando paréntesis, y el campo que ocupa el nodo en él.
-    fn estree_place(&self, field: Option<&'tree str>) -> Place<'tree> {
-        let mut field = field;
-        for (ancestor, own_field) in self.ancestors.iter().rev() {
-            if ancestor.kind() != PARENTHESIZED {
-                return Place {
-                    parent: Some(*ancestor),
-                    field,
-                };
-            }
-            field = *own_field;
-        }
-        Place::default()
-    }
-
-    fn grandparent(&self) -> Option<Node<'tree>> {
-        self.ancestors
-            .len()
-            .checked_sub(2)
-            .and_then(|index| self.ancestors.get(index))
-            .map(|(node, _)| *node)
     }
 
     fn visit_children(&mut self, node: Node<'tree>, field: Option<&'tree str>, children: Children<'tree>) {
@@ -133,10 +113,16 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
             self.forward();
         }
         self.enter(node, field);
-        self.reachability.at_enter.insert(node.id(), self.reachable());
+        self.flow.at_enter.insert(node.id(), self.reachable());
+        if let Some(record) = self.records.last_mut() {
+            record.observe_enter(node);
+        }
         self.visit_children(node, field, children_with_fields(node));
         self.exit(node, place);
-        self.reachability.at_exit.insert(node.id(), self.reachable());
+        self.flow.at_exit.insert(node.id(), self.reachable());
+        if let Some(record) = self.records.last_mut() {
+            record.observe_exit(node);
+        }
         self.postprocess(node, place);
         if chain {
             if let Some((state, graph)) = self.state() {
@@ -150,7 +136,7 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
     fn visit_method(&mut self, method: Node<'tree>, field: Option<&'tree str>) {
         self.preprocess(method, self.place(field));
         self.forward();
-        self.reachability.at_enter.insert(method.id(), self.reachable());
+        self.flow.at_enter.insert(method.id(), self.reachable());
         let (key, function): (Children<'tree>, Children<'tree>) = children_with_fields(method)
             .into_iter()
             .partition(|(child, child_field)| child.kind() == DECORATOR || *child_field == Some(NAME_FIELD));
@@ -159,7 +145,7 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
             .iter()
             .any(|(_, child_field)| *child_field == Some(BODY_FIELD))
         {
-            self.start_path();
+            self.start_path(method);
             self.forward();
             self.visit_children(method, field, function);
             self.forward();
@@ -168,20 +154,24 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
             self.visit_children(method, field, function);
         }
         self.forward();
-        self.reachability.at_exit.insert(method.id(), self.reachable());
+        self.flow.at_exit.insert(method.id(), self.reachable());
     }
 
-    fn start_path(&mut self) {
+    fn start_path(&mut self, start: Node<'tree>) {
         if !self.paths.is_empty() {
             self.forward();
         }
         let state = State::new(&mut self.graph);
         self.paths.push(state);
+        self.records.push(PathRecord::new(start));
     }
 
     fn end_path(&mut self) {
         if let Some(mut state) = self.paths.pop() {
             state.make_final(&self.graph);
+        }
+        if let Some(record) = self.records.pop() {
+            self.flow.paths.push(record);
         }
     }
 
@@ -191,12 +181,23 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
             return;
         };
         let head = self.graph.head(state.fork);
-        for (index, segment) in head.iter().enumerate() {
-            if state.current.get(index) != Some(segment) {
-                self.graph.mark_used(*segment);
-            }
+        let (ended, started) = segment_changes(&state.current, &head);
+        for segment in &started {
+            self.graph.mark_used(*segment);
         }
         state.current = head;
+        let Some(record) = self.records.last_mut() else {
+            return;
+        };
+        for segment in ended {
+            record.end_segment(segment);
+        }
+        for segment in started
+            .into_iter()
+            .filter(|segment| self.graph.is_reachable(*segment))
+        {
+            record.start_segment(segment);
+        }
     }
 
     fn preprocess(&mut self, node: Node<'tree>, place: Place<'tree>) {
@@ -204,7 +205,7 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
             return;
         };
         let source = self.source;
-        let grandparent = self.grandparent();
+        let grandparent = self.ancestors.iter().rev().nth(1).map(|(ancestor, _)| *ancestor);
         let Some((state, graph)) = self.state() else {
             return;
         };
@@ -258,12 +259,12 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
         let source = self.source;
         let kind = node.kind();
         let place = self.place(field);
-        let estree_place = self.estree_place(field);
+        let estree_place = estree_place(&self.ancestors, field);
         if is_field_value(place) {
-            self.start_path();
+            self.start_path(node);
         }
         if kind == PROGRAM || kind == STATIC_BLOCK || CODE_PATH_FUNCTIONS.contains(&kind) {
-            self.start_path();
+            self.start_path(node);
         }
         if let Some((state, graph)) = self.state() {
             if let Some(choice) = logical_kind(node, source) {

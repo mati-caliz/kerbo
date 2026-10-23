@@ -17,8 +17,11 @@
 33:7 no-unused-vars
 37:1 no-func-assign
 38:1 no-func-assign
+38:1 no-useless-assignment
 39:2 no-func-assign
+39:2 no-useless-assignment
 40:4 no-func-assign
 40:4 no-unused-vars
+40:4 no-useless-assignment
 43:3 no-func-assign
 47:10 no-redeclare

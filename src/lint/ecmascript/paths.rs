@@ -8,11 +8,11 @@ mod segments;
 mod shapes;
 mod state;
 
-pub use reachability::Reachability;
+pub use reachability::{Flow, PathRecord};
 pub use shapes::case_statements;
 
 use tree_sitter::Node;
 
-pub fn reachability(root: Node<'_>, source: &[u8]) -> Reachability {
+pub fn flow<'tree>(root: Node<'tree>, source: &[u8]) -> Flow<'tree> {
     analyzer::Analyzer::analyze(root, source)
 }

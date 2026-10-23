@@ -1,8 +1,12 @@
+4:7 no-useless-assignment
 5:1 no-const-assign
 6:1 no-const-assign
 7:1 no-const-assign
+7:1 no-useless-assignment
 8:2 no-const-assign
+8:2 no-useless-assignment
 9:4 no-const-assign
+9:4 no-useless-assignment
 10:6 no-const-assign
 10:6 no-unused-vars
 10:20 no-empty

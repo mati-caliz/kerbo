@@ -3,8 +3,12 @@
 6:7 no-unused-vars
 8:1 no-unused-vars
 10:1 no-unused-vars
+10:1 no-useless-assignment
 12:1 no-unused-vars
+12:1 no-useless-assignment
 14:1 no-unused-vars
+14:1 no-useless-assignment
+15:5 no-useless-assignment
 18:1 no-var
 18:5 no-unused-vars
 19:6 no-unused-vars
@@ -38,6 +42,8 @@
 89:9 no-unused-vars
 100:34 no-unused-vars
 103:1 no-unused-vars
+103:1 no-useless-assignment
+105:1 no-useless-assignment
 107:1 no-unused-expressions
 107:2 no-unused-vars
 111:1 no-var

@@ -1394,9 +1394,16 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   clase derivada sin `super()`) y `no-fallthrough` (con el comentario `falls through` y las líneas en
   blanco de un `case` vacío). Paridad en express, zod, react, vscode y next.js: 37 de 37 y 51 de 51,
   sin avisos de más. Los casos quedaron en `fixtures/reachability.js`.
+- `no-useless-assignment` (hecho, 2026-10-23), sobre el análisis de caminos: cada camino guarda los
+  segmentos alcanzables activos en cada asignación, el primer y el último identificador de cada
+  segmento y sus bloques `try`, y la regla recorre los segmentos siguientes como ESLint (sin pasar
+  de uno que vuelve a asignar, con las lecturas desde otra función como uso y las variables
+  exportadas afuera). Paridad en express, zod, react, vscode y next.js:
+  599 de 602, sin avisos de más; los tres que faltan están en archivos que tree-sitter no parsea. La
+  frecuencia de arriba contaba el código compilado que next.js ignora. Los casos quedaron en
+  `fixtures/assigned.js`.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
-  - Sobre el análisis de caminos que ya está: `no-useless-assignment` (1.778, pide además los
-    segmentos de cada referencia), `getter-return` (43), `no-this-before-super` (9) y
+  - Sobre el análisis de caminos que ya está: `getter-return` (43), `no-this-before-super` (9) y
     `constructor-super` (7).
   - `no-misleading-character-class` (290), `no-control-regex` (138), `getter-return` (43),
     `no-loss-of-precision` (14), `no-irregular-whitespace` (10),

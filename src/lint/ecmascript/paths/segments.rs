@@ -193,6 +193,10 @@ impl Graph {
         self.forks.len().saturating_sub(1)
     }
 
+    pub fn successor_lists(&self) -> Vec<Vec<SegmentId>> {
+        self.segments.iter().map(|segment| segment.next.clone()).collect()
+    }
+
     pub fn upper(&self, fork: ForkId) -> Option<ForkId> {
         self.forks.get(fork).and_then(|found| found.upper)
     }

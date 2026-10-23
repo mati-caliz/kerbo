@@ -55,6 +55,7 @@ rule_family!(EslintRule {
     NoArrayConstructor => "no-array-constructor",
     NoUnreachable => "no-unreachable",
     NoFallthrough => "no-fallthrough",
+    NoUselessAssignment => "no-useless-assignment",
 });
 
 pub const fn wrap_eslint<'slots>(slots: &'slots mut [RuleId], rules: &[EslintRule]) -> &'slots mut [RuleId] {

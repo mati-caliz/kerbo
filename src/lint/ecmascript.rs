@@ -37,13 +37,14 @@ mod triple_slash;
 mod typescript;
 mod unreachable;
 mod unused;
+mod useless_assignment;
 mod wrappers;
 
 use std::cell::OnceCell;
 
 use tree_sitter::Node;
 
-use self::paths::Reachability;
+use self::paths::Flow;
 use self::scope::ScopeTree;
 use super::{LintFinding, LintKind, finding};
 use crate::fix::Fix;
@@ -134,6 +135,10 @@ const CHECKS: &[(EslintRule, Check)] = &[
     (EslintRule::NoArrayConstructor, typescript::array_constructors),
     (EslintRule::NoUnreachable, unreachable::unreachable_code),
     (EslintRule::NoFallthrough, fallthrough::fallthroughs),
+    (
+        EslintRule::NoUselessAssignment,
+        useless_assignment::useless_assignments,
+    ),
 ];
 
 #[derive(Debug, Clone, Copy)]
@@ -148,7 +153,7 @@ pub struct Context<'tree, 'source> {
     pub root: Node<'tree>,
     pub declaration_file: bool,
     pub scopes: OnceCell<ScopeTree<'tree>>,
-    pub paths: OnceCell<Reachability>,
+    pub paths: OnceCell<Flow<'tree>>,
 }
 
 impl<'tree> Context<'tree, '_> {
@@ -166,9 +171,8 @@ impl<'tree> Context<'tree, '_> {
         node.utf8_text(self.source).unwrap_or_default()
     }
 
-    pub fn paths(&self) -> &Reachability {
-        self.paths
-            .get_or_init(|| paths::reachability(self.root, self.source))
+    pub fn paths(&self) -> &Flow<'tree> {
+        self.paths.get_or_init(|| paths::flow(self.root, self.source))
     }
 
     pub fn scopes(&self) -> &ScopeTree<'tree> {

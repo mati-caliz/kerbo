@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
 use super::nodes::{COMMENT, STATEMENT_BLOCK, VALUE_FIELD, VARIABLE_DECLARATOR};
-use super::paths::Reachability;
+use super::paths::Flow;
 use super::token_index::TokenIndex;
 use super::{Context, report};
 use crate::lint::LintFinding;
@@ -55,7 +55,7 @@ struct Range<'tree> {
 }
 
 struct Walker<'context, 'tree> {
-    reachability: &'context Reachability,
+    reachability: &'context Flow<'tree>,
     tokens: TokenIndex<'tree>,
     source: &'context [u8],
     range: Option<Range<'tree>>,
