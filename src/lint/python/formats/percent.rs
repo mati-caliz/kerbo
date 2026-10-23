@@ -26,47 +26,92 @@ pub enum PercentError {
     Invalid,
 }
 
-pub fn summary(format: &str) -> Result<PercentSummary, PercentError> {
-    let mut summary = PercentSummary::default();
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Quantity {
+    Star,
+    Digits,
+}
+
+// Un `%…` del formato: clave, flags, ancho, precisión y conversión.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Specifier {
+    pub key: Option<String>,
+    pub flagged: bool,
+    pub width: Option<Quantity>,
+    pub precision: Option<Quantity>,
+    pub conversion: char,
+}
+
+impl Specifier {
+    fn stars(&self) -> usize {
+        [self.width, self.precision]
+            .into_iter()
+            .filter(|quantity| *quantity == Some(Quantity::Star))
+            .count()
+    }
+}
+
+pub fn specifiers(format: &str) -> Result<Vec<Specifier>, PercentError> {
+    let mut found = Vec::new();
     let mut characters = format.chars().peekable();
     while let Some(character) = characters.next() {
         if character != MARKER || characters.next_if_eq(&MARKER).is_some() {
             continue;
         }
-        specifier(&mut characters, &mut summary)?;
+        found.push(specifier(&mut characters)?);
+    }
+    Ok(found)
+}
+
+pub fn summary(format: &str) -> Result<PercentSummary, PercentError> {
+    let mut summary = PercentSummary::default();
+    for specifier in specifiers(format)? {
+        let stars = specifier.stars();
+        match specifier.key {
+            Some(key) => {
+                summary.keywords.insert(key);
+            }
+            None => summary.positional = summary.positional.saturating_add(1),
+        }
+        summary.positional = summary.positional.saturating_add(stars);
+        summary.starred |= stars > 0;
     }
     Ok(summary)
 }
 
-fn specifier(characters: &mut Peekable<Chars<'_>>, summary: &mut PercentSummary) -> Result<(), PercentError> {
+fn specifier(characters: &mut Peekable<Chars<'_>>) -> Result<Specifier, PercentError> {
     let key = mapping_key(characters)?;
-    while characters.next_if(|flag| FLAGS.contains(flag)).is_some() {}
-    let mut stars = usize::from(quantity(characters));
-    if characters.next_if_eq(&PRECISION).is_some() {
-        stars = stars.saturating_add(usize::from(quantity(characters)));
+    let mut flagged = false;
+    while characters.next_if(|flag| FLAGS.contains(flag)).is_some() {
+        flagged = true;
     }
+    let width = quantity(characters);
+    let precision = characters
+        .next_if_eq(&PRECISION)
+        .map(|_| quantity(characters).unwrap_or(Quantity::Digits));
     characters.next_if(|modifier| LENGTH_MODIFIERS.contains(modifier));
     let conversion = characters.next().ok_or(PercentError::Invalid)?;
     if !CONVERSIONS.contains(&conversion) {
         return Err(PercentError::Unsupported);
     }
-    match key {
-        Some(key) => {
-            summary.keywords.insert(key);
-        }
-        None => summary.positional = summary.positional.saturating_add(1),
-    }
-    summary.positional = summary.positional.saturating_add(stars);
-    summary.starred |= stars > 0;
-    Ok(())
+    Ok(Specifier {
+        key,
+        flagged,
+        width,
+        precision,
+        conversion,
+    })
 }
 
-fn quantity(characters: &mut Peekable<Chars<'_>>) -> bool {
+fn quantity(characters: &mut Peekable<Chars<'_>>) -> Option<Quantity> {
     if characters.next_if_eq(&STAR).is_some() {
-        return true;
+        return Some(Quantity::Star);
     }
-    while characters.next_if(char::is_ascii_digit).is_some() {}
-    false
+    let mut digits = false;
+    while characters.next_if(char::is_ascii_digit).is_some() {
+        digits = true;
+    }
+    digits.then_some(Quantity::Digits)
 }
 
 fn mapping_key(characters: &mut Peekable<Chars<'_>>) -> Result<Option<String>, PercentError> {

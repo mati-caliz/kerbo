@@ -1,5 +1,6 @@
 mod braces;
 mod percent;
+mod printf;
 
 use tree_sitter::Node;
 
@@ -52,7 +53,10 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     nodes
         .iter()
         .flat_map(|node| match node.kind() {
-            BINARY => percent_format(*node, source),
+            BINARY => percent_format(*node, source)
+                .into_iter()
+                .chain(printf_report(*node, source))
+                .collect(),
             CALL => brace_format(*node, source),
             _ => Vec::new(),
         })
@@ -80,6 +84,18 @@ fn percent_format(operation: Node<'_>, source: &[u8]) -> Vec<Report> {
             .map(|(rule, subject)| Report::at(rule, operation, &subject))
             .collect(),
     }
+}
+
+fn printf_report(operation: Node<'_>, source: &[u8]) -> Option<Report> {
+    let is_modulo = operation
+        .child_by_field_name(OPERATOR_FIELD)
+        .is_some_and(|operator| text(operator, source) == MODULO);
+    let left = operation
+        .child_by_field_name(LEFT_FIELD)
+        .map(unparenthesized)
+        .filter(|left| is_modulo && is_string(*left))?;
+    let right = operation.child_by_field_name(RIGHT_FIELD).map(unparenthesized)?;
+    printf::printf_formatting(operation, left, right, source)
 }
 
 fn percent_rules(summary: &PercentSummary, right: Node<'_>, source: &[u8]) -> Vec<(PythonRule, String)> {

@@ -1,6 +1,6 @@
 use tree_sitter::Node;
 
-use super::model::{BindingKind, ScopeKind};
+use super::model::{BindingKind, Model, ScopeKind};
 use super::qualified::{is_builtin_named, qualified_name};
 use super::targets::Store;
 use super::{Mode, Visitor};
@@ -26,6 +26,10 @@ const COMPREHENSIONS: [&str; 4] = [
     "generator_expression",
 ];
 const LOCALS: &str = "locals";
+const ARGUMENT_LIST: &str = "argument_list";
+const DICTIONARY_SPLAT: &str = "dictionary_splat";
+const DICT_BUILTIN: &str = "dict";
+const COLLECTION_BUILTINS: [&str; 3] = [DICT_BUILTIN, "list", "tuple"];
 const TYPE_BUILTIN: &str = "type";
 const EQUALITY: [&str; 2] = ["==", "!="];
 const DTYPE: &str = "dtype";
@@ -235,6 +239,11 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         let Some(arguments) = call.child_by_field_name(crate::lint::python::ast::ARGUMENTS_FIELD) else {
             return;
         };
+        if let Some(function) = function
+            && let Some(collection) = unnecessary_collection(&self.model, self.source, function, arguments)
+        {
+            self.reports.push(Report::at(PythonRule::C408, call, collection));
+        }
         if COMPREHENSIONS.contains(&arguments.kind()) {
             self.comprehension(arguments);
             return;
@@ -290,4 +299,40 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
 
 fn is_type_name(name: &str) -> bool {
     TYPE_NAMES.contains(&name)
+}
+
+// C408: `dict()`, `list()` o `tuple()` del builtin, sin posicionales (y `dict` sin `**`), en vez del
+// literal.
+fn unnecessary_collection(
+    model: &Model<'_>,
+    source: &[u8],
+    function: Node<'_>,
+    arguments: Node<'_>,
+) -> Option<&'static str> {
+    if arguments.kind() != ARGUMENT_LIST {
+        return None;
+    }
+    let items = named(arguments);
+    let keywords = items
+        .iter()
+        .filter(|item| item.kind() == KEYWORD_ARGUMENT)
+        .count();
+    let splats = items
+        .iter()
+        .filter(|item| item.kind() == DICTIONARY_SPLAT)
+        .count();
+    if items.len() != keywords.saturating_add(splats) {
+        return None;
+    }
+    COLLECTION_BUILTINS
+        .iter()
+        .find(|name| is_builtin_named(model, function, source, name))
+        .copied()
+        .filter(|name| {
+            if *name == DICT_BUILTIN {
+                splats == 0
+            } else {
+                items.is_empty()
+            }
+        })
 }

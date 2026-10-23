@@ -1236,6 +1236,17 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     como un solo valor cualquier literal que no sea una tupla.
   - Las columnas cuentan bytes, como el resto de las reglas; ruff cuenta caracteres (la medición
     convierte).
+- Python contra el conjunto por defecto de ruff 0.17 (empezado, 2026-10-23). Frecuencia en los diez
+  repos de arriba, sin el conjunto clásico: UP031 15.546, I001 6.736, RUF059 4.549, C408 4.413,
+  UP045 4.371, RUF012 4.039, UP006 4.025, UP032 1.920, B018 1.692, UP025 1.634, SIM117 1.535, RUF100
+  1.437, UP007 1.410, BLE001 1.367, UP035 1.169, UP004 995, ISC004 947, SIM102 708, SIM115 633,
+  PIE790 587, B023 583, UP005 540, C405 532, TRY002 517 y el resto con menos de 500.
+  - Hechas: UP031 (el formato con `%`, con el parser de especificadores de F501–F509 parte por parte
+    del string y el `clean_params_dictionary` de pyupgrade para decidir si avisa en el string o en la
+    operación) y C408 (`dict()`, `list()` y `tuple()` del builtin sin posicionales). Paridad: 15.540
+    de 15.546 y 4.385 de 4.413, sin avisos de más; lo que falta está en carpetas ocultas (`.ci`,
+    `.azure-pipelines`), que kerbo no recorre, y en los archivos de CPython que tree-sitter no
+    parsea. Los casos quedaron en `src/lint/python/fixtures/modern.py`.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.
