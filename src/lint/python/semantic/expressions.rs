@@ -29,6 +29,8 @@ const LOCALS: &str = "locals";
 const ARGUMENT_LIST: &str = "argument_list";
 const DICTIONARY_SPLAT: &str = "dictionary_splat";
 const DICT_BUILTIN: &str = "dict";
+const SET_BUILTIN: &str = "set";
+const LITERAL_SEQUENCES: [&str; 2] = ["list", "tuple"];
 const COLLECTION_BUILTINS: [&str; 3] = [DICT_BUILTIN, "list", "tuple"];
 const TYPE_BUILTIN: &str = "type";
 const EQUALITY: [&str; 2] = ["==", "!="];
@@ -244,6 +246,11 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         {
             self.reports.push(Report::at(PythonRule::C408, call, collection));
         }
+        if let Some(function) = function
+            && is_literal_set_call(&self.model, self.source, function, arguments)
+        {
+            self.reports.push(Report::at(PythonRule::C405, call, ""));
+        }
         if COMPREHENSIONS.contains(&arguments.kind()) {
             self.comprehension(arguments);
             return;
@@ -335,4 +342,12 @@ fn unnecessary_collection(
                 items.is_empty()
             }
         })
+}
+
+// C405: `set([...])` o `set((...))` con el `set` del builtin, en vez del literal `{...}`.
+fn is_literal_set_call(model: &Model<'_>, source: &[u8], function: Node<'_>, arguments: Node<'_>) -> bool {
+    let is_set_name = function.kind() == IDENTIFIER && text(function, source) == SET_BUILTIN;
+    let single_literal = arguments.kind() == ARGUMENT_LIST
+        && matches!(named(arguments).as_slice(), [argument] if LITERAL_SEQUENCES.contains(&crate::lint::python::ast::unparenthesized(*argument).kind()));
+    is_set_name && single_literal && is_builtin_named(model, function, source, SET_BUILTIN)
 }

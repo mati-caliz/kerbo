@@ -1,9 +1,12 @@
 use tree_sitter::Node;
 
+use super::effects::useless_expression;
 use super::model::{BindingKind, GLOBAL, MODULE_SCOPE, NAME_ERROR, NONLOCAL, ScopeKind, Site};
 use super::qualified::is_builtin_named;
 use super::targets::Store;
 use super::{Mode, Visitor};
+use crate::lint::python::Report;
+use crate::lint::python::ast::text;
 use crate::lint::python::ast::{
     ASSIGNMENT, AUGMENTED_ASSIGNMENT, BLOCK, BODY_FIELD, CLASS, COMMENT, DECORATED, EXPRESSION_STATEMENT,
     FUNCTION, FUTURE_IMPORT, IDENTIFIER, IMPORT, IMPORT_FROM, LEFT_FIELD, RIGHT_FIELD, TUPLE, VALUE_FIELD,
@@ -15,6 +18,7 @@ use crate::lint::python::semantic::expressions::Expressions;
 use crate::lint::python::semantic::imports::Imports;
 use crate::lint::python::semantic::patterns::Patterns;
 use crate::lint::python::semantic::targets::Targets;
+use crate::rules::PythonRule;
 
 const IF: &str = "if_statement";
 const FOR: &str = "for_statement";
@@ -97,6 +101,16 @@ impl<'tree> Statements<'tree> for Visitor<'tree> {
     }
 
     fn expression_statement(&mut self, statement: Node<'tree>) {
+        let is_expression = named(statement)
+            .iter()
+            .all(|child| child.kind() != ASSIGNMENT && child.kind() != AUGMENTED_ASSIGNMENT);
+        if is_expression {
+            let is_builtin =
+                |name: Node<'_>| is_builtin_named(&self.model, name, self.source, text(name, self.source));
+            if let Some(value) = useless_expression(statement, self.source, &is_builtin) {
+                self.reports.push(Report::at(PythonRule::B018, value, ""));
+            }
+        }
         for child in named(statement) {
             match child.kind() {
                 ASSIGNMENT => self.assignment(child, statement),

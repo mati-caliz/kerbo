@@ -2,6 +2,7 @@ mod annotations;
 mod boundary;
 mod checks;
 mod definitions;
+mod effects;
 mod expressions;
 mod imports;
 mod model;

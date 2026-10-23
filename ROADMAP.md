@@ -1247,6 +1247,13 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     de 15.546 y 4.385 de 4.413, sin avisos de más; lo que falta está en carpetas ocultas (`.ci`,
     `.azure-pipelines`), que kerbo no recorre, y en los archivos de CPython que tree-sitter no
     parsea. Los casos quedaron en `src/lint/python/fixtures/modern.py`.
+  - Hechas en una segunda tanda: UP025 (prefijo `u`), UP004 (heredar de `object`), UP005 (alias de
+    `unittest`), UP009 (declaración de codificación utf-8), C405 (`set([...])`), B015 (comparación
+    suelta), B018 (expresión suelta, con el `contains_effect` de ruff; una t-string no cuenta como
+    string) y PIE790 (`pass` o `...` de más, salvo `...` en `if TYPE_CHECKING:`, protocolos y métodos
+    abstractos). Paridad: 1.634 de 1.634, 975 de 995, 540 de 540, 396 de 397, 532 de 532, 249 de 249,
+    1.667 de 1.692 y 587 de 587, sin avisos de más; lo que falta está en los archivos de CPython que
+    tree-sitter no parsea y en carpetas ocultas. Los casos quedaron en `fixtures/upgrades.py`.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

@@ -7,6 +7,7 @@ mod escapes;
 mod flow;
 mod formats;
 mod fstrings;
+mod modern;
 mod names;
 mod noqa;
 mod semantic;
@@ -112,6 +113,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(fstrings::reports(&nodes, source));
     reports.extend(formats::reports(&nodes, source));
     reports.extend(dicts::reports(&nodes, source));
+    reports.extend(modern::reports(root, &nodes, source));
     let suppressions = noqa::Suppressions::new(root, source);
     let mut found: Vec<LintFinding> = reports
         .into_iter()

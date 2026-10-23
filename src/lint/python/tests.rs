@@ -9,7 +9,7 @@ use crate::limits::{Limits, Preset};
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::{PythonRule, RuleId};
 
-const FIXTURES: [(&str, &str, &str); 9] = [
+const FIXTURES: [(&str, &str, &str); 10] = [
     (
         "scopes.py",
         include_str!("fixtures/scopes.py"),
@@ -49,6 +49,11 @@ const FIXTURES: [(&str, &str, &str); 9] = [
         "modern.py",
         include_str!("fixtures/modern.py"),
         include_str!("fixtures/modern.ruff"),
+    ),
+    (
+        "upgrades.py",
+        include_str!("fixtures/upgrades.py"),
+        include_str!("fixtures/upgrades.ruff"),
     ),
     (
         "package/__init__.py",
@@ -112,7 +117,7 @@ fn reports_exactly_what_ruff_reports_with_its_default_rules() {
         assert_eq!(
             rendered(&lints_at(path, source, strict())),
             expected(golden),
-            "{path} contra ruff 0.17 (E4, E7, E9, F, C408, UP031)"
+            "{path} contra ruff 0.17 (E4, E7, E9, F y las del conjunto nuevo)"
         );
     }
 }

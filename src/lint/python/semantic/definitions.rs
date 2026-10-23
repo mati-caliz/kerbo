@@ -1,8 +1,10 @@
 use tree_sitter::Node;
 
 use super::model::{BindingKind, MODULE_SCOPE, ScopeKind, Site};
+use super::qualified::is_builtin_named;
 use super::targets::Store;
 use super::{Mode, Pending, Visitor};
+use crate::lint::python::Report;
 use crate::lint::python::ast::{
     BODY_FIELD, CLASS, DECORATED, FUNCTION, IDENTIFIER, LEFT_FIELD, NAME_FIELD, RIGHT_FIELD, TYPE_FIELD,
     VALUE_FIELD, named,
@@ -11,7 +13,9 @@ use crate::lint::python::semantic::annotations::Annotations;
 use crate::lint::python::semantic::expressions::Expressions;
 use crate::lint::python::semantic::statements::Statements;
 use crate::lint::python::semantic::targets::Targets;
+use crate::rules::PythonRule;
 
+const OBJECT_BUILTIN: &str = "object";
 const DEFINITION_FIELD: &str = "definition";
 const DECORATOR: &str = "decorator";
 const PARAMETERS_FIELD: &str = "parameters";
@@ -103,6 +107,12 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
         self.type_parameters(class);
         if let Some(arguments) = class.child_by_field_name(SUPERCLASSES_FIELD) {
             self.expression(arguments, Mode::Value);
+            for base in named(arguments)
+                .into_iter()
+                .filter(|base| is_builtin_named(&self.model, *base, self.source, OBJECT_BUILTIN))
+            {
+                self.reports.push(Report::at(PythonRule::UP004, base, ""));
+            }
         }
         self.model.push_scope(ScopeKind::Class);
         if let Some(body) = class.child_by_field_name(BODY_FIELD) {
