@@ -18,11 +18,13 @@ mod members;
 mod modules;
 mod no_var;
 mod nodes;
+mod numbers;
 mod optional_chains;
 mod paths;
 mod prefer_const;
 mod presets;
 mod redeclare;
+mod regexes;
 mod repair;
 mod restricted;
 mod scope;
@@ -122,6 +124,8 @@ const CHECKS: &[(EslintRule, Check)] = &[
     (EslintRule::NoSelfAssign, self_assign::self_assignments),
     (EslintRule::NoSetterReturn, accessors::setter_returns),
     (EslintRule::GetterReturn, accessors::getter_returns),
+    (EslintRule::NoLossOfPrecision, numbers::precision_losses),
+    (EslintRule::NoControlRegex, regexes::control_characters_in_regexes),
     (
         EslintRule::NoUnsafeOptionalChaining,
         optional_chains::unsafe_optional_chains,

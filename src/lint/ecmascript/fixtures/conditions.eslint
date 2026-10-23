@@ -71,6 +71,7 @@
 38:5 no-constant-binary-expression
 38:19 no-empty
 39:5 no-constant-binary-expression
+39:5 no-loss-of-precision
 39:22 no-empty
 40:7 no-unused-vars
 40:19 no-constant-condition

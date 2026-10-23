@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 27] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 29] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -243,6 +243,24 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 27] = [
             "devolvé un valor en todos los caminos",
             "Quien lee la propiedad recibe undefined en ese camino, casi siempre sin querer.",
             "get total() { if (lista) return suma(lista); } se vuelve get total() { return lista ? suma(lista) : 0; }.",
+        ),
+    ),
+    (
+        EslintRule::NoLossOfPrecision,
+        RuleText::new(
+            "Un número que JavaScript no puede guardar tal cual",
+            "escribilo con la precisión que entra en un double, o usá BigInt",
+            "El valor se redondea al compilar: el número que corre no es el que está escrito.",
+            "9007199254740993 se vuelve 9007199254740993n o 9007199254740992.",
+        ),
+    ),
+    (
+        EslintRule::NoControlRegex,
+        RuleText::new(
+            "Un carácter de control en una expresión regular",
+            "escribí el escape a propósito o sacalo",
+            "Los caracteres de U+0000 a U+001F casi nunca aparecen en el texto que se busca: suele ser un error al escapar.",
+            "/\\x1f/ se vuelve /\\s/ o lo que se quería buscar.",
         ),
     ),
 ];

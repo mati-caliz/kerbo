@@ -1406,10 +1406,15 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   `Object.defineProperty` y compañía (como `no-setter-return`), con el `return;` vacío y la salida
   alcanzable del análisis de caminos. Se apaga en TypeScript. Paridad: 11 de 11. Los casos quedaron
   en `fixtures/getters.js`.
+- `no-loss-of-precision` y `no-control-regex` (hecho, 2026-10-23): el número escrito contra el que
+  guarda el `double` (en base 10 con la precisión pedida, en las otras bases por los bits
+  significativos), y los caracteres de control de un patrón (literal o primer argumento de
+  `RegExp`) escritos tal cual o con `\x` y `\u`. Paridad: 14 de 14 y 33 de 33. Los casos quedaron
+  en `fixtures/literals.js`.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
   - Sobre el análisis de caminos que ya está: `no-this-before-super` (9) y `constructor-super` (7).
-  - `no-misleading-character-class` (290), `no-control-regex` (138), `getter-return` (43),
-    `no-loss-of-precision` (14), `no-irregular-whitespace` (10),
+  - `no-misleading-character-class` (290, casi todo en código compilado),
+    `no-irregular-whitespace` (10),
     `no-unused-private-class-members` (10), `no-unexpected-multiline` (2) y las que no aparecieron
     en el corpus.
   - `no-undef`: pide las variables globales de cada entorno (navegador, Node, Jest).
