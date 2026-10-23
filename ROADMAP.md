@@ -1347,7 +1347,15 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     falta: 64 archivos de CPython con `lazy import`, los que tree-sitter no parsea, la carpeta
     oculta `.ci` de sympy y un `.pyi` de pydantic-core sin explicar todavía. Los casos quedaron en
     `fixtures/isort.py` y `fixtures/isort_unsorted.py`.
-  - Siguiente: UP032 (1.920), RUF100 (1.437) y la cola
+  - Hecha UP032 (`"{}".format(x)` que puede ser f-string), con un port del parser de formatos de
+    `ruff_python_literal` sobre el texto de cada parte del string (con `\N{…}` y el prefijo `r`):
+    argumentos sin `*`/`**`, comillas ni saltos de línea, campos que apuntan a argumentos que
+    existen, sin repetir uno con efectos, y nada adentro de un `gettext`/`gettext_lazy` de Django.
+    De paso, el resumen de F521–F525 saltea `\N{…}` como ruff (daba un F524 de más en un string
+    crudo). Paridad: 1.851 de 1.920, sin avisos de más; lo que falta está en archivos de CPython con
+    `lazy import`, en `test_patma.py` y en una carpeta oculta de ansible. Los casos quedaron en
+    `fixtures/format_calls.py`. I001 sale del preset `minimal`, con las demás reglas de estilo.
+  - Siguiente: RUF100 (1.437) y la cola
     de reglas chicas: UP044, UP037, SIM103, SIM905, FURB157, N999, UP034, RUF046, RUF013 y
     siguientes.
 - Pendientes de Python contra ruff:
