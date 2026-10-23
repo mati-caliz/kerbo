@@ -1254,6 +1254,18 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     abstractos). Paridad: 1.634 de 1.634, 975 de 995, 540 de 540, 396 de 397, 532 de 532, 249 de 249,
     1.667 de 1.692 y 587 de 587, sin avisos de más; lo que falta está en los archivos de CPython que
     tree-sitter no parsea y en carpetas ocultas. Los casos quedaron en `fixtures/upgrades.py`.
+  - Hechas en una tercera tanda: UP006 (`List`, `Dict` y compañía de `typing`, en cualquier lectura y
+    también adentro de anotaciones entre comillas), UP045 (`Optional[X]`) y UP007 (`Union[X, Y]`),
+    con las excepciones de ruff: `NamedTuple` adentro, un elemento con `*`, y un elemento entre
+    comillas cuando la expresión se evalúa en ejecución. El contexto de tipos sale de los ancestros:
+    `if TYPE_CHECKING:`, o una anotación que Python no evalúa (con el import del futuro, o la de una
+    variable local o `self.x` dentro de una función). La versión de Python por defecto de ruff 0.17 es
+    la 3.11, así que las tres valen en todo el código. Paridad: 4.006 de 4.025, 1.404 de 1.410 y 4.371
+    de 4.371, sin avisos de más; lo que falta está en CPython sin parsear y en carpetas ocultas. Los
+    casos quedaron en `fixtures/pep604.py`.
+  - Siguiente: RUF012 (atributos de clase mutables, con las anotaciones inmutables de ruff, la
+    jerarquía de clases del mismo archivo, dataclasses, attrs y pydantic), RUF059, UP032, UP035,
+    SIM117 y SIM102.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

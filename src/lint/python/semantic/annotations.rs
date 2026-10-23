@@ -5,6 +5,7 @@ use crate::lint::python::semantic::annotations::embedded::EmbeddedAnnotations;
 use crate::lint::python::semantic::expressions::Expressions;
 use tree_sitter::{Node, Point};
 
+use super::pep::{is_typing_only, pep604_rule};
 use super::qualified::{is_typing, qualified_name};
 use super::{Mode, Pending, Visitor};
 use crate::lint::python::Report;
@@ -39,6 +40,7 @@ pub trait Annotations<'tree> {
     fn subscript(&mut self, subscript: Node<'tree>, mode: Mode);
     fn generic_type(&mut self, generic: Node<'tree>, mode: Mode);
     fn slices(&mut self, value: Option<Node<'tree>>, slices: Vec<Node<'tree>>, mode: Mode);
+    fn pep604_operator(&mut self, subscript: Node<'tree>, value: Option<Node<'tree>>, slices: &[Node<'tree>]);
     fn string_annotation(&mut self, pending: Pending<'tree>);
     fn content(&self, part: Node<'_>) -> Content;
     fn parse_annotation(&mut self, value: &str, placement: Placement, string: Node<'_>);
@@ -64,6 +66,7 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
         if let Some(value) = value {
             self.expression(value, mode);
         }
+        self.pep604_operator(subscript, value, &fields(subscript, SUBSCRIPT_FIELD));
         self.slices(value, fields(subscript, SUBSCRIPT_FIELD), mode);
     }
 
@@ -73,8 +76,27 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
             return;
         };
         self.expression(*value, mode);
-        let slices = rest.iter().flat_map(|parameters| named(*parameters)).collect();
+        let slices: Vec<Node<'tree>> = rest.iter().flat_map(|parameters| named(*parameters)).collect();
+        self.pep604_operator(generic, Some(*value), &slices);
         self.slices(Some(*value), slices, mode);
+    }
+
+    // UP045 y UP007: `Optional[X]` y `Union[X, Y]`, que en 3.10 se escriben con `|`.
+    fn pep604_operator(
+        &mut self,
+        subscript: Node<'tree>,
+        value: Option<Node<'tree>>,
+        slices: &[Node<'tree>],
+    ) {
+        let Some(name) = value.and_then(|value| qualified_name(&self.model, value, self.source)) else {
+            return;
+        };
+        let typing_context =
+            self.file.stub || is_typing_only(subscript, self.boundaries.future_annotations(), self.source);
+        let qualify = |node: Node<'_>| qualified_name(&self.model, node, self.source);
+        if let Some(rule) = pep604_rule(&name, slices, &qualify, typing_context) {
+            self.reports.push(Report::at(rule, subscript, ""));
+        }
     }
 
     fn slices(&mut self, value: Option<Node<'tree>>, slices: Vec<Node<'tree>>, mode: Mode) {

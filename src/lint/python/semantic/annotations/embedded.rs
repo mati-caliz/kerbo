@@ -1,3 +1,6 @@
+use crate::lint::python::Report;
+use crate::lint::python::semantic::pep::{is_pep585_generic, pep604_rule};
+use crate::rules::PythonRule;
 use tree_sitter::{Node, Point};
 
 use super::super::Visitor;
@@ -76,6 +79,7 @@ pub fn wrap(value: &str) -> String {
 pub trait EmbeddedAnnotations {
     fn embedded_loads(&mut self, node: Node<'_>, context: &Embedded<'_>);
     fn embedded_subscript(&mut self, node: Node<'_>, context: &Embedded<'_>);
+    fn embedded_pep585(&mut self, node: Node<'_>, context: &Embedded<'_>);
     fn embedded_lambda(&mut self, lambda: Node<'_>, context: &Embedded<'_>);
     fn nested_annotation(&mut self, string: Node<'_>, context: &Embedded<'_>);
 }
@@ -88,12 +92,14 @@ impl EmbeddedAnnotations for Visitor<'_> {
                 if !context.locals.iter().any(|local| local == name) {
                     self.model
                         .resolve_load(name, context.placement.map(node.start_position()));
+                    self.embedded_pep585(node, context);
                 }
             }
             ATTRIBUTE => {
                 if let Some(object) = node.child_by_field_name(OBJECT_FIELD) {
                     self.embedded_loads(object, context);
                 }
+                self.embedded_pep585(node, context);
             }
             SUBSCRIPT => self.embedded_subscript(node, context),
             STRING | CONCATENATED_STRING if !context.literal => self.nested_annotation(node, context),
@@ -112,12 +118,35 @@ impl EmbeddedAnnotations for Visitor<'_> {
         }
     }
 
+    // UP006 adentro de una anotación entre comillas.
+    fn embedded_pep585(&mut self, node: Node<'_>, context: &Embedded<'_>) {
+        if qualified_name(&self.model, node, context.source).is_some_and(|name| is_pep585_generic(&name)) {
+            self.reports.push(Report::at_point(
+                PythonRule::UP006,
+                context.placement.map(node.start_position()),
+                "",
+            ));
+        }
+    }
+
     fn embedded_subscript(&mut self, node: Node<'_>, context: &Embedded<'_>) {
         let value = node.child_by_field_name(VALUE_FIELD);
         if let Some(value) = value {
             self.embedded_loads(value, context);
         }
         let name = value.and_then(|value| qualified_name(&self.model, value, context.source));
+        let slices = fields(node, SUBSCRIPT_FIELD);
+        let qualify = |inner: Node<'_>| qualified_name(&self.model, inner, context.source);
+        if let Some(rule) = name
+            .as_deref()
+            .and_then(|name| pep604_rule(name, &slices, &qualify, true))
+        {
+            self.reports.push(Report::at_point(
+                rule,
+                context.placement.map(node.start_position()),
+                "",
+            ));
+        }
         let is_literal = context.literal || name.as_deref().is_some_and(|name| is_typing(name, LITERAL));
         let is_annotated = name.as_deref().is_some_and(|name| is_typing(name, ANNOTATED));
         for (index, slice) in fields(node, SUBSCRIPT_FIELD).into_iter().enumerate() {

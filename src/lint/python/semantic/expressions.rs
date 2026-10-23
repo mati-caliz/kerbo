@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::model::{BindingKind, Model, ScopeKind};
+use super::pep::is_pep585_generic;
 use super::qualified::{is_builtin_named, qualified_name};
 use super::targets::Store;
 use super::{Mode, Visitor};
@@ -138,6 +139,7 @@ pub trait Expressions<'tree> {
     fn string(&mut self, node: Node<'tree>, mode: Mode);
     fn call(&mut self, call: Node<'tree>, mode: Mode);
     fn type_comparison(&mut self, comparison: Node<'tree>);
+    fn pep585_generic(&mut self, node: Node<'tree>);
     fn is_type(&self, node: Node<'_>) -> bool;
     fn is_dtype(&self, node: Node<'_>) -> bool;
 }
@@ -152,11 +154,13 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         match node.kind() {
             IDENTIFIER => {
                 self.model.resolve_load(self.text(node), node.start_position());
+                self.pep585_generic(node);
             }
             ATTRIBUTE => {
                 if let Some(object) = node.child_by_field_name(OBJECT_FIELD) {
                     self.expression(object, mode);
                 }
+                self.pep585_generic(node);
             }
             SUBSCRIPT => self.subscript(node, mode),
             GENERIC_TYPE => self.generic_type(node, mode),
@@ -257,6 +261,13 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         }
         let callee = function.and_then(|function| qualified_name(&self.model, function, self.source));
         self.typing_call(arguments, callee.as_deref());
+    }
+
+    // UP006: `typing.List` y compañía donde alcanza con `list`.
+    fn pep585_generic(&mut self, node: Node<'tree>) {
+        if qualified_name(&self.model, node, self.source).is_some_and(|name| is_pep585_generic(&name)) {
+            self.reports.push(Report::at(PythonRule::UP006, node, ""));
+        }
     }
 
     fn type_comparison(&mut self, comparison: Node<'tree>) {

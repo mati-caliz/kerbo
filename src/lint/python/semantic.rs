@@ -7,6 +7,7 @@ mod expressions;
 mod imports;
 mod model;
 mod patterns;
+mod pep;
 mod qualified;
 mod statements;
 mod targets;

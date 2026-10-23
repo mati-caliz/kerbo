@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 10] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 13] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -92,6 +92,33 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 10] = [
             "delete it",
             "The block already has another statement: the pass or ... is not needed.",
             "def f():\n    \"\"\"Doc.\"\"\"\n    pass loses the pass.",
+        ),
+    ),
+    (
+        PythonRule::UP006,
+        RuleText::new(
+            "List, Dict and friends from typing where list, dict will do",
+            "use the builtin or collections type",
+            "Since Python 3.9 list[int] works the same: the typing import is redundant and reads worse.",
+            "List[int] becomes list[int] and typing.Dict[str, int] becomes dict[str, int].",
+        ),
+    ),
+    (
+        PythonRule::UP007,
+        RuleText::new(
+            "Union[X, Y] instead of X | Y",
+            "write the union with |",
+            "Since Python 3.10 the | union is shorter and needs no import.",
+            "Union[int, str] becomes int | str.",
+        ),
+    ),
+    (
+        PythonRule::UP045,
+        RuleText::new(
+            "Optional[X] instead of X | None",
+            "write X | None",
+            "Since Python 3.10 X | None says the same without importing Optional.",
+            "Optional[int] becomes int | None.",
         ),
     ),
 ];
