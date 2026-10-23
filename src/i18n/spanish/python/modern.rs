@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 39] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 41] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -353,6 +353,24 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 39] = [
             "pasala como valor por defecto de un parámetro (x=x), o con functools.partial",
             "La función lee la variable cuando se la llama, no cuando se define: todas terminan viendo el último valor del loop.",
             "lambda: valor pasa a lambda valor=valor: valor.",
+        ),
+    ),
+    (
+        PythonRule::RUF022,
+        RuleText::new(
+            "__all__ no está ordenado",
+            "ordenalo: primero las constantes, después las clases y al final el resto",
+            "Un __all__ ordenado se revisa de un vistazo y no genera conflictos cuando dos personas agregan nombres a la vez.",
+            "__all__ = [\"b\", \"a\"] pasa a __all__ = [\"a\", \"b\"].",
+        ),
+    ),
+    (
+        PythonRule::RUF023,
+        RuleText::new(
+            "__slots__ no está ordenado",
+            "ordenalo en orden natural",
+            "Un __slots__ ordenado se revisa de un vistazo y deja claro qué atributos tiene la clase.",
+            "__slots__ = (\"nombre\", \"edad\") pasa a __slots__ = (\"edad\", \"nombre\").",
         ),
     ),
 ];

@@ -6,8 +6,9 @@ use super::{Mode, Visitor};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ASSIGNMENT, ATTRIBUTE, CLASS, FUNCTION, IDENTIFIER, LEFT_FIELD, LIST, OBJECT_FIELD, PARENTHESIZED,
-    RIGHT_FIELD, SET, STRING, SUBSCRIPT, TUPLE, TYPE_FIELD, VALUE_FIELD, is_f_string, named, unparenthesized,
+    RIGHT_FIELD, SET, SUBSCRIPT, TUPLE, TYPE_FIELD, VALUE_FIELD, is_string, named, unparenthesized,
 };
+use crate::lint::python::escapes::text_value;
 use crate::lint::python::semantic::annotations::Annotations;
 use crate::lint::python::semantic::checks::Exports;
 use crate::lint::python::semantic::expressions::Expressions;
@@ -16,6 +17,7 @@ use crate::rules::PythonRule;
 
 const DUNDER_ALL: &str = "__all__";
 const SEQUENCE_TARGETS: [&str; 5] = ["pattern_list", "tuple_pattern", "list_pattern", TUPLE, LIST];
+const EXPRESSION_LIST: &str = "expression_list";
 const SEQUENCE_VALUES: [&str; 4] = [TUPLE, LIST, SET, "expression_list"];
 const NESTED_TARGETS: [&str; 8] = [
     "pattern_list",
@@ -147,12 +149,14 @@ impl<'tree> Targets<'tree> for Visitor<'tree> {
 
     fn export_names(&self, value: Node<'tree>, names: &mut Vec<(String, tree_sitter::Point)>) {
         let value = unparenthesized(value);
-        if matches!(value.kind(), LIST | TUPLE) {
+        if matches!(value.kind(), LIST | TUPLE | EXPRESSION_LIST) {
             names.extend(
                 named(value)
                     .into_iter()
-                    .filter(|element| element.kind() == STRING && !is_f_string(*element, self.source))
-                    .map(|element| (string_value(self.text(element)), element.start_position())),
+                    .filter(|element| is_string(*element))
+                    .filter_map(|element| {
+                        text_value(element, self.source).map(|name| (name, element.start_position()))
+                    }),
             );
             return;
         }
@@ -275,13 +279,6 @@ impl<'tree> Targets<'tree> for Visitor<'tree> {
         self.model.branch = branch;
         id
     }
-}
-
-fn string_value(literal: &str) -> String {
-    literal
-        .trim_start_matches(|letter: char| letter.is_ascii_alphabetic())
-        .trim_matches(['"', '\''])
-        .to_owned()
 }
 
 fn in_handler(statement: Node<'_>) -> bool {

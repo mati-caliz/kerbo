@@ -1321,7 +1321,12 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     lambdas), con las lambdas que se consumen enseguida como seguras. `loops/names.rs` decide si un
     identificador de tree-sitter es una lectura, una escritura o no es un nombre en el AST de ruff.
     Paridad: 583 de 583.
-  - Siguiente: UP032, RUF022, RUF023, RUF100 e I001.
+  - Hechas RUF022 (`__all__` sin ordenar, en el módulo: asignación, `+=` y `.extend`) y RUF023
+    (`__slots__` sin ordenar, en una clase: lista, tupla, conjunto o claves de un diccionario), con un
+    port de `natord` y del orden "isort" de ruff (constantes, clases y el resto, cada grupo en orden
+    natural). Paridad: 406 de 406 y 311 de 311. De paso, F822 lee también los nombres de `__all__`
+    en una tupla sin paréntesis y en strings concatenados.
+  - Siguiente: UP032, RUF100 e I001.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

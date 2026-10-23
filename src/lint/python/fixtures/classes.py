@@ -46,3 +46,30 @@ def factory():
         items = []
 
     return Local
+
+
+__all__ = ["b", "a"]
+__all__ = ["CONSTANT", "Class", "function"]
+__all__ = ["function", "Class"]
+__all__ += ["z", "y"]
+__all__.extend(("item2", "item10"))
+__all__.extend(("item10", "item2"))
+__all__ = "b", "a"
+__all__ = ["a", f"b", "c"]
+__all__ = ["a" "z", "b"]
+__all__ = ["A1", "A01"]
+__all__: list[str] = ["d", "c"]
+other = __all__ = ["b", "a"]
+
+
+def scoped():
+    __all__ = ["b", "a"]
+    return __all__
+
+
+class Slotted:
+    __slots__ = ("name", "breed")
+    __slots__ = {"b": "doc", "a": "doc"}
+    __slots__ = {"b", "a"}
+    __slots__ = ["Zeta", "alpha"]
+    __slots__ = ["a", "B"]

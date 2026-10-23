@@ -6,6 +6,7 @@ mod compound;
 mod concatenation;
 mod deprecated;
 mod dicts;
+mod dunders;
 mod escapes;
 mod flow;
 mod formats;
@@ -124,6 +125,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(concatenation::reports(&nodes));
     reports.extend(branches::reports(&nodes, source));
     reports.extend(loops::reports(&nodes, source));
+    reports.extend(dunders::reports(&nodes, source));
     let suppressions = noqa::Suppressions::new(root, source);
     let mut found: Vec<LintFinding> = reports
         .into_iter()
