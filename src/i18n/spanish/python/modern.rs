@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 38] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 39] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -344,6 +344,15 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 38] = [
             "juntá las condiciones con or",
             "El mismo código repetido en dos ramas obliga a mantenerlo dos veces y esconde que la decisión es una sola.",
             "if a: f()\nelif b: f() pasa a if a or b: f().",
+        ),
+    ),
+    (
+        PythonRule::B023,
+        RuleText::new(
+            "Una función o lambda definida en un loop que usa una variable del loop",
+            "pasala como valor por defecto de un parámetro (x=x), o con functools.partial",
+            "La función lee la variable cuando se la llama, no cuando se define: todas terminan viendo el último valor del loop.",
+            "lambda: valor pasa a lambda valor=valor: valor.",
         ),
     ),
 ];

@@ -118,3 +118,45 @@ def arms(value):
         print(value + 1)
     elif value > 2:
         print(value - 1)
+
+
+def closures(values):
+    functions = []
+    for value in values:
+        functions.append(lambda: value)
+        functions.append(lambda value=value: value)
+        functions.append(lambda other: other + value)
+
+        def inner():
+            return value
+
+        def shadowed(value):
+            return value
+
+        def local():
+            value = 1
+            return value
+
+        functions.append(inner)
+        print((lambda: value)())
+        print(list(map(lambda item: item + value, values)))
+        print(sorted(values, key=lambda item: item - value))
+        total = value * 2
+        functions.append(lambda: total)
+    index = 0
+    while index < 3:
+        functions.append(lambda: index)
+        index += 1
+    for first, (second, *rest) in values:
+        functions.append(lambda: first + second + len(rest))
+    with open("x") as handle:
+        functions.append(lambda: handle)
+    for value in values:
+        functions.append(lambda: [value for value in values])
+    return [lambda: item for item in values], functions
+
+
+def returned(values):
+    for value in values:
+        return lambda: value
+    return None

@@ -1315,7 +1315,13 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     aproxima el `ComparableStmt` de ruff comparando el árbol sin comentarios ni paréntesis de
     agrupación y los strings por su valor, y compara los comentarios en el mismo rango que
     `body_range` (desde la línea siguiente a la condición). Paridad: 947 de 947 y 245 de 245.
-  - Siguiente: UP032, B023, RUF022, RUF023, RUF100 e I001.
+  - Hecha B023 (función o lambda en un loop que usa una variable del loop), sintáctica como en
+    ruff: los nombres que lee cada función o lambda sin ser parámetros ni asignarlos, contra los que
+    el loop asigna (destinos de asignaciones, `for` y comprensiones, sin entrar a funciones ni
+    lambdas), con las lambdas que se consumen enseguida como seguras. `loops/names.rs` decide si un
+    identificador de tree-sitter es una lectura, una escritura o no es un nombre en el AST de ruff.
+    Paridad: 583 de 583.
+  - Siguiente: UP032, RUF022, RUF023, RUF100 e I001.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.
