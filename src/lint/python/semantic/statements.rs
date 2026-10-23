@@ -5,6 +5,7 @@ use super::handlers::vanilla_raise;
 use super::model::{BindingKind, GLOBAL, MODULE_SCOPE, NAME_ERROR, NONLOCAL, ScopeKind, Site};
 use super::qualified::is_builtin_named;
 use super::targets::Store;
+use super::typecheck::TypeChecks;
 use super::{Mode, Visitor};
 use crate::lint::python::Report;
 use crate::lint::python::ast::text;
@@ -129,6 +130,13 @@ impl<'tree> Statements<'tree> for Visitor<'tree> {
     }
 
     fn if_statement(&mut self, statement: Node<'tree>) {
+        self.reports.extend(
+            TypeChecks {
+                model: &self.model,
+                source: self.source,
+            }
+            .reports(statement),
+        );
         if let Some(condition) = statement.child_by_field_name(CONDITION_FIELD) {
             self.expression(condition, Mode::Value);
         }

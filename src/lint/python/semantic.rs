@@ -15,9 +15,11 @@ mod mutability;
 mod patterns;
 mod pep;
 mod qualified;
+mod resources;
 mod statements;
 mod supers;
 mod targets;
+mod typecheck;
 
 use crate::lint::python::semantic::annotations::Annotations;
 use crate::lint::python::semantic::checks::Exports;

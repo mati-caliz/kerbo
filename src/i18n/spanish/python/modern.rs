@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 33] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 35] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -299,6 +299,24 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 33] = [
             "renombrala con un _ adelante, o reemplazala por _",
             "Un nombre que se desempaqueta y nunca se lee hace pensar que el valor importa, y esconde errores de tipeo.",
             "nombre, edad = persona con edad sin usar pasa a nombre, _edad = persona.",
+        ),
+    ),
+    (
+        PythonRule::SIM115,
+        RuleText::new(
+            "Se abre un archivo fuera de un with",
+            "abrilo con with",
+            "Sin with, el archivo queda abierto si algo falla antes de cerrarlo, y depende del recolector de basura.",
+            "f = open(ruta) pasa a with open(ruta) as f:.",
+        ),
+    ),
+    (
+        PythonRule::TRY004,
+        RuleText::new(
+            "Un chequeo de tipo que lanza una excepción que no es TypeError",
+            "lanzá TypeError",
+            "Si el problema es el tipo del valor, TypeError es lo que espera quien llama; una excepción genérica lo confunde.",
+            "if not isinstance(x, int): raise ValueError(...) pasa a raise TypeError(...).",
         ),
     ),
 ];

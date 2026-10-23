@@ -1297,7 +1297,15 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Hecha RUF059 (variable desempaquetada sin usar): son los mismos candidatos que F841, con los
     bindings desempaquetados que F841 descarta. Paridad: 4.511 de 4.549, sin avisos de más; lo que
     falta está en archivos que tree-sitter no parsea.
-  - Siguiente: UP032, UP035, SIM115, B023, RUF022, RUF023, SIM114 y TRY004.
+  - Hechas SIM115 (abrir un archivo fuera de un `with`, con las excepciones de ruff: `.close()`
+    inmediato, `return`, `ExitStack`/`AsyncExitStack`, los contextos de unittest y `__enter__`) y
+    TRY004 (chequeo de tipo con `isinstance`, `issubclass` o `callable` que lanza una excepción
+    genérica). Paridad: 612 de 633 y 212 de 219, sin avisos de más. Además de los archivos sin
+    parsear y las carpetas ocultas, faltan los módulos de la biblioteca estándar que se usan a sí
+    mismos (`open` dentro de `gzip.py`): ruff conoce el nombre del módulo de cada archivo y resuelve
+    esas definiciones como `gzip.open`; kerbo no lo calcula. Los casos quedaron en
+    `fixtures/resources.py`.
+  - Siguiente: UP032, UP035, B023, RUF022, RUF023 y SIM114.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

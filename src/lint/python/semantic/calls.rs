@@ -2,6 +2,9 @@ use tree_sitter::Node;
 
 use super::model::Model;
 use super::qualified::is_builtin_named;
+use super::resources::unmanaged_open;
+use super::supers::is_super_with_parameters;
+use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, COMMENT, EXPRESSION_STATEMENT, FUNCTION_FIELD,
     KEYWORD_ARGUMENT, LIST, OBJECT_FIELD, VALUE_FIELD, is_identifier, named, text, unparenthesized,
@@ -42,9 +45,26 @@ pub fn call_arguments(call: Node<'_>) -> CallArguments<'_> {
     CallArguments { positional, keywords }
 }
 
+// Los avisos sobre una llamada que no dependen del recorrido: PIE808, B009, B010, RUF015, SIM115 y
+// UP008.
+pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Report> {
+    let mut reports: Vec<Report> = call_rule(model, source, call)
+        .map(|(rule, at)| Report::at(rule, at, ""))
+        .into_iter()
+        .collect();
+    reports
+        .extend(unmanaged_open(model, source, call).map(|opener| Report::at(PythonRule::SIM115, opener, "")));
+    if is_super_with_parameters(model, source, call)
+        && let Some(arguments) = call.child_by_field_name(ARGUMENTS_FIELD)
+    {
+        reports.push(Report::at(PythonRule::UP008, arguments, ""));
+    }
+    reports
+}
+
 // PIE808 (`range(0, n)`), B009 (`getattr(x, "a")`), B010 (`setattr(x, "a", v)` como sentencia) y
 // RUF015 (`list(x)[0]` y `list(x).pop(0)`), con dónde avisar.
-pub fn call_rule<'tree>(
+fn call_rule<'tree>(
     model: &Model<'_>,
     source: &[u8],
     call: Node<'tree>,
