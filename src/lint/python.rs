@@ -17,6 +17,7 @@ mod modern;
 mod names;
 mod negations;
 mod noqa;
+mod rewrites;
 mod semantic;
 mod simplify;
 mod statements;
@@ -130,6 +131,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(dunders::reports(&nodes, source));
     reports.extend(negations::reports(&nodes, source));
     reports.extend(comments::reports(&nodes, source));
+    reports.extend(rewrites::reports(&nodes, source));
     let suppressions = noqa::Suppressions::new(root, source);
     let mut found: Vec<LintFinding> = reports
         .into_iter()

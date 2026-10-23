@@ -59,3 +59,39 @@ class Comparable:
 
     def __ne__(self, other):
         return not self == other
+
+
+def joins(first, second, items):
+    return [
+        " ".join([first, second]),
+        "".join(("a", "b")),
+        ", ".join([first, "x", 1, True, second.name, second.load()]),
+        " ".join([first, second.load(1)]),
+        " ".join(items),
+        " ".join([*items]),
+        " ".join([first, f"{second}"]),
+        "'".join([first, '"']),
+        b" ".join([first, second]),
+        " ".join([]),
+    ]
+
+
+def keywords(function, options):
+    function(**{"a": 1, "b": 2})
+    function(**{})
+    function(**{**options})
+    function(**{"not valid": 1})
+    function(**{"class": 1})
+    function(**options)
+
+
+def conversions(value, values):
+    return [
+        f"{str(value)} {repr(value)} {ascii(value)}",
+        f"{str(value)!r}",
+        f"{str(object=value)}",
+        f"{repr(object=value)}",
+        f"{str(value)=}",
+        f"{str(*values)} {repr(value)}",
+        f"{str(value, 'utf-8')}",
+    ]

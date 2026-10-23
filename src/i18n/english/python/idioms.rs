@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: modismos de pylint, refurb, flake8-logging y
 // compañía.
-pub const IDIOM_TEXTS: [(PythonRule, RuleText); 9] = [
+pub const IDIOM_TEXTS: [(PythonRule, RuleText); 12] = [
     (
         PythonRule::FURB167,
         RuleText::new(
@@ -83,6 +83,33 @@ pub const IDIOM_TEXTS: [(PythonRule, RuleText); 9] = [
             "use a module logger",
             "logging.info and friends write to the root logger: it can't be filtered or configured per module.",
             "logging.info(\"x\") becomes logger = logging.getLogger(__name__) and logger.info(\"x\").",
+        ),
+    ),
+    (
+        PythonRule::FLY002,
+        RuleText::new(
+            "A join over a fixed list of elements",
+            "use an f-string",
+            "\" \".join([a, b]) builds a list to glue two things an f-string writes directly.",
+            "\" \".join([first, last]) becomes f\"{first} {last}\".",
+        ),
+    ),
+    (
+        PythonRule::PIE804,
+        RuleText::new(
+            "A literal dict unpacked with ** in a call",
+            "pass the arguments by name",
+            "f(**{\"a\": 1}) builds a dict to say the same as f(a=1).",
+            "f(**{\"a\": 1}) becomes f(a=1).",
+        ),
+    ),
+    (
+        PythonRule::RUF010,
+        RuleText::new(
+            "str(), repr() or ascii() inside an f-string",
+            "use the f-string conversion: !s, !r or !a",
+            "The f-string already knows how to convert the value; the explicit call is longer and slower.",
+            "f\"{repr(x)}\" becomes f\"{x!r}\".",
         ),
     ),
 ];

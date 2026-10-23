@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::calls::{call_reports, is_first_element_subscript};
 use super::comparisons::comparison_reports;
+use super::conversions::conversion_reports;
 use super::literals::is_native_literal_call;
 use super::model::{BindingKind, Model, ScopeKind};
 use super::pep::is_pep585_generic;
@@ -235,6 +236,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         } else {
             named(node)
         };
+        self.reports
+            .extend(conversion_reports(&self.model, self.source, &parts));
         for interpolation in parts
             .iter()
             .flat_map(|part| named(*part))

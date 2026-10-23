@@ -1332,9 +1332,12 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     dos constantes), C401 y C402 (`set`/`dict` sobre un generador) y LOG015 (logger raíz). Paridad
     exacta salvo un C401 de CPython con `await` adentro del generador y dos casos en archivos sin
     parsear.
+  - Hechas FLY002 (`" ".join([...])` fijo, con las reglas de flynt sobre qué elementos entran en
+    una f-string y las comillas), PIE804 (`f(**{"a": 1})`) y RUF010 (`str()`, `repr()` o `ascii()`
+    adentro de una f-string). Paridad: 242 de 242, 102 de 102 y 105 de 105.
   - Siguiente: I001 (6.736 avisos, el bloque más grande), UP032 (1.920), RUF100 (1.437) y la cola
-    de reglas chicas: FLY002, UP044, UP037, SIM103, SIM905, FURB157, N999, UP034, RUF046, RUF010,
-    PIE804, RUF013 y siguientes.
+    de reglas chicas: UP044, UP037, SIM103, SIM905, FURB157, N999, UP034, RUF046, RUF013 y
+    siguientes.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.
