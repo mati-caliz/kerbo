@@ -2,7 +2,9 @@ use tree_sitter::Node;
 
 use super::mutability::Resolver;
 use crate::lint::python::Report;
-use crate::lint::python::ast::{CALL, FUNCTION_FIELD, LAMBDA, TYPE_FIELD, VALUE_FIELD, named};
+use crate::lint::python::ast::{
+    CALL, FUNCTION_FIELD, LAMBDA, TYPE_FIELD, VALUE_FIELD, named, unparenthesized,
+};
 use crate::rules::PythonRule;
 
 const DEFAULTED: [&str; 2] = ["default_parameter", "typed_default_parameter"];
@@ -28,7 +30,7 @@ pub fn default_reports(
             continue;
         }
         if checks_mutable && resolver.is_mutable_expression(default) {
-            reports.push(Report::at(PythonRule::B006, default, ""));
+            reports.push(Report::at(PythonRule::B006, unparenthesized(default), ""));
         }
         reports.extend(
             calls_outside_lambdas(default)

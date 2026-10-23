@@ -2,6 +2,7 @@ mod annotations;
 mod boundary;
 mod calls;
 mod checks;
+mod classes;
 mod defaults;
 mod definitions;
 mod effects;
@@ -74,6 +75,7 @@ pub struct Visitor<'tree> {
     pub deferred: Deferred<'tree>,
     pub boundaries: boundary::Boundaries,
     pub exports: Vec<(String, Point)>,
+    pub classes: Vec<Pending<'tree>>,
 }
 
 pub fn reports(root: Node<'_>, source: &[u8], file: FileKind) -> Vec<Report> {
@@ -85,11 +87,13 @@ pub fn reports(root: Node<'_>, source: &[u8], file: FileKind) -> Vec<Report> {
         deferred: Deferred::default(),
         boundaries: boundary::Boundaries::default(),
         exports: Vec::new(),
+        classes: Vec::new(),
     };
     visitor.block(root);
     visitor.run_deferred();
     visitor.visit_exports();
-    let mut reports = checks::reports(&visitor);
+    let mut reports = classes::mutable_class_defaults(&visitor.model, source, &visitor.classes);
+    reports.extend(checks::reports(&visitor));
     reports.append(&mut visitor.reports);
     reports
 }

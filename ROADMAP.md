@@ -1286,9 +1286,15 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     parsea, salvo un B009 con un identificador que lleva un selector de variación Unicode (la
     biblioteca estándar de Rust no expone XID; haría falta `unicode-ident`). Los casos quedaron en
     `fixtures/defaults.py`.
-  - Siguiente: RUF012 (atributos de clase mutables, con la jerarquía de clases del mismo archivo,
-    dataclasses, attrs y pydantic), RUF059, UP032, UP035, SIM115, B023, RUF022, RUF023, SIM114 y
-    TRY004.
+  - Hecha RUF012 (atributos de clase mutables): corre al final del recorrido, como los scopes
+    diferidos de ruff. Los nombres se resuelven desde el scope donde está la clase (ruff usa la
+    resolución que guardó al visitar cada nombre) y las bases heredadas desde el módulo (ruff usa
+    `lookup_attribute` desde el scope global). Respeta `ClassVar` y `Final` (sólo si el archivo
+    importa `typing`), las anotaciones inmutables, dataclasses y attrs, los modelos de pydantic,
+    msgspec y sqlmodel (también heredados de una clase del archivo) y el `_fields_` de ctypes.
+    Paridad: 4.009 de 4.039, sin avisos de más; lo que falta está en archivos que tree-sitter no
+    parsea. Los casos quedaron en `fixtures/classes.py`.
+  - Siguiente: RUF059, UP032, UP035, SIM115, B023, RUF022, RUF023, SIM114 y TRY004.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

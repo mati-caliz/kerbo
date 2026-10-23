@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
-use super::model::{BindingKind, Model, Resolution};
-use super::qualified::{is_typing, qualified_name};
+use super::model::{BindingKind, Model, Resolution, ScopeId};
+use super::qualified::{is_typing, qualified_name_from};
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, ASSIGNMENT, ATTRIBUTE, CALL, COMMENT, FUNCTION_FIELD, IDENTIFIER, KEYWORD_ARGUMENT,
     NAME_FIELD, NONE, RIGHT_FIELD, SUBSCRIPT, TUPLE, TYPE_FIELD, VALUE_FIELD, named, text, unparenthesized,
@@ -115,14 +115,16 @@ const OPERATOR_FIELD: &str = "operator";
 const BIT_OR: &str = "|";
 const SUBSCRIPT_FIELD: &str = "subscript";
 
+// Resuelve nombres desde `scope`: el actual mientras se recorre, o el del módulo al final del archivo.
 pub struct Resolver<'model, 'tree> {
     pub model: &'model Model<'tree>,
     pub source: &'model [u8],
+    pub scope: ScopeId,
 }
 
 impl Resolver<'_, '_> {
-    fn qualified(&self, node: Node<'_>) -> Option<String> {
-        qualified_name(self.model, node, self.source)
+    pub fn qualified(&self, node: Node<'_>) -> Option<String> {
+        qualified_name_from(self.model, self.scope, node, self.source)
     }
 
     // `is_mutable_expr`: una lista, un diccionario o un conjunto (literales o por comprensión), o una
@@ -226,7 +228,7 @@ impl Resolver<'_, '_> {
         if name.kind() != IDENTIFIER {
             return false;
         }
-        let Resolution::Binding(id) = self.model.lookup(text(name, self.source)) else {
+        let Resolution::Binding(id) = self.model.lookup_from(self.scope, text(name, self.source)) else {
             return false;
         };
         let Some(binding) = self
@@ -292,7 +294,7 @@ impl Resolver<'_, '_> {
     }
 }
 
-fn unwrap_type(node: Node<'_>) -> Node<'_> {
+pub fn unwrap_type(node: Node<'_>) -> Node<'_> {
     let node = unparenthesized(node);
     if node.kind() == TYPE_NODE {
         named(node).first().map_or(node, |inner| unwrap_type(*inner))
@@ -302,7 +304,7 @@ fn unwrap_type(node: Node<'_>) -> Node<'_> {
 }
 
 // `map_subscript`: `tuple[int]` se resuelve como `tuple`.
-fn without_subscript(function: Node<'_>) -> Node<'_> {
+pub fn without_subscript(function: Node<'_>) -> Node<'_> {
     if function.kind() == SUBSCRIPT {
         function.child_by_field_name(VALUE_FIELD).unwrap_or(function)
     } else {

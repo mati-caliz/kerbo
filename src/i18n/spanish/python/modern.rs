@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 31] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 32] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -281,6 +281,15 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 31] = [
             "calculá el valor adentro de la función, o guardalo en una constante del módulo",
             "El default se evalúa una sola vez, al definir la función, no en cada llamada: un now() queda congelado.",
             "def registrar(momento=datetime.now()): pasa a def registrar(momento=None): con momento = datetime.now() si es None.",
+        ),
+    ),
+    (
+        PythonRule::RUF012,
+        RuleText::new(
+            "Un atributo de clase con un valor mutable",
+            "anotalo con ClassVar si es compartido a propósito, o crealo en __init__",
+            "El valor se crea una sola vez y lo comparten todas las instancias: modificarlo desde una lo cambia para todas.",
+            "items = [] pasa a items: ClassVar[list[str]] = [], o a self.items = [] en __init__.",
         ),
     ),
 ];

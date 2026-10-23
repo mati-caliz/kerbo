@@ -83,6 +83,7 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
         let resolver = Resolver {
             model: &self.model,
             source: self.source,
+            scope: self.model.scope,
         };
         let defaults = default_reports(&resolver, &parameters, !self.file.stub);
         self.reports.extend(defaults);
@@ -111,6 +112,7 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
     }
 
     fn class(&mut self, class: Node<'tree>) {
+        self.classes.push(self.snapshot(class));
         self.declare_globals(class.child_by_field_name(BODY_FIELD));
         self.model.push_scope(ScopeKind::Type);
         self.type_parameters(class);
@@ -221,6 +223,7 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
         let resolver = Resolver {
             model: &self.model,
             source: self.source,
+            scope: self.model.scope,
         };
         let defaults = default_reports(&resolver, &parameters, false);
         self.reports.extend(defaults);
