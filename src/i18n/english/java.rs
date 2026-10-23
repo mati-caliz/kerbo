@@ -308,6 +308,18 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "The code in its file only writes values to it: nobody reads them, so the field and every assignment are dead weight. Like IntelliJ's unused (\"Field is assigned but never accessed\"), without the fields a framework reads (@Column, @Data, @JsonProperty).",
         "private final boolean adjustmentNote; assigned in an enum constructor and never read is deleted along with the parameter.",
     ),
+    RuleText::new(
+        "A less visible type in the signature of a member seen from further away",
+        "make the type more visible or the member less",
+        "Callers of the method cannot name the type it takes or returns: they cannot declare, implement or test it without tricks. Like IntelliJ's ClassEscapesItsScope.",
+        "public void apply(State state) with a package-private class State: either public class State, or a package-private apply(...).",
+    ),
+    RuleText::new(
+        "Parameter the method never uses",
+        "drop it from the signature and the calls, or use it",
+        "Callers must come up with a value that gets thrown away: the signature promises something the method does not do. In a Spring handler, the request data arrives and nobody looks at it. Like IntelliJ's unused (\"Parameter is not used\").",
+        "void fail(UUID case, String reason) that never reads reason becomes void fail(UUID case).",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

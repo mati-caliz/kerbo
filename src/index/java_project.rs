@@ -41,6 +41,7 @@ pub struct Project<'summary> {
     bodies: HashMap<Key<'summary>, Vec<(&'summary Declaration, bool)>>,
     interface_methods: HashMap<&'summary str, usize>,
     constants: HashMap<(&'summary str, &'summary str), Vec<Reach<'summary>>>,
+    known_types: HashSet<&'summary str>,
 }
 
 impl<'summary> Project<'summary> {
@@ -56,6 +57,7 @@ impl<'summary> Project<'summary> {
             bodies: HashMap::new(),
             interface_methods: HashMap::new(),
             constants: HashMap::new(),
+            known_types: HashSet::new(),
         };
         let mut parents: HashMap<&str, Vec<&str>> = HashMap::new();
         for file in files {
@@ -76,6 +78,7 @@ impl<'summary> Project<'summary> {
 
     fn add(&mut self, file: &IndexedSummary<'summary>) {
         let summary = file.summary;
+        self.known_types.extend(summary.types.iter().map(String::as_str));
         for constant in &summary.constants {
             self.constants
                 .entry((constant.owner.as_str(), constant.name.as_str()))
@@ -169,6 +172,16 @@ impl<'summary> Project<'summary> {
         !declaration.overrides
             && !self.has_twin(declaration)
             && (declaration.is_constructor || !self.referenced.contains(declaration.name.as_str()))
+    }
+
+    // Si el tipo hereda o implementa algo de afuera del proyecto: sus métodos pueden implementar uno
+    // de una librería aunque no digan `@Override`.
+    pub fn has_foreign_ancestor(&self, owner: &str) -> bool {
+        self.ancestors.get(owner).is_some_and(|ancestors| {
+            ancestors
+                .iter()
+                .any(|ancestor| !self.known_types.contains(ancestor))
+        })
     }
 
     // Una redefinición con `@Override` en una clase que hereda de la de éste.

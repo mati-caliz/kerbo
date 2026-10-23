@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use tree_sitter::Node;
 
+use super::java_exposure::{DeclaredType, Exposure, exposures};
 use crate::lint::java::children;
 use crate::lint::java_calls::{
     Arity, Body, Call, Callable, ReturnType, Returns, TYPE_DECLARATIONS, Visibility, extract,
@@ -29,6 +30,9 @@ const ASTERISK: &str = "asterisk";
 const WILDCARD_SUFFIX: &str = ".*";
 const NAME_FIELD: &str = "name";
 const BODY_FIELD: &str = "body";
+const IDENTIFIER: &str = "identifier";
+// Los componentes de un record son sus campos: siempre se usan.
+const RECORD: &str = "record_declaration";
 const QUALIFIER_SEPARATOR: char = '.';
 const NULLNESS_ANNOTATIONS: &[&str] = &["Nullable", "NonNull", "NotNull", "Nonnull", "CheckForNull"];
 
@@ -44,6 +48,14 @@ pub struct Parameter {
     pub position: Position,
     pub declares_nullness: bool,
     pub dereferenced: bool,
+    pub reading: Reading,
+}
+
+// Si el cuerpo del método nombra al parámetro (un método sin cuerpo o un record, siempre).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reading {
+    Read,
+    Unread,
 }
 
 // Un método o constructor tal como lo necesita el índice: sin nodos, para guardarlo en la caché.
@@ -106,10 +118,15 @@ pub struct JavaSummary {
     pub identifiers: Vec<String>,
     pub written_only: Vec<String>,
     pub taints: Vec<TaintMethod>,
+    pub declared_types: Vec<DeclaredType>,
+    pub exposures: Vec<Exposure>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
+    let (declared_types, exposures) = exposures(root, source);
     let mut summary = JavaSummary {
+        declared_types,
+        exposures,
         package: named_children(root)
             .into_iter()
             .find(|node| node.kind() == PACKAGE)
@@ -213,7 +230,27 @@ fn simple_name(written: &str) -> String {
         .to_owned()
 }
 
+// Los nombres que se leen en el cuerpo: un parámetro que no aparece no se usa.
+fn read_names(callable: &Callable<'_>, source: &[u8]) -> HashSet<String> {
+    callable
+        .name_node
+        .parent()
+        .and_then(|declaration| declaration.child_by_field_name(BODY_FIELD))
+        .map(descendants)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|node| node.kind() == IDENTIFIER)
+        .filter_map(|node| node.utf8_text(source).ok())
+        .map(str::to_owned)
+        .collect()
+}
+
 fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declaration {
+    let read = read_names(&callable, source);
+    let record = callable
+        .name_node
+        .parent()
+        .is_some_and(|declaration| declaration.kind() == RECORD);
     let dereferenced = if callable.overrides {
         callable
             .name_node
@@ -248,6 +285,11 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
                     position: position_of(*parameter),
                     declares_nullness: declares_nullness(*parameter, source),
                     dereferenced: dereferenced.contains(name),
+                    reading: if record || callable.body != Body::Written || read.contains(name) {
+                        Reading::Read
+                    } else {
+                        Reading::Unread
+                    },
                 }
             })
             .collect(),

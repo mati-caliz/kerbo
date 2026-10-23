@@ -51,6 +51,8 @@ rule_family!(JavaRule {
     AutoCloseableResource => "auto-closeable-resource",
     UnusedField => "unused-field",
     UnreadField => "unread-field",
+    ClassEscapesItsScope => "class-escapes-its-scope",
+    UnusedParameter => "unused-parameter",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {

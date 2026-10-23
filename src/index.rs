@@ -2,6 +2,8 @@ pub mod ecmascript_taint;
 pub mod go_taint;
 pub mod java;
 mod java_dereference;
+mod java_escapes;
+pub mod java_exposure;
 mod java_jdk;
 mod java_nullness;
 mod java_project;
@@ -21,6 +23,8 @@ pub use java_rules::project_lints;
 mod ecmascript_taint_tests;
 #[cfg(test)]
 mod go_taint_tests;
+#[cfg(test)]
+mod java_escapes_tests;
 #[cfg(test)]
 mod python_taint_tests;
 #[cfg(test)]

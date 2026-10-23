@@ -1108,6 +1108,26 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   implementación de producción, así que kerbo no los marca, a propósito. Una interfaz con un solo
   método abstracto se salta (puede tener lambdas). En los servicios y las librerías no aparece
   ninguno: queda fijado en un test.
+- `ClassEscapesItsScope` (hecho, 2026-10-22): `class-escapes-its-scope`, el "tipo privado expuesto"
+  de arriba. Cada archivo guarda sus tipos con la visibilidad que tienen de verdad (la menor entre la
+  suya y la de los que los contienen) y los tipos escritos en la firma de cada miembro no privado
+  (lo que devuelve, sus parámetros, el tipo de un campo, los componentes de un record, también
+  dentro de `List<...>`), con la visibilidad efectiva del miembro. El índice resuelve cada nombre
+  contra los tipos anidados del archivo o los de nivel superior del mismo paquete; un parámetro de
+  tipo o un import con el mismo nombre lo tapan, y si dos tipos se llaman igual no se marca.
+  - Contra Qodana: 33 de 33 por archivo, línea y columna, sin avisos de más. En Guava 85,
+    commons-lang 5 y junit4 17; los revisados a mano son tipos privados en firmas de paquete,
+    protegidas o públicas.
+- Parámetros sin usar (hecho, 2026-10-22): `unused-parameter`, el "Parameter is not used" del
+  `unused` de IntelliJ. Un parámetro que el cuerpo nunca nombra, también en un handler de Spring
+  (`@PathVariable String slug` que nadie lee). No se marca si el método redefine a otro o es
+  redefinido, si hay uno igual en una clase emparentada (implementa algo sin `@Override`), si la
+  clase hereda algo de afuera del proyecto y el método no es privado (puede implementar uno de una
+  librería), en un `main`, en `readObject`/`writeObject` ni en un `@ParameterizedTest`; los
+  componentes de un record son campos y siempre cuentan como usados.
+  - Contra Qodana: 27 de 27, sin avisos de más (falta la variante "not used in any implementation"
+    de un método de interfaz, 1 caso). En Guava 52, commons-lang 37 y junit4 80, casi todos métodos
+    de prueba para reflexión.
 - Lo que sigue en el índice: lo que queda de código muerto (arriba).
 
 ### 10. Go, Python, TypeScript y shell completos

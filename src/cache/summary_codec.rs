@@ -1,7 +1,8 @@
 use super::chain_codec::{read_chain, read_flow, write_chain, write_flow};
 use super::codec::{Corrupt, Reader, Writer};
 use super::taint_codec::{read_taints, write_taints};
-use crate::index::java::{CallSite, Declaration, Field, JavaSummary, Parameter, Position};
+use crate::index::java::{CallSite, Declaration, Field, JavaSummary, Parameter, Position, Reading};
+use crate::index::java_exposure::{DeclaredType, Exposure};
 use crate::lint::java_calls::{Arity, Body, ReturnType, Returns, Visibility};
 use crate::lint::java_constants::Constant;
 use crate::lint::java_owner::{Owner, OwnerKind};
@@ -82,6 +83,17 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     writer.list(&summary.identifiers, |writer, name| writer.text(name));
     writer.list(&summary.written_only, |writer, name| writer.text(name));
     write_taints(writer, &summary.taints);
+    writer.list(&summary.declared_types, |writer, declared| {
+        writer.text(&declared.name);
+        write_flag(writer, declared.top_level);
+        write_visibility(writer, declared.reach);
+    });
+    writer.list(&summary.exposures, |writer, exposure| {
+        writer.text(&exposure.written);
+        write_position(writer, &exposure.position);
+        write_visibility(writer, exposure.reach);
+        writer.list(&exposure.type_parameters, |writer, name| writer.text(name));
+    });
 }
 
 pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corrupt> {
@@ -136,6 +148,21 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         identifiers: reader.list(Reader::text)?,
         written_only: reader.list(Reader::text)?,
         taints: read_taints(reader)?,
+        declared_types: reader.list(|reader| {
+            Ok(DeclaredType {
+                name: reader.text()?,
+                top_level: read_flag(reader)?,
+                reach: read_visibility(reader)?,
+            })
+        })?,
+        exposures: reader.list(|reader| {
+            Ok(Exposure {
+                written: reader.text()?,
+                position: read_position(reader)?,
+                reach: read_visibility(reader)?,
+                type_parameters: reader.list(Reader::text)?,
+            })
+        })?,
     }))
 }
 
@@ -167,6 +194,7 @@ fn write_declaration(writer: &mut Writer, declaration: &Declaration) {
         write_position(writer, &parameter.position);
         write_flag(writer, parameter.declares_nullness);
         write_flag(writer, parameter.dereferenced);
+        write_flag(writer, parameter.reading == Reading::Read);
     });
     writer.list(&declaration.annotations, |writer, name| writer.text(name));
     write_owner(writer, &declaration.owner);
@@ -222,6 +250,11 @@ fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
                 position: read_position(reader)?,
                 declares_nullness: read_flag(reader)?,
                 dereferenced: read_flag(reader)?,
+                reading: if read_flag(reader)? {
+                    Reading::Read
+                } else {
+                    Reading::Unread
+                },
             })
         })?,
         annotations: reader.list(Reader::text)?,

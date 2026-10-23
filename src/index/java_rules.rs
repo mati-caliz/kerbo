@@ -1,10 +1,11 @@
 use super::java::{CallSite, Declaration, JavaSummary, lint_at};
 use super::java_dereference::nullable_dereferences;
+use super::java_escapes::{PackageTypes, escaped_types};
 use super::java_nullness::{ProjectTypes, unannotated_overrides};
 use super::java_project::{IndexedSummary, Project, key_of};
 use super::java_resources::unclosed_resources;
 use super::java_taint::tainted_sinks;
-use super::java_unused::{Usage, unread_field, unused_field, unused_method};
+use super::java_unused::{Usage, unread_field, unused_field, unused_method, unused_parameters};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body, Returns, Visibility};
@@ -18,6 +19,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
     let project = Project::new(files);
     let types = ProjectTypes::new(files);
     let usage = Usage::new(files);
+    let package_types = PackageTypes::new(files);
     let mut tainted = tainted_sinks(files, &project).into_iter();
     files
         .iter()
@@ -26,6 +28,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
             let mut in_file = tainted.next().unwrap_or_default();
             in_file.extend(nullable_dereferences(&types, library, summary));
             in_file.extend(unclosed_resources(&types, library, summary));
+            in_file.extend(escaped_types(&package_types, summary));
             in_file.extend(
                 summary
                     .fields
@@ -49,6 +52,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
                     found.extend(same_implemented_value(&project, declaration));
                 }
                 found.extend(unused_method(&project, declaration, file, &usage));
+                found.extend(unused_parameters(&project, declaration));
                 found.extend(unannotated_overrides(&types, library, summary, declaration));
                 found
             }));

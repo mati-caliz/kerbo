@@ -308,6 +308,18 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "El código de su archivo sólo le escribe valores: nadie los lee, así que el campo y cada asignación sobran. Como el unused de IntelliJ (\"Field is assigned but never accessed\"), sin los campos que lee un framework (@Column, @Data, @JsonProperty).",
         "private final boolean notaDeAjuste; asignado en el constructor de un enum y nunca leído se borra junto con el parámetro.",
     ),
+    RuleText::new(
+        "Tipo menos visible en la firma de un miembro que se ve desde más lejos",
+        "subile la visibilidad al tipo o bajásela al miembro",
+        "Quien puede llamar al método no puede nombrar el tipo que recibe o devuelve: no lo puede declarar, ni implementar, ni probar sin trucos. Como ClassEscapesItsScope de IntelliJ.",
+        "public void aplicar(Estado estado) con class Estado de paquete: o public class Estado, o void aplicar(...) de paquete.",
+    ),
+    RuleText::new(
+        "Parámetro que el método nunca usa",
+        "sacalo de la firma y de las llamadas, o usalo",
+        "Quien llama tiene que conseguir un valor que se tira: la firma promete algo que el método no hace. En un handler de Spring, el dato del pedido llega y nadie lo mira. Como el unused de IntelliJ (\"Parameter is not used\").",
+        "void fallar(UUID caso, String motivo) que nunca lee motivo se vuelve void fallar(UUID caso).",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

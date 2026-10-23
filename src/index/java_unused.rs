@@ -1,10 +1,15 @@
-use super::java::{Declaration, Field, lint_at};
+use super::java::{Declaration, Field, Reading, lint_at};
 use super::java_project::{IndexedSummary, Project};
 use crate::lint::LintFinding;
-use crate::lint::java_calls::Visibility;
+use crate::lint::java_calls::{Body, Visibility};
 use crate::lint::java_owner::OwnerKind;
 use crate::rules::JavaRule;
 
+const MAIN: &str = "main";
+// Los métodos de serialización que llama la JVM con una firma fija.
+const SERIALIZATION: &[&str] = &["readObject", "writeObject", "readObjectNoData"];
+// Los parámetros de un test parametrizado los impone la fuente de argumentos.
+const PARAMETERIZED: &[&str] = &["ParameterizedTest", "Theory"];
 // Anotaciones que no dicen que un framework llame al método: con cualquier otra (`@GetMapping`,
 // `@Bean`, `@PrePersist`, `@Test`, `@JsonCreator`, `@Scheduled`, una propia...), se lo da por usado.
 const PASSIVE_ANNOTATIONS: &[&str] = &[
@@ -233,6 +238,43 @@ fn framework_ignores(field: &Field) -> bool {
 
 // Un campo privado que el código de su archivo sólo escribe: el valor no se usa nunca. Las mismas
 // tablas que `unused_field` deciden si lo lee un framework.
+// El "Parameter is not used" de IntelliJ: un parámetro que el cuerpo nunca nombra, en un método que no
+// redefine a otro ni es redefinido (ahí la firma la impone la jerarquía), que no es un `main`, un
+// método de serialización ni un test parametrizado. Sin `@Override`, un método puede implementar uno
+// de una clase emparentada del proyecto o de una librería: si hay uno igual en la jerarquía, o si la
+// clase hereda algo de afuera y el método no es privado, no se marca.
+pub fn unused_parameters(project: &Project<'_>, declaration: &Declaration) -> Vec<LintFinding> {
+    let entry_point = declaration.name == MAIN && declaration.parameters.len() == 1;
+    if declaration.body != Body::Written
+        || declaration.overrides
+        || entry_point
+        || declaration
+            .annotations
+            .iter()
+            .any(|annotation| PARAMETERIZED.contains(&annotation.as_str()))
+        || project.is_overridden(declaration)
+        || project.has_twin(declaration)
+        || (declaration.visibility == Visibility::Private
+            && SERIALIZATION.contains(&declaration.name.as_str()))
+        || (declaration.visibility != Visibility::Private
+            && project.has_foreign_ancestor(&declaration.owner.name))
+    {
+        return Vec::new();
+    }
+    declaration
+        .parameters
+        .iter()
+        .filter(|parameter| parameter.reading == Reading::Unread)
+        .map(|parameter| {
+            lint_at(
+                JavaRule::UnusedParameter,
+                &parameter.position,
+                parameter.name.clone(),
+            )
+        })
+        .collect()
+}
+
 pub fn unread_field(field: &Field, file: &IndexedSummary<'_>) -> Option<LintFinding> {
     let summary = file.summary;
     let unread = (field.visibility == Visibility::Private || field.owner.kind == OwnerKind::Local)
