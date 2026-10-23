@@ -8,10 +8,12 @@ use super::java_taint::tainted_sinks;
 use super::java_unused::{Usage, unread_field, unused_field, unused_method, unused_parameters};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
-use crate::lint::java_calls::{Arity, Body, Returns, Visibility};
+use crate::lint::java_calls::{Arity, Body, ResultUse, ReturnType, Returns, Visibility};
+use crate::lint::java_receivers::Receiver;
 use crate::rules::JavaRule;
 
 const STRING_QUOTE: char = '"';
+const MIN_INVERTED_CALLS: usize = 2;
 
 // Las inspecciones de IntelliJ que miran el proyecto entero, por archivo. Sólo valen si el
 // análisis ve todo el proyecto: una llamada que falta cambia la respuesta.
@@ -46,6 +48,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
                 if usage.sees_callers_of(declaration.visibility) {
                     found.extend(same_parameter_values(&project, file, declaration));
                     found.extend(unused_return_value(&project, declaration));
+                    found.extend(always_inverted(&project, declaration));
                 }
                 found.extend(same_return_value(&project, summary, declaration));
                 if usage.sees_callers_of(declaration.visibility) {
@@ -119,13 +122,46 @@ fn unused_return_value<'summary>(
         return None;
     }
     let calls = project.calls_to(declaration);
-    (!calls.is_empty() && calls.iter().all(|call| !call.result_used)).then(|| {
+    (!calls.is_empty() && calls.iter().all(|call| call.result == ResultUse::Discarded)).then(|| {
         lint_at(
             JavaRule::UnusedReturnValue,
             &declaration.position,
             declaration.name.clone(),
         )
     })
+}
+
+// BooleanMethodIsAlwaysInverted: todas las llamadas del proyecto lo niegan (`!activo()`), y son al
+// menos dos: con una sola, invertirlo no gana nada. Un `!` sólo va delante de un boolean, así que
+// alcanza con que devuelva un primitivo. Con homónimos en clases sin relación, sólo cuentan las
+// llamadas que se sabe que van a ésta.
+fn always_inverted<'summary>(
+    project: &Project<'summary>,
+    declaration: &'summary Declaration,
+) -> Option<LintFinding> {
+    if declaration.is_constructor
+        || declaration.return_type != ReturnType::Primitive
+        || declaration.body != Body::Written
+        || !project.is_traceable(declaration)
+        || project.is_overridden(declaration)
+    {
+        return None;
+    }
+    let strangers = project.has_strangers(declaration);
+    let calls: Vec<&CallSite> = project
+        .calls_to(declaration)
+        .into_iter()
+        .filter(|call| !strangers || !matches!(call.receiver, Receiver::Unknown))
+        .collect();
+    (calls.len() >= MIN_INVERTED_CALLS && calls.iter().all(|call| call.result == ResultUse::Negated)).then(
+        || {
+            lint_at(
+                JavaRule::BooleanMethodIsAlwaysInverted,
+                &declaration.position,
+                declaration.name.clone(),
+            )
+        },
+    )
 }
 
 // SameReturnValue: todos los `return` de un método devuelven la misma constante. Para lo privado

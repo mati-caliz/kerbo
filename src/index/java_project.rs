@@ -162,7 +162,7 @@ impl<'summary> Project<'summary> {
 
     // Si hay métodos con el mismo nombre y aridad en clases sin relación, las llamadas de receptor
     // desconocido pueden ser de cualquiera: hace falta al menos una que se sepa que va a éste.
-    fn has_strangers(&self, declaration: &'summary Declaration) -> bool {
+    pub fn has_strangers(&self, declaration: &'summary Declaration) -> bool {
         self.declared
             .get(&key_of(declaration))
             .is_some_and(|twins| twins.len() > 1)

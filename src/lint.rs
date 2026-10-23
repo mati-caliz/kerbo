@@ -21,6 +21,7 @@ pub mod java_owner;
 mod java_padding;
 pub mod java_receivers;
 pub mod java_resources;
+mod java_results;
 mod java_returns;
 mod java_same_value;
 mod java_shapes;

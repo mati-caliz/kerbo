@@ -3,12 +3,15 @@ use super::codec::{Corrupt, Reader, Writer};
 use super::taint_codec::{read_taints, write_taints};
 use crate::index::java::{CallSite, Declaration, Field, JavaSummary, Parameter, Position, Reading};
 use crate::index::java_exposure::{DeclaredType, Exposure};
-use crate::lint::java_calls::{Arity, Body, ReturnType, Returns, Visibility};
+use crate::lint::java_calls::{Arity, Body, ResultUse, ReturnType, Returns, Visibility};
 use crate::lint::java_constants::Constant;
 use crate::lint::java_owner::{Owner, OwnerKind};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
 
+const RESULT_DISCARDED: u64 = 0;
+const RESULT_USED: u64 = 1;
+const RESULT_NEGATED: u64 = 2;
 const ABSENT: u64 = 0;
 const PRESENT: u64 = 1;
 const NO: u64 = 0;
@@ -47,7 +50,11 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
         writer.list(&call.arguments, |writer, argument| {
             write_optional_text(writer, argument.as_deref());
         });
-        write_flag(writer, call.result_used);
+        writer.number(match call.result {
+            ResultUse::Discarded => RESULT_DISCARDED,
+            ResultUse::Used => RESULT_USED,
+            ResultUse::Negated => RESULT_NEGATED,
+        });
     });
     writer.list(&summary.referenced, |writer, name| writer.text(name));
     writer.list(&summary.types, |writer, name| writer.text(name));
@@ -108,7 +115,12 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
                 is_constructor: read_flag(reader)?,
                 receiver: read_receiver(reader)?,
                 arguments: reader.list(read_optional_text)?,
-                result_used: read_flag(reader)?,
+                result: match reader.number()? {
+                    RESULT_DISCARDED => ResultUse::Discarded,
+                    RESULT_USED => ResultUse::Used,
+                    RESULT_NEGATED => ResultUse::Negated,
+                    _ => return Err(Corrupt),
+                },
             })
         })?,
         referenced: reader.list(Reader::text)?,

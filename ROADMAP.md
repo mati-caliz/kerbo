@@ -1128,6 +1128,13 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Contra Qodana: 27 de 27, sin avisos de más (falta la variante "not used in any implementation"
     de un método de interfaz, 1 caso). En Guava 52, commons-lang 37 y junit4 80, casi todos métodos
     de prueba para reflexión.
+- `BooleanMethodIsAlwaysInverted` (hecho, 2026-10-22): `boolean-method-is-always-inverted`. Cada
+  llamada del resumen guarda si su resultado se descarta, se usa o se usa negado (`!activo()`, también
+  entre paréntesis). Avisa en un método que devuelve un primitivo (un `!` sólo va delante de un
+  boolean), con cuerpo, que no redefine ni es redefinido, y al que todas las llamadas del proyecto
+  niegan, con al menos dos: con una sola IntelliJ no lo marca. Con homónimos en clases sin relación
+  sólo cuentan las llamadas de receptor resuelto. Contra Qodana: 7 de 8, sin avisos de más; el que
+  falta es un `matches` con homónimos sin receptor resuelto.
 - Lo que sigue en el índice: lo que queda de código muerto (arriba).
 
 ### 10. Go, Python, TypeScript y shell completos

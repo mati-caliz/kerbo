@@ -320,6 +320,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Callers must come up with a value that gets thrown away: the signature promises something the method does not do. In a Spring handler, the request data arrives and nobody looks at it. Like IntelliJ's unused (\"Parameter is not used\").",
         "void fail(UUID case, String reason) that never reads reason becomes void fail(UUID case).",
     ),
+    RuleText::new(
+        "Boolean method every call negates",
+        "invert it and rename it so it says what is being asked",
+        "If everyone writes !isValid(...), the method answers the opposite of the question being asked: every read needs a mental flip. Like IntelliJ's BooleanMethodIsAlwaysInverted.",
+        "if (!isValid(signature)) becomes if (isInvalid(signature)).",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

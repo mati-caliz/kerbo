@@ -1,5 +1,8 @@
 use std::collections::HashSet;
 
+pub use super::java_results::ResultUse;
+use super::java_results::result_use;
+
 use tree_sitter::Node;
 
 use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, PRIVATE, children, modifiers, text};
@@ -98,7 +101,7 @@ pub struct Call {
     pub is_constructor: bool,
     pub receiver: Receiver,
     pub arguments: Vec<Option<String>>,
-    pub result_used: bool,
+    pub result: ResultUse,
 }
 
 #[derive(Default)]
@@ -173,7 +176,7 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
                 }
                 let receiver = || imported.receiver(node, source, variables);
                 extracted.calls.extend(
-                    call(node, source, &constants, !discarded.contains(&node.id())).map(|found| Call {
+                    call(node, source, &constants, result_use(node, &discarded, source)).map(|found| Call {
                         receiver: if node.kind() == INVOCATION {
                             receiver()
                         } else {
@@ -338,7 +341,7 @@ fn in_enum(constructor: Node<'_>) -> bool {
         .is_some_and(|declaration| declaration.kind() == ENUM)
 }
 
-fn call(node: Node<'_>, source: &[u8], constants: &Constants, result_used: bool) -> Option<Call> {
+fn call(node: Node<'_>, source: &[u8], constants: &Constants, result: ResultUse) -> Option<Call> {
     let (name, is_constructor) = match node.kind() {
         INVOCATION => (
             text(node.child_by_field_name(NAME_FIELD)?, source).to_owned(),
@@ -365,7 +368,7 @@ fn call(node: Node<'_>, source: &[u8], constants: &Constants, result_used: bool)
         is_constructor,
         receiver: Receiver::Unknown,
         arguments,
-        result_used,
+        result,
     })
 }
 

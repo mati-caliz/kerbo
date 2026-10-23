@@ -118,3 +118,42 @@ fn a_parameter_the_body_never_reads_is_reported() {
         .collect();
     assert_eq!(found, ["7:44 reason"]);
 }
+
+const LINKS: &str = r"package app.links;
+
+class Links {
+    private boolean isValid(String token) { return !token.isEmpty(); }
+
+    private boolean isExpired(String token) { return token.isEmpty(); }
+
+    private boolean isKnown(String token) { return token.isEmpty(); }
+
+    void check(String first, String second) {
+        if (!isValid(first) || !(isValid(second))) {
+            return;
+        }
+        if (!isExpired(first)) {
+            return;
+        }
+        if (!isKnown(first) && isKnown(second)) {
+            return;
+        }
+    }
+}
+";
+
+#[test]
+fn a_boolean_method_every_call_negates_is_reported() {
+    let summary = summary_of(LINKS);
+    let files = [IndexedSummary {
+        summary: &summary,
+        in_tests: false,
+    }];
+    let found: Vec<String> = project_lints(&files, &Library::load(&[]))
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "boolean-method-is-always-inverted")
+        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
+        .collect();
+    assert_eq!(found, ["4:21 isValid"]);
+}

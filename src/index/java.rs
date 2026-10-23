@@ -5,7 +5,7 @@ use tree_sitter::Node;
 use super::java_exposure::{DeclaredType, Exposure, exposures};
 use crate::lint::java::children;
 use crate::lint::java_calls::{
-    Arity, Body, Call, Callable, ReturnType, Returns, TYPE_DECLARATIONS, Visibility, extract,
+    Arity, Body, Call, Callable, ResultUse, ReturnType, Returns, TYPE_DECLARATIONS, Visibility, extract,
 };
 use crate::lint::java_chains::Chain;
 use crate::lint::java_constants::{Constant, declared_constants};
@@ -95,7 +95,7 @@ pub struct CallSite {
     pub is_constructor: bool,
     pub receiver: Receiver,
     pub arguments: Vec<Option<String>>,
-    pub result_used: bool,
+    pub result: ResultUse,
 }
 
 // Lo que un archivo Java declara y llama, para cruzarlo con el resto del proyecto.
@@ -314,7 +314,7 @@ fn call_site(call: Call) -> CallSite {
         is_constructor: call.is_constructor,
         receiver: call.receiver,
         arguments: call.arguments,
-        result_used: call.result_used,
+        result: call.result,
     }
 }
 

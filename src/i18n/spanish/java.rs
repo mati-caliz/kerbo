@@ -320,6 +320,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Quien llama tiene que conseguir un valor que se tira: la firma promete algo que el método no hace. En un handler de Spring, el dato del pedido llega y nadie lo mira. Como el unused de IntelliJ (\"Parameter is not used\").",
         "void fallar(UUID caso, String motivo) que nunca lee motivo se vuelve void fallar(UUID caso).",
     ),
+    RuleText::new(
+        "Método booleano que todas las llamadas niegan",
+        "invertilo y cambiale el nombre para que diga lo que se pregunta",
+        "Si todos escriben !esValido(...), el método responde la pregunta opuesta a la que se hace: cada lectura pide invertir mentalmente. Como BooleanMethodIsAlwaysInverted de IntelliJ.",
+        "if (!esValido(firma)) se vuelve if (esInvalido(firma)).",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {
