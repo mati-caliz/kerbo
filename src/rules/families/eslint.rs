@@ -23,6 +23,11 @@ rule_family!(EslintRule {
     NoDupeKeys => "no-dupe-keys",
     NoRedeclare => "no-redeclare",
     NoFuncAssign => "no-func-assign",
+    NoWrapperObjectTypes => "no-wrapper-object-types",
+    NoUnsafeFunctionType => "no-unsafe-function-type",
+    TripleSlashReference => "triple-slash-reference",
+    NoUnsafeFinally => "no-unsafe-finally",
+    PreferSpread => "prefer-spread",
 });
 
 pub const fn wrap_eslint<'slots>(slots: &'slots mut [RuleId], rules: &[EslintRule]) -> &'slots mut [RuleId] {

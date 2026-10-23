@@ -2,6 +2,7 @@ mod comments;
 mod duplicates;
 mod escapes;
 mod expressions;
+mod finally;
 mod modules;
 mod no_var;
 mod nodes;
@@ -10,12 +11,15 @@ mod presets;
 mod redeclare;
 mod repair;
 mod scope;
+mod spread;
 mod statements;
 mod strings;
 pub mod taint;
 mod tokens;
+mod triple_slash;
 mod typescript;
 mod unused;
+mod wrappers;
 
 use std::cell::OnceCell;
 
@@ -55,6 +59,14 @@ const CHECKS: &[(EslintRule, Check)] = &[
     (EslintRule::NoUselessEscape, escapes::useless_escapes),
     (EslintRule::NoRedeclare, redeclare::redeclarations),
     (EslintRule::NoFuncAssign, redeclare::function_assignments),
+    (EslintRule::NoWrapperObjectTypes, wrappers::wrapper_object_types),
+    (EslintRule::NoUnsafeFunctionType, wrappers::unsafe_function_types),
+    (
+        EslintRule::TripleSlashReference,
+        triple_slash::triple_slash_references,
+    ),
+    (EslintRule::NoUnsafeFinally, finally::unsafe_finally),
+    (EslintRule::PreferSpread, spread::spread_calls),
 ];
 
 #[derive(Debug, Clone, Copy)]

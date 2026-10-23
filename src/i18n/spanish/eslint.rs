@@ -10,7 +10,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "ESLint la marca en su conjunto recomendado.",
     "Mirá la documentación de ESLint.",
 );
-const TEXTS: [(EslintRule, RuleText); 22] = [
+const TEXTS: [(EslintRule, RuleText); 27] = [
     (
         EslintRule::NoVar,
         RuleText::new(
@@ -207,6 +207,51 @@ const TEXTS: [(EslintRule, RuleText); 22] = [
             "guardá el valor en otra variable",
             "Después de la asignación, quien llama a la función llama a otra cosa: casi siempre es un error.",
             "function cargar() {} cargar = otra; se vuelve const cargarOtra = otra;.",
+        ),
+    ),
+    (
+        EslintRule::NoWrapperObjectTypes,
+        RuleText::new(
+            "String, Number u Object como tipo en vez del primitivo",
+            "usá el tipo primitivo en minúscula",
+            "String como tipo también acepta los objetos que envuelven al primitivo (new String('a')), que se comparan por referencia y casi nunca son lo que se quiere.",
+            "let nombre: String se vuelve let nombre: string.",
+        ),
+    ),
+    (
+        EslintRule::NoUnsafeFunctionType,
+        RuleText::new(
+            "Function como tipo",
+            "escribí la firma: los parámetros y lo que devuelve",
+            "Function acepta cualquier cosa invocable y la llamada devuelve any: se pierde todo el chequeo de tipos.",
+            "callback: Function se vuelve callback: (error: Error | null) => void.",
+        ),
+    ),
+    (
+        EslintRule::TripleSlashReference,
+        RuleText::new(
+            "Una directiva /// <reference> en vez de un import",
+            "importá el módulo o configurá types en el tsconfig",
+            "La directiva esconde la dependencia del sistema de módulos: las herramientas no la ven y el orden de carga queda implícito.",
+            "/// <reference path=\"./util.ts\" /> se vuelve import { util } from './util';.",
+        ),
+    ),
+    (
+        EslintRule::NoUnsafeFinally,
+        RuleText::new(
+            "Un return, throw, break o continue adentro de un finally",
+            "sacalo del finally",
+            "Lo que sale de un finally pisa lo que estaba haciendo el try: se pierde el valor devuelto o la excepción, sin aviso.",
+            "finally { return valor; } se vuelve finally { cerrar(); } con el return después del try.",
+        ),
+    ),
+    (
+        EslintRule::PreferSpread,
+        RuleText::new(
+            "f.apply(this, args) en vez del operador spread",
+            "llamá a la función con ...args",
+            "El spread dice lo mismo sin repetir el this y sin que quien lee tenga que acordarse qué hace apply.",
+            "Math.max.apply(Math, numeros) se vuelve Math.max(...numeros).",
         ),
     ),
 ];

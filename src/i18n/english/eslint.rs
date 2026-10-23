@@ -10,7 +10,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "ESLint reports it in its recommended set.",
     "See the ESLint documentation.",
 );
-const TEXTS: [(EslintRule, RuleText); 22] = [
+const TEXTS: [(EslintRule, RuleText); 27] = [
     (
         EslintRule::NoVar,
         RuleText::new(
@@ -207,6 +207,51 @@ const TEXTS: [(EslintRule, RuleText); 22] = [
             "keep the value in another variable",
             "After the assignment, callers of the function call something else: it is almost always a bug.",
             "function load() {} load = other; becomes const loadOther = other;.",
+        ),
+    ),
+    (
+        EslintRule::NoWrapperObjectTypes,
+        RuleText::new(
+            "String, Number or Object as a type instead of the primitive",
+            "use the lowercase primitive type",
+            "String as a type also accepts the objects that wrap the primitive (new String('a')), which compare by reference and are almost never what you want.",
+            "let name: String becomes let name: string.",
+        ),
+    ),
+    (
+        EslintRule::NoUnsafeFunctionType,
+        RuleText::new(
+            "Function as a type",
+            "write the signature: its parameters and what it returns",
+            "Function accepts anything callable and calling it returns any: all type checking is lost.",
+            "callback: Function becomes callback: (error: Error | null) => void.",
+        ),
+    ),
+    (
+        EslintRule::TripleSlashReference,
+        RuleText::new(
+            "A /// <reference> directive instead of an import",
+            "import the module or set types in the tsconfig",
+            "The directive hides the dependency from the module system: tools cannot see it and the load order stays implicit.",
+            "/// <reference path=\"./util.ts\" /> becomes import { util } from './util';.",
+        ),
+    ),
+    (
+        EslintRule::NoUnsafeFinally,
+        RuleText::new(
+            "A return, throw, break or continue inside a finally",
+            "move it out of the finally",
+            "Leaving a finally overrides what the try was doing: the returned value or the exception is lost without a trace.",
+            "finally { return value; } becomes finally { close(); } with the return after the try.",
+        ),
+    ),
+    (
+        EslintRule::PreferSpread,
+        RuleText::new(
+            "f.apply(this, args) instead of the spread operator",
+            "call the function with ...args",
+            "Spread says the same thing without repeating this and without making the reader remember what apply does.",
+            "Math.max.apply(Math, numbers) becomes Math.max(...numbers).",
         ),
     ),
 ];

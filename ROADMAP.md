@@ -1268,7 +1268,7 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     `no-non-null-assertion`, `prefer-rest-params`, `no-prototype-builtins`, `no-empty`,
     `no-useless-escape`, `no-cond-assign`, `no-this-alias`, `ban-ts-comment`,
     `no-empty-object-type`, `no-case-declarations`, `no-debugger`, `no-duplicate-case`,
-    `no-dupe-else-if` y `no-dupe-keys`.
+    `no-dupe-else-if` y `no-dupe-keys` (las siguientes, más abajo).
   - Motor de alcances calcado de `@typescript-eslint/scope-manager` sobre tree-sitter
     (`src/lint/ecmascript/scope/`): los mismos alcances (también los de tipos, firmas, tipos
     mapeados y condicionales, enums y namespaces), definiciones de tipo y de valor por separado,
@@ -1322,14 +1322,31 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   en TypeScript. Paridad contra ESLint en express, zod, react, vscode y next.js: 149 de 149 y 132
   de 132, sin avisos de más ni de menos. El ejemplo `fixtures/redeclare.js` fija los casos (función
   y `var`, parámetro y `var`, bucles, `catch`, asignación compuesta y desestructuración).
+- `no-wrapper-object-types`, `no-unsafe-function-type`, `triple-slash-reference`,
+  `no-unsafe-finally` y `prefer-spread` (hecho, 2026-10-23), las cinco que no piden el grafo de
+  control:
+  - Las dos de tipos deciden si el nombre es el global como `isReferenceToGlobalFunction` de
+    typescript-eslint: miran sólo la primera referencia con ese nombre creada en el alcance del uso
+    (un `type Boolean` declarado más abajo en el módulo exime a todos los `Boolean` del módulo, y un
+    `const Number` no exime a un tipo). `no-wrapper-object-types` trae el arreglo de ESLint (el
+    nombre en minúscula), salvo en `implements` y `extends` de una interfaz, igual que ESLint.
+  - `triple-slash-reference` con las opciones de fábrica: `path` siempre avisa, `types` sólo si el
+    mismo módulo se importa (un aviso por cada import, con `import x = require()` incluido), `lib`
+    nunca; sólo los comentarios antes del primer token.
+  - `no-unsafe-finally` y `prefer-spread`, calcadas de ESLint: el corte en funciones, clases, loops
+    y `switch` según la sentencia y su etiqueta; el `this` esperado comparado token a token.
+  - Paridad contra ESLint en express, zod, react, vscode y next.js: 152 de 152, 107 de 113, 70 de
+    70, 36 de 36 y 40 de 40, ninguno de más. Los 6 que faltan están en archivos que kerbo no
+    analiza (el `webpack-config.ts` de next.js, que tree-sitter no parsea, y tres `.js` de
+    react-devtools con anotaciones). La frecuencia de abajo contaba también el código compilado
+    que next.js ignora; por eso daba más. Los casos quedaron en `fixtures/wrappers.ts`,
+    `finally.js`, `spread.js` y `applies.ts`.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
   - `no-useless-assignment` (1.778), `no-fallthrough` (700), `no-unreachable` (104) y
     `no-unassigned-vars` (59): piden el grafo de control de ESLint (`code-path-analysis`); armarlo
     sobre tree-sitter es el paso siguiente.
-  - `prefer-spread` (487), `no-misleading-character-class` (290),
-    `no-constant-condition` (248), `no-constant-binary-expression` (154),
-    `no-wrapper-object-types` (152), `no-control-regex` (138), `no-unsafe-function-type` (113),
-    `preserve-caught-error` (92), `triple-slash-reference` (70), `no-unsafe-finally` (67),
+  - `no-misleading-character-class` (290), `no-constant-condition` (248),
+    `no-constant-binary-expression` (154), `no-control-regex` (138), `preserve-caught-error` (92),
     `getter-return` (43), `no-extra-boolean-cast` (38) y el resto con menos de 30.
   - `no-undef`: pide las variables globales de cada entorno (navegador, Node, Jest).
   - `no-useless-escape` no mira las expresiones regulares con el flag `v`.

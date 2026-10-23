@@ -1,0 +1,9 @@
+1:1 prefer-spread
+1:13 no-unsafe-function-type
+2:1 prefer-spread
+2:13 no-explicit-any
+2:42 no-explicit-any
+3:1 prefer-spread
+3:1 no-non-null-assertion
+3:23 no-non-null-assertion
+4:1 prefer-spread

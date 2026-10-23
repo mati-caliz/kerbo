@@ -9,7 +9,7 @@ use crate::profile::LintStyle;
 use crate::rules::{EslintRule, RuleId};
 
 const FATAL_MARK: &str = "FATAL";
-const FIXTURES: [(&str, Language, &str, &str); 16] = [
+const FIXTURES: [(&str, Language, &str, &str); 20] = [
     (
         "hashbang",
         Language::JavaScript,
@@ -39,6 +39,30 @@ const FIXTURES: [(&str, Language, &str, &str); 16] = [
         Language::JavaScript,
         include_str!("fixtures/redeclare.js"),
         include_str!("fixtures/redeclare.eslint"),
+    ),
+    (
+        "wrappers",
+        Language::TypeScript,
+        include_str!("fixtures/wrappers.ts"),
+        include_str!("fixtures/wrappers.eslint"),
+    ),
+    (
+        "finally",
+        Language::JavaScript,
+        include_str!("fixtures/finally.js"),
+        include_str!("fixtures/finally.eslint"),
+    ),
+    (
+        "spread",
+        Language::JavaScript,
+        include_str!("fixtures/spread.js"),
+        include_str!("fixtures/spread.eslint"),
+    ),
+    (
+        "applies",
+        Language::TypeScript,
+        include_str!("fixtures/applies.ts"),
+        include_str!("fixtures/applies.eslint"),
     ),
     (
         "requires",
@@ -164,7 +188,14 @@ fn every_fixture_matches_eslint() {
     }
 }
 
-const FIX_FIXTURES: [(&str, Language, &str, EslintRule, &str); 3] = [
+const FIX_FIXTURES: [(&str, Language, &str, EslintRule, &str); 4] = [
+    (
+        "wrappers",
+        Language::TypeScript,
+        include_str!("fixtures/wrappers.ts"),
+        EslintRule::NoWrapperObjectTypes,
+        include_str!("fixtures/wrappers.no-wrapper-object-types.fixed"),
+    ),
     (
         "bindings",
         Language::JavaScript,
