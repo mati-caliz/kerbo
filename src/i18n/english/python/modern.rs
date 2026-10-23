@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 24] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 31] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -218,6 +218,69 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 24] = [
             "drop the numbers from the braces",
             "\"{0} {1}\" says the same as \"{} {}\": the numbers only add something to maintain.",
             "\"{0} {1}\".format(a, b) becomes \"{} {}\".format(a, b).",
+        ),
+    ),
+    (
+        PythonRule::UP008,
+        RuleText::new(
+            "super with the class and the instance as arguments",
+            "use super() without arguments",
+            "Since Python 3, super() finds the class and the instance by itself; repeating them adds something that breaks when the class is renamed.",
+            "super(Child, self).__init__() becomes super().__init__().",
+        ),
+    ),
+    (
+        PythonRule::PIE808,
+        RuleText::new(
+            "range with an explicit 0 as start",
+            "drop the 0: range already starts there",
+            "range(0, n) says the same as range(n) with more noise.",
+            "range(0, 10) becomes range(10).",
+        ),
+    ),
+    (
+        PythonRule::B009,
+        RuleText::new(
+            "getattr with a fixed attribute name",
+            "access the attribute directly",
+            "getattr(x, \"a\") is x.a written indirectly: the analyzer and the editor lose track of the attribute.",
+            "getattr(user, \"name\") becomes user.name.",
+        ),
+    ),
+    (
+        PythonRule::B010,
+        RuleText::new(
+            "setattr with a fixed attribute name",
+            "assign the attribute directly",
+            "setattr(x, \"a\", v) is x.a = v written indirectly: the analyzer and the editor lose track of the attribute.",
+            "setattr(user, \"name\", value) becomes user.name = value.",
+        ),
+    ),
+    (
+        PythonRule::RUF015,
+        RuleText::new(
+            "A whole list or tuple is built just to take the first element",
+            "use next(iter(...))",
+            "list(x)[0] walks and copies the whole iterable to keep one element.",
+            "list(users)[0] becomes next(iter(users)).",
+        ),
+    ),
+    (
+        PythonRule::B006,
+        RuleText::new(
+            "A parameter with a mutable default value",
+            "use None as default and create the value inside the function",
+            "The default is created once, when the function is defined: every call shares and modifies the same object.",
+            "def add(x, items=[]): becomes def add(x, items=None): with items = [] when None.",
+        ),
+    ),
+    (
+        PythonRule::B008,
+        RuleText::new(
+            "A call in a parameter's default value",
+            "compute the value inside the function, or keep it in a module constant",
+            "The default is evaluated once, when the function is defined, not on each call: a now() stays frozen.",
+            "def log(moment=datetime.now()): becomes def log(moment=None): with moment = datetime.now() when None.",
         ),
     ),
 ];

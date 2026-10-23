@@ -3,7 +3,8 @@ use tree_sitter::Node;
 use super::percent::{Quantity, Specifier, specifiers};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
-    ATTRIBUTE, CALL, CONCATENATED_STRING, IDENTIFIER, STRING, STRING_START, TUPLE, named, string_prefix,
+    ATTRIBUTE, CALL, CONCATENATED_STRING, IDENTIFIER, STRING, STRING_START, TUPLE, is_identifier, named,
+    string_prefix,
 };
 use crate::lint::python::escapes::text_value;
 use crate::rules::PythonRule;
@@ -20,12 +21,6 @@ const STRING_CONVERSION: char = 's';
 const PAIR: &str = "pair";
 const DICTIONARY_SPLAT: &str = "dictionary_splat";
 const KEY_FIELD: &str = "key";
-const UNDERSCORE: char = '_';
-const KEYWORDS: [&str; 35] = [
-    "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue", "def",
-    "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is",
-    "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield",
-];
 const LITERALS: &[&str] = &[
     STRING,
     CONCATENATED_STRING,
@@ -146,16 +141,6 @@ fn string_key(key: Node<'_>, source: &[u8]) -> Option<String> {
             .iter()
             .all(|part| is_plain_string(*part, source));
     plain.then(|| text_value(key, source)).flatten()
-}
-
-fn is_identifier(name: &str) -> bool {
-    let mut characters = name.chars();
-    let starts = characters
-        .next()
-        .is_some_and(|first| first == UNDERSCORE || first.is_alphabetic());
-    starts
-        && characters.all(|character| character == UNDERSCORE || character.is_alphanumeric())
-        && !KEYWORDS.contains(&name)
 }
 
 fn starts_its_line(key: Node<'_>, source: &[u8]) -> bool {

@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 24] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 31] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -218,6 +218,69 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 24] = [
             "sacá los números de las llaves",
             "\"{0} {1}\" dice lo mismo que \"{} {}\": los números sólo agregan algo que mantener.",
             "\"{0} {1}\".format(a, b) pasa a \"{} {}\".format(a, b).",
+        ),
+    ),
+    (
+        PythonRule::UP008,
+        RuleText::new(
+            "super con la clase y la instancia como argumentos",
+            "usá super() sin argumentos",
+            "Desde Python 3, super() encuentra la clase y la instancia solo; repetirlas suma algo que se rompe al renombrar la clase.",
+            "super(Hija, self).__init__() pasa a super().__init__().",
+        ),
+    ),
+    (
+        PythonRule::PIE808,
+        RuleText::new(
+            "range con un 0 explícito como inicio",
+            "sacá el 0: range ya empieza ahí",
+            "range(0, n) dice lo mismo que range(n) con más ruido.",
+            "range(0, 10) pasa a range(10).",
+        ),
+    ),
+    (
+        PythonRule::B009,
+        RuleText::new(
+            "getattr con un nombre de atributo fijo",
+            "accedé al atributo directamente",
+            "getattr(x, \"a\") es x.a escrito de forma indirecta: el analizador y el editor pierden de vista el atributo.",
+            "getattr(usuario, \"nombre\") pasa a usuario.nombre.",
+        ),
+    ),
+    (
+        PythonRule::B010,
+        RuleText::new(
+            "setattr con un nombre de atributo fijo",
+            "asigná el atributo directamente",
+            "setattr(x, \"a\", v) es x.a = v escrito de forma indirecta: el analizador y el editor pierden de vista el atributo.",
+            "setattr(usuario, \"nombre\", valor) pasa a usuario.nombre = valor.",
+        ),
+    ),
+    (
+        PythonRule::RUF015,
+        RuleText::new(
+            "Se arma una lista o tupla entera sólo para tomar el primer elemento",
+            "usá next(iter(...))",
+            "list(x)[0] recorre y copia todo el iterable para quedarse con un elemento.",
+            "list(usuarios)[0] pasa a next(iter(usuarios)).",
+        ),
+    ),
+    (
+        PythonRule::B006,
+        RuleText::new(
+            "Un parámetro con un valor por defecto mutable",
+            "usá None como default y creá el valor adentro de la función",
+            "El default se crea una sola vez, al definir la función: todas las llamadas comparten y modifican el mismo objeto.",
+            "def agregar(x, lista=[]): pasa a def agregar(x, lista=None): con lista = [] si es None.",
+        ),
+    ),
+    (
+        PythonRule::B008,
+        RuleText::new(
+            "Una llamada en el valor por defecto de un parámetro",
+            "calculá el valor adentro de la función, o guardalo en una constante del módulo",
+            "El default se evalúa una sola vez, al definir la función, no en cada llamada: un now() queda congelado.",
+            "def registrar(momento=datetime.now()): pasa a def registrar(momento=None): con momento = datetime.now() si es None.",
         ),
     ),
 ];

@@ -1275,9 +1275,20 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     `int(1)` y compañía) y UP030 (`"{0} {1}".format`). Paridad: 516 de 517, 459 de 460, 417 de 450,
     251 de 265, 335 de 335, 340 de 343, 213 de 213 y 489 de 489, sin avisos de más; todo lo que falta
     está en archivos de CPython que tree-sitter no parsea. Los casos quedaron en `fixtures/hygiene.py`.
-  - Siguiente: RUF012 (atributos de clase mutables, con las anotaciones inmutables de ruff, la
-    jerarquía de clases del mismo archivo, dataclasses, attrs y pydantic), RUF059, UP032, UP035,
-    UP008, SIM115, B023, RUF015, RUF022, B008, RUF023, SIM114, PIE808, B006, TRY004 y B009.
+  - Hechas en una sexta tanda: UP008 (`super(Clase, self)`, con las clases anidadas, `__class__`,
+    los nombres ligados en la función y `dataclass(slots=True)`), PIE808 (`range(0, n)`), B009 y
+    B010 (`getattr`/`setattr` con nombre fijo), RUF015 (`list(x)[0]` y `.pop(0)`), B006 (defaults
+    mutables) y B008 (llamadas en defaults). B006 y B008 usan un port de los helpers de mutabilidad
+    de ruff (`semantic/mutability.rs`: tipos de retorno mutables e inmutables, anotaciones
+    inmutables con `Optional`, `Union`, `|` y `Annotated`, y `NewType` sobre un tipo inmutable), que
+    también va a servir para RUF012. Paridad: 423 de 449, 244 de 245, 181 de 185, 82 de 84, 417 de
+    420, 214 de 221 y 348 de 351, sin avisos de más. Lo que falta está en archivos que tree-sitter no
+    parsea, salvo un B009 con un identificador que lleva un selector de variación Unicode (la
+    biblioteca estándar de Rust no expone XID; haría falta `unicode-ident`). Los casos quedaron en
+    `fixtures/defaults.py`.
+  - Siguiente: RUF012 (atributos de clase mutables, con la jerarquía de clases del mismo archivo,
+    dataclasses, attrs y pydantic), RUF059, UP032, UP035, SIM115, B023, RUF022, RUF023, SIM114 y
+    TRY004.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

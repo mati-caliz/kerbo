@@ -1,5 +1,8 @@
 use tree_sitter::Node;
 
+use super::defaults::default_reports;
+use super::mutability::Resolver;
+
 use super::model::{BindingKind, MODULE_SCOPE, ScopeKind, Site};
 use super::qualified::is_builtin_named;
 use super::targets::Store;
@@ -77,6 +80,12 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
             .child_by_field_name(PARAMETERS_FIELD)
             .map(named)
             .unwrap_or_default();
+        let resolver = Resolver {
+            model: &self.model,
+            source: self.source,
+        };
+        let defaults = default_reports(&resolver, &parameters, !self.file.stub);
+        self.reports.extend(defaults);
         for default in parameters
             .iter()
             .filter(|parameter| DEFAULTED.contains(&parameter.kind()))
@@ -209,6 +218,12 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
             .child_by_field_name(PARAMETERS_FIELD)
             .map(named)
             .unwrap_or_default();
+        let resolver = Resolver {
+            model: &self.model,
+            source: self.source,
+        };
+        let defaults = default_reports(&resolver, &parameters, false);
+        self.reports.extend(defaults);
         for default in parameters
             .iter()
             .filter(|parameter| DEFAULTED.contains(&parameter.kind()))

@@ -9,7 +9,7 @@ use crate::limits::{Limits, Preset};
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::{PythonRule, RuleId};
 
-const FIXTURES: [(&str, &str, &str); 13] = [
+const FIXTURES: [(&str, &str, &str); 14] = [
     (
         "scopes.py",
         include_str!("fixtures/scopes.py"),
@@ -69,6 +69,11 @@ const FIXTURES: [(&str, &str, &str); 13] = [
         "hygiene.py",
         include_str!("fixtures/hygiene.py"),
         include_str!("fixtures/hygiene.ruff"),
+    ),
+    (
+        "defaults.py",
+        include_str!("fixtures/defaults.py"),
+        include_str!("fixtures/defaults.ruff"),
     ),
     (
         "package/__init__.py",

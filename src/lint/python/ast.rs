@@ -50,6 +50,12 @@ pub const NONE: &str = "none";
 pub const TRUE: &str = "true";
 pub const FALSE: &str = "false";
 
+const KEYWORDS: [&str; 35] = [
+    "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue", "def",
+    "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is",
+    "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield",
+];
+
 pub fn text<'source>(node: Node<'_>, source: &'source [u8]) -> &'source str {
     node.utf8_text(source).unwrap_or_default()
 }
@@ -104,4 +110,14 @@ pub fn is_bytes(string: Node<'_>, source: &[u8]) -> bool {
 
 pub fn statement_ancestors(node: Node<'_>) -> impl Iterator<Item = Node<'_>> {
     std::iter::successors(node.parent(), Node::parent)
+}
+
+pub fn is_identifier(name: &str) -> bool {
+    let mut characters = name.chars();
+    let starts = characters
+        .next()
+        .is_some_and(|first| first == '_' || first.is_alphabetic());
+    starts
+        && characters.all(|character| character == '_' || character.is_alphanumeric())
+        && !KEYWORDS.contains(&name)
 }

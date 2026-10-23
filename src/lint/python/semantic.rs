@@ -1,6 +1,8 @@
 mod annotations;
 mod boundary;
+mod calls;
 mod checks;
+mod defaults;
 mod definitions;
 mod effects;
 mod expressions;
@@ -8,10 +10,12 @@ mod handlers;
 mod imports;
 mod literals;
 mod model;
+mod mutability;
 mod patterns;
 mod pep;
 mod qualified;
 mod statements;
+mod supers;
 mod targets;
 
 use crate::lint::python::semantic::annotations::Annotations;

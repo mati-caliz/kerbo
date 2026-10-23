@@ -1,9 +1,11 @@
 use tree_sitter::Node;
 
+use super::calls::{call_rule, is_first_element_subscript};
 use super::literals::is_native_literal_call;
 use super::model::{BindingKind, Model, ScopeKind};
 use super::pep::is_pep585_generic;
 use super::qualified::{is_builtin_named, qualified_name};
+use super::supers::is_super_with_parameters;
 use super::targets::Store;
 use super::{Mode, Visitor};
 use crate::lint::python::Report;
@@ -165,7 +167,12 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
                 }
                 self.upgradable_reference(node);
             }
-            SUBSCRIPT => self.subscript(node, mode),
+            SUBSCRIPT => {
+                if is_first_element_subscript(&self.model, self.source, node) {
+                    self.reports.push(Report::at(PythonRule::RUF015, node, ""));
+                }
+                self.subscript(node, mode);
+            }
             GENERIC_TYPE => self.generic_type(node, mode),
             MEMBER_TYPE => {
                 if let Some(object) = named(node).first() {
@@ -248,9 +255,15 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
                 scope.uses_locals = true;
             }
         }
+        if let Some((rule, at)) = call_rule(&self.model, self.source, call) {
+            self.reports.push(Report::at(rule, at, ""));
+        }
         let Some(arguments) = call.child_by_field_name(crate::lint::python::ast::ARGUMENTS_FIELD) else {
             return;
         };
+        if is_super_with_parameters(&self.model, self.source, call) {
+            self.reports.push(Report::at(PythonRule::UP008, arguments, ""));
+        }
         if let Some(function) = function
             && let Some(collection) = unnecessary_collection(&self.model, self.source, function, arguments)
         {
