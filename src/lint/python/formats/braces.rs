@@ -11,6 +11,7 @@ pub struct BraceSummary {
     pub autos: Vec<usize>,
     pub indices: Vec<usize>,
     pub keywords: Vec<String>,
+    pub has_nested_parts: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,6 +25,7 @@ pub fn summary(format: &str) -> Option<BraceSummary> {
     for field in fields(format)? {
         summary.record(&field.name)?;
         for nested in fields(&field.spec)? {
+            summary.has_nested_parts = true;
             summary.record(&nested.name)?;
         }
     }

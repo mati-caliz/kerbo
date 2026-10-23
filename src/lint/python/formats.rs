@@ -6,7 +6,7 @@ use tree_sitter::Node;
 
 use super::Report;
 use super::ast::{
-    ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, FUNCTION_FIELD, KEYWORD_ARGUMENT, LEFT_FIELD,
+    ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, COMMENT, FUNCTION_FIELD, KEYWORD_ARGUMENT, LEFT_FIELD,
     NAME_FIELD, OBJECT_FIELD, RIGHT_FIELD, STRING, TUPLE, is_string, named, text, unparenthesized,
 };
 use super::escapes::text_value;
@@ -266,5 +266,36 @@ fn brace_rules(summary: &BraceSummary, arguments: &[Node<'_>], source: &[u8]) ->
     if !summary.autos.is_empty() && !summary.indices.is_empty() {
         found.push((PythonRule::F525, String::new()));
     }
+    if is_explicit_positions_only(summary, &positional, &keywords) {
+        found.push((PythonRule::UP030, String::new()));
+    }
     found
+}
+
+// UP030: `"{0} {1}".format(a, b)`, donde los números sobran.
+fn is_explicit_positions_only(
+    summary: &BraceSummary,
+    positional: &[Node<'_>],
+    keywords: &[Node<'_>],
+) -> bool {
+    let indices = &summary.indices;
+    let plain = !summary.has_nested_parts && summary.keywords.is_empty() && summary.autos.is_empty();
+    if !plain || indices.is_empty() || (0..indices.len()).any(|index| !indices.contains(&index)) {
+        return false;
+    }
+    let sequential = indices
+        .iter()
+        .enumerate()
+        .all(|(position, index)| position == *index);
+    let positional: Vec<&Node<'_>> = positional
+        .iter()
+        .filter(|argument| argument.kind() != COMMENT)
+        .collect();
+    sequential
+        || (keywords.is_empty()
+            && positional.len() >= indices.len()
+            && positional
+                .iter()
+                .take(indices.len())
+                .all(|argument| argument.kind() != LIST_SPLAT))
 }

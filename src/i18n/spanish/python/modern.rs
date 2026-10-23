@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 16] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 24] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -146,6 +146,78 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 16] = [
             "atrapá la excepción concreta que esperás, o registrala con logging.exception",
             "Atrapar Exception a ciegas esconde errores de programación y fallas que no se esperaban: el programa sigue como si nada.",
             "except Exception: pass pasa a except ValueError: pass, o a except Exception: logger.exception(\"falló\").",
+        ),
+    ),
+    (
+        PythonRule::TRY002,
+        RuleText::new(
+            "Se lanza Exception o BaseException directamente",
+            "definí una excepción propia, o usá una más específica",
+            "Quien atrape el error no puede distinguirlo de cualquier otro: le queda atrapar Exception entera.",
+            "raise Exception(\"sin saldo\") pasa a raise SaldoInsuficiente(\"sin saldo\").",
+        ),
+    ),
+    (
+        PythonRule::PLC0414,
+        RuleText::new(
+            "Un import con un alias igual al nombre original",
+            "sacá el as",
+            "import x as x dice lo mismo que import x; sólo tiene sentido en __init__.py y en stubs, para reexportar.",
+            "import os as os pasa a import os.",
+        ),
+    ),
+    (
+        PythonRule::S102,
+        RuleText::new(
+            "Uso de exec",
+            "evitá exec: resolvé el problema sin ejecutar código armado en tiempo de ejecución",
+            "exec corre cualquier código que reciba: si el texto viene de afuera, es una puerta abierta.",
+            "exec(codigo) pasa a una función o tabla de despacho que haga lo mismo.",
+        ),
+    ),
+    (
+        PythonRule::S110,
+        RuleText::new(
+            "Un except que atrapa todo y sólo hace pass",
+            "registrá el error, o atrapá sólo la excepción que esperás",
+            "Un error que se traga en silencio no deja rastro: después nadie sabe por qué el programa hizo otra cosa.",
+            "except Exception: pass pasa a except Exception: logger.exception(\"falló\").",
+        ),
+    ),
+    (
+        PythonRule::SIM118,
+        RuleText::new(
+            "Se pregunta por una clave en d.keys()",
+            "preguntá directamente en el diccionario",
+            "clave in d hace lo mismo que clave in d.keys() sin crear una vista intermedia, y se lee mejor.",
+            "if clave in d.keys(): pasa a if clave in d:.",
+        ),
+    ),
+    (
+        PythonRule::UP017,
+        RuleText::new(
+            "Uso de datetime.timezone.utc",
+            "usá datetime.UTC",
+            "Desde Python 3.11 datetime.UTC es el alias corto para la zona horaria UTC.",
+            "datetime.timezone.utc pasa a datetime.UTC.",
+        ),
+    ),
+    (
+        PythonRule::UP018,
+        RuleText::new(
+            "Un str, int, float, bool, bytes o complex que envuelve un literal del mismo tipo",
+            "escribí el literal directamente",
+            "La llamada no cambia el valor: sólo suma ruido y una llamada de más.",
+            "str(\"hola\") pasa a \"hola\", e int() pasa a 0.",
+        ),
+    ),
+    (
+        PythonRule::UP030,
+        RuleText::new(
+            "Un .format con posiciones numeradas en orden",
+            "sacá los números de las llaves",
+            "\"{0} {1}\" dice lo mismo que \"{} {}\": los números sólo agregan algo que mantener.",
+            "\"{0} {1}\".format(a, b) pasa a \"{} {}\".format(a, b).",
         ),
     ),
 ];

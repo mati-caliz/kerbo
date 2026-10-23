@@ -3,7 +3,7 @@ use tree_sitter::Node;
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
 use crate::lint::python::ast::{
-    ALIAS_FIELD, ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, BLOCK, CALL, CLASS, DECORATED,
+    ALIAS_FIELD, ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, BLOCK, CALL, CLASS, COMMENT, DECORATED,
     EXPRESSION_STATEMENT, FUNCTION, FUNCTION_FIELD, IDENTIFIER, KEYWORD_ARGUMENT, NAME_FIELD, OBJECT_FIELD,
     TUPLE, VALUE_FIELD, named, text, unparenthesized,
 };
@@ -13,6 +13,8 @@ const TRY: &str = "try_statement";
 const RAISE: &str = "raise_statement";
 const CAUSE_FIELD: &str = "cause";
 const BLIND_EXCEPTIONS: [&str; 2] = ["BaseException", "Exception"];
+const BUILTIN_EXCEPTIONS: [&str; 2] = ["builtins.BaseException", "builtins.Exception"];
+const PASS: &str = "pass_statement";
 const NOT_VISITED: [&str; 4] = [TRY, FUNCTION, CLASS, DECORATED];
 const EXCEPTION_METHOD: &str = "exception";
 const LOGGER_METHODS: [&str; 8] = [
@@ -67,10 +69,7 @@ fn blind_exception<'tree>(model: &Model<'_>, source: &[u8], exception: Node<'tre
             .into_iter()
             .find_map(|element| blind_exception(model, source, element));
     }
-    BLIND_EXCEPTIONS
-        .iter()
-        .any(|builtin| is_builtin_named(model, exception, source, builtin))
-        .then_some(exception)
+    is_blind(model, source, exception).then_some(exception)
 }
 
 // Las sentencias del cuerpo y de sus bloques, sin entrar a `try`, funciones ni clases.
@@ -190,4 +189,55 @@ fn is_falsy(value: Node<'_>, source: &[u8]) -> bool {
         }
         kind => FALSY.contains(&kind) && (kind == "false" || kind == "none" || named(value).is_empty()),
     }
+}
+
+// S110: un `except` sin tipo, o con `Exception`/`BaseException`, cuyo cuerpo es sólo `pass`.
+pub fn is_silenced_exception(model: &Model<'_>, source: &[u8], handler: Node<'_>) -> bool {
+    let body: Vec<Node<'_>> = named(handler)
+        .into_iter()
+        .filter(|child| child.kind() == BLOCK)
+        .flat_map(named)
+        .filter(|statement| statement.kind() != COMMENT)
+        .collect();
+    let only_pass = matches!(body.as_slice(), [statement] if statement.kind() == PASS);
+    let untyped = handler.child_by_field_name(VALUE_FIELD).is_none_or(|value| {
+        let exception = if value.kind() == AS_PATTERN {
+            named(value).first().copied()
+        } else {
+            Some(value)
+        };
+        exception.is_some_and(|exception| {
+            let candidates = if exception.kind() == TUPLE {
+                named(exception)
+            } else {
+                vec![exception]
+            };
+            candidates
+                .into_iter()
+                .any(|candidate| is_blind(model, source, candidate))
+        })
+    });
+    only_pass && untyped
+}
+
+// TRY002: `raise Exception(...)` o `raise BaseException`, en vez de una excepción propia.
+pub fn vanilla_raise<'tree>(model: &Model<'_>, source: &[u8], statement: Node<'tree>) -> Option<Node<'tree>> {
+    let cause = statement.child_by_field_name(CAUSE_FIELD);
+    let exception = named(statement)
+        .into_iter()
+        .find(|child| child.kind() != COMMENT && cause.is_none_or(|cause| cause.id() != child.id()))?;
+    let class = if exception.kind() == CALL {
+        exception.child_by_field_name(FUNCTION_FIELD)?
+    } else {
+        exception
+    };
+    let is_builtin_attribute =
+        qualified_name(model, class, source).is_some_and(|name| BUILTIN_EXCEPTIONS.contains(&name.as_str()));
+    (is_blind(model, source, class) || is_builtin_attribute).then_some(exception)
+}
+
+fn is_blind(model: &Model<'_>, source: &[u8], exception: Node<'_>) -> bool {
+    BLIND_EXCEPTIONS
+        .iter()
+        .any(|builtin| is_builtin_named(model, exception, source, builtin))
 }

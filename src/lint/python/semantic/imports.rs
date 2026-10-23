@@ -2,11 +2,13 @@ use tree_sitter::Node;
 
 use super::Visitor;
 use super::model::{BindingKind, EXPLICIT_EXPORT, Site};
+use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ALIAS_FIELD, ALIASED_IMPORT, DOTTED_NAME, MODULE_NAME_FIELD, NAME_FIELD, WILDCARD_IMPORT, children,
     fields,
 };
 use crate::lint::python::semantic::boundary::Boundary;
+use crate::rules::PythonRule;
 
 const SEPARATOR: char = '.';
 
@@ -23,12 +25,14 @@ pub trait Imports<'tree> {
     fn future_import(&mut self, statement: Node<'tree>);
     fn aliased(&self, aliased: Node<'tree>, module: Option<&str>) -> Option<Imported<'tree>>;
     fn bind_import(&mut self, statement: Node<'tree>, imported: Imported<'tree>, kind: BindingKind);
+    fn useless_import_alias(&mut self, name: Node<'tree>);
 }
 
 impl<'tree> Imports<'tree> for Visitor<'tree> {
     fn import(&mut self, statement: Node<'tree>) {
         self.import_out_of_place(statement);
         for name in fields(statement, NAME_FIELD) {
+            self.useless_import_alias(name);
             if name.kind() == DOTTED_NAME {
                 let (imported, kind) = dotted_import(name, self.text(name));
                 self.bind_import(statement, imported, kind);
@@ -54,6 +58,7 @@ impl<'tree> Imports<'tree> for Visitor<'tree> {
             .map(|module| self.text(module))
             .unwrap_or_default();
         for name in fields(statement, NAME_FIELD) {
+            self.useless_import_alias(name);
             let imported = if name.kind() == DOTTED_NAME {
                 let member = self.text(name);
                 Some(Imported {
@@ -115,6 +120,22 @@ impl<'tree> Imports<'tree> for Visitor<'tree> {
         self.model.flag(id, imported.flags);
         if let Some(binding) = self.model.bindings.get_mut(id) {
             binding.qualified = imported.qualified;
+        }
+    }
+
+    // PLC0414: `import x as x`, fuera de stubs y de `__init__.py`, donde sirve para reexportar.
+    fn useless_import_alias(&mut self, name: Node<'tree>) {
+        if name.kind() != ALIASED_IMPORT || self.file.stub || self.file.package_init {
+            return;
+        }
+        let original = name
+            .child_by_field_name(NAME_FIELD)
+            .map(|original| self.text(original));
+        let alias = name
+            .child_by_field_name(ALIAS_FIELD)
+            .map(|alias| self.text(alias));
+        if original.is_some() && original == alias {
+            self.reports.push(Report::at(PythonRule::PLC0414, name, ""));
         }
     }
 }

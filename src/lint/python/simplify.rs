@@ -2,8 +2,8 @@ use tree_sitter::Node;
 
 use super::Report;
 use super::ast::{
-    ATTRIBUTE, BLOCK, CALL, COMMENT, COMPARISON, FALSE, FUNCTION_FIELD, IDENTIFIER, STRING, TRUE, named,
-    text, unparenthesized,
+    ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, BLOCK, CALL, COMMENT, COMPARISON, FALSE, FUNCTION_FIELD,
+    IDENTIFIER, LEFT_FIELD, OBJECT_FIELD, RIGHT_FIELD, STRING, TRUE, named, text, unparenthesized,
 };
 use super::escapes::text_value;
 use crate::rules::PythonRule;
@@ -11,6 +11,11 @@ use crate::rules::PythonRule;
 const IF: &str = "if_statement";
 const ELSE: &str = "else_clause";
 const WITH: &str = "with_statement";
+const FOR: &str = "for_statement";
+const FOR_IN: &str = "for_in_clause";
+const KEYS: &str = "keys";
+const SELF: &str = "self";
+const MEMBERSHIP_OPERATORS: [&[&str]; 2] = [&["in"], &["not", "in"]];
 const WITH_CLAUSE: &str = "with_clause";
 const WITH_ITEM: &str = "with_item";
 const ASYNC: &str = "async";
@@ -56,6 +61,14 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
         .filter_map(|node| match node.kind() {
             IF => collapsible_if(*node, source, &system),
             WITH => multiple_with(*node, source),
+            FOR | FOR_IN => {
+                let target = node.child_by_field_name(LEFT_FIELD)?;
+                in_dict_keys(target, node.child_by_field_name(RIGHT_FIELD)?, source)
+            }
+            COMPARISON => match named(*node).as_slice() {
+                [left, right] if is_membership(*left, *right, source) => in_dict_keys(*left, *right, source),
+                _ => None,
+            },
             _ => None,
         })
         .collect()
@@ -255,4 +268,33 @@ fn is_timeout_scope(statement: Node<'_>, source: &[u8]) -> bool {
         .filter(|value| value.kind() == CALL)
         .and_then(|call| call.child_by_field_name(FUNCTION_FIELD))
         .is_some_and(|function| TIMEOUT_SCOPES.contains(&text(function, source)))
+}
+
+fn is_membership(left: Node<'_>, right: Node<'_>, source: &[u8]) -> bool {
+    let between = source
+        .get(left.end_byte()..right.start_byte())
+        .unwrap_or_default();
+    let words: Vec<&str> = std::str::from_utf8(between)
+        .unwrap_or_default()
+        .split_whitespace()
+        .collect();
+    MEMBERSHIP_OPERATORS.contains(&words.as_slice())
+}
+
+// SIM118: `clave in d.keys()`, donde alcanza con `clave in d`.
+fn in_dict_keys(target: Node<'_>, iterable: Node<'_>, source: &[u8]) -> Option<Report> {
+    let call = Some(unparenthesized(iterable)).filter(|call| call.kind() == CALL)?;
+    let no_arguments = call
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .is_some_and(|arguments| named(arguments).iter().all(|argument| argument.kind() == COMMENT));
+    let function = call
+        .child_by_field_name(FUNCTION_FIELD)
+        .filter(|function| function.kind() == ATTRIBUTE)?;
+    let is_keys = function
+        .child_by_field_name(ATTRIBUTE_FIELD)
+        .is_some_and(|name| text(name, source) == KEYS);
+    let on_self = function
+        .child_by_field_name(OBJECT_FIELD)
+        .is_some_and(|object| object.kind() == IDENTIFIER && text(object, source) == SELF);
+    (no_arguments && is_keys && !on_self).then(|| Report::at(PythonRule::SIM118, target, ""))
 }

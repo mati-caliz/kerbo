@@ -1269,9 +1269,15 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     sin `raise` ni registro con `logging.exception` o `exc_info=`, con la heurística de loggers de
     ruff). Paridad: 708 de 708, 1.535 de 1.535 y 1.304 de 1.367, sin avisos de más; los 63 que faltan
     están en archivos de CPython con `lazy import`. Los casos quedaron en `fixtures/simplify.py`.
+  - Hechas en una quinta tanda: TRY002 (`raise Exception`), PLC0414 (`import x as x`, fuera de stubs y
+    de `__init__.py`), S102 (`exec`), S110 (`except` amplio con sólo `pass`), SIM118 (`in d.keys()`,
+    en comparaciones, `for` y comprensiones), UP017 (`datetime.timezone.utc`), UP018 (`str("x")`,
+    `int(1)` y compañía) y UP030 (`"{0} {1}".format`). Paridad: 516 de 517, 459 de 460, 417 de 450,
+    251 de 265, 335 de 335, 340 de 343, 213 de 213 y 489 de 489, sin avisos de más; todo lo que falta
+    está en archivos de CPython que tree-sitter no parsea. Los casos quedaron en `fixtures/hygiene.py`.
   - Siguiente: RUF012 (atributos de clase mutables, con las anotaciones inmutables de ruff, la
     jerarquía de clases del mismo archivo, dataclasses, attrs y pydantic), RUF059, UP032, UP035,
-    UP008, UP017, UP018, UP030, TRY002, PLC0414, S102, S110 y SIM118.
+    UP008, SIM115, B023, RUF015, RUF022, B008, RUF023, SIM114, PIE808, B006, TRY004 y B009.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

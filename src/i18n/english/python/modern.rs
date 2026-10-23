@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 16] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 24] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -146,6 +146,78 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 16] = [
             "catch the specific exception you expect, or log it with logging.exception",
             "Blindly catching Exception hides programming errors and unexpected failures: the program carries on as if nothing happened.",
             "except Exception: pass becomes except ValueError: pass, or except Exception: logger.exception(\"failed\").",
+        ),
+    ),
+    (
+        PythonRule::TRY002,
+        RuleText::new(
+            "Exception or BaseException is raised directly",
+            "define your own exception, or use a more specific one",
+            "Whoever catches the error can't tell it apart from any other: all they can do is catch the whole Exception.",
+            "raise Exception(\"no funds\") becomes raise InsufficientFunds(\"no funds\").",
+        ),
+    ),
+    (
+        PythonRule::PLC0414,
+        RuleText::new(
+            "An import with an alias equal to the original name",
+            "drop the as",
+            "import x as x says the same as import x; it only makes sense in __init__.py and in stubs, to re-export.",
+            "import os as os becomes import os.",
+        ),
+    ),
+    (
+        PythonRule::S102,
+        RuleText::new(
+            "Use of exec",
+            "avoid exec: solve the problem without running code built at run time",
+            "exec runs any code it gets: if the text comes from outside, it's an open door.",
+            "exec(code) becomes a function or dispatch table that does the same.",
+        ),
+    ),
+    (
+        PythonRule::S110,
+        RuleText::new(
+            "An except that catches everything and only does pass",
+            "log the error, or catch only the exception you expect",
+            "An error swallowed in silence leaves no trace: later nobody knows why the program did something else.",
+            "except Exception: pass becomes except Exception: logger.exception(\"failed\").",
+        ),
+    ),
+    (
+        PythonRule::SIM118,
+        RuleText::new(
+            "A key is looked up in d.keys()",
+            "look it up in the dictionary directly",
+            "key in d does the same as key in d.keys() without creating an intermediate view, and reads better.",
+            "if key in d.keys(): becomes if key in d:.",
+        ),
+    ),
+    (
+        PythonRule::UP017,
+        RuleText::new(
+            "Use of datetime.timezone.utc",
+            "use datetime.UTC",
+            "Since Python 3.11 datetime.UTC is the short alias for the UTC time zone.",
+            "datetime.timezone.utc becomes datetime.UTC.",
+        ),
+    ),
+    (
+        PythonRule::UP018,
+        RuleText::new(
+            "A str, int, float, bool, bytes or complex that wraps a literal of the same type",
+            "write the literal directly",
+            "The call doesn't change the value: it only adds noise and an extra call.",
+            "str(\"hello\") becomes \"hello\", and int() becomes 0.",
+        ),
+    ),
+    (
+        PythonRule::UP030,
+        RuleText::new(
+            "A .format with numbered positions in order",
+            "drop the numbers from the braces",
+            "\"{0} {1}\" says the same as \"{} {}\": the numbers only add something to maintain.",
+            "\"{0} {1}\".format(a, b) becomes \"{} {}\".format(a, b).",
         ),
     ),
 ];

@@ -1,6 +1,6 @@
 use tree_sitter::Node;
 
-use super::handlers::blind_except;
+use super::handlers::{blind_except, is_silenced_exception};
 use super::model::{BindingKind, Resolution, ScopeKind, Site, UNPACKED};
 use super::{Mode, Visitor};
 use crate::lint::python::Report;
@@ -254,6 +254,9 @@ impl<'tree> Targets<'tree> for Visitor<'tree> {
         }
         if let Some(blind) = blind_except(&self.model, self.source, handler) {
             self.reports.push(Report::at(PythonRule::BLE001, blind, ""));
+        }
+        if is_silenced_exception(&self.model, self.source, handler) {
+            self.reports.push(Report::at(PythonRule::S110, handler, ""));
         }
         self.clause_body(handler);
         if let Some((bound_name, previous, id)) = bound {

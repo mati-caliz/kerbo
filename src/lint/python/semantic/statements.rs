@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::effects::useless_expression;
+use super::handlers::vanilla_raise;
 use super::model::{BindingKind, GLOBAL, MODULE_SCOPE, NAME_ERROR, NONLOCAL, ScopeKind, Site};
 use super::qualified::is_builtin_named;
 use super::targets::Store;
@@ -24,6 +25,7 @@ const IF: &str = "if_statement";
 const FOR: &str = "for_statement";
 const WHILE: &str = "while_statement";
 const TRY: &str = "try_statement";
+const RAISE: &str = "raise_statement";
 const WITH: &str = "with_statement";
 const MATCH: &str = "match_statement";
 const DELETE: &str = "delete_statement";
@@ -90,6 +92,12 @@ impl<'tree> Statements<'tree> for Visitor<'tree> {
             NONLOCAL_STATEMENT => self.nonlocal(statement),
             TYPE_ALIAS => self.type_alias(statement),
             COMMENT => {}
+            RAISE => {
+                let raised = vanilla_raise(&self.model, self.source, statement);
+                self.reports
+                    .extend(raised.map(|raised| Report::at(PythonRule::TRY002, raised, "")));
+                self.loads(statement);
+            }
             _ => self.loads(statement),
         }
     }

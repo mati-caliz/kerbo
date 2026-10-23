@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::literals::is_native_literal_call;
 use super::model::{BindingKind, Model, ScopeKind};
 use super::pep::is_pep585_generic;
 use super::qualified::{is_builtin_named, qualified_name};
@@ -27,6 +28,8 @@ const COMPREHENSIONS: [&str; 4] = [
     "generator_expression",
 ];
 const LOCALS: &str = "locals";
+const EXEC: &str = "exec";
+const UTC_ALIAS: &str = "datetime.timezone.utc";
 const ARGUMENT_LIST: &str = "argument_list";
 const DICTIONARY_SPLAT: &str = "dictionary_splat";
 const DICT_BUILTIN: &str = "dict";
@@ -139,7 +142,7 @@ pub trait Expressions<'tree> {
     fn string(&mut self, node: Node<'tree>, mode: Mode);
     fn call(&mut self, call: Node<'tree>, mode: Mode);
     fn type_comparison(&mut self, comparison: Node<'tree>);
-    fn pep585_generic(&mut self, node: Node<'tree>);
+    fn upgradable_reference(&mut self, node: Node<'tree>);
     fn is_type(&self, node: Node<'_>) -> bool;
     fn is_dtype(&self, node: Node<'_>) -> bool;
 }
@@ -154,13 +157,13 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         match node.kind() {
             IDENTIFIER => {
                 self.model.resolve_load(self.text(node), node.start_position());
-                self.pep585_generic(node);
+                self.upgradable_reference(node);
             }
             ATTRIBUTE => {
                 if let Some(object) = node.child_by_field_name(OBJECT_FIELD) {
                     self.expression(object, mode);
                 }
-                self.pep585_generic(node);
+                self.upgradable_reference(node);
             }
             SUBSCRIPT => self.subscript(node, mode),
             GENERIC_TYPE => self.generic_type(node, mode),
@@ -235,6 +238,9 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         let function = call.child_by_field_name(crate::lint::python::ast::FUNCTION_FIELD);
         if let Some(function) = function {
             self.expression(function, mode);
+            if is_builtin_named(&self.model, function, self.source, EXEC) {
+                self.reports.push(Report::at(PythonRule::S102, function, ""));
+            }
             if is_builtin_named(&self.model, function, self.source, LOCALS)
                 && self.model.current().kind == ScopeKind::Function
                 && let Some(scope) = self.model.current_mut()
@@ -255,6 +261,11 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         {
             self.reports.push(Report::at(PythonRule::C405, call, ""));
         }
+        if let Some(function) = function
+            && is_native_literal_call(&self.model, self.source, function, arguments)
+        {
+            self.reports.push(Report::at(PythonRule::UP018, call, ""));
+        }
         if COMPREHENSIONS.contains(&arguments.kind()) {
             self.comprehension(arguments);
             return;
@@ -263,10 +274,15 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         self.typing_call(arguments, callee.as_deref());
     }
 
-    // UP006: `typing.List` y compañía donde alcanza con `list`.
-    fn pep585_generic(&mut self, node: Node<'tree>) {
-        if qualified_name(&self.model, node, self.source).is_some_and(|name| is_pep585_generic(&name)) {
+    // UP006: `typing.List` y compañía donde alcanza con `list`; UP017: `datetime.timezone.utc`.
+    fn upgradable_reference(&mut self, node: Node<'tree>) {
+        let Some(name) = qualified_name(&self.model, node, self.source) else {
+            return;
+        };
+        if is_pep585_generic(&name) {
             self.reports.push(Report::at(PythonRule::UP006, node, ""));
+        } else if name == UTC_ALIAS {
+            self.reports.push(Report::at(PythonRule::UP017, node, ""));
         }
     }
 
