@@ -112,6 +112,10 @@ pub fn statement_ancestors(node: Node<'_>) -> impl Iterator<Item = Node<'_>> {
     std::iter::successors(node.parent(), Node::parent)
 }
 
+pub fn is_keyword(name: &str) -> bool {
+    KEYWORDS.contains(&name)
+}
+
 pub fn is_identifier(name: &str) -> bool {
     let mut characters = name.chars();
     let starts = characters

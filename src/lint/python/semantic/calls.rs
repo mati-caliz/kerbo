@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::decimals::verbose_decimal_constructor;
 use super::format_calls::format_call_report;
 use super::idioms::idiom_reports;
 use super::model::Model;
@@ -63,6 +64,7 @@ pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Rep
     }
     reports.extend(idiom_reports(model, source, call));
     reports.extend(format_call_report(model, source, call));
+    reports.extend(verbose_decimal_constructor(model, source, call));
     reports
 }
 

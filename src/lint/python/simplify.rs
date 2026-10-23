@@ -1,3 +1,5 @@
+mod needless_bool;
+
 use tree_sitter::Node;
 
 use super::Report;
@@ -7,6 +9,7 @@ use super::ast::{
 };
 use super::escapes::text_value;
 use crate::rules::PythonRule;
+use needless_bool::needless_bool;
 
 const IF: &str = "if_statement";
 const ELSE: &str = "else_clause";
@@ -56,22 +59,28 @@ struct SystemNames {
 
 pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     let system = system_names(nodes, source);
-    nodes
+    let is_excluded = |condition: Node<'_>| {
+        mentions_system(condition, source, &system) || is_type_checking(condition, source)
+    };
+    let mut found: Vec<Report> = nodes
         .iter()
-        .filter_map(|node| match node.kind() {
-            IF => collapsible_if(*node, source, &system),
-            WITH => multiple_with(*node, source),
-            FOR | FOR_IN => {
-                let target = node.child_by_field_name(LEFT_FIELD)?;
-                in_dict_keys(target, node.child_by_field_name(RIGHT_FIELD)?, source)
-            }
-            COMPARISON => match named(*node).as_slice() {
-                [left, right] if is_membership(*left, *right, source) => in_dict_keys(*left, *right, source),
-                _ => None,
-            },
+        .filter(|node| node.kind() == IF)
+        .filter_map(|statement| needless_bool(*statement, &is_excluded))
+        .collect();
+    found.extend(nodes.iter().filter_map(|node| match node.kind() {
+        IF => collapsible_if(*node, source, &system),
+        WITH => multiple_with(*node, source),
+        FOR | FOR_IN => {
+            let target = node.child_by_field_name(LEFT_FIELD)?;
+            in_dict_keys(target, node.child_by_field_name(RIGHT_FIELD)?, source)
+        }
+        COMPARISON => match named(*node).as_slice() {
+            [left, right] if is_membership(*left, *right, source) => in_dict_keys(*left, *right, source),
             _ => None,
-        })
-        .collect()
+        },
+        _ => None,
+    }));
+    found
 }
 
 fn statements(block: Option<Node<'_>>) -> Vec<Node<'_>> {

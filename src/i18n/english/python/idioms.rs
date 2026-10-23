@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: modismos de pylint, refurb, flake8-logging y
 // compañía.
-pub const IDIOM_TEXTS: [(PythonRule, RuleText); 14] = [
+pub const IDIOM_TEXTS: [(PythonRule, RuleText); 18] = [
     (
         PythonRule::FURB167,
         RuleText::new(
@@ -128,6 +128,44 @@ pub const IDIOM_TEXTS: [(PythonRule, RuleText); 14] = [
             "write it as an f-string",
             "An f-string puts each value where it is printed, so it reads in one pass and cannot pair a placeholder with the wrong argument.",
             "\"hello {}\".format(name) becomes f\"hello {name}\".",
+        ),
+    ),
+    (
+        PythonRule::N999,
+        RuleText::new(
+            "Module name is not a valid lowercase identifier",
+            "rename the file in lowercase, with underscores and without starting with a digit",
+            "A module whose name is not an identifier cannot be imported with a plain import, and PEP 8 asks for short lowercase names.",
+            "MyModule.py becomes my_module.py.",
+        ),
+    ),
+    (
+        PythonRule::SIM103,
+        RuleText::new(
+            "if that returns True or False instead of returning the condition",
+            "return the condition directly (with bool() or not if needed)",
+            "Returning the condition says the same thing in one line and leaves no branch to read.",
+            "if x > 0:
+    return True
+return False becomes return x > 0.",
+        ),
+    ),
+    (
+        PythonRule::SIM905,
+        RuleText::new(
+            "split() on a literal string instead of writing the list",
+            "write the resulting list",
+            "The list is visible as written, without computing it on every run or guessing where it splits.",
+            "\"a b c\".split() becomes [\"a\", \"b\", \"c\"].",
+        ),
+    ),
+    (
+        PythonRule::FURB157,
+        RuleText::new(
+            "Decimal built from a string that could be a literal",
+            "pass the number directly, or the special value as a string",
+            "Decimal(10) says the same as Decimal(\"10\") without parsing a string, and Decimal(\"nan\") avoids going through a float.",
+            "Decimal(\"10\") becomes Decimal(10).",
         ),
     ),
 ];

@@ -20,6 +20,7 @@ use directives::Directives;
 use model::SourceText;
 use normalize::{ImportBlock, normalize};
 use order::{Ordered, order};
+pub use sections::package_root;
 use sections::{Location, SECTION_ORDER, Section};
 
 const PYTHON_WHITESPACE: [char; 3] = [' ', '\t', '\u{c}'];

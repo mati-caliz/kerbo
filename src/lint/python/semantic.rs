@@ -5,6 +5,7 @@ mod checks;
 mod classes;
 mod comparisons;
 mod conversions;
+mod decimals;
 mod defaults;
 mod definitions;
 mod effects;

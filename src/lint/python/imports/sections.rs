@@ -65,7 +65,7 @@ impl Location {
 }
 
 // `detect_package_root`: la carpeta más alta de la cadena de paquetes que contiene al archivo.
-fn package_root(directory: &Path) -> Option<PathBuf> {
+pub fn package_root(directory: &Path) -> Option<PathBuf> {
     let mut root = None;
     for ancestor in directory.ancestors() {
         if ancestor.as_os_str().is_empty() || !is_package(ancestor) {

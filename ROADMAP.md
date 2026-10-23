@@ -1355,9 +1355,20 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     crudo). Paridad: 1.851 de 1.920, sin avisos de más; lo que falta está en archivos de CPython con
     `lazy import`, en `test_patma.py` y en una carpeta oculta de ansible. Los casos quedaron en
     `fixtures/format_calls.py`. I001 sale del preset `minimal`, con las demás reglas de estilo.
-  - Siguiente: RUF100 (1.437) y la cola
-    de reglas chicas: UP044, UP037, SIM103, SIM905, FURB157, N999, UP034, RUF046, RUF013 y
-    siguientes.
+  - Hechas N999 (nombre de módulo, sólo adentro de un paquete; un `__init__.py` toma el nombre del
+    paquete raíz y en `migrations`/`versions` se permite empezar con un dígito), SIM103 (`if` que
+    devuelve `True`/`False`, con `else`, con el último `elif` y su `else`, o con el `return` que
+    sigue), SIM905 (`split`/`rsplit` sobre un string fijo) y FURB157 (`Decimal("10")` y
+    `Decimal(float("nan"))`). Paridad: 155 de 156, 162 de 162, 162 de 162 y 161 de 161, sin avisos
+    de más; el N999 que falta es un archivo oculto (`.util.py`). Los casos quedaron en
+    `fixtures/statics.py` y N999 en un test con un paquete en disco.
+  - RUF100 (`noqa` sin usar, 1.437) queda para cuando kerbo tenga el conjunto por defecto completo:
+    decidir si un código de un `noqa` se usa pide correr esa regla, y con un conjunto parcial
+    marcaría como sobrante un `# noqa: B904` que en ruff sí silencia algo.
+  - RUF046 (`int()` sobre algo que ya es entero) necesita un port de `ResolvedPythonType`, la
+    inferencia de tipos de expresiones de ruff, y de los tipos de los parámetros de `round`.
+  - Siguiente, la cola de reglas chicas: UP044, UP037, UP034, RUF013, PLR1704, RET501, PLC0205,
+    PLW0120, PLC0206 y siguientes.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

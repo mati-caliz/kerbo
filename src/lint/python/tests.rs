@@ -8,8 +8,9 @@ use crate::language::Language;
 use crate::limits::{Limits, Preset};
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::{PythonRule, RuleId};
+use crate::test_support::TempTree;
 
-const FIXTURES: [(&str, &str, &str); 20] = [
+const FIXTURES: [(&str, &str, &str); 21] = [
     (
         "scopes.py",
         include_str!("fixtures/scopes.py"),
@@ -104,6 +105,11 @@ const FIXTURES: [(&str, &str, &str); 20] = [
         "format_calls.py",
         include_str!("fixtures/format_calls.py"),
         include_str!("fixtures/format_calls.ruff"),
+    ),
+    (
+        "statics.py",
+        include_str!("fixtures/statics.py"),
+        include_str!("fixtures/statics.ruff"),
     ),
     (
         "package/__init__.py",
@@ -314,5 +320,49 @@ fn columns_count_bytes_like_the_rest_of_the_rules() {
     assert_eq!(
         rendered(&found),
         ["1:11 E402", "1:11 I001", "1:18 F401", "1:9 E702"]
+    );
+}
+
+#[test]
+fn module_names_are_checked_only_inside_packages() {
+    let tree = TempTree::new("python-module-names");
+    let files = [
+        "pkg/__init__.py",
+        "pkg/BadName.py",
+        "pkg/good_name.py",
+        "pkg/migrations/__init__.py",
+        "pkg/migrations/0001_initial.py",
+        "pkg/tests/__init__.py",
+        "pkg/tests/0001_initial.py",
+        "loose/Loose.py",
+        "Upper/__init__.py",
+        "Upper/inner/__init__.py",
+    ];
+    for file in files {
+        tree.write(file, "");
+    }
+    let invalid: Vec<String> = files
+        .iter()
+        .filter(|file| {
+            let path = tree.path().join(file);
+            lints_at(
+                &path.to_string_lossy(),
+                "x = 1
+",
+                strict(),
+            )
+            .iter()
+            .any(|finding| finding.kind == LintKind::Python(PythonRule::N999))
+        })
+        .map(|file| (*file).to_owned())
+        .collect();
+    assert_eq!(
+        invalid,
+        [
+            "pkg/BadName.py",
+            "pkg/tests/0001_initial.py",
+            "Upper/__init__.py",
+            "Upper/inner/__init__.py"
+        ]
     );
 }

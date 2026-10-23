@@ -15,6 +15,7 @@ mod fstrings;
 mod imports;
 mod loops;
 mod modern;
+mod module_names;
 mod names;
 mod natural;
 mod negations;
@@ -22,6 +23,7 @@ mod noqa;
 mod rewrites;
 mod semantic;
 mod simplify;
+mod splits;
 mod statements;
 pub mod taint;
 
@@ -134,6 +136,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(dicts::reports(&nodes, source));
     reports.extend(modern::reports(root, &nodes, source));
     reports.extend(simplify::reports(&nodes, source));
+    reports.extend(splits::reports(&nodes, source));
     reports.extend(deprecated::reports(&nodes, source));
     reports.extend(concatenation::reports(&nodes));
     reports.extend(branches::reports(&nodes, source));
@@ -142,6 +145,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(negations::reports(&nodes, source));
     reports.extend(comments::reports(&nodes, source));
     reports.extend(rewrites::reports(&nodes, source));
+    reports.extend(module_names::invalid_module_name(path));
     let suppressions = noqa::Suppressions::new(root, source);
     let mut found: Vec<LintFinding> = reports
         .into_iter()
