@@ -76,7 +76,7 @@ const FIXTURES: [(&str, &str, &str); 7] = [
     ),
 ];
 
-fn strict() -> Limits {
+pub(super) fn strict() -> Limits {
     Preset::Strict.limits(Language::Java, false)
 }
 
@@ -89,7 +89,7 @@ fn unit(source: &str) -> SourceUnit<'_> {
     }
 }
 
-fn lints(source: &str, limits: Limits) -> Vec<LintFinding> {
+pub(super) fn lints(source: &str, limits: Limits) -> Vec<LintFinding> {
     let mut parser = Parser::new();
     parser
         .set_language(&Language::Java.grammar().expect("tiene gramática"))
@@ -102,7 +102,7 @@ fn rendered(findings: &[LintFinding]) -> Vec<String> {
     rendered_where(findings, |rule| LINT_RULES.contains(&rule))
 }
 
-fn rendered_where(findings: &[LintFinding], wanted: fn(RuleId) -> bool) -> Vec<String> {
+pub(super) fn rendered_where(findings: &[LintFinding], wanted: fn(RuleId) -> bool) -> Vec<String> {
     let mut lines: Vec<String> = findings
         .iter()
         .filter(|finding| wanted(finding.kind.rule()))
@@ -120,7 +120,7 @@ fn rendered_where(findings: &[LintFinding], wanted: fn(RuleId) -> bool) -> Vec<S
     lines
 }
 
-fn expected(golden: &str) -> Vec<String> {
+pub(super) fn expected(golden: &str) -> Vec<String> {
     let mut lines: Vec<String> = golden.lines().map(str::to_owned).collect();
     lines.sort();
     lines

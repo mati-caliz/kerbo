@@ -1135,6 +1135,14 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   niegan, con al menos dos: con una sola IntelliJ no lo marca. Con homónimos en clases sin relación
   sólo cuentan las llamadas de receptor resuelto. Contra Qodana: 7 de 8, sin avisos de más; el que
   falta es un `matches` con homónimos sin receptor resuelto.
+- `FieldMayBeFinal` (hecho, 2026-10-22): `field-may-be-final`, por archivo (un campo privado sólo se
+  escribe desde su tipo de nivel superior). Un campo privado, no `final` ni `volatile`, que se
+  inicializa en la declaración y no se vuelve a escribir, o (si no es estático) que cada constructor
+  asigna una vez con una sentencia suelta o delega con `this(...)`, y nadie más lo escribe. No se
+  marca con una anotación que lo escribe por reflexión (`@Autowired`, `@Value`, `@Mock`, `@Spy`,
+  `@InjectMocks`, `@TempDir`...) ni en una clase con `@Data` o `@Setter`. Contra Qodana: 12 de 12,
+  sin avisos de más. `CanBeFinal` (14) marca los mismos campos más los dos `@Spy` de gastronova, que
+  esa inspección global no excluye: no se calca aparte.
 - Lo que sigue en el índice: lo que queda de código muerto (arriba).
 
 ### 10. Go, Python, TypeScript y shell completos

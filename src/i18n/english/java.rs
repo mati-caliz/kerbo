@@ -326,6 +326,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "If everyone writes !isValid(...), the method answers the opposite of the question being asked: every read needs a mental flip. Like IntelliJ's BooleanMethodIsAlwaysInverted.",
         "if (!isValid(signature)) becomes if (isInvalid(signature)).",
     ),
+    RuleText::new(
+        "Private field assigned only once that could be final",
+        "add final",
+        "With final, readers know the value does not change after the object is built, and the compiler guarantees it. Like IntelliJ's FieldMayBeFinal.",
+        "private Instant createdAt = Instant.now(); becomes private final Instant createdAt = Instant.now();.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {
