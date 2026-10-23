@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 16] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 23] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -144,6 +144,69 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 16] = [
             "delete it or assign what was intended",
             "x = x changes nothing: it is almost always a typo on one of the sides.",
             "this.name = this.name; becomes this.name = name;.",
+        ),
+    ),
+    (
+        EslintRule::NoSetterReturn,
+        RuleText::new(
+            "A setter that returns a value",
+            "drop the value from the return",
+            "Whatever a setter returns is always discarded: a return with a value misleads the reader.",
+            "set name(value) { return this._name = value; } becomes set name(value) { this._name = value; }.",
+        ),
+    ),
+    (
+        EslintRule::NoUnsafeOptionalChaining,
+        RuleText::new(
+            "A ?. where undefined throws",
+            "make sure of the value first or keep using ?. along the chain",
+            "If the optional chain short-circuits, the result is undefined and calling, destructuring or iterating it throws a TypeError.",
+            "(object?.method)() becomes object?.method?.();.",
+        ),
+    ),
+    (
+        EslintRule::NoNonNullAssertedOptionalChain,
+        RuleText::new(
+            "A non-null ! on a ?.",
+            "drop the ! or the ?.",
+            "The ?. says there may be no value and the ! claims the opposite: one of them is wrong.",
+            "user?.name! becomes user?.name or user.name.",
+        ),
+    ),
+    (
+        EslintRule::PreserveCaughtError,
+        RuleText::new(
+            "A new error thrown from a catch without the original",
+            "pass the caught error as cause",
+            "Without cause the original stack and message are lost: debugging turns into guessing.",
+            "throw new Error('load failed'); becomes throw new Error('load failed', { cause: error });.",
+        ),
+    ),
+    (
+        EslintRule::NoExtraBooleanCast,
+        RuleText::new(
+            "A !! or Boolean() where the value is already used as a boolean",
+            "drop the conversion",
+            "An if, a ternary or a ! already converts to boolean: the extra conversion is noise.",
+            "if (!!list.length) becomes if (list.length).",
+        ),
+    ),
+    (
+        EslintRule::NoNamespace,
+        RuleText::new(
+            "A TypeScript namespace instead of modules",
+            "use ES import and export",
+            "Namespaces predate ES modules: modern tools do not analyze them well and they are not needed.",
+            "namespace Utils { export function f() {} } becomes export function f() {} in its own file.",
+        ),
+    ),
+    (
+        EslintRule::NoArrayConstructor,
+        RuleText::new(
+            "Array(...) or new Array(...) instead of a literal",
+            "use the [ ] literal",
+            "With a single number it creates an array of that length and with several, one with those elements: the literal has no such trap.",
+            "new Array(1, 2) becomes [1, 2].",
         ),
     ),
 ];

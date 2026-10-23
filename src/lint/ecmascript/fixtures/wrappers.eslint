@@ -28,6 +28,7 @@
 22:26 no-wrapper-object-types
 22:34 no-unsafe-function-type
 23:7 no-unused-vars
+25:1 no-namespace
 25:11 no-unused-vars
 32:10 no-unused-vars
 37:5 no-unused-vars

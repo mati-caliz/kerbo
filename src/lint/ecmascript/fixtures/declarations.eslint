@@ -9,8 +9,11 @@
 16:5 prefer-const
 19:6 no-unused-vars
 24:6 no-unused-vars
+32:1 no-namespace
 32:11 no-unused-vars
+35:1 no-namespace
 36:9 no-unused-vars
+40:1 no-namespace
 40:19 no-unused-vars
 56:68 no-unused-vars
 59:12 no-unused-vars

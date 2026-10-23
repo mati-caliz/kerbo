@@ -27,6 +27,7 @@
 39:34 no-explicit-any
 44:16 no-explicit-any
 45:5 no-non-null-assertion
+49:1 no-namespace
 49:11 no-unused-vars
 56:21 no-non-null-assertion
 57:13 no-non-null-assertion

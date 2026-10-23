@@ -1,6 +1,8 @@
 1:18 no-unused-vars
 2:15 no-unused-vars
 3:15 no-unused-vars
+4:1 no-namespace
 4:19 no-unused-vars
+5:3 no-namespace
 16:9 no-unused-vars
 17:15 no-unused-vars

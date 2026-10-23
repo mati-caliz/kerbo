@@ -1,10 +1,12 @@
 use tree_sitter::Node;
 
 use super::nodes::{
-    ASSIGNMENT, COMMENT, IDENTIFIER, LEFT_FIELD, NAME_FIELD, PARENTHESIZED_TYPE, RIGHT_FIELD, THIS,
-    VALUE_FIELD, VARIABLE_DECLARATOR, enclosed_children, first_named_child, without_parentheses,
+    ARGUMENTS, ARGUMENTS_FIELD, ASSIGNMENT, CALL, COMMENT, FUNCTION_FIELD, IDENTIFIER, LEFT_FIELD,
+    NAME_FIELD, PARENTHESIZED_TYPE, RIGHT_FIELD, STRING, THIS, VALUE_FIELD, VARIABLE_DECLARATOR,
+    enclosed_children, first_named_child, text, without_parentheses,
 };
-use super::{Context, report};
+use super::{Context, report, report_with_fix};
+use crate::fix::Fix;
 use crate::lint::LintFinding;
 use crate::rules::EslintRule;
 use crate::syntax::named_children;
@@ -18,6 +20,13 @@ const OBJECT_TYPE: &str = "object_type";
 const INTERSECTION_TYPE: &str = "intersection_type";
 const BODY_FIELD: &str = "body";
 const SINGLE_EXTENDED: usize = 1;
+const NAMESPACES: &[&str] = &["internal_module", "module"];
+const AMBIENT: &str = "ambient_declaration";
+const NEW: &str = "new_expression";
+const CONSTRUCTOR_FIELD: &str = "constructor";
+const TYPE_ARGUMENTS_FIELD: &str = "type_arguments";
+const ARRAY: &str = "Array";
+const SINGLE_ARGUMENT: usize = 1;
 const OPERAND_FIELDS: &[(&str, &str)] = &[
     ("binary_expression", "right"),
     ("unary_expression", "argument"),
@@ -123,4 +132,72 @@ fn is_in_intersection(literal: Node<'_>) -> bool {
         parent = current.parent();
     }
     parent.is_some_and(|parent| parent.kind() == INTERSECTION_TYPE)
+}
+
+// `no-namespace`: un `namespace` o `module` con nombre en vez de módulos de ES (salvo en `.d.ts`).
+pub fn namespaces(context: &Context<'_, '_>) -> Vec<LintFinding> {
+    if context.declaration_file {
+        return Vec::new();
+    }
+    context
+        .of_kind(NAMESPACES)
+        .filter(|namespace| {
+            namespace
+                .child_by_field_name(NAME_FIELD)
+                .is_some_and(|name| name.kind() != STRING)
+        })
+        .map(|namespace| {
+            let start = namespace
+                .parent()
+                .filter(|parent| parent.kind() == AMBIENT)
+                .unwrap_or(namespace);
+            report(EslintRule::NoNamespace, start, "")
+        })
+        .collect()
+}
+
+// `no-array-constructor`: `Array(a, b)` o `new Array()` en vez de un literal.
+pub fn array_constructors(context: &Context<'_, '_>) -> Vec<LintFinding> {
+    context
+        .of_kind(&[CALL, NEW])
+        .filter(|call| is_array_constructor(*call, context))
+        .map(|call| {
+            let fix = Fix::replace(
+                call,
+                &format!("[{}]", argument_text(call, context)),
+                context.source,
+            );
+            report_with_fix(EslintRule::NoArrayConstructor, call, ARRAY, fix)
+        })
+        .collect()
+}
+
+fn is_array_constructor(call: Node<'_>, context: &Context<'_, '_>) -> bool {
+    let callee_field = if call.kind() == NEW {
+        CONSTRUCTOR_FIELD
+    } else {
+        FUNCTION_FIELD
+    };
+    let is_array = call
+        .child_by_field_name(callee_field)
+        .map(without_parentheses)
+        .is_some_and(|callee| callee.kind() == IDENTIFIER && context.text(callee) == ARRAY);
+    let arguments = call.child_by_field_name(ARGUMENTS_FIELD);
+    let count = arguments.map_or(0, |arguments| {
+        named_children(arguments)
+            .into_iter()
+            .filter(|child| child.kind() != COMMENT)
+            .count()
+    });
+    is_array
+        && arguments.is_none_or(|arguments| arguments.kind() == ARGUMENTS)
+        && count != SINGLE_ARGUMENT
+        && call.child_by_field_name(TYPE_ARGUMENTS_FIELD).is_none()
+}
+
+fn argument_text<'source>(call: Node<'_>, context: &Context<'_, 'source>) -> &'source str {
+    call.child_by_field_name(ARGUMENTS_FIELD)
+        .map(|arguments| text(arguments, context.source))
+        .and_then(|text| text.strip_prefix('(')?.strip_suffix(')'))
+        .unwrap_or_default()
 }

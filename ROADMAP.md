@@ -1370,12 +1370,25 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   en express, zod, react, vscode y next.js: 4 de 4, 21 de 21, 8 de 8, 14 de 15, 10 de 10, 5 de 5,
   8 de 8, 4 de 4, 4 de 4 y 3 de 3, sin avisos de más; el que falta está en un test de Copilot que
   tree-sitter no parsea. Los casos quedaron en `fixtures/checks.js`.
+- `no-setter-return`, `no-unsafe-optional-chaining`, `no-non-null-asserted-optional-chain`,
+  `preserve-caught-error`, `no-extra-boolean-cast`, `no-namespace` y `no-array-constructor`
+  (hecho, 2026-10-23), con las opciones de fábrica. Un `ChainExpression` de ESTree se reconoce en
+  tree-sitter como un acceso o una llamada con `?.` en su cadena que no sigue encadenado sin
+  paréntesis (`src/lint/ecmascript/optional_chains.rs`). `no-setter-return` mira también los
+  descriptores de `Object.defineProperty` y compañía, y se apaga en TypeScript. `no-array-constructor`
+  trae el arreglo de typescript-eslint (el literal con los mismos argumentos); `no-extra-boolean-cast`
+  todavía no, porque el de ESLint decide los paréntesis por precedencia. Paridad en express, zod,
+  react, vscode y next.js: 23 de 23, 24 de 25, 1 de 1, 3 de 3, 4 de 4 y 64 de 66, sin avisos de
+  más (no-array-constructor no aparece); los que faltan están en archivos de next.js que tree-sitter
+  no parsea. Los casos quedaron en `fixtures/errors.js` y `fixtures/namespaces.ts`.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
   - `no-useless-assignment` (1.778), `no-fallthrough` (700), `no-unreachable` (104) y
     `no-unassigned-vars` (59): piden el grafo de control de ESLint (`code-path-analysis`); armarlo
     sobre tree-sitter es el paso siguiente.
-  - `no-misleading-character-class` (290), `no-control-regex` (138), `preserve-caught-error` (92),
-    `getter-return` (43), `no-extra-boolean-cast` (38) y el resto con menos de 30.
+  - `no-misleading-character-class` (290), `no-control-regex` (138), `getter-return` (43),
+    `no-loss-of-precision` (14), `no-irregular-whitespace` (10),
+    `no-unused-private-class-members` (10), `no-this-before-super` (9), `constructor-super` (7),
+    `no-unexpected-multiline` (2) y las que no aparecieron en el corpus.
   - `no-undef`: pide las variables globales de cada entorno (navegador, Node, Jest).
   - `no-useless-escape` no mira las expresiones regulares con el flag `v`.
   - Los `.js` con argumentos de tipo en llamadas y los huecos de la gramática de arriba.

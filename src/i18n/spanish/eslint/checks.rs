@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 16] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 23] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -144,6 +144,69 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 16] = [
             "borrala o asigná lo que correspondía",
             "x = x no cambia nada: casi siempre es un error de tipeo en uno de los dos lados.",
             "this.nombre = this.nombre; se vuelve this.nombre = nombre;.",
+        ),
+    ),
+    (
+        EslintRule::NoSetterReturn,
+        RuleText::new(
+            "Un setter que devuelve un valor",
+            "sacá el valor del return",
+            "Lo que devuelve un setter se descarta siempre: el return con valor engaña a quien lee.",
+            "set nombre(valor) { return this._nombre = valor; } se vuelve set nombre(valor) { this._nombre = valor; }.",
+        ),
+    ),
+    (
+        EslintRule::NoUnsafeOptionalChaining,
+        RuleText::new(
+            "Un ?. en un lugar donde undefined tira un error",
+            "asegurá el valor antes o usá ?. también en el resto de la cadena",
+            "Si la cadena opcional corta, el resultado es undefined y llamarlo, desestructurarlo o iterarlo tira un TypeError.",
+            "(objeto?.metodo)() se vuelve objeto?.metodo?.();.",
+        ),
+    ),
+    (
+        EslintRule::NoNonNullAssertedOptionalChain,
+        RuleText::new(
+            "Un ! de no nulo sobre un ?.",
+            "sacá el ! o el ?.",
+            "El ?. dice que puede no haber valor y el ! afirma lo contrario: una de las dos cosas sobra.",
+            "usuario?.nombre! se vuelve usuario?.nombre o usuario.nombre.",
+        ),
+    ),
+    (
+        EslintRule::PreserveCaughtError,
+        RuleText::new(
+            "Un error nuevo tirado desde un catch sin el original",
+            "pasá el error atrapado en cause",
+            "Sin cause se pierde la pila y el mensaje del error original: depurar se vuelve adivinar.",
+            "throw new Error('falló la carga'); se vuelve throw new Error('falló la carga', { cause: error });.",
+        ),
+    ),
+    (
+        EslintRule::NoExtraBooleanCast,
+        RuleText::new(
+            "Un !! o Boolean() donde el valor ya se usa como booleano",
+            "sacá la conversión",
+            "Un if, un ternario o un ! ya convierten a booleano: la conversión extra es ruido.",
+            "if (!!lista.length) se vuelve if (lista.length).",
+        ),
+    ),
+    (
+        EslintRule::NoNamespace,
+        RuleText::new(
+            "Un namespace de TypeScript en vez de módulos",
+            "usá import y export de ES",
+            "Los namespaces son anteriores a los módulos de ES: las herramientas modernas no los analizan bien y no hacen falta.",
+            "namespace Utilidades { export function f() {} } se vuelve export function f() {} en su propio archivo.",
+        ),
+    ),
+    (
+        EslintRule::NoArrayConstructor,
+        RuleText::new(
+            "Array(...) o new Array(...) en vez de un literal",
+            "usá el literal [ ]",
+            "Con un solo número crea un arreglo de ese largo y con varios, uno con esos elementos: el literal no tiene esa trampa.",
+            "new Array(1, 2) se vuelve [1, 2].",
         ),
     ),
 ];

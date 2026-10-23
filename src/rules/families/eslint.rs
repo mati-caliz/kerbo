@@ -46,6 +46,13 @@ rule_family!(EslintRule {
     UseIsnan => "use-isnan",
     NoUnusedLabels => "no-unused-labels",
     NoSelfAssign => "no-self-assign",
+    NoSetterReturn => "no-setter-return",
+    NoUnsafeOptionalChaining => "no-unsafe-optional-chaining",
+    NoNonNullAssertedOptionalChain => "no-non-null-asserted-optional-chain",
+    PreserveCaughtError => "preserve-caught-error",
+    NoExtraBooleanCast => "no-extra-boolean-cast",
+    NoNamespace => "no-namespace",
+    NoArrayConstructor => "no-array-constructor",
 });
 
 pub const fn wrap_eslint<'slots>(slots: &'slots mut [RuleId], rules: &[EslintRule]) -> &'slots mut [RuleId] {

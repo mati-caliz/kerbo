@@ -1,3 +1,4 @@
+2:1 no-namespace
 5:5 no-unassigned-vars
 7:6 no-unused-vars
 10:1 no-unused-vars

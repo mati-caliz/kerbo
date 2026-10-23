@@ -9,6 +9,7 @@ const CHECKED_BY_TYPESCRIPT: &[EslintRule] = &[
     EslintRule::NoConstAssign,
     EslintRule::NoClassAssign,
     EslintRule::NoImportAssign,
+    EslintRule::NoSetterReturn,
 ];
 const STRICT_ONLY: &[EslintRule] = &[EslintRule::NoNonNullAssertion];
 const SUGGESTIONS: &[EslintRule] = &[
@@ -26,6 +27,9 @@ const SUGGESTIONS: &[EslintRule] = &[
     EslintRule::TripleSlashReference,
     EslintRule::NoUnusedLabels,
     EslintRule::NoUselessCatch,
+    EslintRule::NoExtraBooleanCast,
+    EslintRule::NoNamespace,
+    EslintRule::NoArrayConstructor,
 ];
 
 pub fn relaxed_by(preset: Preset, language: Language) -> Vec<RuleId> {

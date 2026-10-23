@@ -51,10 +51,14 @@
 28:20 no-empty
 29:19 no-empty
 30:5 no-constant-condition
+30:5 no-extra-boolean-cast
 30:17 no-empty
 31:5 no-constant-condition
+31:5 no-extra-boolean-cast
 31:16 no-empty
+32:5 no-extra-boolean-cast
 32:19 no-empty
+33:5 no-extra-boolean-cast
 33:21 no-empty
 34:5 no-constant-condition
 34:16 no-empty

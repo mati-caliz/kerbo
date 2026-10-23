@@ -1,12 +1,15 @@
+mod accessors;
 mod arrays;
 mod assignments;
 mod blocks;
+mod casts;
 mod comments;
 mod comparisons;
 mod constant_binary;
 mod constant_condition;
 mod constants;
 mod duplicates;
+mod errors;
 mod escapes;
 mod expressions;
 mod finally;
@@ -14,6 +17,7 @@ mod members;
 mod modules;
 mod no_var;
 mod nodes;
+mod optional_chains;
 mod prefer_const;
 mod presets;
 mod redeclare;
@@ -110,6 +114,19 @@ const CHECKS: &[(EslintRule, Check)] = &[
     (EslintRule::UseIsnan, comparisons::nan_comparisons),
     (EslintRule::NoUnusedLabels, blocks::unused_labels),
     (EslintRule::NoSelfAssign, self_assign::self_assignments),
+    (EslintRule::NoSetterReturn, accessors::setter_returns),
+    (
+        EslintRule::NoUnsafeOptionalChaining,
+        optional_chains::unsafe_optional_chains,
+    ),
+    (
+        EslintRule::NoNonNullAssertedOptionalChain,
+        optional_chains::non_null_optional_chains,
+    ),
+    (EslintRule::PreserveCaughtError, errors::lost_caught_errors),
+    (EslintRule::NoExtraBooleanCast, casts::extra_boolean_casts),
+    (EslintRule::NoNamespace, typescript::namespaces),
+    (EslintRule::NoArrayConstructor, typescript::array_constructors),
 ];
 
 #[derive(Debug, Clone, Copy)]
