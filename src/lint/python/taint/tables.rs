@@ -125,19 +125,6 @@ const PROGRAM_FUNCTIONS: &[&str] = &[
     "asyncio.create_subprocess_exec",
     "asyncio.subprocess.create_subprocess_exec",
 ];
-const SHELLS: &[&str] = &[
-    "sh",
-    "bash",
-    "zsh",
-    "dash",
-    "ksh",
-    "cmd",
-    "cmd.exe",
-    "powershell",
-    "pwsh",
-];
-const SHELL_COMMAND_FLAGS: &[&str] = &["-c", "/c", "-Command"];
-const PATH_SEPARATORS: &[char] = &['/', '\\'];
 // Los métodos de un `Query` de SQLAlchemy que reciben SQL en texto.
 const QUERY_METHODS: &[&str] = &[
     "distinct",
@@ -164,15 +151,6 @@ pub fn platform_constant(qualified: &str) -> Option<&'static str> {
 
 pub fn runs_program(qualified: &str) -> bool {
     PROGRAM_FUNCTIONS.contains(&qualified)
-}
-
-pub fn is_shell(program: &str) -> bool {
-    let name = program.rsplit(PATH_SEPARATORS).next().unwrap_or(program);
-    SHELLS.contains(&name)
-}
-
-pub fn is_shell_command_flag(written: &str) -> bool {
-    SHELL_COMMAND_FLAGS.contains(&written)
 }
 
 pub fn creates_query(method: &str) -> bool {
@@ -395,3 +373,5 @@ pub fn escapes(qualified: &str) -> Option<SinkKind> {
         None
     }
 }
+
+pub use crate::lint::taint::commands::{is_shell, is_shell_command_flag};

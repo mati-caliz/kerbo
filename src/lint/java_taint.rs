@@ -17,6 +17,7 @@ use statements::Interpreter;
 
 const PARAMETERS_FIELD: &str = "parameters";
 const BODY_FIELD: &str = "body";
+const TYPE_FIELD: &str = "type";
 const FORMAL_PARAMETER: &str = "formal_parameter";
 const SPREAD_PARAMETER: &str = "spread_parameter";
 const VARIABLE_DECLARATOR: &str = "variable_declarator";
@@ -41,7 +42,12 @@ pub fn taint_method(
         let Some(parameter_name) = parameter_name(*parameter) else {
             continue;
         };
-        let value = if tables::is_source_parameter(&annotation_names(*parameter, source)) {
+        let clean_type = parameter
+            .child_by_field_name(TYPE_FIELD)
+            .is_some_and(|typ| tables::is_clean_type(text(typ, source)));
+        let value = if clean_type {
+            Value::clean()
+        } else if tables::is_source_parameter(&annotation_names(*parameter, source)) {
             Value::Data(Flow::of(Atom::Source))
         } else {
             Value::Data(Flow::of(Atom::Parameter(position)))

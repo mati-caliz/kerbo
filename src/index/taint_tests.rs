@@ -270,3 +270,29 @@ fn lambdas_and_anonymous_classes_see_what_they_capture() {
         ]
     );
 }
+
+const SAFE: &str = r#"package app;
+
+@RestController
+class Tools {
+    private final JdbcTemplate jdbcTemplate;
+
+    void ping(@RequestParam String host) throws Exception {
+        Runtime.getRuntime().exec(new String[] {"/usr/bin/ping", host});
+        Runtime.getRuntime().exec(new String[] {"sh", "-c", "ping " + host});
+    }
+
+    List<Object> byId(@RequestParam Integer id, @RequestParam boolean active) {
+        return jdbcTemplate.queryForList("SELECT * FROM t WHERE id = " + id + " AND a = " + active);
+    }
+
+    void image(@RequestParam String image) {
+        new File("static/", FilenameUtils.getName(image));
+    }
+}
+"#;
+
+#[test]
+fn numbers_a_file_name_and_a_fixed_program_are_not_injections() {
+    assert_eq!(tainted(&[("Tools", SAFE)]), ["Tools:9 command-injection exec"]);
+}

@@ -746,6 +746,18 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     escritura de lo que devuelve `response.getWriter()` o `getOutputStream()`, encadenado o en una
     variable. Contra el Benchmark: 246 de 246 y ningún falso positivo de 209; Semgrep, 82 % con
     52 % de falsos positivos (+30 %). En los repos reales, ningún aviso.
+- Java contra los tests de las reglas de taint de Semgrep (2026-10-22): la primera medición daba 6
+  avisos "de más". Tres eran falsos positivos y se corrigieron: un parámetro del pedido numérico,
+  booleano, `UUID` o de fecha no puede llevar texto (`@RequestBody Integer`), `FilenameUtils.getName`
+  y `getBaseName` limpian una ruta, y `exec(new String[] {"programa", x})` sin shell sólo cuenta si
+  el usuario elige el programa (como en Python y JS; la lista de shells pasa a `src/lint/taint/
+  commands.rs`, compartida; los arreglos `new T[] {...}` y `{...}` se siguen por posición). Los otros
+  tres son desacuerdos: dos `exec(args, entorno)` con el entorno del usuario, que el propio test llama
+  "vulnerable, pero otro tema", y un literal con un escape inválido (`\l`) que no compila. Detecta 6
+  de 9 comandos, 2 de 2 rutas, 7 de 83 SQL y 2 de 13 XSS: lo que falta son las reglas `audit` de
+  Semgrep (`spring-sqli` toma cualquier parámetro de un `@RequestMapping` como fuente, y
+  `formatted-sql-string` cualquier texto armado con `format`). El Benchmark sigue en 100 % sin
+  falsos positivos y en los servicios y librerías no hay avisos.
 - Pendientes de contaminación:
   - Un `PrintWriter` que llega como parámetro o campo no se reconoce como la respuesta; tampoco las
     plantillas (Thymeleaf con `th:utext`, JSP con `<%= %>`) ni `@ResponseBody` que devuelve HTML.

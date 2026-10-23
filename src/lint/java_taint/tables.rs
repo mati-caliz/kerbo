@@ -318,6 +318,48 @@ pub fn factory_type(owner: &str, method: &str) -> Option<&'static str> {
     }
 }
 
+// Un parámetro de estos tipos no puede llevar texto armado por el usuario, aunque venga del pedido.
+const CLEAN_PARAMETER_TYPES: &[&str] = &[
+    "int",
+    "long",
+    "short",
+    "byte",
+    "double",
+    "float",
+    "boolean",
+    "char",
+    "Integer",
+    "Long",
+    "Short",
+    "Byte",
+    "Double",
+    "Float",
+    "Boolean",
+    "Character",
+    "UUID",
+    "BigDecimal",
+    "BigInteger",
+    "LocalDate",
+    "LocalDateTime",
+    "LocalTime",
+    "Instant",
+    "OffsetDateTime",
+    "ZonedDateTime",
+    "Duration",
+];
+// Lo que deja sólo el nombre del archivo, sin carpetas: limpia una ruta.
+const QUALIFIER_SEPARATOR: char = '.';
+const PATH_CLEANERS: &[(&str, &str)] = &[("FilenameUtils", "getName"), ("FilenameUtils", "getBaseName")];
+
+pub fn is_clean_type(written: &str) -> bool {
+    let simple = written.rsplit(QUALIFIER_SEPARATOR).next().unwrap_or(written);
+    CLEAN_PARAMETER_TYPES.contains(&simple)
+}
+
+pub fn cleans_path(owner: Option<&str>, method: &str) -> bool {
+    owner.is_some_and(|written| PATH_CLEANERS.contains(&(written, method)))
+}
+
 pub fn escapes_html(method: &str) -> bool {
     HTML_ESCAPES.contains(&method)
 }

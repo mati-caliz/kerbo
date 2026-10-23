@@ -8,8 +8,9 @@ use super::statements::{BODY_FIELD, Interpreter, SWITCH, SWITCH_LABEL};
 use super::tables;
 use crate::lint::java::NAME_FIELD;
 use crate::lint::java_receivers::{Receiver, simple_type_name};
+use crate::lint::taint::commands::is_shell;
 use crate::lint::taint::folding::{fold_binary, fold_text_method, fold_unary, truth};
-use crate::lint::taint::{Atom, Flow, Literal, SinkReceiver, State, TaintCall, Value};
+use crate::lint::taint::{Atom, Flow, Literal, SinkKind, SinkReceiver, State, TaintCall, Value};
 use crate::syntax::named_children;
 
 const IDENTIFIER: &str = "identifier";
@@ -48,7 +49,39 @@ const CONSEQUENCE_FIELD: &str = "consequence";
 const ALTERNATIVE_FIELD: &str = "alternative";
 const CLASS_BODY: &str = "class_body";
 const PLUS: &str = "+";
+const ARRAY_INITIALIZER: &str = "array_initializer";
+const ARRAY_CREATION: &str = "array_creation_expression";
+const EXEC: &str = "exec";
 const ASSIGN: &str = "=";
+
+// `exec(new String[] {"programa", x})`: sin shell, el usuario sólo elige un argumento, no lo que se
+// corre; cuenta sólo el programa. Con `sh -c` o un programa variable, cuenta todo.
+fn program_without_shell(method: &str, arguments: &[Value]) -> Option<Flow> {
+    if method != EXEC {
+        return None;
+    }
+    let Some(Value::List(items)) = arguments.first() else {
+        return None;
+    };
+    let program = items.first()?;
+    match program.literal() {
+        Some(Literal::Text(written)) if !is_shell(written) => Some(program.flow()),
+        _ => None,
+    }
+}
+
+// Lo que devuelve una llamada que limpia: un número o un booleano, un nombre de archivo sin carpetas
+// (sigue sirviendo para lo demás) o un texto escapado para HTML.
+fn cleaned_result(owner: Option<&str>, method: &str, arguments: &[Flow]) -> Option<Value> {
+    if tables::gives_clean_result(owner, method) {
+        return Some(Value::clean());
+    }
+    let carried = || arguments.iter().fold(Flow::default(), Flow::union);
+    if tables::cleans_path(owner, method) {
+        return Some(Value::Data(carried().without(SinkKind::Path.bit())));
+    }
+    tables::escapes_html(method).then(|| Value::Data(carried().escaped_for_html()))
+}
 
 impl Interpreter<'_, '_> {
     pub(super) fn expression(&mut self, node: Node<'_>, state: &mut State) -> Value {
@@ -100,6 +133,16 @@ impl Interpreter<'_, '_> {
                 Value::Data(array.flow())
             }
             SWITCH => self.switch_value(node, state),
+            ARRAY_INITIALIZER => Value::List(
+                named_children(node)
+                    .into_iter()
+                    .filter(|item| !COMMENTS.contains(&item.kind()))
+                    .map(|item| self.expression(item, state))
+                    .collect(),
+            ),
+            ARRAY_CREATION => {
+                field(VALUE_FIELD).map_or_else(Value::clean, |items| self.expression(items, state))
+            }
             LAMBDA => lambda(self, node, state, &Value::clean()),
             kind if CLEAN_EXPRESSIONS.contains(&kind) => Value::clean(),
             _ => Value::Data(self.all_children(node, state)),
@@ -221,7 +264,12 @@ impl Interpreter<'_, '_> {
             return Value::Data(Flow::of(Atom::Source));
         }
         let receiver_flow = receiver.as_ref().map(Value::flow).unwrap_or_default();
-        let argument_flows: Vec<Flow> = arguments.iter().map(Value::flow).collect();
+        let mut argument_flows: Vec<Flow> = arguments.iter().map(Value::flow).collect();
+        if let Some(program) = program_without_shell(name, &arguments)
+            && let Some(first) = argument_flows.first_mut()
+        {
+            *first = program;
+        }
         if tables::might_be_method_sink(name)
             && let Some(sink_receiver) = object.and_then(|inner| sink_receiver(self, inner))
         {
@@ -238,12 +286,8 @@ impl Interpreter<'_, '_> {
         let written_owner = object
             .filter(|inner| inner.kind() == IDENTIFIER)
             .map(|inner| self.text(inner));
-        if tables::gives_clean_result(written_owner, name) {
-            return Value::clean();
-        }
-        if tables::escapes_html(name) {
-            let carried = argument_flows.iter().fold(Flow::default(), Flow::union);
-            return Value::Data(carried.escaped_for_html());
+        if let Some(cleaned) = cleaned_result(written_owner, name, &argument_flows) {
+            return cleaned;
         }
         let call_receiver = match object {
             Some(inner) if inner.kind() == CREATION => inner

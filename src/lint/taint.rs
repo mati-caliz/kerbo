@@ -1,3 +1,4 @@
+pub mod commands;
 pub mod folding;
 pub mod responses;
 mod values;
