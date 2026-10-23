@@ -37,6 +37,7 @@ const LEFT_FIELD: &str = "left";
 const LOCAL_PREFIX: &str = "@";
 const QUALIFIER_SEPARATOR: &str = ".";
 const ANONYMOUS_PREFIX: &str = "<anónima>:";
+const MODULE_NAME: &str = "<módulo>";
 
 // Lo que cada función del archivo hace con los datos, para cruzarlo en el índice. Las anónimas (el
 // `(req, res) => { ... }` de una ruta de Express) también, con su línea como nombre.
@@ -53,7 +54,28 @@ pub fn ecmascript_taints(root: Node<'_>, source: &[u8]) -> Vec<TaintMethod> {
         .iter()
         .filter(|node| FUNCTIONS.contains(&node.kind()))
         .filter_map(|function| summary(*function, source, &imports, &locals))
+        .chain(std::iter::once(module_summary(root, source, &imports, &locals)))
         .collect()
+}
+
+// Lo que corre al cargar el archivo, fuera de toda función: un script del navegador, o las rutas que
+// se registran con lo que ven las variables del módulo.
+fn module_summary(
+    root: Node<'_>,
+    source: &[u8],
+    imports: &Imports,
+    locals: &HashMap<String, String>,
+) -> TaintMethod {
+    let mut interpreter = Interpreter::new(source, imports, locals);
+    interpreter.run_module(root);
+    TaintMethod {
+        name: MODULE_NAME.to_owned(),
+        owner: String::new(),
+        arity: 0,
+        returns: Flow::default(),
+        calls: interpreter.calls,
+        sinks: interpreter.sinks,
+    }
 }
 
 fn text<'source>(node: Node<'_>, source: &'source [u8]) -> &'source str {

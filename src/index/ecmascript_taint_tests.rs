@@ -260,6 +260,25 @@ fn callbacks_see_what_the_enclosing_function_sees() {
     );
 }
 
+const SCRIPT: &str = r"const fragment = location.hash;
+document.write(fragment);
+export const title = 'fijo';
+document.title = title;
+if (fragment) {
+  document.body.innerHTML = '<p>' + fragment + '</p>';
+}
+";
+
+#[test]
+fn code_outside_functions_is_followed_too() {
+    let script = taints_of(SCRIPT);
+    let modules = [ScriptModule {
+        path: "src/page.js",
+        taints: &script,
+    }];
+    assert_eq!(found(&modules), ["2 xss write", "6 xss document.body.innerHTML"]);
+}
+
 #[test]
 fn module_names_drop_extensions_and_index() {
     assert_eq!(module_name("src/helpers.js"), "src/helpers");

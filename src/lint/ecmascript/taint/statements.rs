@@ -11,6 +11,8 @@ use crate::lint::taint::{Flow, SinkKind, SinkReceiver, State, TaintCall, TaintSi
 use crate::syntax::named_children;
 
 const BLOCK: &str = "statement_block";
+const EXPORT: &str = "export_statement";
+const DECLARATION_FIELD: &str = "declaration";
 const DANGEROUS_HTML: &str = "dangerouslySetInnerHTML";
 const RETURN_SUBJECT: &str = "return";
 const EXPRESSION_STATEMENT: &str = "expression_statement";
@@ -89,6 +91,11 @@ impl<'source, 'context> Interpreter<'source, 'context> {
 
     // Una función de flecha con una expresión como cuerpo devuelve esa expresión. Si la función
     // declara que la respuesta no es HTML, sus escrituras no son un XSS.
+    pub fn run_module(&mut self, root: Node<'_>) {
+        self.sequence(root, State::new());
+        self.drop_html_sinks_from(0);
+    }
+
     pub fn run(&mut self, body: Node<'_>, state: State) {
         self.walk_body(body, state);
         self.drop_html_sinks_from(0);
@@ -173,6 +180,10 @@ impl<'source, 'context> Interpreter<'source, 'context> {
                 }
                 Some(state)
             }
+            EXPORT => match node.child_by_field_name(DECLARATION_FIELD) {
+                Some(declaration) => self.statement(declaration, state),
+                None => Some(state),
+            },
             IF => self.if_statement(node, state),
             kind if LOOPS.contains(&kind) => self.repeat(node, state),
             TRY => self.try_statement(node, state),

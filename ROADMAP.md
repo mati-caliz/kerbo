@@ -802,8 +802,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     halo, portfolio, bender, finarg, propmetrics, soma y tradeagent): ningún aviso. La primera
     versión daba 13, todos falsos: `reply.send` de Fastify (texto plano o JSON), respuestas que
     declaran JSON con `writeHead` y un `escapeHtml` propio.
+- Código de nivel de módulo en JavaScript y TypeScript (hecho, 2026-10-22): lo que corre al cargar
+  el archivo (un script del navegador, `export const ...`, las rutas que se registran fuera de una
+  función) se recorre como una función más, `<módulo>`, así un `document.write(location.hash)`
+  suelto avisa. En los tests de Semgrep, lo mismo; en tus proyectos, ningún aviso.
 - Pendientes de contaminación en JavaScript y TypeScript:
-  - El código de nivel de módulo no se recorre.
   - Sin tipos, las conexiones y los objetos del pedido se reconocen por el nombre de la variable;
     con el chequeo de tipos de TypeScript se podría mirar el tipo.
 - Plantillas en archivos, Python y JavaScript (hecho, 2026-10-22; estaba a medias en un stash y se
