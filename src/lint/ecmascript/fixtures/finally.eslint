@@ -8,6 +8,7 @@
 46:7 no-unsafe-finally
 63:11 no-unsafe-finally
 69:10 no-unused-vars
+74:7 no-unused-labels
 74:25 no-unused-vars
 75:9 no-unsafe-finally
 80:18 no-unused-vars

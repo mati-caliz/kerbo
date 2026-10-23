@@ -1362,6 +1362,14 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   `router.ts` de next.js) y 12 de una salida de tests de next.js que redeclara cuatro veces el mismo
   import como `const` (código inválido). Los casos quedaron en `fixtures/assignments.js` y
   `fixtures/declared.ts`.
+- `valid-typeof`, `no-empty-pattern`, `no-sparse-arrays`, `require-yield`, `no-useless-catch`,
+  `no-compare-neg-zero`, `no-async-promise-executor`, `use-isnan`, `no-unused-labels` y
+  `no-self-assign` (hecho, 2026-10-23), con las opciones de fábrica (`use-isnan` mira los `switch`
+  y no `indexOf`; `no-self-assign` mira también las propiedades, con el `isSameReference` y el
+  `getStaticPropertyName` de ESLint en `src/lint/ecmascript/self_assign.rs` y `members.rs`). Paridad
+  en express, zod, react, vscode y next.js: 4 de 4, 21 de 21, 8 de 8, 14 de 15, 10 de 10, 5 de 5,
+  8 de 8, 4 de 4, 4 de 4 y 3 de 3, sin avisos de más; el que falta está en un test de Copilot que
+  tree-sitter no parsea. Los casos quedaron en `fixtures/checks.js`.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
   - `no-useless-assignment` (1.778), `no-fallthrough` (700), `no-unreachable` (104) y
     `no-unassigned-vars` (59): piden el grafo de control de ESLint (`code-path-analysis`); armarlo

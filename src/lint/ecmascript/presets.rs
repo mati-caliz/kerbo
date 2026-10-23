@@ -24,6 +24,8 @@ const SUGGESTIONS: &[EslintRule] = &[
     EslintRule::NoCaseDeclarations,
     EslintRule::PreferSpread,
     EslintRule::TripleSlashReference,
+    EslintRule::NoUnusedLabels,
+    EslintRule::NoUselessCatch,
 ];
 
 pub fn relaxed_by(preset: Preset, language: Language) -> Vec<RuleId> {

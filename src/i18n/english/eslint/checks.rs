@@ -1,0 +1,149 @@
+use crate::i18n::catalog::RuleText;
+use crate::rules::EslintRule;
+
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 16] = [
+    (
+        EslintRule::NoConstAssign,
+        RuleText::new(
+            "Something is assigned to a constant",
+            "use let if the value has to change, or store it in another variable",
+            "Assigning to a const throws a TypeError when that line runs: the bug stays hidden until then.",
+            "const total = 0; total += 1; becomes let total = 0; total += 1;.",
+        ),
+    ),
+    (
+        EslintRule::NoClassAssign,
+        RuleText::new(
+            "Something is assigned to a class name",
+            "store the value in another variable",
+            "After the assignment the name is no longer the class: whoever instantiates it further down gets something else.",
+            "class Order {} Order = other; becomes const AlternativeOrder = other;.",
+        ),
+    ),
+    (
+        EslintRule::NoImportAssign,
+        RuleText::new(
+            "Something is assigned to an import",
+            "copy the value to a local variable",
+            "Imports are read-only: assigning to one throws, and so does mutating an imported namespace.",
+            "import { limit } from './config'; limit = 10; becomes let localLimit = limit; localLimit = 10;.",
+        ),
+    ),
+    (
+        EslintRule::NoGlobalAssign,
+        RuleText::new(
+            "Something is assigned to a JavaScript global",
+            "use another name",
+            "Overwriting undefined, Object or Math breaks every piece of code that relies on them, and in strict mode it throws.",
+            "undefined = 1; or Object = {}; is deleted or uses another name.",
+        ),
+    ),
+    (
+        EslintRule::NoShadowRestrictedNames,
+        RuleText::new(
+            "A declaration named after a restricted global",
+            "pick another name",
+            "Shadowing undefined, NaN, Infinity, arguments, eval or globalThis confuses the reader and can change what the code does.",
+            "function f(undefined) {} becomes function f(value) {}.",
+        ),
+    ),
+    (
+        EslintRule::NoUnassignedVars,
+        RuleText::new(
+            "A variable that is read but never gets a value",
+            "assign it a value or delete it",
+            "It is always undefined: the assignment is almost always missing or the code is a leftover.",
+            "let total; return total; becomes let total = compute(); return total;.",
+        ),
+    ),
+    (
+        EslintRule::ValidTypeof,
+        RuleText::new(
+            "typeof compared with a type that does not exist",
+            "use one of the types typeof returns: string, number, object, etc.",
+            "typeof never returns anything else: the comparison always gives the same result and is almost always a typo.",
+            "typeof value === 'strng' becomes typeof value === 'string'.",
+        ),
+    ),
+    (
+        EslintRule::NoEmptyPattern,
+        RuleText::new(
+            "An empty destructuring pattern",
+            "name what you want to extract or delete the pattern",
+            "{} or [] in a pattern extracts nothing; a default value was almost always intended.",
+            "const { a: {} } = object; becomes const { a = {} } = object;.",
+        ),
+    ),
+    (
+        EslintRule::NoSparseArrays,
+        RuleText::new(
+            "An array with holes",
+            "write every element, with undefined if needed",
+            "Two commas in a row leave a hole that looks like a typo and that array methods skip.",
+            "[1, , 3] becomes [1, undefined, 3].",
+        ),
+    ),
+    (
+        EslintRule::RequireYield,
+        RuleText::new(
+            "A generator without yield",
+            "add the yield or turn it into a regular function",
+            "A function* without yield produces no values: either the yield is missing or it should not be a generator.",
+            "function* ids() { return 1; } becomes function ids() { return 1; }.",
+        ),
+    ),
+    (
+        EslintRule::NoUselessCatch,
+        RuleText::new(
+            "A catch that only rethrows the error",
+            "delete the try/catch, or the catch if there is a finally",
+            "Catching an error just to throw it again adds noise without changing anything.",
+            "try { load(); } catch (e) { throw e; } becomes load();.",
+        ),
+    ),
+    (
+        EslintRule::NoCompareNegZero,
+        RuleText::new(
+            "A comparison against -0",
+            "use Object.is(value, -0)",
+            "Comparisons do not tell -0 from 0: x === -0 is also true for 0.",
+            "x === -0 becomes Object.is(x, -0).",
+        ),
+    ),
+    (
+        EslintRule::NoAsyncPromiseExecutor,
+        RuleText::new(
+            "An async function as the executor of new Promise",
+            "drop the async and await outside, or return the promise directly",
+            "If an async executor throws, the promise is never rejected: the error is lost.",
+            "new Promise(async (resolve) => ...) becomes an async function that returns the value.",
+        ),
+    ),
+    (
+        EslintRule::UseIsnan,
+        RuleText::new(
+            "A comparison against NaN",
+            "use Number.isNaN(value)",
+            "NaN equals nothing, not even itself: the comparison always gives the same result.",
+            "value === NaN becomes Number.isNaN(value).",
+        ),
+    ),
+    (
+        EslintRule::NoUnusedLabels,
+        RuleText::new(
+            "A label nobody uses",
+            "delete it",
+            "A label with no break or continue naming it is noise, or a mistyped object literal.",
+            "outer: for (...) { ... } becomes for (...) { ... }.",
+        ),
+    ),
+    (
+        EslintRule::NoSelfAssign,
+        RuleText::new(
+            "An assignment of something to itself",
+            "delete it or assign what was intended",
+            "x = x changes nothing: it is almost always a typo on one of the sides.",
+            "this.name = this.name; becomes this.name = name;.",
+        ),
+    ),
+];

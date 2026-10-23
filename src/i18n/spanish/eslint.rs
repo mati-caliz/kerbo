@@ -1,5 +1,8 @@
+mod checks;
+
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
+use checks::CHECK_TEXTS;
 
 const DEAD_BRANCH_WHY: &str =
     "Una rama que nunca corre es un error esperando: o la condición está mal o el código quedó de más.";
@@ -10,7 +13,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "ESLint la marca en su conjunto recomendado.",
     "Mirá la documentación de ESLint.",
 );
-const TEXTS: [(EslintRule, RuleText); 35] = [
+const TEXTS: [(EslintRule, RuleText); 29] = [
     (
         EslintRule::NoVar,
         RuleText::new(
@@ -272,65 +275,12 @@ const TEXTS: [(EslintRule, RuleText); 35] = [
             "lista === [] se vuelve lista.length === 0; a + b ?? 0 se vuelve a + (b ?? 0).",
         ),
     ),
-    (
-        EslintRule::NoConstAssign,
-        RuleText::new(
-            "Se le asigna algo a una constante",
-            "usá let si el valor tiene que cambiar, o guardalo en otra variable",
-            "Asignarle a una const tira un TypeError cuando esa línea corre: el error queda escondido hasta ese momento.",
-            "const total = 0; total += 1; se vuelve let total = 0; total += 1;.",
-        ),
-    ),
-    (
-        EslintRule::NoClassAssign,
-        RuleText::new(
-            "Se le asigna algo al nombre de una clase",
-            "guardá el valor en otra variable",
-            "Después de la asignación el nombre ya no es la clase: quien la instancia más abajo recibe otra cosa.",
-            "class Pedido {} Pedido = otra; se vuelve const PedidoAlternativo = otra;.",
-        ),
-    ),
-    (
-        EslintRule::NoImportAssign,
-        RuleText::new(
-            "Se le asigna algo a un import",
-            "copiá el valor a una variable local",
-            "Los imports son de sólo lectura: asignarles tira un error, y mutar un namespace importado también.",
-            "import { limite } from './config'; limite = 10; se vuelve let limiteLocal = limite; limiteLocal = 10;.",
-        ),
-    ),
-    (
-        EslintRule::NoGlobalAssign,
-        RuleText::new(
-            "Se le asigna algo a un global de JavaScript",
-            "usá otro nombre",
-            "Pisar undefined, Object o Math rompe todo el código que confía en ellos, y en modo estricto es un error.",
-            "undefined = 1; o Object = {}; se borran o usan otro nombre.",
-        ),
-    ),
-    (
-        EslintRule::NoShadowRestrictedNames,
-        RuleText::new(
-            "Una declaración con el nombre de un global reservado",
-            "elegí otro nombre",
-            "Tapar undefined, NaN, Infinity, arguments, eval o globalThis confunde a quien lee y puede cambiar lo que hace el código.",
-            "function f(undefined) {} se vuelve function f(valor) {}.",
-        ),
-    ),
-    (
-        EslintRule::NoUnassignedVars,
-        RuleText::new(
-            "Una variable que se lee pero nunca recibe valor",
-            "asignale un valor o borrala",
-            "Siempre vale undefined: casi siempre falta la asignación o es un resto de código.",
-            "let total; return total; se vuelve let total = calcular(); return total;.",
-        ),
-    ),
 ];
 
 pub fn eslint(rule: EslintRule) -> RuleText {
     TEXTS
         .iter()
+        .chain(CHECK_TEXTS.iter())
         .find(|(candidate, _)| *candidate == rule)
         .map_or(UNKNOWN, |(_, text)| *text)
 }

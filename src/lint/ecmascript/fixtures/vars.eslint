@@ -20,6 +20,7 @@
 41:3 no-var
 41:7 no-unused-vars
 45:5 no-var
+47:1 no-unused-labels
 47:8 no-var
 48:1 no-var
 51:3 no-var

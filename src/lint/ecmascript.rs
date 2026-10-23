@@ -1,5 +1,8 @@
+mod arrays;
 mod assignments;
+mod blocks;
 mod comments;
+mod comparisons;
 mod constant_binary;
 mod constant_condition;
 mod constants;
@@ -7,6 +10,7 @@ mod duplicates;
 mod escapes;
 mod expressions;
 mod finally;
+mod members;
 mod modules;
 mod no_var;
 mod nodes;
@@ -16,6 +20,7 @@ mod redeclare;
 mod repair;
 mod restricted;
 mod scope;
+mod self_assign;
 mod spread;
 mod statements;
 mod strings;
@@ -89,6 +94,22 @@ const CHECKS: &[(EslintRule, Check)] = &[
         restricted::restricted_shadows,
     ),
     (EslintRule::NoUnassignedVars, restricted::unassigned_variables),
+    (EslintRule::ValidTypeof, comparisons::invalid_typeof_comparisons),
+    (EslintRule::NoEmptyPattern, arrays::empty_patterns),
+    (EslintRule::NoSparseArrays, arrays::sparse_arrays),
+    (EslintRule::RequireYield, blocks::generators_without_yield),
+    (EslintRule::NoUselessCatch, blocks::useless_catches),
+    (
+        EslintRule::NoCompareNegZero,
+        comparisons::negative_zero_comparisons,
+    ),
+    (
+        EslintRule::NoAsyncPromiseExecutor,
+        blocks::async_promise_executors,
+    ),
+    (EslintRule::UseIsnan, comparisons::nan_comparisons),
+    (EslintRule::NoUnusedLabels, blocks::unused_labels),
+    (EslintRule::NoSelfAssign, self_assign::self_assignments),
 ];
 
 #[derive(Debug, Clone, Copy)]

@@ -4,6 +4,7 @@
 7:19 no-empty
 8:13 no-empty
 10:18 no-empty
+15:3 no-unused-labels
 15:10 no-empty
 22:3 no-debugger
 23:14 no-debugger

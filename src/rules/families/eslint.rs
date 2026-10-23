@@ -36,6 +36,16 @@ rule_family!(EslintRule {
     NoGlobalAssign => "no-global-assign",
     NoShadowRestrictedNames => "no-shadow-restricted-names",
     NoUnassignedVars => "no-unassigned-vars",
+    ValidTypeof => "valid-typeof",
+    NoEmptyPattern => "no-empty-pattern",
+    NoSparseArrays => "no-sparse-arrays",
+    RequireYield => "require-yield",
+    NoUselessCatch => "no-useless-catch",
+    NoCompareNegZero => "no-compare-neg-zero",
+    NoAsyncPromiseExecutor => "no-async-promise-executor",
+    UseIsnan => "use-isnan",
+    NoUnusedLabels => "no-unused-labels",
+    NoSelfAssign => "no-self-assign",
 });
 
 pub const fn wrap_eslint<'slots>(slots: &'slots mut [RuleId], rules: &[EslintRule]) -> &'slots mut [RuleId] {
