@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 29] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 31] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -261,6 +261,26 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 29] = [
             "escribí el escape a propósito o sacalo",
             "Los caracteres de U+0000 a U+001F casi nunca aparecen en el texto que se busca: suele ser un error al escapar.",
             "/\\x1f/ se vuelve /\\s/ o lo que se quería buscar.",
+        ),
+    ),
+    (
+        EslintRule::NoUnexpectedMultiline,
+        RuleText::new(
+            "Una línea que JavaScript une con la anterior",
+            "terminá la línea anterior con punto y coma o juntá las dos líneas",
+            "Sin punto y coma, un paréntesis, un corchete o un template al principio de la línea siguen la expresión de arriba: se llama o se indexa algo sin querer.",
+            "const a = b
+(c || d).cargar() se vuelve const a = b;
+(c || d).cargar().",
+        ),
+    ),
+    (
+        EslintRule::NoUnusedPrivateClassMembers,
+        RuleText::new(
+            "Un miembro privado (#campo) que la clase nunca lee",
+            "borralo o usalo",
+            "Nadie de afuera puede leer un miembro privado: si la clase tampoco lo lee, sobra.",
+            "class Pedido { #total = 0; } se vuelve class Pedido {}.",
         ),
     ),
 ];

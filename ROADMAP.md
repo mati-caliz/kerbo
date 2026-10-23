@@ -1411,12 +1411,15 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   significativos), y los caracteres de control de un patrón (literal o primer argumento de
   `RegExp`) escritos tal cual o con `\x` y `\u`. Paridad: 14 de 14 y 33 de 33. Los casos quedaron
   en `fixtures/literals.js`.
+- `no-unexpected-multiline` y `no-unused-private-class-members` (hecho, 2026-10-23): la línea que
+  sigue a la anterior por un `(`, `[`, template o `/…/flags` sin punto y coma (una flecha sin
+  paréntesis como lo llamado es un error de tree-sitter, que no ve el punto y coma automático), y
+  los `#miembros` que la clase sólo escribe, incrementa como sentencia o desestructura. Paridad: 2
+  de 2 y 3 de 3. Los casos quedaron en `fixtures/multiline.js`.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
   - Sobre el análisis de caminos que ya está: `no-this-before-super` (9) y `constructor-super` (7).
   - `no-misleading-character-class` (290, casi todo en código compilado),
-    `no-irregular-whitespace` (10),
-    `no-unused-private-class-members` (10), `no-unexpected-multiline` (2) y las que no aparecieron
-    en el corpus.
+    `no-irregular-whitespace` (10) y las que no aparecieron en el corpus.
   - `no-undef`: pide las variables globales de cada entorno (navegador, Node, Jest).
   - `no-useless-escape` no mira las expresiones regulares con el flag `v`.
   - Los `.js` con argumentos de tipo en llamadas y los huecos de la gramática de arriba.

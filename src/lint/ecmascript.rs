@@ -16,6 +16,7 @@ mod fallthrough;
 mod finally;
 mod members;
 mod modules;
+mod multiline;
 mod no_var;
 mod nodes;
 mod numbers;
@@ -23,6 +24,7 @@ mod optional_chains;
 mod paths;
 mod prefer_const;
 mod presets;
+mod private_members;
 mod redeclare;
 mod regexes;
 mod repair;
@@ -125,6 +127,14 @@ const CHECKS: &[(EslintRule, Check)] = &[
     (EslintRule::NoSetterReturn, accessors::setter_returns),
     (EslintRule::GetterReturn, accessors::getter_returns),
     (EslintRule::NoLossOfPrecision, numbers::precision_losses),
+    (
+        EslintRule::NoUnexpectedMultiline,
+        multiline::unexpected_multilines,
+    ),
+    (
+        EslintRule::NoUnusedPrivateClassMembers,
+        private_members::unused_private_members,
+    ),
     (EslintRule::NoControlRegex, regexes::control_characters_in_regexes),
     (
         EslintRule::NoUnsafeOptionalChaining,

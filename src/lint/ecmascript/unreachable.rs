@@ -147,7 +147,7 @@ impl<'tree> Walker<'_, 'tree> {
             return true;
         }
         let consecutive = self.tokens.token_before(node.start_byte()).is_some_and(|token| {
-            range.start.start_byte() <= token.start && token.end <= range.end.end_byte()
+            range.start.start_byte() <= token.start_byte() && token.end_byte() <= range.end.end_byte()
         });
         if consecutive {
             self.range = Some(Range {

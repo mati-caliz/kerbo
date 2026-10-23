@@ -59,6 +59,8 @@ rule_family!(EslintRule {
     GetterReturn => "getter-return",
     NoLossOfPrecision => "no-loss-of-precision",
     NoControlRegex => "no-control-regex",
+    NoUnexpectedMultiline => "no-unexpected-multiline",
+    NoUnusedPrivateClassMembers => "no-unused-private-class-members",
 });
 
 pub const fn wrap_eslint<'slots>(slots: &'slots mut [RuleId], rules: &[EslintRule]) -> &'slots mut [RuleId] {

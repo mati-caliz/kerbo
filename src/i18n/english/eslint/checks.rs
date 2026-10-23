@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 29] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 31] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -261,6 +261,26 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 29] = [
             "write the escape on purpose or remove it",
             "Characters U+0000 to U+001F almost never appear in searched text: it is usually an escaping mistake.",
             "/\\x1f/ becomes /\\s/ or whatever was meant.",
+        ),
+    ),
+    (
+        EslintRule::NoUnexpectedMultiline,
+        RuleText::new(
+            "A line JavaScript joins with the previous one",
+            "end the previous line with a semicolon or join both lines",
+            "Without a semicolon, a parenthesis, bracket or template at the start of a line continues the expression above: something gets called or indexed by accident.",
+            "const a = b
+(c || d).load() becomes const a = b;
+(c || d).load().",
+        ),
+    ),
+    (
+        EslintRule::NoUnusedPrivateClassMembers,
+        RuleText::new(
+            "A private member (#field) the class never reads",
+            "delete it or use it",
+            "Nobody outside can read a private member: if the class does not read it either, it is dead.",
+            "class Order { #total = 0; } becomes class Order {}.",
         ),
     ),
 ];

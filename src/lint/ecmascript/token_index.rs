@@ -2,15 +2,10 @@ use tree_sitter::Node;
 
 use super::nodes::COMMENT;
 
-#[derive(Debug, Clone, Copy)]
-pub struct Span {
-    pub start: usize,
-    pub end: usize,
-}
-
-// Los tokens del archivo en orden, sin comentarios, para `getTokenBefore` y `getCommentsBefore`.
+// Los tokens del archivo en orden, sin comentarios, para `getTokenBefore`, `getTokenAfter` y
+// `getCommentsBefore`. Un token es una hoja del árbol que ocupa al menos un byte.
 pub struct TokenIndex<'tree> {
-    tokens: Vec<Span>,
+    tokens: Vec<Node<'tree>>,
     comments: Vec<Node<'tree>>,
 }
 
@@ -25,7 +20,7 @@ impl<'tree> TokenIndex<'tree> {
                 continue;
             }
             if node.child_count() == 0 {
-                tokens.extend(span_of(node));
+                tokens.extend(Some(node).filter(|leaf| leaf.end_byte() > leaf.start_byte()));
                 continue;
             }
             let mut cursor = node.walk();
@@ -37,28 +32,27 @@ impl<'tree> TokenIndex<'tree> {
         Self { tokens, comments }
     }
 
-    pub fn token_before(&self, offset: usize) -> Option<Span> {
-        let index = self.tokens.partition_point(|token| token.end <= offset);
+    pub fn token_before(&self, offset: usize) -> Option<Node<'tree>> {
+        let index = self.tokens.partition_point(|token| token.end_byte() <= offset);
         index
             .checked_sub(1)
             .and_then(|previous| self.tokens.get(previous))
             .copied()
     }
 
+    // Los tokens desde la posición en adelante, en orden.
+    pub fn tokens_after(&self, offset: usize) -> impl Iterator<Item = Node<'tree>> + '_ {
+        let index = self.tokens.partition_point(|token| token.start_byte() < offset);
+        self.tokens.get(index..).unwrap_or_default().iter().copied()
+    }
+
     // Los comentarios entre el token anterior y la posición, en orden.
     pub fn comments_before(&self, offset: usize) -> Vec<Node<'tree>> {
-        let from = self.token_before(offset).map_or(0, |token| token.end);
+        let from = self.token_before(offset).map_or(0, |token| token.end_byte());
         self.comments
             .iter()
             .copied()
             .filter(|comment| comment.start_byte() >= from && comment.end_byte() <= offset)
             .collect()
     }
-}
-
-fn span_of(leaf: Node<'_>) -> Option<Span> {
-    (leaf.end_byte() > leaf.start_byte()).then(|| Span {
-        start: leaf.start_byte(),
-        end: leaf.end_byte(),
-    })
 }
