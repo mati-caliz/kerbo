@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::idioms::idiom_reports;
 use super::model::Model;
 use super::qualified::is_builtin_named;
 use super::resources::unmanaged_open;
@@ -59,6 +60,7 @@ pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Rep
     {
         reports.push(Report::at(PythonRule::UP008, arguments, ""));
     }
+    reports.extend(idiom_reports(model, source, call));
     reports
 }
 

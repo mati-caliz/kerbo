@@ -1,10 +1,10 @@
 mod formats;
+mod idioms;
 mod modern;
 
 use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 use formats::FORMAT_TEXTS;
-use modern::MODERN_TEXTS;
 
 const SYNTAX_WHY: &str = "Python lo rechaza al compilar el módulo: el archivo no llega a importarse.";
 const ALWAYS_TRUE_WHY: &str =
@@ -393,7 +393,7 @@ pub fn python(rule: PythonRule) -> RuleText {
     TEXTS
         .iter()
         .chain(FORMAT_TEXTS.iter())
-        .chain(MODERN_TEXTS.iter())
+        .chain(modern::extended_texts())
         .find(|(candidate, _)| *candidate == rule)
         .map_or(UNKNOWN, |(_, text)| *text)
 }

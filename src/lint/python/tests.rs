@@ -9,7 +9,7 @@ use crate::limits::{Limits, Preset};
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::{PythonRule, RuleId};
 
-const FIXTURES: [(&str, &str, &str); 16] = [
+const FIXTURES: [(&str, &str, &str); 17] = [
     (
         "scopes.py",
         include_str!("fixtures/scopes.py"),
@@ -84,6 +84,11 @@ const FIXTURES: [(&str, &str, &str); 16] = [
         "resources.py",
         include_str!("fixtures/resources.py"),
         include_str!("fixtures/resources.ruff"),
+    ),
+    (
+        "idioms.py",
+        include_str!("fixtures/idioms.py"),
+        include_str!("fixtures/idioms.ruff"),
     ),
     (
         "package/__init__.py",
@@ -237,7 +242,10 @@ fn imports_sharing_a_line_or_in_a_package_have_no_fix() {
 #[test]
 fn noqa_directives_silence_like_ruff() {
     let source = "import a  # noqa\nimport b  # NoQA: F401, E501\nimport c  # noqa: E501\nimport d  # noqa:\nx = None == \"\"\"\n\"\"\"  # noqa: E711\ny = None == \\\n    a  # noqa: E711\nz = None == \\\n    a\n";
-    assert_eq!(rendered(&lints(source)), ["3:8 F401", "4:8 F401", "9:5 E711"]);
+    assert_eq!(
+        rendered(&lints(source)),
+        ["3:8 F401", "4:8 F401", "5:5 PLR0133", "9:5 E711"]
+    );
     assert_eq!(
         rendered(&lints("# ruff: noqa\nimport os\n")),
         Vec::<String>::new()

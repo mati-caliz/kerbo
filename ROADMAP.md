@@ -1326,7 +1326,15 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     port de `natord` y del orden "isort" de ruff (constantes, clases y el resto, cada grupo en orden
     natural). Paridad: 406 de 406 y 311 de 311. De paso, F822 lee también los nombres de `__all__`
     en una tupla sin paréntesis y en strings concatenados.
-  - Siguiente: UP032, RUF100 e I001.
+  - Hechas en una tanda de reglas chicas: FURB167 (alias de una letra de los flags de `re`),
+    PLR2044 (comentario vacío, con los bloques de comentarios de ruff), SIM201 (`not a == b`),
+    PLW1510 (`subprocess.run` sin `check`), PLR0124 (comparar algo consigo mismo), PLR0133 (comparar
+    dos constantes), C401 y C402 (`set`/`dict` sobre un generador) y LOG015 (logger raíz). Paridad
+    exacta salvo un C401 de CPython con `await` adentro del generador y dos casos en archivos sin
+    parsear.
+  - Siguiente: I001 (6.736 avisos, el bloque más grande), UP032 (1.920), RUF100 (1.437) y la cola
+    de reglas chicas: FLY002, UP044, UP037, SIM103, SIM905, FURB157, N999, UP034, RUF046, RUF010,
+    PIE804, RUF013 y siguientes.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

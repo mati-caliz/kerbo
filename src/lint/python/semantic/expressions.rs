@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::calls::{call_reports, is_first_element_subscript};
+use super::comparisons::comparison_reports;
 use super::literals::is_native_literal_call;
 use super::model::{BindingKind, Model, ScopeKind};
 use super::pep::is_pep585_generic;
@@ -31,6 +32,7 @@ const COMPREHENSIONS: [&str; 4] = [
 const LOCALS: &str = "locals";
 const EXEC: &str = "exec";
 const UTC_ALIAS: &str = "datetime.timezone.utc";
+const REGEX_FLAG_ALIASES: [&str; 8] = ["re.A", "re.I", "re.L", "re.M", "re.S", "re.T", "re.U", "re.X"];
 const ARGUMENT_LIST: &str = "argument_list";
 const DICTIONARY_SPLAT: &str = "dictionary_splat";
 const DICT_BUILTIN: &str = "dict";
@@ -188,6 +190,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
                 }
             }
             COMPARISON => {
+                self.reports
+                    .extend(comparison_reports(&self.model, self.source, node));
                 self.type_comparison(node);
                 self.children(node, mode);
             }
@@ -290,6 +294,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
             self.reports.push(Report::at(PythonRule::UP006, node, ""));
         } else if name == UTC_ALIAS {
             self.reports.push(Report::at(PythonRule::UP017, node, ""));
+        } else if REGEX_FLAG_ALIASES.contains(&name.as_str()) {
+            self.reports.push(Report::at(PythonRule::FURB167, node, ""));
         }
     }
 
