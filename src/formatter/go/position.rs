@@ -104,6 +104,15 @@ impl LineTable {
     pub fn line_count(&self) -> i64 {
         signed(self.starts.len())
     }
+
+    // `MergeLine` de go/token: la línea siguiente pasa a ser parte de ésta.
+    pub fn merge_line(&mut self, line: i64) {
+        if let Ok(next) = usize::try_from(line)
+            && next < self.starts.len()
+        {
+            self.starts.remove(next);
+        }
+    }
 }
 
 pub fn signed(value: usize) -> i64 {

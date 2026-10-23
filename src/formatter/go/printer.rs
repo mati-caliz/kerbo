@@ -1,5 +1,6 @@
 mod block_comment;
 pub mod comments;
+mod doc_comment;
 mod tabwriter;
 mod trimmer;
 

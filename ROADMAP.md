@@ -1644,25 +1644,40 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     `compose-depends-on-healthy` (un `depends_on` hacia un servicio con healthcheck activo que no
     espera `service_healthy`). Criterio propio, como las tres primeras; `minimal` las apaga.
 
-### 13. Formateo propio (empezada: Go, sin medir)
+### 13. Formateo propio (empezada: Go medido contra gofmt)
 
 - Lenguaje por lenguaje, y sólo cuando la salida sea idéntica a la de la herramienta actual.
-- Go, primera versión (2026-10-22; la armó un agente en una rama aparte, que quedó cortado, y se
-  trajo a main recién después de pasar el gate): `kerbo fmt [rutas]` reescribe los `.go` y
-  `kerbo fmt --check` sólo avisa cuáles cambiarían. Un archivo con errores de sintaxis no se toca.
-  No reimplementa gofmt a ojo: arma desde tree-sitter el mismo AST que `go/parser` y lo imprime con
-  un port de `go/printer` (`src/formatter/go/`: tabwriter, comentarios, cortes de línea, orden de
+- Go (2026-10-22; la primera versión la armó un agente en una rama aparte que quedó cortada):
+  `kerbo fmt [rutas]` reescribe los `.go` y `kerbo fmt --check` sólo avisa cuáles cambiarían. No
+  reimplementa gofmt a ojo: arma desde tree-sitter el mismo AST que `go/parser` y lo imprime con un
+  port de `go/printer` (`src/formatter/go/`: tabwriter, comentarios, cortes de línea, orden de
   imports, paréntesis que se sacan de las condiciones). `new(expresión)` de Go 1.26, que
   tree-sitter-go todavía no conoce, se parsea cambiando `new` por un nombre del mismo largo.
-  - Probado: dos archivos de ejemplo (`src/formatter/go/fixtures/`, sintaxis y comentarios) dan
-    byte a byte lo de gofmt, formatear dos veces no cambia nada, y los finales CRLF pasan a LF.
-  - **Falta medirlo contra gofmt sobre código real**, que es lo que exige el principio de esta
-    etapa: hasta entonces no se publica ni se recomienda. El arnés empezado (gofmt y kerbo sobre el
-    mismo corpus, también con el código desordenado a propósito y con CRLF, y la comparación
-    archivo por archivo) se cortó porque en Windows una ruta de terraform pasa el largo máximo; hay
-    que correrlo entero dentro de Docker.
-  - Después de Go, en el orden de la etapa: ruff format (Python), Prettier (JS/TS) y
-    google-java-format o palantir (Java).
+  - Un archivo que tree-sitter-go no lee, o que lee distinto que Go, queda como está y se avisa:
+    formatearlo cambiaría el programa. Las lecturas distintas que se detectan: `if x {...}` seguido
+    de un bloque suelto (tree-sitter toma `x{...}` como literal), `*(*T)(p).f` (lo lee como el campo
+    de una conversión al tipo `*(*T)`) y `chan<- chan T` (lo lee como un `chan` de `<-chan T`).
+    Las dos últimas, sin la guarda, cambiaban el significado del archivo.
+  - Paridad contra gofmt (2026-10-22) sobre 19.143 archivos (la biblioteca estándar de Go, golang/
+    tools, terraform, consul, hugo, caddy, etcd, prometheus, syncthing, tailscale, gin, cobra, chi y
+    fzf), en tres versiones: el original, uno desordenado a propósito (sangrías, espacios y líneas en
+    blanco cambiados sin tocar textos ni comentarios) y el desordenado con CRLF. Idénticos a gofmt:
+    19.043 de 19.071 originales, 19.018 de 19.068 desordenados y 19.030 de 19.068 con CRLF (los que
+    gofmt mismo no parsea, excluidos). Formatear dos veces no cambia nada salvo en 7 archivos.
+  - Lo que falta, por tipo, en los originales: 16 archivos que tree-sitter-go no lee (sintaxis nueva
+    como los métodos genéricos, o las lecturas distintas de arriba) y 12 comentarios de
+    documentación que gofmt reescribe desde Go 1.19 (`go/doc/comment`: `//texto` pasa a `// texto`,
+    las sangrías a bloques de código con tab y las listas se reacomodan) y kerbo deja como están. En
+    los desordenados se suman los mismos comentarios.
+  - Lo que se arregló con esta medición: un grupo de comentarios con `/* */` en posición de
+    documentación ya no se junta en una línea, las directivas (`//go:noinline`, `//export`) van al
+    final de la documentación separadas por `//` y el texto pierde las líneas en blanco de los
+    bordes, y las líneas en blanco entre el último import y el `)` se juntan como en `SortImports`.
+  - El arnés (desordenar, gofmt y kerbo sobre el mismo corpus y comparar archivo por archivo) corre
+    entero en un volumen de Docker, así no choca con el largo máximo de las rutas de Windows; quedó
+    fuera del repo, como los demás.
+  - Pendientes: el reformateo de `go/doc/comment`, y recién después de eso recomendar `kerbo fmt`.
+    Después de Go: ruff format (Python), Prettier (JS/TS) y google-java-format (Java).
 - Con el formateador, compilar los tests con cobertura queda al borde de los 1,5 GB del gate: sin
   la caché caliente lo mata el límite de memoria (SIGKILL). Pasa, pero hay que ganar margen
   (partir el crate o bajar la información de depuración de los tests) antes de que crezca más.

@@ -3,6 +3,7 @@ use super::super::build_lines::{is_go_build, is_plus_build};
 use super::super::position::{INFINITY, Position, signed};
 use super::super::token::Token;
 use super::block_comment::strip_common_prefix;
+use super::doc_comment::format_doc_comment;
 use super::{FORMFEED, Mode, Printer, Whitespace, limit_newlines};
 
 const LINE_DIRECTIVE: &str = "//line ";
@@ -148,18 +149,6 @@ fn separate_after_comment(printer: &mut Printer<'_, '_>, last: &Comment, next: P
         needs_linebreak = true;
     }
     needs_linebreak
-}
-
-// Con el texto de un comentario de documentación ya canónico, `formatDocComment` de go/printer
-// devuelve las mismas líneas pero todas con la posición de la primera.
-fn format_doc_comment(list: &[Comment]) -> Vec<Comment> {
-    let slash = list.first().map(|first| first.slash).unwrap_or_default();
-    list.iter()
-        .map(|comment| Comment {
-            slash,
-            text: comment.text.clone(),
-        })
-        .collect()
 }
 
 fn write_comment_prefix(printer: &mut Printer<'_, '_>, spot: &Spot<'_>) {

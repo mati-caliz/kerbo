@@ -1,3 +1,4 @@
+mod ambiguity;
 mod ast;
 mod build_lines;
 mod convert;
@@ -23,9 +24,12 @@ const NEW_ALIAS: &str = "nev$1";
 // mismo AST que go/parser y se imprime con un port de go/printer.
 pub fn format(source: &str) -> Result<String, Unparsable> {
     let tree = parse(source).ok_or(Unparsable)?;
-    let lines = LineTable::new(source.as_bytes());
+    if ambiguity::misreads_go(tree.root_node()) {
+        return Err(Unparsable);
+    }
+    let mut lines = LineTable::new(source.as_bytes());
     let mut file = convert::file(tree.root_node(), source, &lines).ok_or(Unparsable)?;
-    imports::sort(&mut file, &lines);
+    imports::sort(&mut file, &mut lines);
     String::from_utf8(nodes::file(&file, &lines)).map_err(|_| Unparsable)
 }
 

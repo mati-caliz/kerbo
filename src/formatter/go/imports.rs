@@ -14,8 +14,9 @@ struct Assignment {
 }
 
 // Port de `ast.SortImports`, que gofmt aplica antes de imprimir: ordena cada tanda de imports en
-// líneas seguidas y les reasigna las posiciones, comentarios incluidos. No saca duplicados.
-pub fn sort(file: &mut File, lines: &LineTable) {
+// líneas seguidas y les reasigna las posiciones, comentarios incluidos. No saca duplicados, pero sí
+// junta las líneas en blanco entre el último import y el `)`, como Go.
+pub fn sort(file: &mut File, lines: &mut LineTable) {
     let File { decls, comments, .. } = file;
     for decl in decls.iter_mut() {
         let Decl::Gen(decl) = decl else {
@@ -30,6 +31,14 @@ pub fn sort(file: &mut File, lines: &LineTable) {
         for (start, end) in runs(&decl.specs, lines) {
             if let Some(run) = decl.specs.get_mut(start..end) {
                 sort_run(run, comments, lines);
+            }
+        }
+        if let Some(last) = decl.specs.last() {
+            let last_line = lines.line(last.pos());
+            let mut rparen_line = lines.line(decl.rparen);
+            while rparen_line > last_line.saturating_add(1) {
+                rparen_line = rparen_line.saturating_sub(1);
+                lines.merge_line(rparen_line);
             }
         }
     }
