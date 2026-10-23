@@ -7,6 +7,7 @@ mod no_var;
 mod nodes;
 mod prefer_const;
 mod presets;
+mod redeclare;
 mod repair;
 mod scope;
 mod statements;
@@ -52,6 +53,8 @@ const CHECKS: &[(EslintRule, Check)] = &[
     (EslintRule::PreferRestParams, modules::rest_parameters),
     (EslintRule::NoUnusedExpressions, expressions::unused_expressions),
     (EslintRule::NoUselessEscape, escapes::useless_escapes),
+    (EslintRule::NoRedeclare, redeclare::redeclarations),
+    (EslintRule::NoFuncAssign, redeclare::function_assignments),
 ];
 
 #[derive(Debug, Clone, Copy)]

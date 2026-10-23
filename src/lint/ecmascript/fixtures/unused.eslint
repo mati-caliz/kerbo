@@ -42,6 +42,7 @@
 107:2 no-unused-vars
 111:1 no-var
 112:1 no-var
+112:5 no-redeclare
 112:5 no-unused-vars
 113:24 no-unused-vars
 114:1 no-unused-expressions

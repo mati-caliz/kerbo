@@ -10,7 +10,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "ESLint la marca en su conjunto recomendado.",
     "Mirá la documentación de ESLint.",
 );
-const TEXTS: [(EslintRule, RuleText); 20] = [
+const TEXTS: [(EslintRule, RuleText); 22] = [
     (
         EslintRule::NoVar,
         RuleText::new(
@@ -189,6 +189,24 @@ const TEXTS: [(EslintRule, RuleText); 20] = [
             "borrá una de las dos o cambiale el nombre",
             "Gana la última sin avisar: el primer valor se pierde y el lector no sabe cuál vale.",
             "{ id: 1, nombre: 'a', id: 2 } se vuelve { id: 2, nombre: 'a' }.",
+        ),
+    ),
+    (
+        EslintRule::NoRedeclare,
+        RuleText::new(
+            "Una variable declarada dos veces en el mismo alcance",
+            "borrá la segunda declaración o usá otro nombre",
+            "La segunda pisa a la primera sin avisar: quien lee no sabe cuál vale ni desde dónde.",
+            "var total = 0; ... var total = suma(); se vuelve total = suma();.",
+        ),
+    ),
+    (
+        EslintRule::NoFuncAssign,
+        RuleText::new(
+            "Se le asigna algo al nombre de una función declarada",
+            "guardá el valor en otra variable",
+            "Después de la asignación, quien llama a la función llama a otra cosa: casi siempre es un error.",
+            "function cargar() {} cargar = otra; se vuelve const cargarOtra = otra;.",
         ),
     ),
 ];

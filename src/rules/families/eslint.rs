@@ -21,6 +21,8 @@ rule_family!(EslintRule {
     NoDuplicateCase => "no-duplicate-case",
     NoDupeElseIf => "no-dupe-else-if",
     NoDupeKeys => "no-dupe-keys",
+    NoRedeclare => "no-redeclare",
+    NoFuncAssign => "no-func-assign",
 });
 
 pub const fn wrap_eslint<'slots>(slots: &'slots mut [RuleId], rules: &[EslintRule]) -> &'slots mut [RuleId] {

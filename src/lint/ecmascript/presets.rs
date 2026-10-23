@@ -2,7 +2,11 @@ use crate::language::Language;
 use crate::limits::Preset;
 use crate::rules::{EslintRule, RuleId};
 
-const CHECKED_BY_TYPESCRIPT: &[EslintRule] = &[EslintRule::NoDupeKeys];
+const CHECKED_BY_TYPESCRIPT: &[EslintRule] = &[
+    EslintRule::NoDupeKeys,
+    EslintRule::NoRedeclare,
+    EslintRule::NoFuncAssign,
+];
 const STRICT_ONLY: &[EslintRule] = &[EslintRule::NoNonNullAssertion];
 const SUGGESTIONS: &[EslintRule] = &[
     EslintRule::NoVar,

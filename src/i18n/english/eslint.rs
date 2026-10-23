@@ -10,7 +10,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "ESLint reports it in its recommended set.",
     "See the ESLint documentation.",
 );
-const TEXTS: [(EslintRule, RuleText); 20] = [
+const TEXTS: [(EslintRule, RuleText); 22] = [
     (
         EslintRule::NoVar,
         RuleText::new(
@@ -189,6 +189,24 @@ const TEXTS: [(EslintRule, RuleText); 20] = [
             "delete one of the two or rename it",
             "The last one silently wins: the first value is lost and the reader cannot tell which one counts.",
             "{ id: 1, name: 'a', id: 2 } becomes { id: 2, name: 'a' }.",
+        ),
+    ),
+    (
+        EslintRule::NoRedeclare,
+        RuleText::new(
+            "A variable declared twice in the same scope",
+            "drop the second declaration or use another name",
+            "The second one silently overrides the first: readers can't tell which one holds or from where.",
+            "var total = 0; ... var total = sum(); becomes total = sum();.",
+        ),
+    ),
+    (
+        EslintRule::NoFuncAssign,
+        RuleText::new(
+            "Something is assigned to the name of a declared function",
+            "keep the value in another variable",
+            "After the assignment, callers of the function call something else: it is almost always a bug.",
+            "function load() {} load = other; becomes const loadOther = other;.",
         ),
     ),
 ];

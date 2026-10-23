@@ -3,6 +3,7 @@
 3:1 no-var
 4:1 no-var
 5:1 no-var
+5:5 no-redeclare
 6:1 no-var
 10:1 no-var
 11:1 no-var

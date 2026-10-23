@@ -1239,12 +1239,19 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
       medición convierte).
   - Lo que no se ve a simple vista quedó en `src/lint/ecmascript/fixtures/`, cada archivo con la
     salida de ESLint al lado (`.eslint`) y, para los arreglos, el resultado de `eslint --fix`.
+- `no-redeclare` y `no-func-assign` (hecho, 2026-10-22), sobre el motor de alcances que ya existía:
+  la primera avisa en cada declaración de una variable después de la primera, en los alcances que
+  mira ESLint (programa, funciones, bloques, `for`, `switch` y bloques estáticos; no los `catch` ni
+  el nombre de una función con nombre); la segunda, en cada escritura que no es la inicialización a
+  una variable cuya primera declaración es una función. Como en typescript-eslint, las dos se apagan
+  en TypeScript. Paridad contra ESLint en express, zod, react, vscode y next.js: 149 de 149 y 132
+  de 132, sin avisos de más ni de menos. El ejemplo `fixtures/redeclare.js` fija los casos (función
+  y `var`, parámetro y `var`, bucles, `catch`, asignación compuesta y desestructuración).
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
   - `no-useless-assignment` (1.778), `no-fallthrough` (700), `no-unreachable` (104) y
     `no-unassigned-vars` (59): piden el grafo de control de ESLint (`code-path-analysis`); armarlo
     sobre tree-sitter es el paso siguiente.
-  - `no-redeclare` (1.449) y `no-func-assign` (508), sólo en JavaScript, sobre el motor de
-    alcances que ya existe; `prefer-spread` (487), `no-misleading-character-class` (290),
+  - `prefer-spread` (487), `no-misleading-character-class` (290),
     `no-constant-condition` (248), `no-constant-binary-expression` (154),
     `no-wrapper-object-types` (152), `no-control-regex` (138), `no-unsafe-function-type` (113),
     `preserve-caught-error` (92), `triple-slash-reference` (70), `no-unsafe-finally` (67),
