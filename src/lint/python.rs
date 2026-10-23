@@ -1,7 +1,9 @@
 mod ast;
+mod branches;
 mod builtins;
 mod comparisons;
 mod compound;
+mod concatenation;
 mod deprecated;
 mod dicts;
 mod escapes;
@@ -118,6 +120,8 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(modern::reports(root, &nodes, source));
     reports.extend(simplify::reports(&nodes, source));
     reports.extend(deprecated::reports(&nodes, source));
+    reports.extend(concatenation::reports(&nodes));
+    reports.extend(branches::reports(&nodes, source));
     let suppressions = noqa::Suppressions::new(root, source);
     let mut found: Vec<LintFinding> = reports
         .into_iter()

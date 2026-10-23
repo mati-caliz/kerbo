@@ -77,6 +77,8 @@ rule_family!(PythonRule {
     SIM115 => "sim115",
     TRY004 => "try004",
     UP035 => "up035",
+    ISC004 => "isc004",
+    SIM114 => "sim114",
     E401 => "e401",
     E402 => "e402",
     E701 => "e701",

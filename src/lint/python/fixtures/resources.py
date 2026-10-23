@@ -83,3 +83,38 @@ from backports.strenum import StrEnum
 from pipes import quote
 from typing import Any
 from . import typing
+
+
+CONCATENATED = [
+    "a" "b",
+    "c",
+    ("d" "e"),
+    f"{CONCATENATED}" "g",
+]
+PAIR = "a" "b", "c"
+GROUP = {"a" "b", "c"}
+TUPLE = ("a" "b", "c")
+INDEXED = {}["a" "b", "c"]
+CALLED = print("a" "b", "c")
+
+
+def arms(value):
+    if value == 1:
+        print("uno")
+    elif value == 2:
+        print('uno')
+    elif value == 3:
+        print("tres")
+    elif value == 4:
+        print(("tres"))
+    else:
+        print("tres")
+    if value:
+        # comentario
+        print(value)
+    elif not value:
+        print(value)
+    if value:
+        print(value + 1)
+    elif value > 2:
+        print(value - 1)

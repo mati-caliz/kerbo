@@ -1310,7 +1310,12 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     de ruff 0.17 (lo confirma que `typing_extensions.override`, de 3.12, no se reporta). Un aviso
     por destino y uno por cada miembro de `typing` que cambió de nombre, como ruff. Paridad: 1.168 de
     1.169, sin avisos de más; el que falta es un `lazy from` de CPython.
-  - Siguiente: UP032, B023, RUF022, RUF023 y SIM114.
+  - Hechas ISC004 (concatenación implícita sin paréntesis dentro de una lista, tupla, conjunto o
+    subíndice con varios elementos) y SIM114 (ramas seguidas de un `if` con el mismo cuerpo). SIM114
+    aproxima el `ComparableStmt` de ruff comparando el árbol sin comentarios ni paréntesis de
+    agrupación y los strings por su valor, y compara los comentarios en el mismo rango que
+    `body_range` (desde la línea siguiente a la condición). Paridad: 947 de 947 y 245 de 245.
+  - Siguiente: UP032, B023, RUF022, RUF023, RUF100 e I001.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

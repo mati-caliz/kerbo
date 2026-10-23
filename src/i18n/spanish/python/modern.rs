@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
-pub const MODERN_TEXTS: [(PythonRule, RuleText); 36] = [
+pub const MODERN_TEXTS: [(PythonRule, RuleText); 38] = [
     (
         PythonRule::C408,
         RuleText::new(
@@ -326,6 +326,24 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 36] = [
             "importalo desde su módulo actual",
             "Los nombres viejos de typing, typing_extensions o collections siguen ahí por compatibilidad, pero están deprecados y algunos ya no existen.",
             "from typing import Callable pasa a from collections.abc import Callable.",
+        ),
+    ),
+    (
+        PythonRule::ISC004,
+        RuleText::new(
+            "Dos strings pegados sin coma dentro de una lista, tupla o conjunto",
+            "agregá la coma que falta, o envolvé la concatenación entre paréntesis si es a propósito",
+            "Python junta los strings contiguos en uno solo: casi siempre es una coma olvidada que deja un elemento de menos.",
+            "[\"a\" \"b\", \"c\"] pasa a [\"a\", \"b\", \"c\"], o a [(\"a\" \"b\"), \"c\"] si se quería juntarlos.",
+        ),
+    ),
+    (
+        PythonRule::SIM114,
+        RuleText::new(
+            "Dos ramas seguidas de un if con el mismo cuerpo",
+            "juntá las condiciones con or",
+            "El mismo código repetido en dos ramas obliga a mantenerlo dos veces y esconde que la decisión es una sola.",
+            "if a: f()\nelif b: f() pasa a if a or b: f().",
         ),
     ),
 ];
