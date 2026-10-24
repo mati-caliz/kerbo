@@ -37,24 +37,41 @@ const CONTAINERS: [&str; 7] = [
 ];
 const STARRED: [&str; 2] = ["list_splat", "list_splat_pattern"];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MethodKind {
+    Instance,
+    Class,
+    New,
+    Static,
+}
+
 // PLW0642: `self = ...` en un método (o `cls = ...` en un método de clase o en `__new__`), que sólo
-// cambia la variable local.
+// cambia la variable local. PLW0211: un método estático (o `__new__`) cuyo primer parámetro se
+// llama `self` o `cls`.
 pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     nodes
         .iter()
-        .filter(|node| node.kind() == ASSIGNMENT)
-        .filter(|assignment| {
-            assignment
-                .parent()
-                .is_none_or(|parent| parent.kind() != ASSIGNMENT)
+        .flat_map(|node| match node.kind() {
+            ASSIGNMENT if node.parent().is_none_or(|parent| parent.kind() != ASSIGNMENT) => {
+                self_or_cls_assignments(*node, source)
+            }
+            FUNCTION => bad_static_argument(*node, source).into_iter().collect(),
+            _ => Vec::new(),
         })
-        .flat_map(|assignment| self_or_cls_assignments(*assignment, source))
         .collect()
 }
 
 fn self_or_cls_assignments(assignment: Node<'_>, source: &[u8]) -> Vec<Report> {
-    let Some(receiver) = enclosing_method_receiver(assignment, source) else {
+    let Some(function) = std::iter::successors(assignment.parent(), Node::parent)
+        .find(|ancestor| matches!(ancestor.kind(), FUNCTION | CLASS | LAMBDA))
+        .filter(|scope| scope.kind() == FUNCTION)
+    else {
         return Vec::new();
+    };
+    let receiver = match (method_kind(function, source), first_parameter(function)) {
+        (Some(MethodKind::Instance), Some(first)) if text(first, source) == SELF => SELF,
+        (Some(MethodKind::Class | MethodKind::New), Some(first)) if text(first, source) == CLS => CLS,
+        _ => return Vec::new(),
     };
     let mut targets = Vec::new();
     let mut current = assignment;
@@ -88,22 +105,29 @@ fn receiver_targets(target: Node<'_>, receiver: &str, source: &[u8], found: &mut
     }
 }
 
-// El nombre del primer parámetro si la asignación está directamente en un método que lo recibe como
-// `self` (instancia) o `cls` (de clase o `__new__`), con `function_type::classify` de ruff.
-fn enclosing_method_receiver(assignment: Node<'_>, source: &[u8]) -> Option<&'static str> {
-    let function = std::iter::successors(assignment.parent(), Node::parent)
-        .find(|ancestor| matches!(ancestor.kind(), FUNCTION | CLASS | LAMBDA))
-        .filter(|scope| scope.kind() == FUNCTION)?;
+// PLW0211: avisa en el parámetro.
+fn bad_static_argument(function: Node<'_>, source: &[u8]) -> Option<Report> {
+    let kind = method_kind(function, source)?;
+    if !matches!(kind, MethodKind::Static | MethodKind::New) {
+        return None;
+    }
+    let first = first_parameter(function)?;
+    let name = text(function.child_by_field_name(NAME_FIELD)?, source);
+    let parameter = text(first, source);
+    let allowed = name == NEW_METHOD && parameter == CLS;
+    (!allowed && (parameter == SELF || parameter == CLS)).then(|| Report::at(PythonRule::PLW0211, first, ""))
+}
+
+// `function_type::classify` de ruff, con los decoradores reconocidos por nombre; `None` si la
+// función no está definida directamente en una clase.
+fn method_kind(function: Node<'_>, source: &[u8]) -> Option<MethodKind> {
     let holder = function
         .parent()
         .filter(|parent| parent.kind() == DECORATED)
         .unwrap_or(function);
-    let in_class = std::iter::successors(holder.parent(), Node::parent)
+    std::iter::successors(holder.parent(), Node::parent)
         .find(|ancestor| matches!(ancestor.kind(), FUNCTION | CLASS | LAMBDA))
-        .is_some_and(|owner| owner.kind() == CLASS);
-    if !in_class {
-        return None;
-    }
+        .filter(|owner| owner.kind() == CLASS)?;
     let decorators: Vec<&str> = named(holder)
         .into_iter()
         .filter(|child| child.kind() == DECORATOR)
@@ -121,36 +145,35 @@ fn enclosing_method_receiver(assignment: Node<'_>, source: &[u8]) -> Option<&'st
         })
         .collect();
     let name = text(function.child_by_field_name(NAME_FIELD)?, source);
-    let first = first_parameter(function, source)?;
-    let expected = if decorators
+    let kind = if decorators
         .iter()
         .any(|decorator| STATIC_DECORATORS.contains(decorator))
     {
-        return None;
+        MethodKind::Static
     } else if decorators
         .iter()
         .any(|decorator| CLASS_DECORATORS.contains(decorator))
         || IMPLICIT_CLASS_METHODS.contains(&name)
-        || name == NEW_METHOD
     {
-        CLS
+        MethodKind::Class
+    } else if name == NEW_METHOD {
+        MethodKind::New
     } else {
-        SELF
+        MethodKind::Instance
     };
-    (first == expected).then_some(expected)
+    Some(kind)
 }
 
 // El primer parámetro posicional (`posonlyargs` o `args` en ruff); `None` si empieza con `*`.
-fn first_parameter<'source>(function: Node<'_>, source: &'source [u8]) -> Option<&'source str> {
+fn first_parameter(function: Node<'_>) -> Option<Node<'_>> {
     let first = named(function.child_by_field_name(PARAMETERS_FIELD)?)
         .into_iter()
         .find(|parameter| parameter.kind() != COMMENT)?;
-    let name = match first.kind() {
-        IDENTIFIER => first,
+    match first.kind() {
+        IDENTIFIER => Some(first),
         kind if NAMED_PARAMETERS.contains(&kind) => first
             .child_by_field_name(NAME_FIELD)
-            .or_else(|| named(first).into_iter().find(|child| child.kind() == IDENTIFIER))?,
-        _ => return None,
-    };
-    Some(text(name, source))
+            .or_else(|| named(first).into_iter().find(|child| child.kind() == IDENTIFIER)),
+        _ => None,
+    }
 }

@@ -1,0 +1,53 @@
+import datetime
+from datetime import datetime as moment
+
+
+class Holder:
+    @staticmethod
+    def first(self):
+        return self
+
+    @staticmethod
+    def second(cls, value):
+        return cls, value
+
+    @staticmethod
+    def fine(value):
+        return value
+
+    def __new__(cls):
+        return cls
+
+    def __new__(self):
+        return self
+
+    @staticmethod
+    def __new__(cls):
+        return cls
+
+    @classmethod
+    def build(self):
+        return self
+
+    @staticmethod
+    def typed(self: int = 1):
+        return self
+
+
+@staticmethod
+def outside(self):
+    return self
+
+
+value = (lambda: 1)()
+other = ((lambda x: x))(2)
+named = lambda: 1
+called = named()
+
+datetime.datetime.today()
+moment.today()
+datetime.datetime.today().astimezone()
+datetime.datetime.today().replace(microsecond=0).astimezone()
+datetime.datetime.today().replace(microsecond=0)
+(datetime.datetime.today()).astimezone()
+datetime.date.today()

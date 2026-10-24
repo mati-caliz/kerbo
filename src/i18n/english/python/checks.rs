@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 15] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 18] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -136,6 +136,33 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 15] = [
             "use another local name",
             "Reassigning self or cls only changes the local variable, not the object or the class.",
             "self = other becomes current = other.",
+        ),
+    ),
+    (
+        PythonRule::PLW0211,
+        RuleText::new(
+            "Static method whose first parameter is self or cls",
+            "rename the parameter, or make it a regular or class method",
+            "A static method receives no instance or class, so calling the first parameter self or cls misleads the reader.",
+            "@staticmethod def f(self): becomes @staticmethod def f(value):.",
+        ),
+    ),
+    (
+        PythonRule::PLC3002,
+        RuleText::new(
+            "Lambda called right where it is defined",
+            "write the expression directly",
+            "(lambda: x)() is just x with an extra function call.",
+            "(lambda: compute())() becomes compute().",
+        ),
+    ),
+    (
+        PythonRule::DTZ002,
+        RuleText::new(
+            "datetime.today() without a time zone",
+            "use datetime.now(tz=...)",
+            "today() returns a naive datetime in local time, which breaks comparisons and arithmetic with aware datetimes.",
+            "datetime.today() becomes datetime.now(tz=timezone.utc).",
         ),
     ),
 ];

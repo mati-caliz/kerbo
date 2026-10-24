@@ -4,8 +4,8 @@ use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
-    ARGUMENTS_FIELD, CALL, COMMENT, FALSE, FUNCTION_FIELD, KEYWORD_ARGUMENT, NAME_FIELD, STRING, TRUE,
-    VALUE_FIELD, is_string, named, string_prefix, text,
+    ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, COMMENT, FALSE, FUNCTION_FIELD, KEYWORD_ARGUMENT,
+    NAME_FIELD, PARENTHESIZED, STRING, TRUE, VALUE_FIELD, is_string, named, string_prefix, text,
 };
 use crate::lint::python::escapes::text_value;
 use crate::rules::PythonRule;
@@ -23,6 +23,9 @@ const HASATTR: &str = "hasattr";
 const GETATTR: &str = "getattr";
 const LRU_CACHE: &str = "functools.lru_cache";
 const ARGUMENT_LIST: &str = "argument_list";
+const DATETIME_TODAY: &str = "datetime.datetime.today";
+const REPLACE: &str = "replace";
+const ASTIMEZONE: &str = "astimezone";
 const DICTIONARY_SPLAT: &str = "dictionary_splat";
 
 struct Arguments<'tree> {
@@ -55,10 +58,47 @@ pub fn builtin_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
     {
         reports.push(Report::at(PythonRule::UP022, call, ""));
     }
+    if qualified_name(model, function, source).as_deref() == Some(DATETIME_TODAY)
+        && !is_followed_by_astimezone(call, source)
+    {
+        reports.push(Report::at(PythonRule::DTZ002, call, ""));
+    }
     if is_unreliable_callable_check(model, source, function, &arguments) {
         reports.push(Report::at(PythonRule::B004, call, ""));
     }
     reports
+}
+
+// `followed_by_astimezone`: `datetime.today()` seguido de `.astimezone()`, quizás después de una
+// cadena de `.replace(...)`.
+fn is_followed_by_astimezone(call: Node<'_>, source: &[u8]) -> bool {
+    let mut current = call;
+    loop {
+        let Some(attribute) = parent_expression(current).filter(|parent| parent.kind() == ATTRIBUTE) else {
+            return false;
+        };
+        match attribute
+            .child_by_field_name(ATTRIBUTE_FIELD)
+            .map(|method| text(method, source))
+        {
+            Some(ASTIMEZONE) => return true,
+            Some(REPLACE) => {}
+            _ => return false,
+        }
+        let Some(next) = parent_expression(attribute).filter(|parent| {
+            parent.kind() == CALL
+                && parent
+                    .child_by_field_name(FUNCTION_FIELD)
+                    .is_some_and(|function| function.id() == attribute.id())
+        }) else {
+            return false;
+        };
+        current = next;
+    }
+}
+
+fn parent_expression(node: Node<'_>) -> Option<Node<'_>> {
+    std::iter::successors(node.parent(), Node::parent).find(|ancestor| ancestor.kind() != PARENTHESIZED)
 }
 
 // UP011: `@functools.lru_cache()` sin argumentos, que se escribe sin paréntesis. Avisa en los

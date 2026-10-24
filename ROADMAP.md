@@ -1408,6 +1408,9 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     el `function_type::classify` de ruff y los decoradores reconocidos por nombre). Paridad exacta:
     18, 20, 12, 19 y 68. Los casos quedaron en `fixtures/class_bodies.py`; la tabla de fixtures pasó
     a `src/lint/python/tests/fixtures.rs`.
+  - Hechas PLW0211 (método estático cuyo primer parámetro es `self` o `cls`), PLC3002 (`(lambda:
+    x)()`) y DTZ002 (`datetime.today()` sin `.astimezone()` después). Paridad exacta: 20, 15 y 18.
+    Los casos quedaron en `fixtures/methods.py`.
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
   - Siguiente, la cola de reglas chicas: UP044, UP037, RUF013, PLR1704, PLC0206 y siguientes.

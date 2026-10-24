@@ -2,7 +2,8 @@ use tree_sitter::Node;
 
 use super::Report;
 use super::ast::{
-    ALIAS_FIELD, ALIASED_IMPORT, CALL, CLASS, COMMENT, IMPORT, KEYWORD_ARGUMENT, NAME_FIELD, named, text,
+    ALIAS_FIELD, ALIASED_IMPORT, CALL, CLASS, COMMENT, FUNCTION_FIELD, IMPORT, KEYWORD_ARGUMENT, LAMBDA,
+    NAME_FIELD, named, text, unparenthesized,
 };
 use crate::rules::PythonRule;
 
@@ -48,7 +49,11 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     nodes
         .iter()
         .flat_map(|node| match node.kind() {
-            CALL => star_after_keyword(*node),
+            CALL => {
+                let mut found = star_after_keyword(*node);
+                found.extend(direct_lambda_call(*node));
+                found
+            }
             CLASS => empty_class_parentheses(*node).into_iter().collect(),
             IMPORT => {
                 let mut found = manual_from_imports(*node, source);
@@ -80,6 +85,14 @@ fn star_after_keyword(call: Node<'_>) -> Vec<Report> {
         .filter(|argument| argument.kind() == LIST_SPLAT)
         .map(|argument| Report::at(PythonRule::B026, *argument, ""))
         .collect()
+}
+
+// PLC3002: `(lambda: x)()`, una lambda que se llama apenas se define.
+fn direct_lambda_call(call: Node<'_>) -> Option<Report> {
+    call.child_by_field_name(FUNCTION_FIELD)
+        .map(unparenthesized)
+        .filter(|function| function.kind() == LAMBDA)
+        .map(|_| Report::at(PythonRule::PLC3002, call, ""))
 }
 
 // UP039: `class Clase():`, con paréntesis vacíos.

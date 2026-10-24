@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 15] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 18] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -136,6 +136,33 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 15] = [
             "usá otro nombre local",
             "Reasignar self o cls sólo cambia la variable local, no el objeto ni la clase.",
             "self = otro pasa a actual = otro.",
+        ),
+    ),
+    (
+        PythonRule::PLW0211,
+        RuleText::new(
+            "Método estático cuyo primer parámetro se llama self o cls",
+            "renombrá el parámetro, o hacelo un método común o de clase",
+            "Un método estático no recibe ni la instancia ni la clase, así que llamar self o cls al primer parámetro confunde.",
+            "@staticmethod def f(self): pasa a @staticmethod def f(valor):.",
+        ),
+    ),
+    (
+        PythonRule::PLC3002,
+        RuleText::new(
+            "Lambda que se llama apenas se define",
+            "escribí la expresión directamente",
+            "(lambda: x)() es x con una llamada de más.",
+            "(lambda: calcular())() pasa a calcular().",
+        ),
+    ),
+    (
+        PythonRule::DTZ002,
+        RuleText::new(
+            "datetime.today() sin zona horaria",
+            "usá datetime.now(tz=...)",
+            "today() devuelve un datetime sin zona en la hora local, que rompe comparaciones y cuentas con datetimes con zona.",
+            "datetime.today() pasa a datetime.now(tz=timezone.utc).",
         ),
     ),
 ];
