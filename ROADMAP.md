@@ -1497,10 +1497,23 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     no resuelve el tipo de una operación binaria (`"a" + "b"`). Ninguna de estas reglas trae arreglo
     todavía (ruff lo tiene en FURB188, SIM401, FURB122, FURB129, W605, UP049, UP029, PYI020, TC005,
     UP036 y RUF068).
-  - Lo que queda del conjunto por defecto (2026-10-24): 7 reglas con unos 1.560 avisos en el corpus.
-    RUF100 (`noqa` sin uso) suma 1.437; el resto: PYI036 47, PYI034 26, PYI019 22, TC004 17, PYI055 8
-    y RUF028 6 (comentarios `fmt: off`/`fmt: skip` en lugares donde el formateador de ruff no los
-    toma, que pide conocer ese formateador).
+  - Hecha RUF100 (`noqa` sin uso), con el `check_noqa` de ruff: cada aviso cuenta para el primer
+    `noqa` que lo silencia (la línea de la sentencia y después la del aviso), los códigos viejos
+    redirigen al nuevo, un código de una regla apagada sale como "non-enabled" y uno que ruff no
+    conoce se deja (es RUF102). La lista de reglas de ruff 0.17.1, su conjunto por defecto (407) y las
+    redirecciones quedaron en `noqa/ruff_codes.rs`. Lo que está apagado lo decide la configuración de
+    kerbo, así que la medición apaga las 17 reglas que kerbo tiene y el conjunto por defecto de ruff
+    0.17 no (E4, E7, F403, F405 y F722). De paso, `# noqa[E501]` dejó de ser una directiva, como en
+    ruff. Paridad: 1.437 de 1.437, con uno de más (un `noqa` adentro de `if TYPE_CHECKING:` en
+    `sqlalchemy/orm/decl_api.py` que en ruff silencia un TC004, regla que kerbo todavía no tiene).
+    Las otras 281 reglas del conjunto por defecto no cambiaron.
+  - Pendientes de RUF100: si kerbo no implementa una regla del conjunto por defecto de ruff, un
+    código suyo en un `noqa` no se marca nunca (no se sabe si se usa); en un archivo que tree-sitter
+    no parsea sólo se marcan los códigos de reglas apagadas o repetidos. Falta el arreglo (borrar el
+    comentario o los códigos de más).
+  - Lo que queda del conjunto por defecto (2026-10-24): 6 reglas con unos 125 avisos en el corpus:
+    PYI036 47, PYI034 26, PYI019 22, TC004 17, PYI055 8 y RUF028 6 (comentarios `fmt: off`/`fmt: skip`
+    en lugares donde el formateador de ruff no los toma, que pide conocer ese formateador).
   - Los archivos que no están en UTF-8 (ruff da E902 y no los analiza) se analizan igual: falta
     saltearlos o avisar como ruff. Se hacen en tandas de 15 a 25 reglas por
     tema, con un solo gate y una sola medición por tanda.

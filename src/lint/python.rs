@@ -196,10 +196,8 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(comments::reports(&nodes, source));
     reports.extend(rewrites::reports(&nodes, source));
     reports.extend(module_names::invalid_module_name(path));
-    let suppressions = noqa::Suppressions::new(root, source);
-    let mut found: Vec<LintFinding> = reports
+    let mut found: Vec<LintFinding> = suppressed(root, source, reports, &enabled)
         .into_iter()
-        .filter(|report| enabled(report.rule) && !suppressions.silences(report))
         .map(|report| {
             finding_at(
                 LintKind::Python(report.rule),
@@ -211,6 +209,22 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
         .collect();
     found.sort_by_key(|finding| (finding.line, finding.column));
     found
+}
+
+// Lo que queda después de los `noqa`, más los `noqa` sin uso (RUF100) que se calculan con los avisos
+// de las reglas prendidas antes de silenciarlos.
+fn suppressed(
+    root: Node<'_>,
+    source: &[u8],
+    mut reports: Vec<Report>,
+    enabled: &dyn Fn(PythonRule) -> bool,
+) -> Vec<Report> {
+    let suppressions = noqa::Suppressions::new(root, source);
+    reports.retain(|report| enabled(report.rule));
+    let unused = noqa::unused_directives(&suppressions, &reports, enabled, !root.has_error());
+    reports.retain(|report| !suppressions.silences(report));
+    reports.extend(unused.into_iter().filter(|report| enabled(report.rule)));
+    reports
 }
 
 fn file_kind(path: Option<&Path>) -> FileKind {

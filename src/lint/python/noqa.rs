@@ -1,14 +1,21 @@
+mod ruff_codes;
+mod unused;
+
 use std::collections::HashMap;
 
-use tree_sitter::Node;
+use tree_sitter::{Node, Point};
 
 use super::Report;
 use super::ast::{COMMENT, STRING, text};
 use crate::syntax::descendants;
+use ruff_codes::REDIRECTS;
+pub use unused::unused_directives;
 
 const NOQA: &str = "noqa";
 const FILE_PREFIXES: [&str; 2] = ["ruff:", "flake8:"];
 const CODE_SEPARATORS: [char; 2] = [',', ' '];
+const COMMENT_MARKER: char = '#';
+const CODES_MARKER: char = ':';
 const CONTINUATION: u8 = b'\\';
 const LINE_FEED: u8 = b'\n';
 const CARRIAGE_RETURN: u8 = b'\r';
@@ -23,15 +30,30 @@ impl Directive {
     fn covers(&self, code: &str) -> bool {
         match self {
             Self::All => true,
-            Self::Codes(codes) => codes.iter().any(|listed| listed == code),
+            Self::Codes(codes) => codes.iter().any(|listed| redirected(listed) == code),
         }
     }
 }
 
+// `get_redirect_target` de ruff: un código viejo apunta al de la regla que lo reemplazó.
+fn redirected(code: &str) -> &str {
+    REDIRECTS
+        .binary_search_by(|(old, _)| (*old).cmp(code))
+        .ok()
+        .and_then(|index| REDIRECTS.get(index))
+        .map_or(code, |(_, new)| *new)
+}
+
+#[derive(Debug, Clone)]
+struct Placed {
+    directive: Directive,
+    start: Point,
+}
+
 #[derive(Debug, Default)]
 pub struct Suppressions {
-    lines: HashMap<usize, Directive>,
-    file: Option<Directive>,
+    lines: HashMap<usize, Placed>,
+    files: Vec<Placed>,
     spans: Vec<(usize, usize)>,
 }
 
@@ -54,20 +76,26 @@ impl Suppressions {
 
     pub fn silences(&self, report: &Report) -> bool {
         let code = report.rule.as_str().to_uppercase();
-        if self
-            .file
-            .as_ref()
-            .is_some_and(|directive| directive.covers(&code))
-        {
-            return true;
-        }
-        std::iter::once(report.start.row)
-            .chain(report.statement_row)
+        self.exempts(&code) || self.silencing_row(report, &code).is_some()
+    }
+
+    // La exención de archivo (`# ruff: noqa`), toda o por códigos.
+    fn exempts(&self, code: &str) -> bool {
+        self.files.iter().any(|file| file.directive.covers(code))
+    }
+
+    // La línea cuyo `noqa` silencia el aviso: la de la sentencia y después la del aviso, como el
+    // `parent` de ruff.
+    fn silencing_row(&self, report: &Report, code: &str) -> Option<usize> {
+        report
+            .statement_row
+            .into_iter()
+            .chain(std::iter::once(report.start.row))
             .map(|row| self.mapped(row))
-            .any(|row| {
+            .find(|row| {
                 self.lines
-                    .get(&row)
-                    .is_some_and(|directive| directive.covers(&code))
+                    .get(row)
+                    .is_some_and(|placed| placed.directive.covers(code))
             })
     }
 
@@ -80,16 +108,21 @@ impl Suppressions {
 
     fn read_comment(&mut self, comment: Node<'_>, source: &[u8]) {
         let content = text(comment, source);
+        let start = comment.start_position();
         if let Some(directive) = file_directive(content) {
-            self.file = Some(directive);
-        } else if let Some(directive) = line_directive(content) {
-            self.lines.insert(comment.start_position().row, directive);
+            self.files.push(Placed { directive, start });
+        } else if let Some((offset, directive)) = line_directive(content) {
+            let start = Point {
+                row: start.row,
+                column: start.column.saturating_add(offset),
+            };
+            self.lines.insert(start.row, Placed { directive, start });
         }
     }
 }
 
 fn file_directive(comment: &str) -> Option<Directive> {
-    let body = comment.trim_start_matches('#').trim_start();
+    let body = comment.trim_start_matches(COMMENT_MARKER).trim_start();
     let lowered = body.to_lowercase();
     let prefix = FILE_PREFIXES.iter().find(|prefix| lowered.starts_with(*prefix))?;
     let rest = body.get(prefix.len()..)?.trim_start();
@@ -100,18 +133,29 @@ fn file_directive(comment: &str) -> Option<Directive> {
     directive_after(after)
 }
 
-fn line_directive(comment: &str) -> Option<Directive> {
-    comment.match_indices('#').find_map(|(index, _)| {
+// La directiva y dónde empieza su `#` adentro del comentario.
+fn line_directive(comment: &str) -> Option<(usize, Directive)> {
+    comment.match_indices(COMMENT_MARKER).find_map(|(index, _)| {
         let rest = comment.get(index.saturating_add(1)..)?.trim_start();
         let word = rest.get(..NOQA.len())?;
         word.eq_ignore_ascii_case(NOQA)
             .then(|| rest.get(NOQA.len()..).and_then(directive_after))
             .flatten()
+            .map(|directive| (index, directive))
     })
 }
 
+// Lo que sigue a `noqa`, como el `lex_directive` de ruff: nada, `#` o espacios sin `:` es un `noqa`
+// general; `:` abre la lista de códigos; cualquier otra cosa (`noqa[E501]`) no es una directiva.
 fn directive_after(rest: &str) -> Option<Directive> {
-    let Some(listed) = rest.trim_start().strip_prefix(':') else {
+    let starts_valid = rest
+        .chars()
+        .next()
+        .is_none_or(|first| first == COMMENT_MARKER || first == CODES_MARKER || first.is_whitespace());
+    if !starts_valid {
+        return None;
+    }
+    let Some(listed) = rest.trim_start().strip_prefix(CODES_MARKER) else {
         return Some(Directive::All);
     };
     let codes: Vec<String> = listed

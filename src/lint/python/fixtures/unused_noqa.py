@@ -1,0 +1,36 @@
+import os  # noqa: F401
+import sys  # noqa
+import re  # noqa: F401, F401
+import json  # noqa: E501, F401
+import math  # noqa: F811
+
+
+value = 1  # noqa
+other = 2  # noqa: F401
+third = 3  # noqa: XYZ123
+fourth = 4  # noqa: E501
+fifth = 5  # noqa: RUF100
+sixth = 6  # noqa:F841,F401
+seventh = l = 7  # noqa: E741
+eighth = undefined_name  # noqa: F821
+ninth = undefined_name  # noqa: F821, F841
+tenth = 10  # comentario # noqa: F401
+eleventh = 11  # noqa: TCH001
+twelfth = 12  # noqa: TC001
+
+
+def function():
+    unused = 1  # noqa: F841
+    also_unused = 2  # noqa
+    used = 3  # noqa: F841
+    return used
+
+
+text = """
+uno
+"""  # noqa: F401
+call = function(
+    undefined_inside,
+)  # noqa: F821
+import shutil  # type: ignore[import]  # noqa[F401]
+import glob  # noqa  : F401

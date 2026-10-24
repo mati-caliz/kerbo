@@ -232,6 +232,7 @@ rule_family!(PythonRule {
     TC005 => "tc005",
     UP036 => "up036",
     SIM113 => "sim113",
+    RUF100 => "ruf100",
     UP004 => "up004",
     UP005 => "up005",
     UP009 => "up009",

@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 35] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 36] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -316,6 +316,15 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 35] = [
             "remove the int() call",
             "The value is already an int (an integer literal, len(), round() without digits, math.floor() and the like), so the conversion does nothing.",
             "int(len(items)) becomes len(items).",
+        ),
+    ),
+    (
+        PythonRule::RUF100,
+        RuleText::new(
+            "Unused noqa directive",
+            "remove the directive or the codes it no longer needs",
+            "A noqa that silences nothing hides future problems on that line and misleads whoever reads it.",
+            "x = 1  # noqa: F401 on a line without F401 can go away.",
         ),
     ),
 ];

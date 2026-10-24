@@ -163,7 +163,15 @@ fn noqa_directives_silence_like_ruff() {
     let source = "import a  # noqa\nimport b  # NoQA: F401, E501\nimport c  # noqa: E501\nimport d  # noqa:\nx = None == \"\"\"\n\"\"\"  # noqa: E711\ny = None == \\\n    a  # noqa: E711\nz = None == \\\n    a\n";
     assert_eq!(
         rendered(&lints(source)),
-        ["3:8 F401", "4:8 F401", "5:5 PLR0133", "9:5 E711"]
+        [
+            "2:11 RUF100",
+            "3:11 RUF100",
+            "3:8 F401",
+            "4:8 F401",
+            "5:5 PLR0133",
+            "6:6 RUF100",
+            "9:5 E711"
+        ]
     );
     assert_eq!(
         rendered(&lints("# ruff: noqa\nimport os\n")),
@@ -179,6 +187,12 @@ fn noqa_directives_silence_like_ruff() {
 fn files_tree_sitter_cannot_parse_keep_only_the_local_rules() {
     let source = "import os\nlazy import json\nx = 1;\n";
     assert_eq!(rendered(&lints(source)), ["3:6 E703"]);
+}
+
+#[test]
+fn unparsed_files_only_flag_noqa_codes_that_do_not_need_findings() {
+    let source = "import os  # noqa: F401\nlazy import json  # noqa: E501\nx = 1  # noqa\n";
+    assert_eq!(rendered(&lints(source)), ["2:19 RUF100"]);
 }
 
 #[test]
