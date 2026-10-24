@@ -1468,13 +1468,22 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     UP014, G201, B035, B005, PLW0245, B021, B012 y B013. Paridad exacta salvo un D419 y un FURB105 en
     dos archivos que no están en UTF-8 y que ruff no lee (su E902); kerbo los analiza igual. Los
     casos quedaron en `fixtures/mixed_checks.py`.
+  - Hechas 27 reglas más en una tanda: UP028 (`for x in y: yield x`, también con tuplas; no en
+    funciones `async` ni si los nombres se leen en otro lado del alcance), PIE810, C417, PLC0132,
+    YTT201, YTT203, RUF040, PLR1733 y PLR1736 (hasta la sentencia que modifica la secuencia, sin
+    entrar en los destinos), FURB136, PLR1708, FURB132 (sólo con un nombre o un literal), UP050,
+    RUF020 (cada `|` en cualquier contexto), TRY401, FURB161, FURB168, PLE0117, LOG001, FURB163,
+    DTZ004, PERF101, B032 (salvo `self.x: T`), PLW0711, ASYNC251, ASYNC230 y ASYNC115. Paridad exacta
+    salvo cuatro avisos sueltos: dos C417 de `test_builtin.py`, donde kerbo no toma `list` como el
+    builtin porque otras funciones del archivo lo reasignan, y dos PERF101 (`plugin_base.py` de
+    sqlalchemy y `test_capi/test_time.py`) sin explicar todavía. Los casos quedaron en
+    `fixtures/tail_checks.py`.
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
-  - Lo que queda del conjunto por defecto (2026-10-24): 62 reglas con unos 1.900 avisos en el
-    corpus, contra más de 100.000 ya cubiertos. RUF100 (`noqa` sin uso) suma 1.437; el resto tiene
-    menos de 50 cada una: UP028 49, PYI036 47, PIE810 46, UP036 44, PYI034 26, PYI019 22,
-    SIM401 17, TC004 17, FURB122 15, PLE1300 12, C417 12, SIM113 11 y una cola de reglas con menos
-    de 10.
+  - Lo que queda del conjunto por defecto (2026-10-24): 35 reglas con unos 1.700 avisos en el
+    corpus. RUF100 (`noqa` sin uso) suma 1.437; el resto: PYI036 47, UP036 44, PYI034 26, FURB188 22,
+    PYI019 22, SIM401 17, TC004 17, FURB122 15, PLE1300 12, SIM113 11, RUF063 9, PYI055 8, PLE1307 7,
+    RUF028 6, RUF068 6, RUF009 5, ASYNC100 5, W605 2, PTH124 3, PLW0406 1, UP029 1 y otras sueltas.
   - Los archivos que no están en UTF-8 (ruff da E902 y no los analiza) se analizan igual: falta
     saltearlos o avisar como ruff. Se hacen en tandas de 15 a 25 reglas por
     tema, con un solo gate y una sola medición por tanda.

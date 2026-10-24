@@ -25,6 +25,7 @@ const BIT_OR: &str = "|";
 const NONE_LITERAL: &str = "none";
 const UNION: &str = "Union";
 const LITERAL: &str = "Literal";
+const NEVER_TYPES: [&str; 2] = ["Never", "NoReturn"];
 const FINAL: &str = "Final";
 const GENERIC: &str = "Generic";
 const SPLATS: [&str; 2] = ["list_splat", "dictionary_splat"];
@@ -95,6 +96,7 @@ pub fn type_hint_reports(model: &Model<'_>, source: &[u8], node: Node<'_>, mode:
         );
         reports.extend(duplicates(&members, source, PythonRule::PYI062));
     }
+    reports.extend(hints.never_in_union(node));
     reports.extend(hints.redundant_final_literal(node));
     if node.kind() == ATTRIBUTE
         && qualified_name(model, node, source).is_some_and(|name| BYTE_STRINGS.contains(&name.as_str()))
@@ -228,6 +230,32 @@ impl<'tree> Hints<'_, '_, '_> {
                 members.push(slice);
             }
         }
+    }
+
+    // RUF020: `Never | int` o `Union[NoReturn, int]`. Como ruff, mira los dos lados de cada `|` y los
+    // elementos de `Union`, en cualquier contexto.
+    fn never_in_union(self, node: Node<'_>) -> Vec<Report> {
+        let operands = if node.kind() == UNION_TYPE || self.is_bit_or(node) {
+            named(node)
+                .into_iter()
+                .filter(|part| part.kind() != COMMENT)
+                .collect()
+        } else if self.is_typing_subscript(node, UNION) {
+            subscript_parts(node)
+                .map(|(_, slices)| slices)
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        operands
+            .into_iter()
+            .map(unwrapped)
+            .filter(|operand| {
+                qualified_name(self.model, *operand, self.source)
+                    .is_some_and(|name| NEVER_TYPES.iter().any(|never| is_typing(&name, never)))
+            })
+            .map(|operand| Report::at(PythonRule::RUF020, operand, ""))
+            .collect()
     }
 
     // PYI064: `x: Final[Literal[1]] = ...`, donde alcanza con `Final`. Avisa en la asignación.

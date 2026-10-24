@@ -14,6 +14,7 @@ use super::qualified::{is_builtin_named, qualified_name};
 use super::resources::unmanaged_open;
 use super::supers::is_super_with_parameters;
 use super::suspicious_calls::suspicious_call_reports;
+use super::tail_calls::tail_call_reports;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, COMMENT, EXPRESSION_STATEMENT, FUNCTION_FIELD,
@@ -80,6 +81,7 @@ pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Rep
     reports.extend(integer_call_reports(model, source, call));
     reports.extend(cast_call_reports(model, source, call));
     reports.extend(misc_call_reports(model, source, call));
+    reports.extend(tail_call_reports(model, source, call));
     if let Some(function) = call.child_by_field_name(FUNCTION_FIELD) {
         reports.extend(called_alias_reports(model, source, function));
     }

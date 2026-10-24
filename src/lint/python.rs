@@ -20,6 +20,7 @@ mod imports;
 mod known_types;
 mod literal_checks;
 mod loop_else;
+mod loop_lookups;
 mod loop_variable_reads;
 mod loops;
 mod methods;
@@ -42,6 +43,7 @@ mod special_methods;
 mod splits;
 mod statement_checks;
 mod statements;
+mod tail_statements;
 pub mod taint;
 mod typing_names;
 
@@ -168,6 +170,8 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(statement_checks::reports(&nodes, source));
     reports.extend(collection_loops::reports(&nodes, source));
     reports.extend(pytest_checks::reports(&nodes, source));
+    reports.extend(tail_statements::reports(&nodes, source));
+    reports.extend(loop_lookups::reports(&nodes, source));
     reports.extend(typing_names::reports(&nodes, source));
     reports.extend(exception_flow::reports(&nodes, source));
     reports.extend(methods::reports(&nodes, source));

@@ -42,6 +42,8 @@ const NAMED_PARAMETERS: [&str; 2] = ["default_parameter", "typed_default_paramet
 pub enum Known {
     Dict,
     List,
+    Set,
+    Tuple,
 }
 
 impl Known {
@@ -49,6 +51,8 @@ impl Known {
         match self {
             Self::Dict => ["dictionary", "dictionary_comprehension"],
             Self::List => ["list", "list_comprehension"],
+            Self::Set => ["set", "set_comprehension"],
+            Self::Tuple => ["tuple", "tuple"],
         }
     }
 
@@ -56,6 +60,8 @@ impl Known {
         match self {
             Self::Dict => ["dict", "Dict"],
             Self::List => ["list", "List"],
+            Self::Set => ["set", "Set"],
+            Self::Tuple => ["tuple", "Tuple"],
         }
     }
 }

@@ -39,6 +39,7 @@ mod statements;
 mod stub_signatures;
 mod supers;
 mod suspicious_calls;
+mod tail_calls;
 mod targets;
 mod type_hints;
 mod type_names;

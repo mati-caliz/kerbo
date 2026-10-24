@@ -14,6 +14,14 @@ const ARGUMENTS_FIELD: &str = "arguments";
 const NUMBERS: [&str; 2] = ["integer", "float"];
 const ELLIPSIS: &str = "ellipsis";
 const FLOAT_BUILTIN: &str = "float";
+const VERSION_INFO: &str = "sys.version_info";
+const OPERATORS_FIELD: &str = "operators";
+const VALUE_FIELD: &str = "value";
+const SUBSCRIPT: &str = "subscript";
+const INTEGER: &str = "integer";
+const MAJOR: &str = "3";
+const EQUALITY: [&str; 2] = ["==", "!="];
+const ORDERINGS: [&str; 4] = ["<", "<=", ">", ">="];
 const NAN_TEXTS: [&str; 3] = ["nan", "+nan", "-nan"];
 const NAN_CONSTANTS: [&str; 4] = ["math.nan", "numpy.nan", "numpy.NaN", "numpy.NAN"];
 const IDEMPOTENT_BUILTINS: [&str; 8] = ["id", "len", "type", "int", "bool", "str", "repr", "bytes"];
@@ -31,6 +39,7 @@ pub fn comparison_reports(model: &Model<'_>, source: &[u8], comparison: Node<'_>
         .filter(|operand| is_nan(model, source, **operand))
         .map(|operand| Report::at(PythonRule::PLW0177, *operand, ""))
         .collect();
+    reports.extend(version_info_comparison(model, source, comparison, &operands));
     for pair in operands.windows(2) {
         let [left, right] = pair else {
             continue;
@@ -61,6 +70,42 @@ fn is_nan(model: &Model<'_>, source: &[u8], operand: Node<'_>) -> bool {
                 matches!(given.as_slice(), [only] if is_string(*only)
                     && text_value(*only, source).is_some_and(|value| NAN_TEXTS.contains(&value.to_ascii_lowercase().as_str())))
             })
+}
+
+// YTT201 (`sys.version_info[0] == 3`) y YTT203 (`sys.version_info[1] < 7`), que se rompen con
+// Python 4. Avisa en el subíndice.
+fn version_info_comparison(
+    model: &Model<'_>,
+    source: &[u8],
+    comparison: Node<'_>,
+    operands: &[Node<'_>],
+) -> Option<Report> {
+    let [left, right] = operands else {
+        return None;
+    };
+    let mut cursor = comparison.walk();
+    let operators: Vec<&str> = comparison
+        .children_by_field_name(OPERATORS_FIELD, &mut cursor)
+        .map(|operator| text(operator, source))
+        .collect();
+    let [operator] = operators.as_slice() else {
+        return None;
+    };
+    let indexes = left.child_by_field_name(VALUE_FIELD).filter(|value| {
+        left.kind() == SUBSCRIPT && qualified_name(model, *value, source).as_deref() == Some(VERSION_INFO)
+    })?;
+    let index = named(*left)
+        .into_iter()
+        .filter(|part| part.kind() != COMMENT && part.id() != indexes.id())
+        .map(|part| text(part, source))
+        .collect::<Vec<_>>();
+    let is_integer = right.kind() == INTEGER;
+    let rule = match index.as_slice() {
+        ["0"] if EQUALITY.contains(operator) && text(*right, source) == MAJOR => PythonRule::YTT201,
+        ["1"] if ORDERINGS.contains(operator) && is_integer => PythonRule::YTT203,
+        _ => return None,
+    };
+    Some(Report::at(rule, *left, ""))
 }
 
 fn is_same_name(left: Node<'_>, right: Node<'_>, source: &[u8]) -> bool {

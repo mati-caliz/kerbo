@@ -5,6 +5,7 @@ mod idioms;
 mod mixed_checks;
 mod modern;
 mod small_checks;
+mod tail_checks;
 mod typing;
 
 use crate::i18n::catalog::RuleText;
@@ -16,6 +17,7 @@ use idioms::IDIOM_TEXTS;
 use mixed_checks::MIXED_CHECK_TEXTS;
 use modern::MODERN_TEXTS;
 use small_checks::SMALL_CHECK_TEXTS;
+use tail_checks::TAIL_CHECK_TEXTS;
 use typing::TYPING_TEXTS;
 
 const UNKNOWN: RuleText = RuleText::new(
@@ -31,6 +33,7 @@ pub fn python(rule: PythonRule) -> RuleText {
         .chain(MODERN_TEXTS.iter())
         .chain(IDIOM_TEXTS.iter())
         .chain(CHECK_TEXTS.iter())
+        .chain(TAIL_CHECK_TEXTS.iter())
         .chain(MIXED_CHECK_TEXTS.iter())
         .chain(SMALL_CHECK_TEXTS.iter())
         .chain(TYPING_TEXTS.iter())

@@ -108,7 +108,7 @@ fn binds_name(target: Node<'_>, wanted: &str, source: &[u8]) -> bool {
         .any(|inner| binds_name(inner, wanted, source))
 }
 
-fn is_load(identifier: Node<'_>) -> bool {
+pub fn is_load(identifier: Node<'_>) -> bool {
     let mut child = identifier;
     let mut parent = identifier.parent();
     while let Some(container) = parent.filter(|container| CONTAINERS.contains(&container.kind())) {

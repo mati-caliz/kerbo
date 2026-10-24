@@ -1,0 +1,215 @@
+import asyncio
+import datetime
+import logging
+import math
+import sys
+import time
+from builtins import str as text_type
+from typing import Never, TypeVar
+
+import trio
+
+T = TypeVar("U")
+V = TypeVar("V")
+logger = logging.Logger(__name__)
+named_logger = logging.getLogger(__name__)
+values = {}
+values["key"]: int
+other: int
+
+
+class Meta(metaclass=type):
+    pass
+
+
+class Plain(metaclass=abc):
+    pass
+
+
+def generator(items, pairs):
+    for item in items:
+        yield item
+    for left, right in pairs:
+        yield left, right
+    for item in items:
+        yield item
+        print(item)
+    for item in items:
+        yield other
+    for key, value in pairs:
+        yield value, key
+
+
+def starts(message, other_message):
+    return (
+        message.startswith("a") or message.startswith("b"),
+        message.endswith("a") or message.endswith("b") or other_message.endswith("c"),
+        message.startswith("a") and message.startswith("b"),
+        message.startswith(("a", "b")) or message.startswith("c"),
+        message.startswith("a") or other_message.startswith("b"),
+    )
+
+
+def maps(items):
+    return (
+        map(lambda x: x + 1, items),
+        list(map(lambda x: x * 2, items)),
+        set(map(lambda x: x, items)),
+        dict(map(lambda pair: (pair, pair), items)),
+        map(str, items),
+        map(lambda x, y: x + y, items, items),
+    )
+
+
+def versions():
+    return (
+        sys.version_info[1] < 7,
+        sys.version_info[0] == 3,
+        sys.version_info[0] >= 3,
+        sys.version_info.minor <= 5,
+    )
+
+
+def asserts(items):
+    assert len(items), 2
+    assert len(items), "message"
+
+
+def lookups(mapping, items):
+    for key, value in mapping.items():
+        print(mapping[key])
+    for index, item in enumerate(items):
+        print(items[index])
+    for index, item in enumerate(items):
+        items[index] = item
+
+
+def ternaries(a, b):
+    return (
+        a if a > b else b,
+        b if a > b else a,
+        a if a >= b else b,
+        a if b > a else b,
+        a if a > b else 0,
+    )
+
+
+def stopping():
+    yield 1
+    raise StopIteration
+
+
+def stopping_call():
+    yield 1
+    raise StopIteration("done")
+
+
+def sets(item):
+    numbers = {1, 2}
+    if item in numbers:
+        numbers.remove(item)
+    return numbers
+
+
+def never() -> Never | int:
+    return 1
+
+
+def handlers():
+    try:
+        pass
+    except ValueError as error:
+        logger.exception(f"Found an error: {error}")
+        logging.exception("failed %s", error)
+        logger.exception("plain")
+
+
+def bits(number, obj):
+    return bin(number).count("1"), isinstance(obj, type(None)), isinstance(obj, (int, type(None)))
+
+
+def outer():
+    def inner():
+        nonlocal missing
+        missing = 1
+
+    return inner
+
+
+def logs(number):
+    return math.log(number, math.e), math.log(number, 2), math.log(number, 10), math.log(number, 3)
+
+
+def timestamps():
+    return datetime.datetime.utcfromtimestamp(0), text_type(1)
+
+
+def loops(items):
+    for item in list(items):
+        print(item)
+    for item in list((1, 2)):
+        print(item)
+    for item in list(items):
+        items.append(item)
+
+
+def exceptions():
+    try:
+        pass
+    except ValueError or TypeError:
+        pass
+    try:
+        pass
+    except ValueError and TypeError:
+        pass
+
+
+async def asynchronous():
+    time.sleep(1)
+    with open("file") as handle:
+        print(handle)
+    await trio.sleep(0)
+    await asyncio.sleep(0)
+    await trio.sleep(1)
+
+
+async def async_generator(items):
+    for item in items:
+        yield item
+
+
+def tuple_generator(pairs):
+    for first, second in pairs:
+        yield first, second
+
+
+class Annotated:
+    def __init__(self):
+        self.value: int
+
+
+def targets(frame, other):
+    result = {}
+    for index, item in enumerate(frame):
+        result[frame[index]] = item
+    for index, _ in enumerate(frame):
+        print(frame[index])
+    gamma = {1, 2}
+    if other in gamma:
+        gamma.remove(other)
+    gamma = gamma - {3}
+    return result, Never | other
+
+
+def holder():
+    class Inner:
+        nonlocal later
+    later = 1
+    return Inner
+
+
+def nested_log():
+    try:
+        pass
+    except ValueError as error:
+        logger.exception(f"{type(error).__name__}")
