@@ -187,6 +187,9 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
                 .push(Report::at(PythonRule::F722, string, value.trim()));
             return;
         };
+        if self.file.stub {
+            self.reports.push(Report::at(PythonRule::PYI020, string, ""));
+        }
         let typing_only =
             is_typing_only_annotation(string, self.boundaries.future_annotations() || self.file.stub);
         if typing_only {

@@ -4,6 +4,7 @@ use super::boolean_chains::boolean_chain_reports;
 use super::calls::{call_reports, is_first_element_subscript};
 use super::comparisons::comparison_reports;
 use super::conversions::conversion_reports;
+use super::if_blocks::dict_get_expression;
 use super::isinstance_calls::{BOOLEAN_OPERATOR, duplicate_isinstance_reports};
 use super::literals::is_native_literal_call;
 use super::model::{BindingKind, Model, ScopeKind};
@@ -111,6 +112,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
                 self.children(node, mode);
             }
             CONDITIONAL => {
+                self.reports
+                    .extend(dict_get_expression(&self.model, self.source, node));
                 let mut parts = named(node);
                 if parts.len() > 1 {
                     parts.swap(0, 1);

@@ -1,8 +1,8 @@
 use tree_sitter::Node;
 
 use super::ast::{
-    ASSIGNMENT, CALL, CLASS, FUNCTION, FUNCTION_FIELD, IDENTIFIER, LAMBDA, LEFT_FIELD, MODULE, NAME_FIELD,
-    RIGHT_FIELD, TYPE_FIELD, named, text,
+    ASSIGNMENT, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, CLASS, FUNCTION, FUNCTION_FIELD, IDENTIFIER,
+    KEYWORD_ARGUMENT, LAMBDA, LEFT_FIELD, MODULE, NAME_FIELD, RIGHT_FIELD, TYPE_FIELD, named, text,
 };
 
 const SCOPES: [&str; 4] = [FUNCTION, CLASS, LAMBDA, MODULE];
@@ -216,4 +216,48 @@ fn is_known_annotation(annotation: Node<'_>, kind: Known, source: &[u8]) -> bool
     let base = written.split('[').next().unwrap_or(written).trim();
     let last = base.rsplit('.').next().unwrap_or(base);
     kind.names().contains(&last)
+}
+
+// Después de `statement`, en su alcance, el nombre se lee antes de volver a ligarse: la lectura usa el
+// binding que dejó la sentencia, como las referencias de ruff.
+pub fn is_read_after(statement: Node<'_>, name: &str, source: &[u8]) -> bool {
+    let Some(scope) =
+        std::iter::successors(statement.parent(), Node::parent).find(|node| SCOPES.contains(&node.kind()))
+    else {
+        return false;
+    };
+    let mut uses = Vec::new();
+    let mut pending = vec![scope];
+    while let Some(node) = pending.pop() {
+        if node.kind() == IDENTIFIER {
+            if node.start_byte() >= statement.end_byte()
+                && text(node, source) == name
+                && is_name_reference(node)
+            {
+                uses.push(node);
+            }
+            continue;
+        }
+        pending.extend(named(node));
+    }
+    uses.iter()
+        .min_by_key(|identifier| identifier.start_byte())
+        .is_some_and(|first| {
+            !is_binding(*first) || first.parent().is_some_and(|parent| parent.kind() == AUGMENTED)
+        })
+}
+
+// Un identificador que nombra una variable: no el nombre de un keyword (`f(x=1)`) ni el de un atributo.
+pub fn is_name_reference(identifier: Node<'_>) -> bool {
+    let Some(parent) = identifier.parent() else {
+        return true;
+    };
+    let field = match parent.kind() {
+        KEYWORD_ARGUMENT => NAME_FIELD,
+        ATTRIBUTE => ATTRIBUTE_FIELD,
+        _ => return true,
+    };
+    parent
+        .child_by_field_name(field)
+        .is_none_or(|named_field| named_field.id() != identifier.id())
 }

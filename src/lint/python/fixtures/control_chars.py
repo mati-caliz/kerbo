@@ -1,0 +1,9 @@
+import os
+
+x = "a‏b" * 2
+y = 1  # ‮ comentario
+#!/usr/bin/env python
+    #!/usr/bin/env python
+z = """
+#!/usr/bin/env python
+"""

@@ -1480,10 +1480,27 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     `fixtures/tail_checks.py`.
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
-  - Lo que queda del conjunto por defecto (2026-10-24): 35 reglas con unos 1.700 avisos en el
-    corpus. RUF100 (`noqa` sin uso) suma 1.437; el resto: PYI036 47, UP036 44, PYI034 26, FURB188 22,
-    PYI019 22, SIM401 17, TC004 17, FURB122 15, PLE1300 12, SIM113 11, RUF063 9, PYI055 8, PLE1307 7,
-    RUF028 6, RUF068 6, RUF009 5, ASYNC100 5, W605 2, PTH124 3, PLW0406 1, UP029 1 y otras sueltas.
+  - Hechas 27 reglas más en una tanda: FURB188, SIM401 (también la forma `d[k] if k in d else x`,
+    estable en ruff 0.17), FURB122 y FURB129 (con el `is_io_base` de ruff sobre el binding al que
+    resuelve el nombre), PLE1300 (formato `%` y `.format`, con el `FormatSpec::parse` de ruff),
+    PLE1307, RUF063, RUF068, RUF009, ASYNC100, ASYNC222, PLE2502, PTH124, W605, UP049, PYI006, UP029,
+    PLE0643, PLW0406 (sólo dentro de un paquete; en un `__init__.py` nunca coincide, como en ruff),
+    INT002 (sin el plural de `ngettext`, que es de preview), EXE005, PLE0604, PYI020, PLE1142, TC005,
+    UP036 (con 3.11 como versión mínima) y SIM113. Paridad: 173 de 178, sin avisos de más; los cinco
+    que faltan están en archivos de CPython que tree-sitter no parsea (`lazy import` y
+    `test_type_params.py`). Los casos quedaron en `fixtures/assorted_checks.py`,
+    `fixtures/assorted_stub.pyi` y `fixtures/control_chars.py`.
+  - Pendientes de esa tanda: W605 no mira los especificadores de formato de un f-string ni una barra
+    al final de un tramo literal antes de `{`; SIM401 calcula el largo de la línea con el texto
+    original y no con el generador de ruff; PYI020 no mira anotaciones entre comillas adentro de
+    otras; RUF009 trata las clases de `attrs` como dataclasses comunes (sin `auto_attribs`); PLE1307
+    no resuelve el tipo de una operación binaria (`"a" + "b"`). Ninguna de estas reglas trae arreglo
+    todavía (ruff lo tiene en FURB188, SIM401, FURB122, FURB129, W605, UP049, UP029, PYI020, TC005,
+    UP036 y RUF068).
+  - Lo que queda del conjunto por defecto (2026-10-24): 7 reglas con unos 1.560 avisos en el corpus.
+    RUF100 (`noqa` sin uso) suma 1.437; el resto: PYI036 47, PYI034 26, PYI019 22, TC004 17, PYI055 8
+    y RUF028 6 (comentarios `fmt: off`/`fmt: skip` en lugares donde el formateador de ruff no los
+    toma, que pide conocer ese formateador).
   - Los archivos que no están en UTF-8 (ruff da E902 y no los analiza) se analizan igual: falta
     saltearlos o avisar como ruff. Se hacen en tandas de 15 a 25 reglas por
     tema, con un solo gate y una sola medición por tanda.

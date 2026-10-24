@@ -11,6 +11,41 @@ use crate::lint::python::semantic::boundary::Boundary;
 use crate::rules::PythonRule;
 
 const SEPARATOR: char = '.';
+const WILDCARD: &str = "*";
+const MEMBER_SEPARATOR: &str = ", ";
+const BUILTIN_MODULES: [&str; 2] = ["builtins", "six.moves.builtins"];
+const BUILTIN_MEMBERS: [&str; 24] = [
+    "*",
+    "ascii",
+    "bytes",
+    "chr",
+    "dict",
+    "filter",
+    "hex",
+    "input",
+    "int",
+    "isinstance",
+    "list",
+    "map",
+    "max",
+    "min",
+    "next",
+    "object",
+    "oct",
+    "open",
+    "pow",
+    "range",
+    "round",
+    "str",
+    "super",
+    "zip",
+];
+const SIX_MEMBERS: [&str; 2] = ["callable", "next"];
+const SIX_MOVES_MEMBERS: [&str; 5] = ["filter", "input", "map", "range", "zip"];
+const IO_MODULE: &str = "io";
+const IO_OPEN: &str = "open";
+const SIX: &str = "six";
+const SIX_MOVES: &str = "six.moves";
 
 pub struct Imported<'tree> {
     name: &'tree str,
@@ -26,6 +61,7 @@ pub trait Imports<'tree> {
     fn aliased(&self, aliased: Node<'tree>, module: Option<&str>) -> Option<Imported<'tree>>;
     fn bind_import(&mut self, statement: Node<'tree>, imported: Imported<'tree>, kind: BindingKind);
     fn useless_import_alias(&mut self, name: Node<'tree>);
+    fn unnecessary_builtin_imports(&mut self, statement: Node<'tree>, module: &str);
 }
 
 impl<'tree> Imports<'tree> for Visitor<'tree> {
@@ -44,19 +80,23 @@ impl<'tree> Imports<'tree> for Visitor<'tree> {
 
     fn import_from(&mut self, statement: Node<'tree>) {
         self.import_out_of_place(statement);
+        let module = statement
+            .child_by_field_name(MODULE_NAME_FIELD)
+            .map(|module| self.text(module))
+            .unwrap_or_default();
         if children(statement)
             .iter()
             .any(|child| child.kind() == WILDCARD_IMPORT)
         {
+            if is_builtin_import(module, WILDCARD) {
+                self.reports
+                    .push(Report::at(PythonRule::UP029, statement, WILDCARD));
+            }
             if let Some(scope) = self.model.current_mut() {
                 scope.star_import = true;
             }
             return;
         }
-        let module = statement
-            .child_by_field_name(MODULE_NAME_FIELD)
-            .map(|module| self.text(module))
-            .unwrap_or_default();
         for name in fields(statement, NAME_FIELD) {
             self.useless_import_alias(name);
             let imported = if name.kind() == DOTTED_NAME {
@@ -74,6 +114,7 @@ impl<'tree> Imports<'tree> for Visitor<'tree> {
                 self.bind_import(statement, imported, BindingKind::FromImport);
             }
         }
+        self.unnecessary_builtin_imports(statement, module);
     }
 
     fn future_import(&mut self, statement: Node<'tree>) {
@@ -124,6 +165,32 @@ impl<'tree> Imports<'tree> for Visitor<'tree> {
     }
 
     // PLC0414: `import x as x`, fuera de stubs y de `__init__.py`, donde sirve para reexportar.
+    // UP029: `from builtins import zip` (o de `six`, `io`), que ya están sin importar. Como ruff, sólo
+    // los nombres sin alias que no pisan otro binding del mismo alcance.
+    fn unnecessary_builtin_imports(&mut self, statement: Node<'tree>, module: &str) {
+        let scope = self.model.scope;
+        let unnecessary: Vec<&str> = fields(statement, NAME_FIELD)
+            .into_iter()
+            .filter(|name| name.kind() == DOTTED_NAME)
+            .map(|name| self.text(name))
+            .filter(|member| is_builtin_import(module, member))
+            .filter(|member| {
+                self.model
+                    .scope_of(scope)
+                    .names
+                    .get(*member)
+                    .is_some_and(|id| self.model.shadowed_in_scope(scope, *id).is_none())
+            })
+            .collect();
+        if !unnecessary.is_empty() {
+            self.reports.push(Report::at(
+                PythonRule::UP029,
+                statement,
+                &unnecessary.join(MEMBER_SEPARATOR),
+            ));
+        }
+    }
+
     fn useless_import_alias(&mut self, name: Node<'tree>) {
         if name.kind() != ALIASED_IMPORT || self.file.stub || self.file.package_init {
             return;
@@ -160,4 +227,17 @@ fn dotted_import<'tree>(name: Node<'tree>, full: &'tree str) -> (Imported<'tree>
         flags: 0,
     };
     (imported, kind)
+}
+
+fn is_builtin_import(module: &str, member: &str) -> bool {
+    if BUILTIN_MODULES.contains(&module) {
+        BUILTIN_MEMBERS.contains(&member)
+    } else {
+        match module {
+            IO_MODULE => member == IO_OPEN,
+            SIX => SIX_MEMBERS.contains(&member),
+            SIX_MOVES => SIX_MOVES_MEMBERS.contains(&member),
+            _ => false,
+        }
+    }
 }

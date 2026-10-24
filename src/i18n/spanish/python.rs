@@ -1,3 +1,4 @@
+mod assorted_checks;
 mod checks;
 mod classic;
 mod formats;
@@ -10,6 +11,7 @@ mod typing;
 
 use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
+use assorted_checks::ASSORTED_CHECK_TEXTS;
 use checks::CHECK_TEXTS;
 use classic::CLASSIC_TEXTS;
 use formats::FORMAT_TEXTS;
@@ -33,6 +35,7 @@ pub fn python(rule: PythonRule) -> RuleText {
         .chain(MODERN_TEXTS.iter())
         .chain(IDIOM_TEXTS.iter())
         .chain(CHECK_TEXTS.iter())
+        .chain(ASSORTED_CHECK_TEXTS.iter())
         .chain(TAIL_CHECK_TEXTS.iter())
         .chain(MIXED_CHECK_TEXTS.iter())
         .chain(SMALL_CHECK_TEXTS.iter())

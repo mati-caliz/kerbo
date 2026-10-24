@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 use super::Pending;
+use super::dataclass_defaults::dataclass_call_defaults;
 use super::model::{BindingKind, MODULE_SCOPE, Model, Resolution};
 use super::mutability::{Resolver, unwrap_type, without_subscript};
 use super::qualified::is_typing;
@@ -16,7 +17,7 @@ use crate::rules::PythonRule;
 const SPECIAL_ATTRIBUTES: [&str; 4] = ["__slots__", "__dict__", "__weakref__", "__annotations__"];
 const TYPING_MODULES: [&str; 3] = ["typing", "typing_extensions", "_typeshed"];
 const DATACLASS_MODULES: [&str; 3] = ["dataclasses", "attr", "attrs"];
-const CLASS_VAR: &str = "ClassVar";
+pub const CLASS_VAR: &str = "ClassVar";
 const FINAL: &str = "Final";
 const DATACLASS_DECORATORS: [&str; 10] = [
     "dataclasses.dataclass",
@@ -54,16 +55,16 @@ const CTYPES_BASES: [&str; 6] = [
 ];
 const CTYPES_FIELDS: &str = "_fields_";
 const SUPERCLASSES_FIELD: &str = "superclasses";
-const DEFINITION_FIELD: &str = "definition";
+pub const DEFINITION_FIELD: &str = "definition";
 const DECORATOR: &str = "decorator";
 const GENERIC_TYPE: &str = "generic_type";
-const MODULE_SEPARATOR: char = '.';
+pub const MODULE_SEPARATOR: char = '.';
 const DICTIONARY_SPLAT: &str = "dictionary_splat";
 
 // Los módulos importados en algún lugar del archivo, como `seen_module` de ruff.
-struct SeenModules {
-    typing: bool,
-    dataclasses: bool,
+pub struct SeenModules {
+    pub typing: bool,
+    pub dataclasses: bool,
 }
 
 // RUF012: un atributo de clase con un valor mutable, que comparten todas las instancias. Corre al
@@ -94,15 +95,19 @@ pub fn mutable_class_defaults(model: &Model<'_>, source: &[u8], classes: &[Pendi
                 source,
                 scope: class.scope,
             };
-            class_reports(&resolver, &seen, class.node)
+            let mut reports = class_reports(&resolver, &seen, class.node);
+            if seen.dataclasses && dataclass_decorator(&resolver, class.node).is_some() {
+                reports.extend(dataclass_call_defaults(&resolver, &seen, class.node));
+            }
+            reports
         })
         .collect()
 }
 
-struct Assignment<'tree> {
-    targets: Vec<Node<'tree>>,
-    annotation: Option<Node<'tree>>,
-    value: Node<'tree>,
+pub struct Assignment<'tree> {
+    pub targets: Vec<Node<'tree>>,
+    pub annotation: Option<Node<'tree>>,
+    pub value: Node<'tree>,
 }
 
 fn class_reports(resolver: &Resolver<'_, '_>, seen: &SeenModules, class: Node<'_>) -> Vec<Report> {
@@ -153,7 +158,7 @@ fn class_reports(resolver: &Resolver<'_, '_>, seen: &SeenModules, class: Node<'_
     reports
 }
 
-fn assignments(class: Node<'_>) -> Vec<Assignment<'_>> {
+pub fn assignments(class: Node<'_>) -> Vec<Assignment<'_>> {
     class
         .child_by_field_name(BODY_FIELD)
         .map(named)
@@ -191,7 +196,7 @@ fn is_special_attribute(target: Node<'_>, source: &[u8]) -> bool {
 }
 
 // `ClassVar` o `Final`, solos o con su tipo entre corchetes.
-fn annotation_is(resolver: &Resolver<'_, '_>, annotation: Node<'_>, member: &str) -> bool {
+pub fn annotation_is(resolver: &Resolver<'_, '_>, annotation: Node<'_>, member: &str) -> bool {
     let annotation = unwrap_type(annotation);
     let head = if annotation.kind() == GENERIC_TYPE {
         named(annotation).first().copied().unwrap_or(annotation)
@@ -204,6 +209,11 @@ fn annotation_is(resolver: &Resolver<'_, '_>, annotation: Node<'_>, member: &str
 }
 
 fn has_dataclass_decorator(resolver: &Resolver<'_, '_>, class: Node<'_>) -> bool {
+    dataclass_decorator(resolver, class).is_some()
+}
+
+// El decorador de dataclass de la clase, con sus argumentos si es una llamada.
+pub fn dataclass_decorator<'tree>(resolver: &Resolver<'_, '_>, class: Node<'tree>) -> Option<Node<'tree>> {
     class
         .parent()
         .filter(|parent| parent.kind() == DECORATED)
@@ -212,16 +222,14 @@ fn has_dataclass_decorator(resolver: &Resolver<'_, '_>, class: Node<'_>) -> bool
         .into_iter()
         .filter(|child| child.kind() == DECORATOR)
         .filter_map(|decorator| named(decorator).first().copied())
-        .map(|expression| {
-            if expression.kind() == CALL {
+        .find(|expression| {
+            let decorator = if expression.kind() == CALL {
                 expression
                     .child_by_field_name(FUNCTION_FIELD)
-                    .unwrap_or(expression)
+                    .unwrap_or(*expression)
             } else {
-                expression
-            }
-        })
-        .any(|decorator| {
+                *expression
+            };
             resolver
                 .qualified(decorator)
                 .is_some_and(|name| DATACLASS_DECORATORS.contains(&name.as_str()))

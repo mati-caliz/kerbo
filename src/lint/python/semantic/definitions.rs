@@ -30,6 +30,7 @@ const DEFINITION_FIELD: &str = "definition";
 const DECORATOR: &str = "decorator";
 const PARAMETERS_FIELD: &str = "parameters";
 const TYPE_PARAMETERS_FIELD: &str = "type_parameters";
+const PRIVATE_PREFIX: char = '_';
 const SUPERCLASSES_FIELD: &str = "superclasses";
 const RETURN_TYPE_FIELD: &str = "return_type";
 const GLOBAL_STATEMENT: &str = "global_statement";
@@ -186,6 +187,8 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
             let name = std::iter::successors(Some(*first), |node| named(*node).first().copied())
                 .find(|node| node.kind() == IDENTIFIER);
             if let Some(name) = name {
+                self.reports
+                    .extend(private_type_parameter(definition, name, self.text(name)));
                 self.bind_name(name, Store::plain(BindingKind::TypeParameter, definition));
             }
             for bound in bounds {
@@ -345,4 +348,11 @@ pub fn enclosing_statement(node: Node<'_>) -> Option<Node<'_>> {
     crate::lint::python::ast::statement_ancestors(node).find(|ancestor| {
         ancestor.kind().ends_with(STATEMENT_SUFFIX) || matches!(ancestor.kind(), FUNCTION | CLASS | DECORATED)
     })
+}
+
+// UP049: `class C[_T]`, un parámetro de tipo con guion bajo adelante; `_T_` y `__T__` no cuentan.
+fn private_type_parameter(definition: Node<'_>, name: Node<'_>, text: &str) -> Option<Report> {
+    let private = text.starts_with(PRIVATE_PREFIX) && !text.ends_with(PRIVATE_PREFIX);
+    (private && matches!(definition.kind(), FUNCTION | CLASS))
+        .then(|| Report::at(PythonRule::UP049, name, ""))
 }

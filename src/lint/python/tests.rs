@@ -261,3 +261,37 @@ fn module_names_are_checked_only_inside_packages() {
         ]
     );
 }
+
+#[test]
+fn self_imports_are_found_from_the_package_path() {
+    let tree = TempTree::new("python-import-self");
+    tree.write("pkg/__init__.py", "");
+    tree.write("pkg/sub/__init__.py", "");
+    let module = "import pkg.sub.mod
+import pkg.sub.mod as alias
+import pkg.sub
+from pkg.sub import mod
+from . import mod as again
+from .. import sub
+from .mod import thing
+from ... import other
+import os
+";
+    let found = |relative: &str, source: &str| {
+        let path = tree.path().join(relative);
+        let mut lines = rendered(&lints_at(&path.to_string_lossy(), source, strict()));
+        lines.retain(|line| line.ends_with("PLW0406"));
+        lines
+    };
+    assert_eq!(
+        found("pkg/sub/mod.py", module),
+        ["1:8 PLW0406", "2:8 PLW0406", "4:21 PLW0406", "5:15 PLW0406"]
+    );
+    let quiet = [
+        ("pkg/sub/__init__.py", "import pkg.sub\nfrom pkg import sub\n"),
+        ("loose.py", "import loose\n"),
+    ];
+    for (relative, source) in quiet {
+        assert_eq!(found(relative, source), Vec::<String>::new(), "{relative}");
+    }
+}

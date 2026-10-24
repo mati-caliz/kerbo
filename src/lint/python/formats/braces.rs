@@ -8,6 +8,16 @@ const CONVERSION_SEPARATOR: char = '!';
 const ATTRIBUTE: char = '.';
 const INDEX_OPENING: char = '[';
 const INDEX_CLOSING: char = ']';
+const ALIGNMENTS: [char; 4] = ['<', '>', '=', '^'];
+const SIGNS: [char; 3] = ['+', '-', ' '];
+const ALTERNATE_FORM: char = '#';
+const ZERO: char = '0';
+const GROUPINGS: [char; 2] = [',', '_'];
+const PRECISION: char = '.';
+const CONVERSIONS: [char; 4] = ['s', 'r', 'a', 'b'];
+const FORMAT_TYPES: [char; 16] = [
+    's', 'b', 'c', 'd', 'o', 'n', 'N', 'x', 'X', 'e', 'E', 'f', 'F', 'g', 'G', '%',
+];
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct BraceSummary {
@@ -33,6 +43,76 @@ pub fn summary(format: &str) -> Option<BraceSummary> {
         }
     }
     Some(summary)
+}
+
+// PLE1300: los tipos de formato que no existen (`"{:z}"`), con el `FormatSpec::parse` de ruff. Un
+// especificador con llaves adentro sólo se revisa en las llaves de adentro.
+pub fn invalid_format_types(format: &str) -> Vec<char> {
+    let Some(found) = fields(format) else {
+        return Vec::new();
+    };
+    found
+        .iter()
+        .flat_map(|field| {
+            if field.spec.contains(OPENING) {
+                fields(&field.spec)
+                    .unwrap_or_default()
+                    .iter()
+                    .filter_map(|nested| invalid_format_type(&nested.spec))
+                    .collect()
+            } else {
+                invalid_format_type(&field.spec)
+                    .into_iter()
+                    .collect::<Vec<char>>()
+            }
+        })
+        .collect()
+}
+
+fn invalid_format_type(spec: &str) -> Option<char> {
+    let mut rest = spec;
+    let mut characters = rest.chars();
+    if characters.next() == Some(CONVERSION_SEPARATOR)
+        && characters
+            .next()
+            .is_some_and(|conversion| CONVERSIONS.contains(&conversion))
+    {
+        rest = characters.as_str();
+    }
+    rest = without_fill_and_align(rest);
+    rest = rest.strip_prefix(SIGNS).unwrap_or(rest);
+    rest = rest.strip_prefix(ALTERNATE_FORM).unwrap_or(rest);
+    rest = rest.strip_prefix(ZERO).unwrap_or(rest);
+    rest = without_digits(rest)?;
+    rest = rest.strip_prefix(GROUPINGS).unwrap_or(rest);
+    if let Some(precision) = rest.strip_prefix(PRECISION) {
+        let after = without_digits(precision)?;
+        if after.len() < precision.len() {
+            rest = after;
+        }
+    }
+    rest.chars()
+        .next()
+        .filter(|format_type| !FORMAT_TYPES.contains(format_type))
+}
+
+fn without_fill_and_align(spec: &str) -> &str {
+    let mut characters = spec.chars();
+    let Some(first) = characters.next() else {
+        return spec;
+    };
+    let after_fill = characters.as_str();
+    match after_fill.strip_prefix(ALIGNMENTS) {
+        Some(rest) => rest,
+        None if ALIGNMENTS.contains(&first) => after_fill,
+        None => spec,
+    }
+}
+
+fn without_digits(text: &str) -> Option<&str> {
+    let digits = text.chars().take_while(char::is_ascii_digit).count();
+    let rest = text.get(digits..)?;
+    (digits == 0 || text.get(..digits)?.parse::<usize>().is_ok()).then_some(rest)
 }
 
 impl BraceSummary {

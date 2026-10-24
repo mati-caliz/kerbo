@@ -1,5 +1,5 @@
 // Cada archivo de ejemplo con la salida de ruff 0.17 al lado.
-pub const FIXTURES: [(&str, &str, &str); 39] = [
+pub const FIXTURES: [(&str, &str, &str); 42] = [
     (
         "scopes.py",
         include_str!("../fixtures/scopes.py"),
@@ -189,6 +189,21 @@ pub const FIXTURES: [(&str, &str, &str); 39] = [
         "tail_checks.py",
         include_str!("../fixtures/tail_checks.py"),
         include_str!("../fixtures/tail_checks.ruff"),
+    ),
+    (
+        "assorted_checks.py",
+        include_str!("../fixtures/assorted_checks.py"),
+        include_str!("../fixtures/assorted_checks.ruff"),
+    ),
+    (
+        "assorted_stub.pyi",
+        include_str!("../fixtures/assorted_stub.pyi"),
+        include_str!("../fixtures/assorted_stub.ruff"),
+    ),
+    (
+        "control_chars.py",
+        include_str!("../fixtures/control_chars.py"),
+        include_str!("../fixtures/control_chars.ruff"),
     ),
     (
         "package/__init__.py",

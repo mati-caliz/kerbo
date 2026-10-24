@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::aliases::raise_reports;
+use super::compound_checks::compound_reports;
 use super::effects::useless_expression;
 use super::model::{BindingKind, GLOBAL, MODULE_SCOPE, NAME_ERROR, NONLOCAL, ScopeKind, Site};
 use super::qualified::is_builtin_named;
@@ -76,6 +77,8 @@ impl<'tree> Statements<'tree> for Visitor<'tree> {
 
     fn statement(&mut self, statement: Node<'tree>) {
         self.track_boundaries(statement);
+        self.reports
+            .extend(compound_reports(&self.model, self.source, statement));
         match statement.kind() {
             EXPRESSION_STATEMENT => self.expression_statement(statement),
             IMPORT => self.import(statement),

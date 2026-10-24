@@ -1,3 +1,4 @@
+mod argument_types;
 mod braces;
 mod fstring;
 mod percent;
@@ -13,6 +14,7 @@ use super::ast::{
 };
 use super::escapes::text_value;
 use crate::rules::PythonRule;
+use argument_types::mismatched_types;
 use braces::BraceSummary;
 pub use fstring::is_convertible_format_call;
 use percent::{PercentError, PercentSummary};
@@ -80,11 +82,18 @@ fn percent_format(operation: Node<'_>, source: &[u8]) -> Vec<Report> {
     };
     let right = unparenthesized(right);
     match percent::summary(&format) {
-        Err(PercentError::Unsupported) => vec![Report::at(PythonRule::F509, operation, "")],
+        Err(PercentError::Unsupported(conversion)) => vec![
+            Report::at(PythonRule::F509, operation, ""),
+            Report::at(PythonRule::PLE1300, operation, &conversion.to_string()),
+        ],
         Err(PercentError::Invalid) => vec![Report::at(PythonRule::F501, operation, "")],
         Ok(summary) => percent_rules(&summary, right, source)
             .into_iter()
             .map(|(rule, subject)| Report::at(rule, operation, &subject))
+            .chain(
+                mismatched_types(&format, right, source)
+                    .then(|| Report::at(PythonRule::PLE1307, operation, "")),
+            )
             .collect(),
     }
 }
@@ -202,6 +211,9 @@ fn brace_format(call: Node<'_>, source: &[u8]) -> Vec<Report> {
     let Some(summary) = braces::summary(&format) else {
         return vec![Report::at(PythonRule::F521, call, "")];
     };
+    let invalid_types = braces::invalid_format_types(&format)
+        .into_iter()
+        .map(|format_type| Report::at(PythonRule::PLE1300, call, &format_type.to_string()));
     let arguments = call.child_by_field_name(ARGUMENTS_FIELD);
     let arguments = arguments.map_or_else(Vec::new, |arguments| {
         if arguments.kind() == GENERATOR {
@@ -213,6 +225,7 @@ fn brace_format(call: Node<'_>, source: &[u8]) -> Vec<Report> {
     brace_rules(&summary, &arguments, source)
         .into_iter()
         .map(|(rule, subject)| Report::at(rule, call, &subject))
+        .chain(invalid_types)
         .collect()
 }
 

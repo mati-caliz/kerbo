@@ -22,7 +22,7 @@ pub struct PercentSummary {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PercentError {
-    Unsupported,
+    Unsupported(char),
     Invalid,
 }
 
@@ -92,7 +92,7 @@ fn specifier(characters: &mut Peekable<Chars<'_>>) -> Result<Specifier, PercentE
     characters.next_if(|modifier| LENGTH_MODIFIERS.contains(modifier));
     let conversion = characters.next().ok_or(PercentError::Invalid)?;
     if !CONVERSIONS.contains(&conversion) {
-        return Err(PercentError::Unsupported);
+        return Err(PercentError::Unsupported(conversion));
     }
     Ok(Specifier {
         key,

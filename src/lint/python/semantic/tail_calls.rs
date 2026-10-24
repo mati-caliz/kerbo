@@ -38,6 +38,8 @@ const AS_PATTERN: &str = "as_pattern";
 const ALIAS_FIELD: &str = "alias";
 const VALUE_FIELD: &str = "value";
 const BLOCKING_SLEEP: &str = "time.sleep";
+const PROCESS_WAITS: [&str; 5] = ["os.wait", "os.wait3", "os.wait4", "os.waitid", "os.waitpid"];
+const PY_PATH: &str = "py.path.local";
 const BLOCKING_OPEN: [&str; 3] = ["builtins.open", "io.open", "io.open_code"];
 const ZERO_SLEEPS: [&str; 2] = ["trio.sleep", "anyio.sleep"];
 const ZERO: &str = "0";
@@ -48,8 +50,9 @@ const SCOPES: [&str; 3] = [FUNCTION, CLASS, LAMBDA];
 
 // PLC0132 (nombre de `TypeVar` distinto de la variable), LOG001 (`logging.Logger(...)`), C417
 // (`map(lambda ...)`), FURB161 (`bin(x).count("1")`), FURB168 (`isinstance(x, type(None))`), FURB163
-// (`math.log(x, 2)`), DTZ004 (`utcfromtimestamp`), TRY401 (la excepción repetida en
-// `logger.exception`) y ASYNC251, ASYNC230 y ASYNC115 (llamadas que bloquean en una función async).
+// (`math.log(x, 2)`), DTZ004 (`utcfromtimestamp`), PTH124 (`py.path.local`), TRY401 (la excepción
+// repetida en `logger.exception`) y ASYNC251, ASYNC230, ASYNC222 y ASYNC115 (llamadas que bloquean
+// en una función async).
 pub fn tail_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Report> {
     let Some(function) = call.child_by_field_name(FUNCTION_FIELD) else {
         return Vec::new();
@@ -76,6 +79,9 @@ pub fn tail_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Ve
     }
     if qualified == Some(MATH_LOG) && is_redundant_log_base(hints, &given) {
         reports.push(Report::at(PythonRule::FURB163, call, ""));
+    }
+    if qualified == Some(PY_PATH) {
+        reports.push(Report::at(PythonRule::PTH124, function, ""));
     }
     if qualified == Some(UTCFROMTIMESTAMP) {
         reports.push(Report::at(PythonRule::DTZ004, call, ""));
@@ -324,6 +330,8 @@ fn blocking_async_call(
         PythonRule::ASYNC251
     } else if BLOCKING_OPEN.contains(&qualified) {
         PythonRule::ASYNC230
+    } else if PROCESS_WAITS.contains(&qualified) {
+        PythonRule::ASYNC222
     } else if ZERO_SLEEPS.contains(&qualified)
         && matches!(given.positional.as_slice(), [only] if text(*only, source) == ZERO)
     {
