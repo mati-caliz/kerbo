@@ -1373,6 +1373,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     anotados con otro tipo). Paridad: 145 de 145, 86 de 86, 83 de 83 y 82 de 86, sin avisos de más;
     los RET501 que faltan están en archivos que tree-sitter no parsea. Los casos quedaron en
     `fixtures/pylint_rules.py`.
+  - Hechas PLR1711 (`return` inútil al final), PLR0402 (`import a.b as b`), B026 (`*args` después
+    de un argumento con nombre), UP039 (`class C():`), UP020 (`io.open`) y RUF032 (`Decimal(0.1)`).
+    Paridad: 65 de 66, 56 de 56, 56 de 56, 40 de 40, 53 de 55 y 55 de 55, sin avisos de más; lo que
+    falta está en archivos de CPython con `lazy import`. Los casos quedaron en
+    `fixtures/declarations.py`.
   - Siguiente, la cola de reglas chicas: UP044, UP037, RUF013, PLR1704, PLC0206 y siguientes.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que

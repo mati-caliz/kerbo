@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: modismos de pylint, refurb, flake8-logging y
 // compañía.
-pub const IDIOM_TEXTS: [(PythonRule, RuleText); 22] = [
+pub const IDIOM_TEXTS: [(PythonRule, RuleText); 28] = [
     (
         PythonRule::FURB167,
         RuleText::new(
@@ -205,6 +205,60 @@ else:
             "escribí return a secas",
             "Si la función nunca devuelve un valor, un None explícito sugiere un resultado del que no hay que depender.",
             "return None pasa a return.",
+        ),
+    ),
+    (
+        PythonRule::PLR1711,
+        RuleText::new(
+            "return inútil al final de una función",
+            "sacá el return",
+            "Una función ya devuelve None al llegar al final, así que el último return sólo agrega una línea.",
+            "def f():\n    g()\n    return pasa a def f():\n    g().",
+        ),
+    ),
+    (
+        PythonRule::PLR0402,
+        RuleText::new(
+            "import a.b as b en vez de from a import b",
+            "escribí from a import b",
+            "from a import b dice lo mismo con menos repetición y es la forma que se espera leer.",
+            "import os.path as path pasa a from os import path.",
+        ),
+    ),
+    (
+        PythonRule::B026,
+        RuleText::new(
+            "Argumento con * después de un argumento con nombre",
+            "poné el *args antes de los argumentos con nombre",
+            "Python pasa el *args antes que los argumentos con nombre aunque esté escrito después, y eso confunde el orden.",
+            "f(a=1, *resto) pasa a f(*resto, a=1).",
+        ),
+    ),
+    (
+        PythonRule::UP039,
+        RuleText::new(
+            "Paréntesis vacíos en la definición de una clase",
+            "sacá los paréntesis",
+            "class C(): y class C: son lo mismo; los paréntesis sugieren una clase base que no está.",
+            "class C(): pasa a class C:.",
+        ),
+    ),
+    (
+        PythonRule::UP020,
+        RuleText::new(
+            "io.open en vez del open de siempre",
+            "usá open",
+            "Desde Python 3 el open de siempre es io.open, así que el import no agrega nada.",
+            "io.open(\"f\") pasa a open(\"f\").",
+        ),
+    ),
+    (
+        PythonRule::RUF032,
+        RuleText::new(
+            "Decimal construido desde un float escrito",
+            "pasá el número como string",
+            "El float se redondea antes de que Decimal lo vea, así que Decimal(0.1) no es 0.1.",
+            "Decimal(0.1) pasa a Decimal(\"0.1\").",
         ),
     ),
 ];

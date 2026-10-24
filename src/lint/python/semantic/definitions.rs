@@ -5,7 +5,7 @@ use super::mutability::Resolver;
 
 use super::model::{BindingKind, MODULE_SCOPE, ScopeKind, Site};
 use super::qualified::is_builtin_named;
-use super::returns::unnecessary_return_none;
+use super::returns::{unnecessary_return_none, useless_return};
 use super::targets::Store;
 use super::{Mode, Pending, Visitor};
 use crate::lint::python::Report;
@@ -70,6 +70,7 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
             Some(function) if function.kind() == FUNCTION => {
                 let returns = unnecessary_return_none(&self.model, self.source, function, &decorators);
                 self.reports.extend(returns);
+                self.reports.extend(useless_return(self.source, function));
                 self.function(function);
             }
             Some(class) if class.kind() == CLASS => self.class(class),

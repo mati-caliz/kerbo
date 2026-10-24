@@ -5,6 +5,7 @@ mod comments;
 mod comparisons;
 mod compound;
 mod concatenation;
+mod declarations;
 mod deprecated;
 mod dicts;
 mod dunders;
@@ -143,6 +144,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(slots::reports(&nodes, source));
     reports.extend(loop_else::reports(&nodes));
     reports.extend(parentheses::reports(root));
+    reports.extend(declarations::reports(&nodes, source));
     reports.extend(deprecated::reports(&nodes, source));
     reports.extend(concatenation::reports(&nodes));
     reports.extend(branches::reports(&nodes, source));

@@ -1,0 +1,77 @@
+use tree_sitter::Node;
+
+use super::Report;
+use super::ast::{
+    ALIAS_FIELD, ALIASED_IMPORT, CALL, CLASS, COMMENT, IMPORT, KEYWORD_ARGUMENT, NAME_FIELD, named, text,
+};
+use crate::rules::PythonRule;
+
+const ARGUMENTS_FIELD: &str = "arguments";
+const SUPERCLASSES_FIELD: &str = "superclasses";
+const ARGUMENT_LIST: &str = "argument_list";
+const LIST_SPLAT: &str = "list_splat";
+const DICTIONARY_SPLAT: &str = "dictionary_splat";
+const MODULE_SEPARATOR: char = '.';
+
+pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
+    nodes
+        .iter()
+        .flat_map(|node| match node.kind() {
+            CALL => star_after_keyword(*node),
+            CLASS => empty_class_parentheses(*node).into_iter().collect(),
+            IMPORT => manual_from_imports(*node, source),
+            _ => Vec::new(),
+        })
+        .collect()
+}
+
+// B026: `f(a=1, *rest)`, un `*` después de un argumento con nombre, que Python pasa antes que él.
+fn star_after_keyword(call: Node<'_>) -> Vec<Report> {
+    let arguments: Vec<Node<'_>> = call
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .filter(|arguments| arguments.kind() == ARGUMENT_LIST)
+        .map(named)
+        .unwrap_or_default();
+    let Some(first_keyword) = arguments
+        .iter()
+        .position(|argument| matches!(argument.kind(), KEYWORD_ARGUMENT | DICTIONARY_SPLAT))
+    else {
+        return Vec::new();
+    };
+    arguments
+        .iter()
+        .skip(first_keyword)
+        .filter(|argument| argument.kind() == LIST_SPLAT)
+        .map(|argument| Report::at(PythonRule::B026, *argument, ""))
+        .collect()
+}
+
+// UP039: `class Clase():`, con paréntesis vacíos.
+fn empty_class_parentheses(class: Node<'_>) -> Option<Report> {
+    let arguments = class.child_by_field_name(SUPERCLASSES_FIELD)?;
+    named(arguments)
+        .iter()
+        .all(|argument| argument.kind() == COMMENT)
+        .then(|| Report::at(PythonRule::UP039, arguments, ""))
+}
+
+// PLR0402: `import a.b as b`, que se escribe `from a import b`.
+fn manual_from_imports(statement: Node<'_>, source: &[u8]) -> Vec<Report> {
+    named(statement)
+        .into_iter()
+        .filter(|alias| alias.kind() == ALIASED_IMPORT)
+        .filter(|alias| {
+            let module = alias
+                .child_by_field_name(NAME_FIELD)
+                .map(|name| text(name, source));
+            let local = alias
+                .child_by_field_name(ALIAS_FIELD)
+                .map(|name| text(name, source));
+            module
+                .and_then(|module| module.rsplit_once(MODULE_SEPARATOR))
+                .zip(local)
+                .is_some_and(|((_, last), local)| last == local)
+        })
+        .map(|alias| Report::at(PythonRule::PLR0402, alias, ""))
+        .collect()
+}

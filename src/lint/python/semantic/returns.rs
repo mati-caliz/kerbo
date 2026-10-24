@@ -4,11 +4,14 @@ use super::model::Model;
 use super::qualified::qualified_name;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
-    BODY_FIELD, CALL, CLASS, COMMENT, DECORATED, FUNCTION, FUNCTION_FIELD, NONE, named, unparenthesized,
+    BODY_FIELD, CALL, CLASS, COMMENT, DECORATED, EXPRESSION_STATEMENT, FUNCTION, FUNCTION_FIELD, NONE,
+    STRING, is_string, named, string_prefix, unparenthesized,
 };
+use crate::lint::python::escapes::text_value;
 use crate::rules::PythonRule;
 
 const RETURN: &str = "return_statement";
+const TEMPLATE_PREFIXES: [char; 2] = ['t', 'T'];
 const YIELD: &str = "yield";
 const TYPE_NODE: &str = "type";
 const DECORATOR: &str = "decorator";
@@ -67,6 +70,50 @@ pub fn unnecessary_return_none(
         .filter(|statement| returned_value(*statement).is_some_and(is_none))
         .map(|statement| Report::at(PythonRule::RET501, statement, ""))
         .collect()
+}
+
+// PLR1711: un `return` a secas (o `return None`) al final de una función que no tiene otro
+// `return`, salvo que sea lo único que tiene (con o sin docstring).
+pub fn useless_return(source: &[u8], function: Node<'_>) -> Option<Report> {
+    let annotated_otherwise = function
+        .child_by_field_name(RETURN_TYPE_FIELD)
+        .is_some_and(|annotation| !is_none(inner_type(annotation)));
+    let statements = without_comments(function.child_by_field_name(BODY_FIELD)?);
+    let last = statements.last().copied().filter(|last| last.kind() == RETURN)?;
+    let only_docstring_before = match statements.as_slice() {
+        [_] => true,
+        [first, _] => is_docstring(*first, source),
+        _ => false,
+    };
+    if annotated_otherwise
+        || only_docstring_before
+        || returned_value(last).is_some_and(|value| !is_none(value))
+    {
+        return None;
+    }
+    let mut returns = Returns::default();
+    for statement in statements {
+        collect(statement, &mut returns);
+    }
+    (returns.statements.len() == 1).then(|| Report::at(PythonRule::PLR1711, last, ""))
+}
+
+fn is_docstring(statement: Node<'_>, source: &[u8]) -> bool {
+    statement.kind() == EXPRESSION_STATEMENT
+        && matches!(without_comments(statement).as_slice(), [value] if is_plain_string(*value, source))
+}
+
+fn is_plain_string(value: Node<'_>, source: &[u8]) -> bool {
+    let parts = if value.kind() == STRING {
+        vec![value]
+    } else {
+        named(value)
+    };
+    is_string(value)
+        && text_value(value, source).is_some()
+        && !parts
+            .iter()
+            .any(|part| string_prefix(*part, source).contains(TEMPLATE_PREFIXES))
 }
 
 fn without_comments(node: Node<'_>) -> Vec<Node<'_>> {

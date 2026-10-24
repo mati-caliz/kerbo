@@ -34,6 +34,12 @@ const NON_FINITE: [&str; 9] = [
     "-infinity",
 ];
 const TEMPLATE_PREFIXES: [char; 2] = ['t', 'T'];
+const FLOAT_LITERAL: &str = "float";
+const UNARY: &str = "unary_operator";
+const ARGUMENT_FIELD: &str = "argument";
+const OPERATOR_FIELD: &str = "operator";
+const SIGN_OPERATORS: [&str; 2] = ["+", "-"];
+const IMAGINARY_SUFFIXES: [char; 2] = ['j', 'J'];
 
 // FURB157: `Decimal("10")` o `Decimal(float("nan"))`, que se escriben `Decimal(10)` y
 // `Decimal("nan")`. Avisa en el argumento.
@@ -49,6 +55,34 @@ pub fn verbose_decimal_constructor(model: &Model<'_>, source: &[u8], call: Node<
         string_value(value, source).is_some_and(|literal| is_integer_string(&literal))
     };
     verbose.then(|| Report::at(PythonRule::FURB157, value, ""))
+}
+
+// RUF032: `Decimal(0.1)`, que arrastra el error de representación del float. Avisa en el argumento.
+pub fn decimal_from_float_literal(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Option<Report> {
+    let first = call_arguments(call)
+        .positional
+        .first()
+        .copied()
+        .map(unparenthesized)?;
+    let function = call.child_by_field_name(FUNCTION_FIELD)?;
+    let is_decimal = qualified_name(model, function, source).as_deref() == Some(DECIMAL);
+    (is_decimal && is_float_literal(first, source)).then(|| Report::at(PythonRule::RUF032, first, ""))
+}
+
+// Un float escrito, con signos `+`/`-` adelante; un complejo (`1.5j`) no cuenta.
+fn is_float_literal(node: Node<'_>, source: &[u8]) -> bool {
+    let mut current = node;
+    while current.kind() == UNARY
+        && current
+            .child_by_field_name(OPERATOR_FIELD)
+            .is_some_and(|operator| SIGN_OPERATORS.contains(&text(operator, source)))
+    {
+        let Some(operand) = current.child_by_field_name(ARGUMENT_FIELD) else {
+            return false;
+        };
+        current = unparenthesized(operand);
+    }
+    current.kind() == FLOAT_LITERAL && !text(current, source).ends_with(IMAGINARY_SUFFIXES)
 }
 
 // `find_argument_value("value", 0)`.

@@ -1,10 +1,10 @@
 use tree_sitter::Node;
 
-use super::decimals::verbose_decimal_constructor;
+use super::decimals::{decimal_from_float_literal, verbose_decimal_constructor};
 use super::format_calls::format_call_report;
 use super::idioms::idiom_reports;
 use super::model::Model;
-use super::qualified::is_builtin_named;
+use super::qualified::{is_builtin_named, qualified_name};
 use super::resources::unmanaged_open;
 use super::supers::is_super_with_parameters;
 use crate::lint::python::Report;
@@ -16,6 +16,7 @@ use crate::lint::python::escapes::text_value;
 use crate::rules::PythonRule;
 
 const RANGE: &str = "range";
+const IO_OPEN: &str = "io.open";
 const GETATTR: &str = "getattr";
 const SETATTR: &str = "setattr";
 const DEBUG_NAME: &str = "__debug__";
@@ -65,6 +66,14 @@ pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Rep
     reports.extend(idiom_reports(model, source, call));
     reports.extend(format_call_report(model, source, call));
     reports.extend(verbose_decimal_constructor(model, source, call));
+    reports.extend(decimal_from_float_literal(model, source, call));
+    if call
+        .child_by_field_name(FUNCTION_FIELD)
+        .and_then(|function| qualified_name(model, function, source))
+        .is_some_and(|name| name == IO_OPEN)
+    {
+        reports.push(Report::at(PythonRule::UP020, call, ""));
+    }
     reports
 }
 
