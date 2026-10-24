@@ -10,7 +10,7 @@ use crate::lint::{LintFinding, LintKind};
 use crate::rules::{PythonRule, RuleId};
 use crate::test_support::TempTree;
 
-const FIXTURES: [(&str, &str, &str); 25] = [
+const FIXTURES: [(&str, &str, &str); 26] = [
     (
         "scopes.py",
         include_str!("fixtures/scopes.py"),
@@ -130,6 +130,11 @@ const FIXTURES: [(&str, &str, &str); 25] = [
         "suspicious.py",
         include_str!("fixtures/suspicious.py"),
         include_str!("fixtures/suspicious.ruff"),
+    ),
+    (
+        "exception_flow.py",
+        include_str!("fixtures/exception_flow.py"),
+        include_str!("fixtures/exception_flow.ruff"),
     ),
     (
         "package/__init__.py",

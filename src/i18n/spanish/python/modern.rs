@@ -1,6 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
+use super::checks::CHECK_TEXTS;
 use super::idioms::IDIOM_TEXTS;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
@@ -379,5 +380,8 @@ pub const MODERN_TEXTS: [(PythonRule, RuleText); 41] = [
 
 // Los textos de las reglas fuera del conjunto clásico, en los dos catálogos.
 pub fn extended_texts() -> impl Iterator<Item = &'static (PythonRule, RuleText)> {
-    MODERN_TEXTS.iter().chain(IDIOM_TEXTS.iter())
+    MODERN_TEXTS
+        .iter()
+        .chain(IDIOM_TEXTS.iter())
+        .chain(CHECK_TEXTS.iter())
 }

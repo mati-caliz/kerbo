@@ -1,3 +1,4 @@
+mod checks;
 mod formats;
 mod idioms;
 mod modern;

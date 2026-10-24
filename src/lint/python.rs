@@ -11,6 +11,7 @@ mod dicts;
 mod dunders;
 mod encodings;
 mod escapes;
+mod exception_flow;
 mod flow;
 mod formats;
 mod fstrings;
@@ -151,6 +152,8 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(raises::reports(&nodes, source));
     reports.extend(encodings::reports(&nodes, source));
     reports.extend(redundancies::reports(&nodes, source));
+    reports.extend(exception_flow::reports(&nodes, source));
+    reports.extend(loops::loop_variable_overrides(&nodes, source));
     reports.extend(deprecated::reports(&nodes, source));
     reports.extend(concatenation::reports(&nodes));
     reports.extend(branches::reports(&nodes, source));

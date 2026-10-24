@@ -1393,6 +1393,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     relativo con el nombre de módulo del archivo, que kerbo todavía no calcula (como en SIM115). De
     paso, F823 deja de mirar los alcances de clase al buscar qué nombre de afuera pisa una variable
     local (no se ven desde adentro de sus métodos). Los casos quedaron en `fixtures/suspicious.py`.
+  - Hechas TRY203 (`try` cuyos `except` sólo vuelven a lanzar), PLE0704 (`raise` a secas fuera de
+    un `except`; una función definida adentro de uno ya no cuenta como adentro), SIM210 (`True if c
+    else False`) y B020 (la variable del `for` pisa lo que se recorre, con el `NameFinder` de ruff).
+    Paridad: 37 de 37, 33 de 33, 27 de 27 y 44 de 44. Los casos quedaron en
+    `fixtures/exception_flow.py`; los textos, en un catálogo nuevo (`i18n/*/python/checks.rs`).
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
   - Siguiente, la cola de reglas chicas: UP044, UP037, RUF013, PLR1704, PLC0206 y siguientes.
