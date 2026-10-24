@@ -21,6 +21,7 @@ mod patterns;
 mod pep;
 mod qualified;
 mod resources;
+mod returns;
 mod statements;
 mod supers;
 mod targets;

@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: modismos de pylint, refurb, flake8-logging y
 // compañía.
-pub const IDIOM_TEXTS: [(PythonRule, RuleText); 18] = [
+pub const IDIOM_TEXTS: [(PythonRule, RuleText); 22] = [
     (
         PythonRule::FURB167,
         RuleText::new(
@@ -166,6 +166,45 @@ return False pasa a return x > 0.",
             "pasá el número directamente, o el valor especial como string",
             "Decimal(10) dice lo mismo que Decimal(\"10\") sin parsear un string, y Decimal(\"nan\") evita pasar por un float.",
             "Decimal(\"10\") pasa a Decimal(10).",
+        ),
+    ),
+    (
+        PythonRule::UP034,
+        RuleText::new(
+            "Paréntesis de más alrededor de una expresión",
+            "sacá los paréntesis duplicados",
+            "Un segundo par de paréntesis no agrega nada y hace buscar una tupla o una precedencia que no existe.",
+            "print((x)) pasa a print(x).",
+        ),
+    ),
+    (
+        PythonRule::PLC0205,
+        RuleText::new(
+            "__slots__ asignado a un único string",
+            "usá una tupla o lista de nombres, como (\"nombre\",)",
+            "Un string se recorre letra por letra, así que __slots__ = \"nombre\" declara los slots n, o, m, b, r y e.",
+            "__slots__ = \"nombre\" pasa a __slots__ = (\"nombre\",).",
+        ),
+    ),
+    (
+        PythonRule::PLW0120,
+        RuleText::new(
+            "else en un loop que nunca hace break",
+            "sacá el else y desindentá su cuerpo",
+            "Sin break el else corre siempre, así que se lee como una condición que no existe.",
+            "for x in y:
+    f(x)
+else:
+    g() pasa al loop seguido de g().",
+        ),
+    ),
+    (
+        PythonRule::RET501,
+        RuleText::new(
+            "return None en una función que sólo devuelve None",
+            "escribí return a secas",
+            "Si la función nunca devuelve un valor, un None explícito sugiere un resultado del que no hay que depender.",
+            "return None pasa a return.",
         ),
     ),
 ];

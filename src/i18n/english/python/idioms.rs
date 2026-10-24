@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: modismos de pylint, refurb, flake8-logging y
 // compañía.
-pub const IDIOM_TEXTS: [(PythonRule, RuleText); 18] = [
+pub const IDIOM_TEXTS: [(PythonRule, RuleText); 22] = [
     (
         PythonRule::FURB167,
         RuleText::new(
@@ -166,6 +166,45 @@ return False becomes return x > 0.",
             "pass the number directly, or the special value as a string",
             "Decimal(10) says the same as Decimal(\"10\") without parsing a string, and Decimal(\"nan\") avoids going through a float.",
             "Decimal(\"10\") becomes Decimal(10).",
+        ),
+    ),
+    (
+        PythonRule::UP034,
+        RuleText::new(
+            "Extra parentheses around an expression",
+            "remove the duplicated parentheses",
+            "A second pair of parentheses adds nothing and makes the reader look for a tuple or a precedence that is not there.",
+            "print((x)) becomes print(x).",
+        ),
+    ),
+    (
+        PythonRule::PLC0205,
+        RuleText::new(
+            "__slots__ assigned a single string",
+            "use a tuple or list of names, like (\"name\",)",
+            "A string is iterated character by character, so __slots__ = \"name\" declares the slots n, a, m and e.",
+            "__slots__ = \"name\" becomes __slots__ = (\"name\",).",
+        ),
+    ),
+    (
+        PythonRule::PLW0120,
+        RuleText::new(
+            "else on a loop that never breaks",
+            "remove the else and dedent its body",
+            "Without a break the else always runs, so it reads as a condition that does not exist.",
+            "for x in y:
+    f(x)
+else:
+    g() becomes the loop followed by g().",
+        ),
+    ),
+    (
+        PythonRule::RET501,
+        RuleText::new(
+            "return None in a function that only returns None",
+            "write a plain return",
+            "When a function never returns a value, an explicit None suggests a result that callers should not rely on.",
+            "return None becomes return.",
         ),
     ),
 ];

@@ -1367,8 +1367,13 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     marcaría como sobrante un `# noqa: B904` que en ruff sí silencia algo.
   - RUF046 (`int()` sobre algo que ya es entero) necesita un port de `ResolvedPythonType`, la
     inferencia de tipos de expresiones de ruff, y de los tipos de los parámetros de `round`.
-  - Siguiente, la cola de reglas chicas: UP044, UP037, UP034, RUF013, PLR1704, RET501, PLC0205,
-    PLW0120, PLC0206 y siguientes.
+  - Hechas UP034 (paréntesis de más, con el recorrido por tokens de ruff sobre las hojas del árbol),
+    PLC0205 (`__slots__` con un único string), PLW0120 (`else` de un loop sin `break`) y RET501
+    (`return None` en una función que sólo devuelve `None`, sin generadores, propiedades ni retornos
+    anotados con otro tipo). Paridad: 145 de 145, 86 de 86, 83 de 83 y 82 de 86, sin avisos de más;
+    los RET501 que faltan están en archivos que tree-sitter no parsea. Los casos quedaron en
+    `fixtures/pylint_rules.py`.
+  - Siguiente, la cola de reglas chicas: UP044, UP037, RUF013, PLR1704, PLC0206 y siguientes.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

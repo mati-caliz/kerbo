@@ -5,6 +5,7 @@ use super::mutability::Resolver;
 
 use super::model::{BindingKind, MODULE_SCOPE, ScopeKind, Site};
 use super::qualified::is_builtin_named;
+use super::returns::unnecessary_return_none;
 use super::targets::Store;
 use super::{Mode, Pending, Visitor};
 use crate::lint::python::Report;
@@ -62,11 +63,15 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
         } else {
             (Vec::new(), Some(statement))
         };
-        for decorator in decorators {
-            self.loads(decorator);
+        for decorator in &decorators {
+            self.loads(*decorator);
         }
         match definition {
-            Some(function) if function.kind() == FUNCTION => self.function(function),
+            Some(function) if function.kind() == FUNCTION => {
+                let returns = unnecessary_return_none(&self.model, self.source, function, &decorators);
+                self.reports.extend(returns);
+                self.function(function);
+            }
             Some(class) if class.kind() == CLASS => self.class(class),
             _ => {}
         }
