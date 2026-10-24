@@ -62,13 +62,13 @@ pub fn if_reports(model: &Model<'_>, source: &[u8], statement: Node<'_>) -> Vec<
     reports
 }
 
-struct Comparison<'tree> {
-    left: Node<'tree>,
-    operator: Vec<&'tree str>,
-    right: Node<'tree>,
+pub struct Comparison<'tree> {
+    pub left: Node<'tree>,
+    pub operator: Vec<&'tree str>,
+    pub right: Node<'tree>,
 }
 
-fn single_comparison<'tree>(test: Node<'tree>, source: &'tree [u8]) -> Option<Comparison<'tree>> {
+pub fn single_comparison<'tree>(test: Node<'tree>, source: &'tree [u8]) -> Option<Comparison<'tree>> {
     let test = unparenthesized(test);
     if test.kind() != COMPARISON {
         return None;
@@ -92,7 +92,7 @@ fn single_comparison<'tree>(test: Node<'tree>, source: &'tree [u8]) -> Option<Co
     })
 }
 
-fn operator_is(comparison: &Comparison<'_>, wanted: &str) -> bool {
+pub fn operator_is(comparison: &Comparison<'_>, wanted: &str) -> bool {
     comparison.operator.as_slice() == [wanted]
 }
 

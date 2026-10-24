@@ -1548,21 +1548,33 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     Python rechaza (asignar un nombre antes de su `global`) ruff da además PLW0602, F811 y PLW0603
     que kerbo no imita. Ninguna trae arreglo (ruff lo tiene en PLE1519, PLE1520, PLE2510–2515 y
     PLW1507).
+  - Hechas 24 reglas de `flake8-pyi` que no aparecen en el corpus, medidas con
+    `fixtures/stub_rules.pyi` y `fixtures/stub_rules_runtime.py`: las condiciones de un `if` en un stub
+    (PYI002, PYI003, PYI004, PYI005, PYI007, PYI008 y PYI066, cada parte de un `and`/`or` aplanada como
+    en ruff), las asignaciones de un stub fuera de funciones (PYI001, PYI015, PYI017, PYI026, PYI035 y
+    PYI052, con los valores simples de `is_valid_default_value_with_annotation` y las clases `enum`
+    resueltas por sus bases), los cuerpos (PYI009, PYI010, PYI012, PYI048 y PYI013, que corre en
+    cualquier archivo), PYI033 (`# type:`), PYI044 (`from __future__ import annotations`), PYI043 (alias
+    privado terminado en `T`, en cualquier archivo), PYI045 (`__iter__` que devuelve `Iterable`) y
+    PYI047 y PYI049 (alias y `TypedDict` privados sin usar; fuera de un stub sólo en el módulo y las
+    funciones). Cero avisos de más en el corpus.
+  - Pendientes de esa tanda: ninguna trae arreglo (ruff lo tiene en PYI009, PYI010, PYI012, PYI013,
+    PYI015, PYI026 y PYI044). PYI042 y PYI043 no miran un `x: TypeAlias` sin valor. PYI049 toma como
+    `TypedDict` funcional también una asignación anotada.
   - Los archivos que no están en UTF-8 (ruff da E902 y no los analiza) se analizan igual: falta
     saltearlos o avisar como ruff. Se hacen en tandas de 15 a 25 reglas por
     tema, con un solo gate y una sola medición por tanda.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.
-  - Del conjunto por defecto de ruff 0.17 (407 reglas) quedan 94, más las cuatro del conjunto
+  - Del conjunto por defecto de ruff 0.17 (407 reglas) quedan 70, más las cuatro del conjunto
     clásico de arriba, todas con cero avisos en el corpus, así que su paridad sólo se puede medir con
     fixtures: YTT101–103, YTT202, YTT204, YTT301–303, ASYNC105, ASYNC116, ASYNC210, ASYNC220,
     ASYNC221, B014, B022, B025, B029, B031, B039, C415, EXE001, EXE002, EXE004, FA100, FA102, INT001,
-    INT003, LOG002, LOG009, LOG014, G010, G101, G202, PYI001–005, PYI007–010, PYI012, PYI013, PYI015,
-    PYI017, PYI026, PYI033, PYI035, PYI043–045, PYI047–049, PYI052, PYI066, PT010, PT020, PT025,
-    PT026, SIM107, SIM220, SIM221, SIM911, TC007, TC010, PTH210, PGH005, PLC0131, UP001, UP023, UP026,
-    UP040, UP043, UP046, UP047, FURB162, FURB169, FURB177, FURB181, RUF008, RUF016, RUF018, RUF024,
-    RUF026, RUF030, RUF033, RUF048, RUF049, RUF053, RUF058, RUF101 y RUF200.
+    INT003, LOG002, LOG009, LOG014, G010, G101, G202, PT010, PT020, PT025, PT026, SIM107, SIM220,
+    SIM221, SIM911, TC007, TC010, PTH210, PGH005, PLC0131, UP001, UP023, UP026, UP040, UP043, UP046,
+    UP047, FURB162, FURB169, FURB177, FURB181, RUF008, RUF016, RUF018, RUF024, RUF026, RUF030, RUF033,
+    RUF048, RUF049, RUF053, RUF058, RUF101 y RUF200.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

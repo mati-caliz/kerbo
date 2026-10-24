@@ -1,0 +1,62 @@
+import sys
+import typing
+from collections.abc import Iterable
+from typing import TypeAlias, TypedDict, TypeVar
+
+T = TypeVar("T")
+
+if sys.version_info < (3, 9):
+    x = 1
+else:
+    x = 2
+
+if sys.platform == "linus":
+    pass
+
+
+def passes():
+    pass
+
+
+class PassAndMore:
+    pass
+    value = 1
+
+
+class EllipsisAndMore:
+    ...
+    value = 1
+
+
+class EllipsisAlone: ...
+
+
+_PrivateT: TypeAlias = int
+_UnusedAlias: TypeAlias = str
+
+
+class _UnusedDict(TypedDict):
+    key: int
+
+
+_FunctionalDict = typing.TypedDict("_FunctionalDict", {"key": int})
+
+
+class Iterate:
+    def __iter__(self) -> Iterable[int]:
+        return iter([])
+
+
+def scoped():
+    _LocalAlias: TypeAlias = int
+
+    class _LocalDict(TypedDict):
+        key: int
+
+
+class Holder:
+    _ClassAlias: TypeAlias = int
+
+
+value = 1  # type: int
+default = 1 + 2

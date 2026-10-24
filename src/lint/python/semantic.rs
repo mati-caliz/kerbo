@@ -46,6 +46,8 @@ mod returns;
 mod self_types;
 mod short_circuit;
 mod statements;
+mod stub_assignments;
+mod stub_conditions;
 mod stub_signatures;
 mod supers;
 mod suspicious_calls;

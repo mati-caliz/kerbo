@@ -36,6 +36,8 @@ const ITER: &str = "__iter__";
 const AITER: &str = "__aiter__";
 const GENERATORS: [&str; 2] = ["typing.Generator", "collections.abc.Generator"];
 const ASYNC_GENERATORS: [&str; 2] = ["typing.AsyncGenerator", "collections.abc.AsyncGenerator"];
+const ITERABLES: [&str; 2] = ["typing.Iterable", "collections.abc.Iterable"];
+const ASYNC_ITERABLES: [&str; 2] = ["typing.AsyncIterable", "collections.abc.AsyncIterable"];
 const ANY: &str = "Any";
 const NO_RETURN: &str = "NoReturn";
 const NUMERIC: [&str; 3] = ["int", "float", "complex"];
@@ -91,6 +93,7 @@ pub fn signature_reports(
     reports.extend(any_equality_annotation(hints, signature, &parameters, kind));
     reports.extend(old_style_positional_only(source, &parameters, kind));
     reports.extend(generator_from_iter(hints, signature, &parameters, kind));
+    reports.extend(iterable_from_iter(hints, signature, kind));
     if stub {
         reports.extend(redundant_string_method(hints, signature, &parameters, kind));
     }
@@ -353,4 +356,25 @@ fn redundant_string_method(
             "",
         )
     })
+}
+
+// PYI045: un `__iter__` (o `__aiter__`) de una clase que devuelve `Iterable` en vez de `Iterator`.
+// Avisa en el tipo de retorno.
+fn iterable_from_iter(
+    hints: Hints<'_, '_, '_>,
+    signature: Signature<'_, '_>,
+    kind: Option<MethodKind>,
+) -> Option<Report> {
+    let iterables = match signature.name {
+        ITER => ITERABLES,
+        AITER => ASYNC_ITERABLES,
+        _ => return None,
+    };
+    kind?;
+    let returns = signature.function.child_by_field_name(RETURN_TYPE_FIELD)?;
+    let inner = unwrapped(returns);
+    let (value, _) = subscript_parts(inner).unwrap_or((inner, Vec::new()));
+    qualified_name(hints.model, value, hints.source)
+        .is_some_and(|name| iterables.contains(&name.as_str()))
+        .then(|| Report::at(PythonRule::PYI045, returns, ""))
 }

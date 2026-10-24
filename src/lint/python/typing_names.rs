@@ -16,14 +16,15 @@ const ABSTRACT_SET: &str = "AbstractSet";
 const BYTE_STRING: &str = "ByteString";
 const BYTE_STRING_MODULES: [&str; 3] = ["typing", "typing_extensions", COLLECTIONS_ABC];
 const PRIVATE_PREFIX: char = '_';
+const TYPE_SUFFIX: char = 'T';
 
-// PYI042 (un `type` en snake_case; el `TypeAlias` lo mira el modelo semántico), PYI025 (`from collections.abc import Set` sin llamarlo
+// PYI042 y PYI043 (el nombre de un `type`; el `TypeAlias` lo mira el modelo semántico), PYI025 (`from collections.abc import Set` sin llamarlo
 // `AbstractSet`) y PYI057 (importar `ByteString`).
 pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     let mut found = Vec::new();
     for node in nodes {
         match node.kind() {
-            TYPE_ALIAS_STATEMENT => found.extend(snake_case_statement(*node, source)),
+            TYPE_ALIAS_STATEMENT => found.extend(snake_case_statement(*node, source).unwrap_or_default()),
             IMPORT_FROM => found.extend(import_reports(*node, source)),
             _ => {}
         }
@@ -31,7 +32,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     found
 }
 
-fn snake_case_statement(statement: Node<'_>, source: &[u8]) -> Option<Report> {
+fn snake_case_statement(statement: Node<'_>, source: &[u8]) -> Option<Vec<Report>> {
     let target = named(statement.child_by_field_name(LEFT_FIELD)?)
         .into_iter()
         .next()?;
@@ -40,8 +41,35 @@ fn snake_case_statement(statement: Node<'_>, source: &[u8]) -> Option<Report> {
     } else {
         target
     };
-    (name.kind() == IDENTIFIER && is_snake_case(text(name, source)))
-        .then(|| Report::at(PythonRule::PYI042, name, ""))
+    (name.kind() == IDENTIFIER).then(|| alias_name_reports(name, text(name, source)))
+}
+
+// PYI042 (un alias de tipo en snake_case) y PYI043 (un alias privado terminado en `T`, que parece un
+// `TypeVar`). Avisan en el nombre.
+pub fn alias_name_reports(target: Node<'_>, name: &str) -> Vec<Report> {
+    let mut reports = Vec::new();
+    if is_snake_case(name) {
+        reports.push(Report::at(PythonRule::PYI042, target, ""));
+    }
+    if is_t_suffixed(name) {
+        reports.push(Report::at(PythonRule::PYI043, target, name));
+    }
+    reports
+}
+
+// `is_t_suffixed_type_alias` de ruff: privado, y termina en minúscula, `T` y quizás un dígito.
+fn is_t_suffixed(name: &str) -> bool {
+    if !name.starts_with(PRIVATE_PREFIX) {
+        return false;
+    }
+    let mut letters = name.chars().rev();
+    match (letters.next(), letters.next(), letters.next()) {
+        (Some(digit), Some(TYPE_SUFFIX), Some(lowercase)) if digit.is_ascii_digit() => {
+            lowercase.is_ascii_lowercase()
+        }
+        (Some(TYPE_SUFFIX), Some(lowercase), _) => lowercase.is_ascii_lowercase(),
+        _ => false,
+    }
 }
 
 // `is_snake_case_type_alias` de ruff: empieza en minúscula o dígito, quizás después de un `_`.

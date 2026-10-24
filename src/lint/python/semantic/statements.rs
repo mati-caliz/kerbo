@@ -77,8 +77,12 @@ impl<'tree> Statements<'tree> for Visitor<'tree> {
 
     fn statement(&mut self, statement: Node<'tree>) {
         self.track_boundaries(statement);
-        self.reports
-            .extend(compound_reports(&self.model, self.source, statement));
+        self.reports.extend(compound_reports(
+            &self.model,
+            self.source,
+            statement,
+            self.file.stub,
+        ));
         match statement.kind() {
             EXPRESSION_STATEMENT => self.expression_statement(statement),
             IMPORT => self.import(statement),

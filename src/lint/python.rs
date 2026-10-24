@@ -51,6 +51,7 @@ mod splits;
 mod statement_checks;
 mod statements;
 mod string_characters;
+mod stub_bodies;
 mod tail_statements;
 pub mod taint;
 mod typing_names;
@@ -200,6 +201,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(formatter_comments::reports(root, &nodes, source));
     reports.extend(pylint_scopes::reports(&nodes, source));
     reports.extend(string_characters::reports(&nodes, source));
+    reports.extend(stub_bodies::reports(&nodes, source, file.stub));
     reports.extend(rewrites::reports(&nodes, source));
     reports.extend(module_names::invalid_module_name(path));
     let mut found: Vec<LintFinding> = suppressed(root, source, reports, &enabled)
