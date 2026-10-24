@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::aliases::called_alias_reports;
 use super::builtin_calls::builtin_call_reports;
+use super::cast_calls::cast_call_reports;
 use super::collection_calls::collection_call_reports;
 use super::decimals::{decimal_from_float_literal, verbose_decimal_constructor};
 use super::format_calls::format_call_report;
@@ -76,6 +77,7 @@ pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Rep
     reports.extend(suspicious_call_reports(model, source, call));
     reports.extend(builtin_call_reports(model, source, call));
     reports.extend(integer_call_reports(model, source, call));
+    reports.extend(cast_call_reports(model, source, call));
     if let Some(function) = call.child_by_field_name(FUNCTION_FIELD) {
         reports.extend(called_alias_reports(model, source, function));
     }

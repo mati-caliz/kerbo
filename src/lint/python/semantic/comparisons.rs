@@ -1,28 +1,36 @@
 use tree_sitter::Node;
 
 use super::model::Model;
-use super::qualified::is_builtin_named;
+use super::qualified::{is_builtin_named, qualified_name};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     CALL, COMMENT, CONCATENATED_STRING, FALSE, FUNCTION_FIELD, IDENTIFIER, NONE, STRING, TRUE, is_f_string,
-    named, text, unparenthesized,
+    is_string, named, text, unparenthesized,
 };
+use crate::lint::python::escapes::text_value;
 use crate::rules::PythonRule;
 
 const ARGUMENTS_FIELD: &str = "arguments";
 const NUMBERS: [&str; 2] = ["integer", "float"];
 const ELLIPSIS: &str = "ellipsis";
+const FLOAT_BUILTIN: &str = "float";
+const NAN_TEXTS: [&str; 3] = ["nan", "+nan", "-nan"];
+const NAN_CONSTANTS: [&str; 4] = ["math.nan", "numpy.nan", "numpy.NaN", "numpy.NAN"];
 const IDEMPOTENT_BUILTINS: [&str; 8] = ["id", "len", "type", "int", "bool", "str", "repr", "bytes"];
 
 // PLR0124 (comparar algo consigo mismo) y PLR0133 (comparar dos constantes), por cada par de una
-// comparación encadenada.
+// comparación encadenada, y PLW0177 (comparar con NaN).
 pub fn comparison_reports(model: &Model<'_>, source: &[u8], comparison: Node<'_>) -> Vec<Report> {
     let operands: Vec<Node<'_>> = named(comparison)
         .into_iter()
         .filter(|operand| operand.kind() != COMMENT)
         .map(unparenthesized)
         .collect();
-    let mut reports = Vec::new();
+    let mut reports: Vec<Report> = operands
+        .iter()
+        .filter(|operand| is_nan(model, source, **operand))
+        .map(|operand| Report::at(PythonRule::PLW0177, *operand, ""))
+        .collect();
     for pair in operands.windows(2) {
         let [left, right] = pair else {
             continue;
@@ -35,6 +43,24 @@ pub fn comparison_reports(model: &Model<'_>, source: &[u8], comparison: Node<'_>
         }
     }
     reports
+}
+
+// PLW0177: `float("nan")`, `math.nan` o `numpy.nan`, que nunca son iguales a nada.
+fn is_nan(model: &Model<'_>, source: &[u8], operand: Node<'_>) -> bool {
+    if qualified_name(model, operand, source).is_some_and(|name| NAN_CONSTANTS.contains(&name.as_str())) {
+        return true;
+    }
+    operand.kind() == CALL
+        && operand
+            .child_by_field_name(FUNCTION_FIELD)
+            .is_some_and(|function| is_builtin_named(model, function, source, FLOAT_BUILTIN))
+        && operand
+            .child_by_field_name(ARGUMENTS_FIELD)
+            .map(|list| named(list).into_iter().filter(|argument| argument.kind() != COMMENT).collect::<Vec<_>>())
+            .is_some_and(|given| {
+                matches!(given.as_slice(), [only] if is_string(*only)
+                    && text_value(*only, source).is_some_and(|value| NAN_TEXTS.contains(&value.to_ascii_lowercase().as_str())))
+            })
 }
 
 fn is_same_name(left: Node<'_>, right: Node<'_>, source: &[u8]) -> bool {

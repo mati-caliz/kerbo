@@ -2,6 +2,7 @@ mod checks;
 mod formats;
 mod idioms;
 mod modern;
+mod small_checks;
 mod typing;
 
 use crate::i18n::catalog::RuleText;

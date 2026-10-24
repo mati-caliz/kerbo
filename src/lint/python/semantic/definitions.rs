@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::defaults::default_reports;
+use super::enum_values::duplicate_enum_values;
 use super::implicit_optional::implicit_optional_reports;
 use super::mutability::Resolver;
 
@@ -145,6 +146,8 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
         self.type_parameters(class);
         if let Some(arguments) = class.child_by_field_name(SUPERCLASSES_FIELD) {
             self.expression(arguments, Mode::Value);
+            let duplicates = duplicate_enum_values(&self.model, self.source, class);
+            self.reports.extend(duplicates);
             for base in named(arguments)
                 .into_iter()
                 .filter(|base| is_builtin_named(&self.model, *base, self.source, OBJECT_BUILTIN))

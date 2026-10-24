@@ -1446,12 +1446,25 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     (`-> 'Literal[None]'`), que todavía no se mira. Los casos quedaron en `fixtures/typing_hints.py`
     y `fixtures/typing_stub.pyi`. Quedan para otra tanda PYI034 y PYI019 (`Self`), PYI036 (la firma
     de `__exit__`) y PYI055 (`type[A] | type[B]`, que ruff no marca fuera de un contexto de tipos).
+  - Hechas 30 reglas chicas en una tanda: los métodos especiales que devuelven un tipo equivocado
+    (PLE0303, PLE0304, PLE0305, PLE0307, PLE0308 y PLE0309, también cuando no hay ningún `return` y
+    devuelven `None` sin decirlo), PLE0101 (`__init__` que devuelve algo), PLR0206 (propiedad con
+    parámetros), las comprensiones y conversiones de más (C403, C404, C411, C414 y C418), los
+    booleanos (SIM208, SIM211, SIM222 y SIM223, con el `is_short_circuit` y el `Truthiness` de ruff),
+    RUF034 (ternario con las dos ramas iguales), PERF102 (`d.items()` que descarta la clave o el
+    valor; un nombre cuenta como usado si cualquier variable con ese nombre se lee en el alcance),
+    PLR1730 (`if` que es un `min` o un `max`), PLW1508 (`os.getenv` u `os.environ.get` con un
+    default que no es texto), RUF007 (`zip(x, x[1:])`), PLC0105 (la varianza en el nombre de un
+    `TypeVar` asignado), B030, B016, PLW0129, PLW0177 (comparar con NaN), PIE800, PIE796 (valor
+    repetido en un `enum.Enum` resuelto) y UP019 (`typing.Text`). Paridad exacta en todas salvo
+    cuatro avisos de `test_compile.py`, uno de los archivos de CPython que tree-sitter no parsea.
+    Los casos quedaron en `fixtures/small_checks.py`.
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
-  - Lo que queda del conjunto por defecto (2026-10-24): 116 reglas con unos 2.500 avisos en el
+  - Lo que queda del conjunto por defecto (2026-10-24): 86 reglas con unos 2.200 avisos en el
     corpus, contra más de 100.000 ya cubiertos. RUF100 (`noqa` sin uso) suma 1.437; el resto tiene
-    menos de 80 cada una: PLC0206 78, PLR1730 56, UP028 49, PYI036 47, PIE810 46 y una cola de reglas
-    con menos de 45. Se hacen en tandas de 15 a 25 reglas por
+    menos de 80 cada una: PLC0206 78, UP028 49, PYI036 47, PIE810 46, UP036 44, PERF402 40, PT031 36,
+    PLW0602 34, y una cola de reglas con menos de 30. Se hacen en tandas de 15 a 25 reglas por
     tema, con un solo gate y una sola medición por tanda.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que

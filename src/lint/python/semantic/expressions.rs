@@ -7,7 +7,8 @@ use super::isinstance_calls::{BOOLEAN_OPERATOR, duplicate_isinstance_reports};
 use super::literals::is_native_literal_call;
 use super::model::{BindingKind, Model, ScopeKind};
 use super::pep::is_pep585_generic;
-use super::qualified::{is_builtin_named, qualified_name};
+use super::qualified::{is_builtin_named, is_typing, qualified_name};
+use super::short_circuit::short_circuit_reports;
 use super::targets::Store;
 use super::type_hints::type_hint_reports;
 use super::type_names::is_type_name;
@@ -36,6 +37,7 @@ const COMPREHENSIONS: [&str; 4] = [
 const LOCALS: &str = "locals";
 const EXEC: &str = "exec";
 const UTC_ALIAS: &str = "datetime.timezone.utc";
+const TEXT_ALIAS: &str = "Text";
 const REGEX_FLAG_ALIASES: [&str; 8] = ["re.A", "re.I", "re.L", "re.M", "re.S", "re.T", "re.U", "re.X"];
 const ARGUMENT_LIST: &str = "argument_list";
 const DICTIONARY_SPLAT: &str = "dictionary_splat";
@@ -119,6 +121,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
             BOOLEAN_OPERATOR => {
                 self.reports
                     .extend(duplicate_isinstance_reports(&self.model, self.source, node));
+                self.reports
+                    .extend(short_circuit_reports(&self.model, self.source, node));
                 self.children(node, mode);
             }
             kind if COMPREHENSIONS.contains(&kind) => self.comprehension(node),
@@ -215,6 +219,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
             self.reports.push(Report::at(PythonRule::UP017, node, ""));
         } else if REGEX_FLAG_ALIASES.contains(&name.as_str()) {
             self.reports.push(Report::at(PythonRule::FURB167, node, ""));
+        } else if is_typing(&name, TEXT_ALIAS) {
+            self.reports.push(Report::at(PythonRule::UP019, node, ""));
         }
     }
 
