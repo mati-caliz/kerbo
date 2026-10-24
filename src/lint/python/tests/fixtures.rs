@@ -1,5 +1,5 @@
 // Cada archivo de ejemplo con la salida de ruff 0.17 al lado.
-pub const FIXTURES: [(&str, &str, &str); 43] = [
+pub const FIXTURES: [(&str, &str, &str); 47] = [
     (
         "scopes.py",
         include_str!("../fixtures/scopes.py"),
@@ -209,6 +209,26 @@ pub const FIXTURES: [(&str, &str, &str); 43] = [
         "unused_noqa.py",
         include_str!("../fixtures/unused_noqa.py"),
         include_str!("../fixtures/unused_noqa.ruff"),
+    ),
+    (
+        "self_types.py",
+        include_str!("../fixtures/self_types.py"),
+        include_str!("../fixtures/self_types.ruff"),
+    ),
+    (
+        "self_types_stub.pyi",
+        include_str!("../fixtures/self_types_stub.pyi"),
+        include_str!("../fixtures/self_types_stub.ruff"),
+    ),
+    (
+        "type_checking_imports.py",
+        include_str!("../fixtures/type_checking_imports.py"),
+        include_str!("../fixtures/type_checking_imports.ruff"),
+    ),
+    (
+        "formatter_comments.py",
+        include_str!("../fixtures/formatter_comments.py"),
+        include_str!("../fixtures/formatter_comments.ruff"),
     ),
     (
         "package/__init__.py",

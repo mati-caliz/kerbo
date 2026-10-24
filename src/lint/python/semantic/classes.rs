@@ -255,14 +255,30 @@ fn any_base_named(
     names: &[&str],
     seen: &mut HashSet<usize>,
 ) -> bool {
+    any_base(
+        resolver,
+        class,
+        &mut |base| {
+            resolver
+                .qualified(without_subscript(base))
+                .is_some_and(|name| names.contains(&name.as_str()))
+        },
+        seen,
+    )
+}
+
+// `any_base_class`: alguna base cumple, directamente o heredada de una clase del archivo.
+pub fn any_base(
+    resolver: &Resolver<'_, '_>,
+    class: Node<'_>,
+    matches: &mut dyn FnMut(Node<'_>) -> bool,
+    seen: &mut HashSet<usize>,
+) -> bool {
     bases(class).into_iter().any(|base| {
-        let base = without_subscript(base);
-        if resolver
-            .qualified(base)
-            .is_some_and(|name| names.contains(&name.as_str()))
-        {
+        if matches(base) {
             return true;
         }
+        let base = without_subscript(base);
         if base.kind() != IDENTIFIER {
             return false;
         }
@@ -283,11 +299,11 @@ fn any_base_named(
                     .unwrap_or(statement)
             })
             .filter(|statement| statement.kind() == CLASS);
-        parent.is_some_and(|parent| seen.insert(id) && any_base_named(resolver, parent, names, seen))
+        parent.is_some_and(|parent| seen.insert(id) && any_base(resolver, parent, matches, seen))
     })
 }
 
-fn bases(class: Node<'_>) -> Vec<Node<'_>> {
+pub fn bases(class: Node<'_>) -> Vec<Node<'_>> {
     class
         .child_by_field_name(SUPERCLASSES_FIELD)
         .map(named)

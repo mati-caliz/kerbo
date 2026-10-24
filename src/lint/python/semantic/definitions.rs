@@ -2,8 +2,10 @@ use tree_sitter::Node;
 
 use super::defaults::default_reports;
 use super::enum_values::duplicate_enum_values;
+use super::exit_annotations::exit_annotation_reports;
 use super::implicit_optional::implicit_optional_reports;
 use super::mutability::Resolver;
+use super::self_types::{custom_type_variable_report, non_self_return_report};
 
 use super::builtin_calls::lru_cache_reports;
 use super::cached_methods::cached_instance_method;
@@ -91,6 +93,21 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
                 };
                 let signature = signature_reports(hints, function, &decorators, self.file.stub);
                 self.reports.extend(signature);
+                let exit = exit_annotation_reports(hints, function, &decorators);
+                self.reports.extend(exit);
+                let resolver = Resolver {
+                    model: &self.model,
+                    source: self.source,
+                    scope: self.model.scope,
+                };
+                let non_self = non_self_return_report(&resolver, function, &decorators);
+                let type_variable = if self.boundaries.future_annotations() || self.file.stub {
+                    self.methods.push(self.snapshot(function));
+                    None
+                } else {
+                    custom_type_variable_report(&resolver, function, &decorators)
+                };
+                self.reports.extend(non_self.into_iter().chain(type_variable));
                 self.reports.extend(useless_return(self.source, function));
                 self.function(function);
             }
@@ -175,24 +192,14 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
 
     fn bind_type_parameters(&mut self, parameters: Node<'tree>, definition: Node<'tree>) {
         for parameter in named(parameters) {
-            let inner = named(parameter).first().copied().unwrap_or(parameter);
-            let parts = if inner.kind() == CONSTRAINED_TYPE {
-                named(inner)
-            } else {
-                vec![inner]
-            };
-            let Some((first, bounds)) = parts.split_first() else {
-                continue;
-            };
-            let name = std::iter::successors(Some(*first), |node| named(*node).first().copied())
-                .find(|node| node.kind() == IDENTIFIER);
+            let (name, bounds) = type_parameter_parts(parameter);
             if let Some(name) = name {
                 self.reports
                     .extend(private_type_parameter(definition, name, self.text(name)));
                 self.bind_name(name, Store::plain(BindingKind::TypeParameter, definition));
             }
             for bound in bounds {
-                self.deferred.annotations.push(self.snapshot(*bound));
+                self.deferred.annotations.push(self.snapshot(bound));
             }
         }
     }
@@ -355,4 +362,20 @@ fn private_type_parameter(definition: Node<'_>, name: Node<'_>, text: &str) -> O
     let private = text.starts_with(PRIVATE_PREFIX) && !text.ends_with(PRIVATE_PREFIX);
     (private && matches!(definition.kind(), FUNCTION | CLASS))
         .then(|| Report::at(PythonRule::UP049, name, ""))
+}
+
+// El nombre de un parámetro de tipo (`T`, `T: int`, `*Ts`) y sus cotas o restricciones.
+pub fn type_parameter_parts(parameter: Node<'_>) -> (Option<Node<'_>>, Vec<Node<'_>>) {
+    let inner = named(parameter).first().copied().unwrap_or(parameter);
+    let parts = if inner.kind() == CONSTRAINED_TYPE {
+        named(inner)
+    } else {
+        vec![inner]
+    };
+    let Some((first, bounds)) = parts.split_first() else {
+        return (None, Vec::new());
+    };
+    let name = std::iter::successors(Some(*first), |node| named(*node).first().copied())
+        .find(|node| node.kind() == IDENTIFIER);
+    (name, bounds.to_vec())
 }

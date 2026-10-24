@@ -1,5 +1,6 @@
 mod redefinitions;
 mod removal;
+mod type_checking_imports;
 
 use tree_sitter::{Node, Point};
 
@@ -67,6 +68,9 @@ fn scope_reports(visitor: &Visitor<'_>, scope: ScopeId) -> Vec<Report> {
     reports.extend(super::private_types::unused_private_types(visitor, &latest));
     if matches!(kind, ScopeKind::Module | ScopeKind::Function) {
         reports.extend(removal::unused_imports(visitor, &latest));
+        if !visitor.file.stub {
+            reports.extend(type_checking_imports::runtime_imports(visitor, &latest));
+        }
     }
     if kind == ScopeKind::Function {
         reports.extend(unused_locals(visitor, scope, &latest));

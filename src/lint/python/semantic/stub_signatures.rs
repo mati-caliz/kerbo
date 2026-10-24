@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::Mode;
+use super::decorators::is_abstract;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::type_hints::{Hints, subscript_parts, unwrapped};
 use crate::lint::python::Report;
@@ -16,7 +17,6 @@ use crate::syntax::{SnippetLanguage, parse_snippet};
 const PARAMETERS_FIELD: &str = "parameters";
 const RETURN_TYPE_FIELD: &str = "return_type";
 const TYPE_FIELD: &str = "type";
-const DECORATOR: &str = "decorator";
 const ASYNC: &str = "async";
 const NONE_LITERAL: &str = "none";
 const POSITIONAL_SEPARATOR: &str = "positional_separator";
@@ -36,12 +36,6 @@ const ITER: &str = "__iter__";
 const AITER: &str = "__aiter__";
 const GENERATORS: [&str; 2] = ["typing.Generator", "collections.abc.Generator"];
 const ASYNC_GENERATORS: [&str; 2] = ["typing.AsyncGenerator", "collections.abc.AsyncGenerator"];
-const ABSTRACT_DECORATORS: [&str; 4] = [
-    "abc.abstractmethod",
-    "abc.abstractproperty",
-    "abc.abstractclassmethod",
-    "abc.abstractstaticmethod",
-];
 const ANY: &str = "Any";
 const NO_RETURN: &str = "NoReturn";
 const NUMERIC: [&str; 3] = ["int", "float", "complex"];
@@ -359,20 +353,4 @@ fn redundant_string_method(
             "",
         )
     })
-}
-
-fn is_abstract(hints: Hints<'_, '_, '_>, decorators: &[Node<'_>]) -> bool {
-    decorators
-        .iter()
-        .filter(|decorator| decorator.kind() == DECORATOR)
-        .filter_map(|decorator| {
-            named(*decorator)
-                .into_iter()
-                .find(|child| child.kind() != COMMENT)
-        })
-        .map(|expression| callable(unparenthesized(expression)))
-        .any(|callable| {
-            qualified_name(hints.model, callable, hints.source)
-                .is_some_and(|name| ABSTRACT_DECORATORS.contains(&name.as_str()))
-        })
 }

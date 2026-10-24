@@ -181,7 +181,7 @@ impl<'tree> Hints<'_, '_, '_> {
     }
 
     // `in_nested_union` y compañía: el padre, sin contar paréntesis ni envoltorios, también lo es.
-    fn is_nested(self, node: Node<'_>, mode: Mode, check: impl Fn(Self, Node<'_>, Mode) -> bool) -> bool {
+    pub fn is_nested(self, node: Node<'_>, mode: Mode, check: impl Fn(Self, Node<'_>, Mode) -> bool) -> bool {
         let mut parent = node.parent();
         while let Some(current) = parent.filter(|current| {
             WRAPPERS.contains(&current.kind())

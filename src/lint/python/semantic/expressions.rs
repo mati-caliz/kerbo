@@ -12,8 +12,9 @@ use super::pep::is_pep585_generic;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::short_circuit::short_circuit_reports;
 use super::targets::Store;
-use super::type_hints::type_hint_reports;
+use super::type_hints::{Hints, type_hint_reports};
 use super::type_names::is_type_name;
+use super::type_unions::redundant_type_union;
 use super::{Mode, Visitor};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
@@ -73,6 +74,13 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         }
         self.reports
             .extend(type_hint_reports(&self.model, self.source, node, mode));
+        let hints = Hints {
+            model: &self.model,
+            source: self.source,
+        };
+        let deferred = self.boundaries.future_annotations() || self.file.stub;
+        self.reports
+            .extend(redundant_type_union(hints, node, mode, deferred));
         match node.kind() {
             IDENTIFIER => {
                 self.model.resolve_load(self.text(node), node.start_position());

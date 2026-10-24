@@ -1,0 +1,95 @@
+def decorator(function):
+    return function
+
+
+@decorator
+# fmt: off
+def example():
+    if True:
+        # fmt: skip
+        expression = [
+            # fmt: off
+            1,
+            2,
+        ]
+        # yapf: disable
+    # fmt: on
+    # yapf: enable
+    return expression
+
+
+@decorator
+# fmt: on
+class Decorated:
+    # fmt: off
+    value = 1
+    # fmt: on
+
+
+# fmt: off
+TABLE = {
+    "a": 1,
+    # fmt: off
+    "b": 2,
+    # fmt:on
+    "c": call(
+        # fmt: skip
+        1, 2,
+    ),
+}
+# fmt: on
+
+value = 1  # fmt: skip
+other = 2  # fmt: off
+third = 3  # fmt: on
+fourth = [1, 2]  # noqa: E501 # fmt: skip
+fifth = call(1,  # fmt: skip
+             2)
+sixth = (
+    1  # fmt: skip
+)
+
+
+def parameters(
+    first,  # fmt: skip
+    # fmt: off
+    second,
+):
+    pass  # fmt: skip
+
+
+class Body:
+    def method(self):
+        pass
+        # fmt: on
+
+    # fmt: off
+    def other(self):
+        pass  # fmt:skip
+
+
+if value:
+    pass
+# fmt: off
+else:
+    pass
+
+try:
+    pass
+    # fmt: off
+except ValueError:
+    pass
+
+match value:
+    # fmt: off
+    case 1:
+        pass
+    case [
+        # fmt: skip
+        2
+    ]:
+        pass
+
+result = lambda x: (  # fmt: skip
+    x
+)

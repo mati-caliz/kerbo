@@ -3,8 +3,10 @@ use crate::lint::python::semantic::pep::{is_pep585_generic, is_pep646_unpack, pe
 use crate::rules::PythonRule;
 use tree_sitter::{Node, Point};
 
-use super::super::Visitor;
 use super::super::qualified::{is_typing, qualified_name};
+use super::super::type_hints::Hints;
+use super::super::type_unions::has_redundant_type_members;
+use super::super::{Mode, Visitor};
 use super::{ANNOTATED, LITERAL};
 use crate::lint::python::ast::{
     ATTRIBUTE, CONCATENATED_STRING, IDENTIFIER, KEYWORD_ARGUMENT, LAMBDA, OBJECT_FIELD, STRING, SUBSCRIPT,
@@ -87,6 +89,17 @@ pub trait EmbeddedAnnotations {
 
 impl EmbeddedAnnotations for Visitor<'_> {
     fn embedded_loads(&mut self, node: Node<'_>, context: &Embedded<'_>) {
+        let hints = Hints {
+            model: &self.model,
+            source: context.source,
+        };
+        if !context.literal && has_redundant_type_members(hints, node, Mode::TypeDefinition) {
+            self.reports.push(Report::at_point(
+                PythonRule::PYI055,
+                context.placement.map(node.start_position()),
+                "",
+            ));
+        }
         match node.kind() {
             IDENTIFIER => {
                 let name = text(node, context.source);

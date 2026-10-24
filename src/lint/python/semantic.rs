@@ -14,10 +14,12 @@ mod compound_checks;
 mod conversions;
 mod dataclass_defaults;
 mod decimals;
+mod decorators;
 mod defaults;
 mod definitions;
 mod effects;
 mod enum_values;
+mod exit_annotations;
 mod expressions;
 mod file_loops;
 mod format_calls;
@@ -32,12 +34,14 @@ mod literals;
 mod misc_calls;
 mod model;
 mod mutability;
+mod parameters;
 mod patterns;
 mod pep;
 mod private_types;
 mod qualified;
 mod resources;
 mod returns;
+mod self_types;
 mod short_circuit;
 mod statements;
 mod stub_signatures;
@@ -48,6 +52,7 @@ mod targets;
 mod timeouts;
 mod type_hints;
 mod type_names;
+mod type_unions;
 mod typecheck;
 
 use crate::lint::python::semantic::annotations::Annotations;
@@ -108,6 +113,7 @@ pub struct Visitor<'tree> {
     pub boundaries: boundary::Boundaries,
     pub exports: Vec<(String, Point)>,
     pub classes: Vec<Pending<'tree>>,
+    pub methods: Vec<Pending<'tree>>,
 }
 
 pub fn reports(root: Node<'_>, source: &[u8], file: FileKind) -> Vec<Report> {
@@ -120,12 +126,18 @@ pub fn reports(root: Node<'_>, source: &[u8], file: FileKind) -> Vec<Report> {
         boundaries: boundary::Boundaries::default(),
         exports: Vec::new(),
         classes: Vec::new(),
+        methods: Vec::new(),
     };
     visitor.block(root);
     visitor.run_deferred();
     visitor.visit_exports();
     let mut reports = classes::mutable_class_defaults(&visitor.model, source, &visitor.classes);
     reports.extend(checks::reports(&visitor));
+    reports.extend(self_types::deferred_type_variables(
+        &visitor.model,
+        source,
+        &visitor.methods,
+    ));
     reports.append(&mut visitor.reports);
     reports
 }

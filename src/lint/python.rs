@@ -18,6 +18,7 @@ mod escapes;
 mod exception_flow;
 mod flow;
 mod formats;
+mod formatter_comments;
 mod fstrings;
 mod import_self;
 mod imports;
@@ -194,6 +195,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(dunders::reports(&nodes, source));
     reports.extend(negations::reports(&nodes, source));
     reports.extend(comments::reports(&nodes, source));
+    reports.extend(formatter_comments::reports(root, &nodes, source));
     reports.extend(rewrites::reports(&nodes, source));
     reports.extend(module_names::invalid_module_name(path));
     let mut found: Vec<LintFinding> = suppressed(root, source, reports, &enabled)

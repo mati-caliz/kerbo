@@ -45,7 +45,7 @@ pub fn unused_private_types(visitor: &Visitor<'_>, latest: &[(&str, BindingId)])
         .collect()
 }
 
-fn assigned_call(name: Node<'_>) -> Option<Node<'_>> {
+pub fn assigned_call(name: Node<'_>) -> Option<Node<'_>> {
     let assignment = name.parent().filter(|parent| {
         parent.kind() == ASSIGNMENT
             && parent

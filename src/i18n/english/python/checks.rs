@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 36] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 42] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -325,6 +325,60 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 36] = [
             "remove the directive or the codes it no longer needs",
             "A noqa that silences nothing hides future problems on that line and misleads whoever reads it.",
             "x = 1  # noqa: F401 on a line without F401 can go away.",
+        ),
+    ),
+    (
+        PythonRule::PYI036,
+        RuleText::new(
+            "Badly annotated __exit__ or __aexit__",
+            "annotate the exception arguments with their optional types, or with object",
+            "Type checkers rely on the signature of __exit__ to know whether the context manager swallows exceptions; a wrong annotation breaks that.",
+            "def __exit__(self, typ: BaseException, exc, tb) becomes def __exit__(self, typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None).",
+        ),
+    ),
+    (
+        PythonRule::PYI034,
+        RuleText::new(
+            "Method that returns its own class instead of Self",
+            "annotate the return with Self",
+            "With the class name fixed in the return type, a subclass that calls the method gets the parent type back and loses its own methods.",
+            "def __enter__(self) -> Shape becomes def __enter__(self) -> Self.",
+        ),
+    ),
+    (
+        PythonRule::PYI019,
+        RuleText::new(
+            "Custom TypeVar where Self would do",
+            "use Self and drop the annotation of self or cls",
+            "Self says the same thing as a TypeVar bound to the class, in fewer words and without declaring anything.",
+            "def copy(self: _S) -> _S becomes def copy(self) -> Self.",
+        ),
+    ),
+    (
+        PythonRule::TC004,
+        RuleText::new(
+            "Import inside TYPE_CHECKING that is used at runtime",
+            "move the import out of the type-checking block",
+            "The TYPE_CHECKING block never runs, so a name used at runtime raises NameError when that line executes.",
+            "if TYPE_CHECKING: import json followed by json.dumps(data) needs import json at the top.",
+        ),
+    ),
+    (
+        PythonRule::PYI055,
+        RuleText::new(
+            "Several type[...] members in a union",
+            "combine them into a single type[...]",
+            "type[A] | type[B] means the same as type[A | B], which is shorter and reads as one idea.",
+            "field: type[int] | type[float] becomes field: type[int | float].",
+        ),
+    ),
+    (
+        PythonRule::RUF028,
+        RuleText::new(
+            "Formatter suppression comment in a place where it does nothing",
+            "move the comment next to a statement, or delete it",
+            "The formatter only reads fmt: off, fmt: on and fmt: skip in certain places; anywhere else the code gets formatted anyway.",
+            "A # fmt: off between two items of a list is ignored; put it before the whole statement.",
         ),
     ),
 ];

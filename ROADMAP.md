@@ -1511,17 +1511,43 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     código suyo en un `noqa` no se marca nunca (no se sabe si se usa); en un archivo que tree-sitter
     no parsea sólo se marcan los códigos de reglas apagadas o repetidos. Falta el arreglo (borrar el
     comentario o los códigos de más).
-  - Lo que queda del conjunto por defecto (2026-10-24): 6 reglas con unos 125 avisos en el corpus:
-    PYI036 47, PYI034 26, PYI019 22, TC004 17, PYI055 8 y RUF028 6 (comentarios `fmt: off`/`fmt: skip`
-    en lugares donde el formateador de ruff no los toma, que pide conocer ese formateador).
+  - Hechas las 6 reglas que quedaban del conjunto por defecto (2026-10-24): PYI036 (la firma de
+    `__exit__`/`__aexit__`, también con dos sobrecargas), PYI034 (el retorno que debería ser `Self`,
+    con el `is_metaclass` de ruff y las bases heredadas de clases del archivo), PYI019 (`self: _S` con
+    un `TypeVar` propio o un parámetro de tipo del método; con anotaciones diferidas se resuelve al
+    final del módulo, como ruff), TC004 (un import de `if TYPE_CHECKING:` usado en ejecución; el
+    contexto de cada referencia sale del árbol al final: anotaciones que no se evalúan, strings,
+    cotas de parámetros de tipo y `__all__`), PYI055 (varios `type[...]` en una unión, sólo donde no
+    se evalúa, también entre comillas) y RUF028 (los comentarios `fmt: off`/`on`/`skip` y `yapf:`,
+    con el `SuppressionCommentVisitor` de ruff recorrido sobre el árbol de tree-sitter traducido a la
+    forma del AST de ruff). Paridad exacta en las seis: 47, 26, 22, 17, 8 y 6 avisos, y RUF100 quedó en
+    1.437 de 1.437 sin el aviso de más que dependía de TC004. Los casos quedaron en
+    `fixtures/self_types.py`, `fixtures/self_types_stub.pyi`, `fixtures/type_checking_imports.py` y
+    `fixtures/formatter_comments.py`. Con esto kerbo cubre todas las reglas del conjunto por defecto de
+    ruff 0.17 que aparecen en el corpus.
+  - Pendientes de esa tanda: ninguna de las seis trae arreglo (ruff lo tiene en todas). PYI016 no
+    toma `Optional[X]` como una unión con `None` (`Optional[None]` da un PYI016 en ruff). PYI055 no
+    mira un `|` que no está en una anotación aunque esté adentro de `if TYPE_CHECKING:`. PYI019 no
+    exige que el archivo importe `typing` (el `seen_typing` de ruff). TC004 no tiene la opción
+    `quote-annotations` ni las bases que ruff evalúa en ejecución (`runtime-evaluated-base-classes`).
+    RUF028 no entra en las interpolaciones de un f-string ni separa los destinos de `a = b = c`.
   - Los archivos que no están en UTF-8 (ruff da E902 y no los analiza) se analizan igual: falta
     saltearlos o avisar como ruff. Se hacen en tandas de 15 a 25 reglas por
     tema, con un solo gate y una sola medición por tanda.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.
-  - El resto del conjunto por defecto de ruff 0.17 (`B`, `PL`, `UP`, `RUF`, `SIM`, `C4`, `PYI`,
-    `FURB`, `PERF`, `ASYNC`, `S`, `TRY`, `PT`, `LOG`, `YTT`…), sin medir todavía la frecuencia.
+  - Del conjunto por defecto de ruff 0.17 (407 reglas) quedan 115, más las cuatro del conjunto
+    clásico de arriba, todas con cero avisos en el corpus, así que su paridad sólo se puede medir con
+    fixtures: YTT101–103, YTT202, YTT204, YTT301–303, ASYNC105, ASYNC116, ASYNC210, ASYNC220,
+    ASYNC221, B014, B022, B025, B029, B031, B039, C415, EXE001, EXE002, EXE004, FA100, FA102, INT001,
+    INT003, LOG002, LOG009, LOG014, G010, G101, G202, PYI001–005, PYI007–010, PYI012, PYI013, PYI015,
+    PYI017, PYI026, PYI033, PYI035, PYI043–045, PYI047–049, PYI052, PYI066, PT010, PT020, PT025,
+    PT026, SIM107, SIM220, SIM221, SIM911, TC007, TC010, PTH210, PGH005, PLC0131, PLE0100, PLE0115,
+    PLE0116, PLE0118, PLE1132, PLE1205, PLE1206, PLE1310, PLE1507, PLE1519, PLE1520, PLE1700,
+    PLE2510, PLE2512–2515, PLW0604, PLW1501, PLW1507, PLW2101, UP001, UP023, UP026, UP040, UP043,
+    UP046, UP047, FURB162, FURB169, FURB177, FURB181, RUF008, RUF016, RUF018, RUF024, RUF026, RUF030,
+    RUF033, RUF048, RUF049, RUF053, RUF058, RUF101 y RUF200.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

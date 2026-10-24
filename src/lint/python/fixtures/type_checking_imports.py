@@ -1,0 +1,84 @@
+import typing
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import json
+    import os.path
+    from collections import OrderedDict, defaultdict
+    from decimal import Decimal as Number
+    from fractions import Fraction
+    from pathlib import Path, PurePath
+    from re import Pattern
+    from string import Template
+    from uuid import UUID
+    from enum import Enum
+    from abc import ABC
+
+if typing.TYPE_CHECKING:
+    from datetime import date, time
+
+if TYPE_CHECKING:
+    from io import StringIO
+else:
+    from io import BytesIO
+
+if TYPE_CHECKING:
+    from shutil import copy
+else:
+    from shutil import copy
+
+
+def runtime_uses():
+    json.dumps({})
+    os.path.join("a")
+    OrderedDict()
+    Number(1)
+    date.today()
+    BytesIO()
+    copy("a", "b")
+    return Template
+
+
+def annotations_only(value: Fraction) -> "Path":
+    pattern: Pattern = None
+    other: "UUID" = None
+    return pattern, other
+
+
+def defaults(value=PurePath):
+    return value
+
+
+class Model(Enum):
+    first = 1
+
+
+class Base(ABC):
+    attribute: defaultdict = None
+
+
+isinstance(1, StringIO)
+
+
+def nested():
+    if TYPE_CHECKING:
+        from textwrap import dedent, indent
+        from heapq import heappush
+
+    dedent("x")
+    value: indent = None
+    return value
+
+
+def type_parameter[T: time](value: T) -> T:
+    return value
+
+
+class InTypeChecking:
+    if TYPE_CHECKING:
+        from operator import add
+
+    add(1, 2)
+
+
+__all__ = ["Number"]
