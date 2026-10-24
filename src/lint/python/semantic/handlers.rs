@@ -14,7 +14,8 @@ const RAISE: &str = "raise_statement";
 const CAUSE_FIELD: &str = "cause";
 const BLIND_EXCEPTIONS: [&str; 2] = ["BaseException", "Exception"];
 const BUILTIN_EXCEPTIONS: [&str; 2] = ["builtins.BaseException", "builtins.Exception"];
-const PASS: &str = "pass_statement";
+pub const PASS: &str = "pass_statement";
+pub const CONTINUE: &str = "continue_statement";
 const NOT_VISITED: [&str; 4] = [TRY, FUNCTION, CLASS, DECORATED];
 const EXCEPTION_METHOD: &str = "exception";
 const LOGGER_METHODS: [&str; 8] = [
@@ -192,14 +193,14 @@ fn is_falsy(value: Node<'_>, source: &[u8]) -> bool {
 }
 
 // S110: un `except` sin tipo, o con `Exception`/`BaseException`, cuyo cuerpo es sólo `pass`.
-pub fn is_silenced_exception(model: &Model<'_>, source: &[u8], handler: Node<'_>) -> bool {
+pub fn is_silenced_exception(model: &Model<'_>, source: &[u8], handler: Node<'_>, only: &str) -> bool {
     let body: Vec<Node<'_>> = named(handler)
         .into_iter()
         .filter(|child| child.kind() == BLOCK)
         .flat_map(named)
         .filter(|statement| statement.kind() != COMMENT)
         .collect();
-    let only_pass = matches!(body.as_slice(), [statement] if statement.kind() == PASS);
+    let only_pass = matches!(body.as_slice(), [statement] if statement.kind() == only);
     let untyped = handler.child_by_field_name(VALUE_FIELD).is_none_or(|value| {
         let exception = if value.kind() == AS_PATTERN {
             named(value).first().copied()

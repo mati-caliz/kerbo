@@ -156,6 +156,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(exception_flow::reports(&nodes, source));
     reports.extend(methods::reports(&nodes, source));
     reports.extend(loops::loop_variable_overrides(&nodes, source));
+    reports.extend(loops::iteration_over_set(&nodes, source));
     reports.extend(deprecated::reports(&nodes, source));
     reports.extend(concatenation::reports(&nodes));
     reports.extend(branches::reports(&nodes, source));

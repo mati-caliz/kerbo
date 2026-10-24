@@ -2,7 +2,9 @@ use tree_sitter::Node;
 
 use super::names::{NameRole, name_role};
 use crate::lint::python::Report;
-use crate::lint::python::ast::{IDENTIFIER, LAMBDA, LEFT_FIELD, RIGHT_FIELD, named, text};
+use crate::lint::python::ast::{
+    COMMENT, IDENTIFIER, LAMBDA, LEFT_FIELD, RIGHT_FIELD, named, string_prefix, text, unparenthesized,
+};
 use crate::rules::PythonRule;
 
 const FOR: &str = "for_statement";
@@ -18,6 +20,53 @@ const BODY_FIELD: &str = "body";
 const DEFAULTED_PARAMETERS: [&str; 2] = ["default_parameter", "typed_default_parameter"];
 const NAME_FIELD: &str = "name";
 const TYPED_PARAMETER: &str = "typed_parameter";
+const SET: &str = "set";
+const LITERALS: [&str; 7] = [
+    "string",
+    "concatenated_string",
+    "integer",
+    "float",
+    "true",
+    "false",
+    "none",
+];
+const ELLIPSIS: &str = "ellipsis";
+const FORMATTED_PREFIXES: [char; 4] = ['f', 'F', 't', 'T'];
+
+// PLC0208: `for x in {1, 2}:` (también en comprensiones), recorrer un conjunto escrito, cuyo orden no
+// está definido. Sólo si todos los elementos son literales y no hay repetidos.
+pub fn iteration_over_set(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
+    nodes
+        .iter()
+        .filter(|node| matches!(node.kind(), FOR | FOR_IN))
+        .filter_map(|node| node.child_by_field_name(RIGHT_FIELD))
+        .map(unparenthesized)
+        .filter(|iterable| iterable.kind() == SET && is_literal_set(*iterable, source))
+        .map(|set| Report::at(PythonRule::PLC0208, set, ""))
+        .collect()
+}
+
+fn is_literal_set(set: Node<'_>, source: &[u8]) -> bool {
+    let elements: Vec<Node<'_>> = named(set)
+        .into_iter()
+        .filter(|element| element.kind() != COMMENT)
+        .collect();
+    let all_literal = elements.iter().all(|element| {
+        let is_formatted = string_prefix(*element, source).contains(FORMATTED_PREFIXES)
+            || named(*element)
+                .iter()
+                .any(|part| string_prefix(*part, source).contains(FORMATTED_PREFIXES));
+        (LITERALS.contains(&element.kind()) || element.kind() == ELLIPSIS) && !is_formatted
+    });
+    let mut seen: Vec<&str> = Vec::new();
+    let distinct = elements.iter().all(|element| {
+        let value = text(*element, source);
+        let is_new = !seen.contains(&value);
+        seen.push(value);
+        is_new
+    });
+    all_literal && distinct
+}
 
 // B020: `for item in item:` (o un nombre del destino que también está en lo que se recorre), que
 // pisa el iterable con cada elemento. Avisa en la última aparición del nombre en el destino.

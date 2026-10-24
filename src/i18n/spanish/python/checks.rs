@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 18] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 28] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -163,6 +163,96 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 18] = [
             "usá datetime.now(tz=...)",
             "today() devuelve un datetime sin zona en la hora local, que rompe comparaciones y cuentas con datetimes con zona.",
             "datetime.today() pasa a datetime.now(tz=timezone.utc).",
+        ),
+    ),
+    (
+        PythonRule::S112,
+        RuleText::new(
+            "except que sólo sigue con el loop",
+            "manejá o registrá el error antes de seguir",
+            "Saltear una excepción en silencio esconde fallas que al menos deberían quedar registradas.",
+            "except Exception:\n    continue suma un log antes del continue.",
+        ),
+    ),
+    (
+        PythonRule::C410,
+        RuleText::new(
+            "list() alrededor de una lista o tupla escrita",
+            "escribí la lista directamente",
+            "El literal ya arma la lista sin una llamada de más.",
+            "list([1, 2]) pasa a [1, 2].",
+        ),
+    ),
+    (
+        PythonRule::C406,
+        RuleText::new(
+            "dict() alrededor de una lista o tupla de pares",
+            "escribí el diccionario directamente",
+            "Un diccionario escrito dice lo mismo sin armar una secuencia intermedia de pares.",
+            "dict([(\"a\", 1)]) pasa a {\"a\": 1}.",
+        ),
+    ),
+    (
+        PythonRule::DTZ003,
+        RuleText::new(
+            "datetime.utcnow() devuelve un datetime sin zona",
+            "usá datetime.now(tz=timezone.utc)",
+            "utcnow() devuelve un datetime sin zona horaria que muchas funciones toman como hora local.",
+            "datetime.utcnow() pasa a datetime.now(tz=timezone.utc).",
+        ),
+    ),
+    (
+        PythonRule::PLR1722,
+        RuleText::new(
+            "exit() o quit() en vez de sys.exit()",
+            "usá sys.exit()",
+            "exit y quit son para la consola interactiva y pueden no existir si Python corre sin el módulo site.",
+            "exit(1) pasa a sys.exit(1).",
+        ),
+    ),
+    (
+        PythonRule::UP021,
+        RuleText::new(
+            "universal_newlines en vez de text en subprocess.run",
+            "usá text=True",
+            "universal_newlines es el nombre viejo de text desde Python 3.7.",
+            "run(cmd, universal_newlines=True) pasa a run(cmd, text=True).",
+        ),
+    ),
+    (
+        PythonRule::PLW1509,
+        RuleText::new(
+            "preexec_fn en subprocess.Popen",
+            "evitá preexec_fn, por ejemplo con start_new_session o process_group",
+            "preexec_fn no es seguro en programas con hilos y puede trabar el proceso hijo.",
+            "Popen(cmd, preexec_fn=os.setsid) pasa a Popen(cmd, start_new_session=True).",
+        ),
+    ),
+    (
+        PythonRule::UP033,
+        RuleText::new(
+            "@lru_cache(maxsize=None) en vez de @cache",
+            "usá functools.cache",
+            "Desde Python 3.9 functools.cache es un lru_cache sin límite.",
+            "@lru_cache(maxsize=None) pasa a @cache.",
+        ),
+    ),
+    (
+        PythonRule::B003,
+        RuleText::new(
+            "Asignación a os.environ",
+            "cambiá las variables con os.environ[...] u os.environ.update",
+            "Reemplazar os.environ sólo cambia el nombre; el entorno del proceso y los procesos hijos siguen con las variables viejas.",
+            "os.environ = {} pasa a os.environ.clear().",
+        ),
+    ),
+    (
+        PythonRule::PLC0208,
+        RuleText::new(
+            "Recorrido de un conjunto escrito",
+            "recorré una tupla o una lista",
+            "Un conjunto no tiene orden definido y se arma sólo para recorrerlo, así que una tupla dice lo mismo y mantiene el orden.",
+            "for x in {1, 2}: pasa a for x in (1, 2):.",
         ),
     ),
 ];

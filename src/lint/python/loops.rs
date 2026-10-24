@@ -13,7 +13,7 @@ use crate::rules::PythonRule;
 mod names;
 mod overrides;
 
-pub use overrides::loop_variable_overrides;
+pub use overrides::{iteration_over_set, loop_variable_overrides};
 
 use names::{NameRole, name_role, parameter_names};
 

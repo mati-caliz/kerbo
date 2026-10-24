@@ -11,6 +11,8 @@ use crate::rules::PythonRule;
 
 const LIST_BUILTIN: &str = "list";
 const TUPLE_BUILTIN: &str = "tuple";
+const DICT_BUILTIN: &str = "dict";
+const PAIR_LENGTH: usize = 2;
 const SORTED: &str = "sorted";
 const AROUND_SORTED: [&str; 2] = ["list", "reversed"];
 const SHORT_CIRCUITING: [&str; 2] = ["any", "all"];
@@ -55,6 +57,24 @@ pub fn collection_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>)
         && is_builtin(TUPLE_BUILTIN)
     {
         reports.push(Report::at(PythonRule::C409, call, ""));
+    }
+    if let Some(single) = single
+        && named_function == Some(LIST_BUILTIN)
+        && matches!(single.kind(), TUPLE | LIST)
+        && is_builtin(LIST_BUILTIN)
+    {
+        reports.push(Report::at(PythonRule::C410, call, ""));
+    }
+    if let Some(single) = single
+        && named_function == Some(DICT_BUILTIN)
+        && matches!(single.kind(), TUPLE | LIST)
+        && named(single)
+            .into_iter()
+            .filter(|element| element.kind() != COMMENT)
+            .all(|element| element.kind() == TUPLE && named(element).len() == PAIR_LENGTH)
+        && is_builtin(DICT_BUILTIN)
+    {
+        reports.push(Report::at(PythonRule::C406, call, ""));
     }
     if let Some(first) = first
         && AROUND_SORTED.iter().any(|name| is_builtin(name))

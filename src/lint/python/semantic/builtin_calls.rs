@@ -6,6 +6,7 @@ use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, COMMENT, FALSE, FUNCTION_FIELD, KEYWORD_ARGUMENT,
     NAME_FIELD, PARENTHESIZED, STRING, TRUE, VALUE_FIELD, is_string, named, string_prefix, text,
+    unparenthesized,
 };
 use crate::lint::python::escapes::text_value;
 use crate::rules::PythonRule;
@@ -24,6 +25,13 @@ const GETATTR: &str = "getattr";
 const LRU_CACHE: &str = "functools.lru_cache";
 const ARGUMENT_LIST: &str = "argument_list";
 const DATETIME_TODAY: &str = "datetime.datetime.today";
+const DATETIME_UTCNOW: &str = "datetime.datetime.utcnow";
+const EXIT_ALIASES: [&str; 2] = ["exit", "quit"];
+const UNIVERSAL_NEWLINES: &str = "universal_newlines";
+const SUBPROCESS_POPEN: &str = "subprocess.Popen";
+const PREEXEC_FN: &str = "preexec_fn";
+const MAXSIZE: &str = "maxsize";
+const NONE_LITERAL: &str = "none";
 const REPLACE: &str = "replace";
 const ASTIMEZONE: &str = "astimezone";
 const DICTIONARY_SPLAT: &str = "dictionary_splat";
@@ -58,10 +66,36 @@ pub fn builtin_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
     {
         reports.push(Report::at(PythonRule::UP022, call, ""));
     }
-    if qualified_name(model, function, source).as_deref() == Some(DATETIME_TODAY)
+    let qualified = qualified_name(model, function, source);
+    let naive_datetime = match qualified.as_deref() {
+        Some(DATETIME_TODAY) => Some(PythonRule::DTZ002),
+        Some(DATETIME_UTCNOW) => Some(PythonRule::DTZ003),
+        _ => None,
+    };
+    if let Some(rule) = naive_datetime
         && !is_followed_by_astimezone(call, source)
     {
-        reports.push(Report::at(PythonRule::DTZ002, call, ""));
+        reports.push(Report::at(rule, call, ""));
+    }
+    if EXIT_ALIASES
+        .iter()
+        .any(|alias| is_builtin_named(model, function, source, alias))
+    {
+        reports.push(Report::at(PythonRule::PLR1722, function, ""));
+    }
+    if qualified.as_deref() == Some(SUBPROCESS_RUN)
+        && let Some(keyword) = keyword_argument(&arguments, UNIVERSAL_NEWLINES, source)
+        && let Some(name) = keyword.child_by_field_name(NAME_FIELD)
+    {
+        reports.push(Report::at(PythonRule::UP021, name, ""));
+    }
+    if qualified.as_deref() == Some(SUBPROCESS_POPEN)
+        && let Some(keyword) = keyword_argument(&arguments, PREEXEC_FN, source)
+        && keyword
+            .child_by_field_name(VALUE_FIELD)
+            .is_some_and(|value| unparenthesized(value).kind() != NONE_LITERAL)
+    {
+        reports.push(Report::at(PythonRule::PLW1509, keyword, ""));
     }
     if is_unreliable_callable_check(model, source, function, &arguments) {
         reports.push(Report::at(PythonRule::B004, call, ""));
@@ -115,12 +149,35 @@ pub fn lru_cache_reports(model: &Model<'_>, source: &[u8], decorators: &[Node<'_
         .filter_map(|call| {
             let function = call.child_by_field_name(FUNCTION_FIELD)?;
             let list = call.child_by_field_name(ARGUMENTS_FIELD)?;
-            let is_empty =
-                list.kind() == ARGUMENT_LIST && named(list).iter().all(|argument| argument.kind() == COMMENT);
-            let is_lru_cache = qualified_name(model, function, source).as_deref() == Some(LRU_CACHE);
-            (is_empty && is_lru_cache).then(|| Report::at(PythonRule::UP011, list, ""))
+            if list.kind() != ARGUMENT_LIST
+                || qualified_name(model, function, source).as_deref() != Some(LRU_CACHE)
+            {
+                return None;
+            }
+            let given: Vec<Node<'_>> = named(list)
+                .into_iter()
+                .filter(|argument| argument.kind() != COMMENT)
+                .collect();
+            match given.as_slice() {
+                [] => Some(Report::at(PythonRule::UP011, list, "")),
+                [keyword] if is_unbounded_maxsize(*keyword, source) => {
+                    Some(Report::at(PythonRule::UP033, list, ""))
+                }
+                _ => None,
+            }
         })
         .collect()
+}
+
+// `maxsize=None`.
+fn is_unbounded_maxsize(keyword: Node<'_>, source: &[u8]) -> bool {
+    keyword.kind() == KEYWORD_ARGUMENT
+        && keyword
+            .child_by_field_name(NAME_FIELD)
+            .is_some_and(|name| text(name, source) == MAXSIZE)
+        && keyword
+            .child_by_field_name(VALUE_FIELD)
+            .is_some_and(|value| unparenthesized(value).kind() == NONE_LITERAL)
 }
 
 // `Primitive::from_expr`: un booleano, un string, bytes o un número escrito.
@@ -185,6 +242,15 @@ fn arguments(call: Node<'_>) -> Arguments<'_> {
 }
 
 fn keyword_value<'tree>(arguments: &Arguments<'tree>, keyword: &str, source: &[u8]) -> Option<Node<'tree>> {
+    keyword_argument(arguments, keyword, source)
+        .and_then(|argument| argument.child_by_field_name(VALUE_FIELD))
+}
+
+fn keyword_argument<'tree>(
+    arguments: &Arguments<'tree>,
+    keyword: &str,
+    source: &[u8],
+) -> Option<Node<'tree>> {
     arguments
         .keywords
         .iter()
@@ -194,5 +260,5 @@ fn keyword_value<'tree>(arguments: &Arguments<'tree>, keyword: &str, source: &[u
                 .child_by_field_name(NAME_FIELD)
                 .is_some_and(|name| text(name, source) == keyword)
         })
-        .and_then(|argument| argument.child_by_field_name(VALUE_FIELD))
+        .copied()
 }

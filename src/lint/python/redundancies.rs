@@ -26,6 +26,9 @@ const TARGET_CONTAINERS: [&str; 8] = [
 ];
 const DICTIONARY: &str = "dictionary";
 const PARAMETERS_FIELD: &str = "parameters";
+const OS_MODULE: &str = "os";
+const ENVIRON: &str = "environ";
+const OBJECT_FIELD: &str = "object";
 
 pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     nodes
@@ -35,6 +38,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
             ASSIGNMENT => {
                 let mut found = self_assignments(*node, source);
                 found.extend(redeclared_names(*node, source));
+                found.extend(environ_assignment(*node, source));
                 found
             }
             CLASS => duplicate_class_fields(*node, source),
@@ -233,4 +237,25 @@ fn empty_container_lambda(lambda: Node<'_>) -> Option<Report> {
     let is_empty_container =
         matches!(body.kind(), LIST | DICTIONARY) && named(body).iter().all(|child| child.kind() == COMMENT);
     is_empty_container.then(|| Report::at(PythonRule::PIE807, lambda, ""))
+}
+
+// B003: `os.environ = {...}`, que reemplaza el objeto en vez de cambiar el entorno del proceso.
+fn environ_assignment(assignment: Node<'_>, source: &[u8]) -> Option<Report> {
+    let is_single_target = assignment
+        .parent()
+        .is_none_or(|parent| parent.kind() != ASSIGNMENT)
+        && assignment
+            .child_by_field_name(RIGHT_FIELD)
+            .is_none_or(|right| right.kind() != ASSIGNMENT);
+    let target = assignment
+        .child_by_field_name(LEFT_FIELD)
+        .filter(|target| target.kind() == ATTRIBUTE)?;
+    let is_environ = target
+        .child_by_field_name(ATTRIBUTE_FIELD)
+        .is_some_and(|attribute| text(attribute, source) == ENVIRON)
+        && target
+            .child_by_field_name(OBJECT_FIELD)
+            .is_some_and(|object| object.kind() == IDENTIFIER && text(object, source) == OS_MODULE);
+    (is_single_target && is_environ && assignment.child_by_field_name(TYPE_FIELD).is_none())
+        .then(|| Report::at(PythonRule::B003, target, ""))
 }

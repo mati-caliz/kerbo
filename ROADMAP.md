@@ -1411,6 +1411,12 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Hechas PLW0211 (método estático cuyo primer parámetro es `self` o `cls`), PLC3002 (`(lambda:
     x)()`) y DTZ002 (`datetime.today()` sin `.astimezone()` después). Paridad exacta: 20, 15 y 18.
     Los casos quedaron en `fixtures/methods.py`.
+  - Hechas S112 (`try`/`except`/`continue`), C410 (`list([...])`), C406 (`dict([...])`), DTZ003
+    (`datetime.utcnow()`), PLR1722 (`exit()` y `quit()`), UP021 (`universal_newlines` de
+    `subprocess`), PLW1509 (`preexec_fn`), UP033 (`lru_cache(maxsize=None)`), B003 (asignar a
+    `os.environ`) y PLC0208 (recorrer un conjunto escrito). Paridad: 7 de 8 S112 y exacta en el
+    resto (10, 9, 10, 9, 7, 7, 8, 10 y 8); el S112 que falta está en un archivo de CPython con
+    `lazy import`. Los casos quedaron en `fixtures/builtins_misc.py`.
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
   - Siguiente, la cola de reglas chicas: UP044, UP037, RUF013, PLR1704, PLC0206 y siguientes.

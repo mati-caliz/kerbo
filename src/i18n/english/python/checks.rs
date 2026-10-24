@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 18] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 28] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -163,6 +163,96 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 18] = [
             "use datetime.now(tz=...)",
             "today() returns a naive datetime in local time, which breaks comparisons and arithmetic with aware datetimes.",
             "datetime.today() becomes datetime.now(tz=timezone.utc).",
+        ),
+    ),
+    (
+        PythonRule::S112,
+        RuleText::new(
+            "except that only continues the loop",
+            "handle or log the error before continuing",
+            "Silently skipping an exception hides failures that should at least be logged.",
+            "except Exception:\n    continue gets a log call before continue.",
+        ),
+    ),
+    (
+        PythonRule::C410,
+        RuleText::new(
+            "list() around a list or tuple literal",
+            "write the list literal",
+            "The literal already builds the list without an extra call.",
+            "list([1, 2]) becomes [1, 2].",
+        ),
+    ),
+    (
+        PythonRule::C406,
+        RuleText::new(
+            "dict() around a list or tuple of pairs",
+            "write the dict literal",
+            "A dict literal says the same without building an intermediate sequence of pairs.",
+            "dict([(\"a\", 1)]) becomes {\"a\": 1}.",
+        ),
+    ),
+    (
+        PythonRule::DTZ003,
+        RuleText::new(
+            "datetime.utcnow() returns a naive datetime",
+            "use datetime.now(tz=timezone.utc)",
+            "utcnow() returns a datetime without a time zone that many functions treat as local time.",
+            "datetime.utcnow() becomes datetime.now(tz=timezone.utc).",
+        ),
+    ),
+    (
+        PythonRule::PLR1722,
+        RuleText::new(
+            "exit() or quit() instead of sys.exit()",
+            "use sys.exit()",
+            "exit and quit are meant for the interactive shell and may not exist when Python runs without the site module.",
+            "exit(1) becomes sys.exit(1).",
+        ),
+    ),
+    (
+        PythonRule::UP021,
+        RuleText::new(
+            "universal_newlines instead of text in subprocess.run",
+            "use text=True",
+            "universal_newlines is the old name of text since Python 3.7.",
+            "run(cmd, universal_newlines=True) becomes run(cmd, text=True).",
+        ),
+    ),
+    (
+        PythonRule::PLW1509,
+        RuleText::new(
+            "preexec_fn in subprocess.Popen",
+            "avoid preexec_fn, for example with start_new_session or process_group",
+            "preexec_fn is not safe in programs with threads and can deadlock the child process.",
+            "Popen(cmd, preexec_fn=os.setsid) becomes Popen(cmd, start_new_session=True).",
+        ),
+    ),
+    (
+        PythonRule::UP033,
+        RuleText::new(
+            "@lru_cache(maxsize=None) instead of @cache",
+            "use functools.cache",
+            "Since Python 3.9 functools.cache is an unbounded lru_cache.",
+            "@lru_cache(maxsize=None) becomes @cache.",
+        ),
+    ),
+    (
+        PythonRule::B003,
+        RuleText::new(
+            "Assignment to os.environ",
+            "change the variables with os.environ[...] or os.environ.update",
+            "Replacing os.environ only rebinds the name; the process environment and child processes keep the old variables.",
+            "os.environ = {} becomes os.environ.clear().",
+        ),
+    ),
+    (
+        PythonRule::PLC0208,
+        RuleText::new(
+            "Iteration over a set literal",
+            "iterate over a tuple or list",
+            "A set has no defined order and is built only to be traversed, so a tuple says the same and keeps the order.",
+            "for x in {1, 2}: becomes for x in (1, 2):.",
         ),
     ),
 ];
