@@ -1,8 +1,9 @@
 use tree_sitter::Node;
 
 use super::ast::{
-    ASSIGNMENT, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, CLASS, FUNCTION, FUNCTION_FIELD, IDENTIFIER,
-    KEYWORD_ARGUMENT, LAMBDA, LEFT_FIELD, MODULE, NAME_FIELD, RIGHT_FIELD, TYPE_FIELD, named, text,
+    ASSIGNMENT, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, CLASS, CONCATENATED_STRING, FUNCTION, FUNCTION_FIELD,
+    IDENTIFIER, KEYWORD_ARGUMENT, LAMBDA, LEFT_FIELD, MODULE, NAME_FIELD, RIGHT_FIELD, STRING, TYPE_FIELD,
+    is_bytes, is_string, named, text,
 };
 
 const SCOPES: [&str; 4] = [FUNCTION, CLASS, LAMBDA, MODULE];
@@ -44,6 +45,8 @@ pub enum Known {
     List,
     Set,
     Tuple,
+    String,
+    Bytes,
 }
 
 impl Known {
@@ -53,6 +56,7 @@ impl Known {
             Self::List => ["list", "list_comprehension"],
             Self::Set => ["set", "set_comprehension"],
             Self::Tuple => ["tuple", "tuple"],
+            Self::String | Self::Bytes => [STRING, CONCATENATED_STRING],
         }
     }
 
@@ -62,6 +66,8 @@ impl Known {
             Self::List => ["list", "List"],
             Self::Set => ["set", "Set"],
             Self::Tuple => ["tuple", "Tuple"],
+            Self::String => ["str", "str"],
+            Self::Bytes => ["bytes", "bytes"],
         }
     }
 }
@@ -177,7 +183,12 @@ fn binds_known(binding: Node<'_>, kind: Known, source: &[u8]) -> bool {
 }
 
 fn is_known_value(value: Node<'_>, kind: Known, source: &[u8]) -> bool {
-    kind.literals().contains(&value.kind())
+    let literal = match kind {
+        Known::String => is_string(value) && !is_bytes(value, source),
+        Known::Bytes => is_string(value) && is_bytes(value, source),
+        Known::Dict | Known::List | Known::Set | Known::Tuple => kind.literals().contains(&value.kind()),
+    };
+    literal
         || (value.kind() == CALL
             && value
                 .child_by_field_name(FUNCTION_FIELD)

@@ -142,7 +142,7 @@ fn logs_exception(model: &Model<'_>, source: &[u8], statement: Node<'_>) -> bool
 }
 
 // `is_logger_candidate` de ruff.
-fn is_logger_candidate(model: &Model<'_>, source: &[u8], function: Node<'_>) -> bool {
+pub fn is_logger_candidate(model: &Model<'_>, source: &[u8], function: Node<'_>) -> bool {
     let Some(object) = function.child_by_field_name(OBJECT_FIELD) else {
         return false;
     };

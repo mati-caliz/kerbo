@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
 use super::Report;
-use super::ast::{CLASS, FUNCTION, LAMBDA};
+use super::ast::{CLASS, FUNCTION, LAMBDA, RIGHT_FIELD, named};
 use crate::rules::PythonRule;
 
 const BREAK: &str = "break_statement";
@@ -12,6 +12,7 @@ const AWAIT: &str = "await";
 const FOR: &str = "for_statement";
 const WHILE: &str = "while_statement";
 const ELSE: &str = "else_clause";
+const FOR_IN_CLAUSE: &str = "for_in_clause";
 const COMPREHENSIONS: [&str; 4] = [
     "list_comprehension",
     "set_comprehension",
@@ -27,7 +28,8 @@ pub fn reports(nodes: &[Node<'_>]) -> Vec<Report> {
             BREAK => outside_loop(*node).then(|| Report::at(PythonRule::F701, *node, "")),
             CONTINUE => outside_loop(*node).then(|| Report::at(PythonRule::F702, *node, "")),
             RETURN => outside_function(*node).then(|| Report::at(PythonRule::F706, *node, "")),
-            YIELD | AWAIT => outside_function(*node).then(|| Report::at(PythonRule::F704, *node, "")),
+            YIELD => outside_generator_function(*node).then(|| Report::at(PythonRule::F704, *node, "")),
+            AWAIT => outside_function(*node).then(|| Report::at(PythonRule::F704, *node, "")),
             _ => None,
         })
         .collect()
@@ -52,4 +54,31 @@ fn outside_function(node: Node<'_>) -> bool {
             matches!(ancestor.kind(), FUNCTION | CLASS | LAMBDA) || COMPREHENSIONS.contains(&ancestor.kind())
         })
         .is_none_or(|scope| scope.kind() == CLASS)
+}
+
+// Un `yield` adentro de una comprensión tampoco vale: la comprensión es su propio alcance, salvo el
+// primer iterable, que se evalúa afuera.
+fn outside_generator_function(node: Node<'_>) -> bool {
+    for ancestor in std::iter::successors(node.parent(), Node::parent) {
+        if COMPREHENSIONS.contains(&ancestor.kind()) && !is_in_first_iterable(ancestor, node) {
+            return true;
+        }
+        if matches!(ancestor.kind(), FUNCTION | LAMBDA) {
+            return false;
+        }
+        if ancestor.kind() == CLASS {
+            return true;
+        }
+    }
+    true
+}
+
+fn is_in_first_iterable(comprehension: Node<'_>, node: Node<'_>) -> bool {
+    named(comprehension)
+        .into_iter()
+        .find(|clause| clause.kind() == FOR_IN_CLAUSE)
+        .and_then(|clause| clause.child_by_field_name(RIGHT_FIELD))
+        .is_some_and(|iterable| {
+            iterable.start_byte() <= node.start_byte() && node.end_byte() <= iterable.end_byte()
+        })
 }

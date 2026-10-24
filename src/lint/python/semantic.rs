@@ -38,6 +38,8 @@ mod parameters;
 mod patterns;
 mod pep;
 mod private_types;
+mod pylint_calls;
+mod pylint_definitions;
 mod qualified;
 mod resources;
 mod returns;

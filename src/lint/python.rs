@@ -36,6 +36,7 @@ mod natural;
 mod negations;
 mod noqa;
 mod parentheses;
+mod pylint_scopes;
 mod pytest_checks;
 mod raises;
 mod raw_text;
@@ -49,6 +50,7 @@ mod special_methods;
 mod splits;
 mod statement_checks;
 mod statements;
+mod string_characters;
 mod tail_statements;
 pub mod taint;
 mod typing_names;
@@ -196,6 +198,8 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(negations::reports(&nodes, source));
     reports.extend(comments::reports(&nodes, source));
     reports.extend(formatter_comments::reports(root, &nodes, source));
+    reports.extend(pylint_scopes::reports(&nodes, source));
+    reports.extend(string_characters::reports(&nodes, source));
     reports.extend(rewrites::reports(&nodes, source));
     reports.extend(module_names::invalid_module_name(path));
     let mut found: Vec<LintFinding> = suppressed(root, source, reports, &enabled)

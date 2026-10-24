@@ -1531,23 +1531,38 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     exige que el archivo importe `typing` (el `seen_typing` de ruff). TC004 no tiene la opción
     `quote-annotations` ni las bases que ruff evalúa en ejecución (`runtime-evaluated-base-classes`).
     RUF028 no entra en las interpolaciones de un f-string ni separa los destinos de `a = b = c`.
+  - Hechas 20 reglas de pylint que no aparecen en el corpus, medidas sólo con fixtures
+    (`fixtures/pylint_errors.py`): PLE0100 (`yield` en `__init__`), PLE0115 (`nonlocal` y `global`),
+    PLE0118 (un nombre usado antes de su `global`, también en el módulo), PLE1132 (clave repetida
+    entre `k=` y `**{...}`), PLE1205 y PLE1206 (argumentos de un logging con `%`), PLE1310 (`strip`
+    con caracteres repetidos, con `Known::String`/`Bytes` para las variables), PLE1507 (`os.getenv`
+    con una clave que no es texto), PLE1519 y PLE1520 (`singledispatch` en un método y
+    `singledispatchmethod` en una función), PLE1700 (`yield from` en una función `async`), PLE2510 y
+    PLE2512–2515 (caracteres de control escritos tal cual en un string), PLW0604 (`global` en el
+    módulo), PLW1501 (modo inválido de `open`), PLW1507 (`copy.copy(os.environ)`) y PLW2101 (un
+    candado nuevo en un `with`). De paso, F704 marca un `yield` adentro de una comprensión (salvo en
+    el primer iterable, que se evalúa afuera). Cero avisos de más en el corpus. PLE0116 (`continue`
+    en un `finally`) no hace falta: ruff sólo la da con una versión de Python anterior a 3.8.
+  - Pendientes de esa tanda: un byte NUL en el código rompe el parseo de tree-sitter, así que en ese
+    archivo PLE2514 y las reglas de alcance no corren (Python tampoco lo acepta). Con código que
+    Python rechaza (asignar un nombre antes de su `global`) ruff da además PLW0602, F811 y PLW0603
+    que kerbo no imita. Ninguna trae arreglo (ruff lo tiene en PLE1519, PLE1520, PLE2510–2515 y
+    PLW1507).
   - Los archivos que no están en UTF-8 (ruff da E902 y no los analiza) se analizan igual: falta
     saltearlos o avisar como ruff. Se hacen en tandas de 15 a 25 reglas por
     tema, con un solo gate y una sola medición por tanda.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.
-  - Del conjunto por defecto de ruff 0.17 (407 reglas) quedan 115, más las cuatro del conjunto
+  - Del conjunto por defecto de ruff 0.17 (407 reglas) quedan 94, más las cuatro del conjunto
     clásico de arriba, todas con cero avisos en el corpus, así que su paridad sólo se puede medir con
     fixtures: YTT101–103, YTT202, YTT204, YTT301–303, ASYNC105, ASYNC116, ASYNC210, ASYNC220,
     ASYNC221, B014, B022, B025, B029, B031, B039, C415, EXE001, EXE002, EXE004, FA100, FA102, INT001,
     INT003, LOG002, LOG009, LOG014, G010, G101, G202, PYI001–005, PYI007–010, PYI012, PYI013, PYI015,
     PYI017, PYI026, PYI033, PYI035, PYI043–045, PYI047–049, PYI052, PYI066, PT010, PT020, PT025,
-    PT026, SIM107, SIM220, SIM221, SIM911, TC007, TC010, PTH210, PGH005, PLC0131, PLE0100, PLE0115,
-    PLE0116, PLE0118, PLE1132, PLE1205, PLE1206, PLE1310, PLE1507, PLE1519, PLE1520, PLE1700,
-    PLE2510, PLE2512–2515, PLW0604, PLW1501, PLW1507, PLW2101, UP001, UP023, UP026, UP040, UP043,
-    UP046, UP047, FURB162, FURB169, FURB177, FURB181, RUF008, RUF016, RUF018, RUF024, RUF026, RUF030,
-    RUF033, RUF048, RUF049, RUF053, RUF058, RUF101 y RUF200.
+    PT026, SIM107, SIM220, SIM221, SIM911, TC007, TC010, PTH210, PGH005, PLC0131, UP001, UP023, UP026,
+    UP040, UP043, UP046, UP047, FURB162, FURB169, FURB177, FURB181, RUF008, RUF016, RUF018, RUF024,
+    RUF026, RUF030, RUF033, RUF048, RUF049, RUF053, RUF058, RUF101 y RUF200.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

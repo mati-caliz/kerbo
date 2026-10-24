@@ -1,7 +1,7 @@
 mod argument_types;
 mod braces;
 mod fstring;
-mod percent;
+pub mod percent;
 mod printf;
 mod template;
 

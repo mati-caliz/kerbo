@@ -163,7 +163,7 @@ fn same_keywords(outer: &Arguments<'_>, inner: &Arguments<'_>, source: &[u8]) ->
 }
 
 // `ResolvedPythonType` de ruff: algo que se sabe que no es texto ni `None`.
-fn is_non_string_default(default: Node<'_>, source: &[u8]) -> bool {
+pub fn is_non_string_default(default: Node<'_>, source: &[u8]) -> bool {
     NON_STRING_DEFAULTS.contains(&default.kind()) || (is_string(default) && is_bytes(default, source))
 }
 

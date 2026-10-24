@@ -5,6 +5,7 @@ use super::enum_values::duplicate_enum_values;
 use super::exit_annotations::exit_annotation_reports;
 use super::implicit_optional::implicit_optional_reports;
 use super::mutability::Resolver;
+use super::pylint_definitions::dispatch_decorator_reports;
 use super::self_types::{custom_type_variable_report, non_self_return_report};
 
 use super::builtin_calls::lru_cache_reports;
@@ -95,6 +96,8 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
                 self.reports.extend(signature);
                 let exit = exit_annotation_reports(hints, function, &decorators);
                 self.reports.extend(exit);
+                let dispatch = dispatch_decorator_reports(hints, function, &decorators);
+                self.reports.extend(dispatch);
                 let resolver = Resolver {
                     model: &self.model,
                     source: self.source,
