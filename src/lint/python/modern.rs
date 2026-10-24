@@ -48,6 +48,19 @@ const ABSTRACT_DECORATORS: [&str; 4] = [
 const UTF8_NAMES: [&str; 2] = ["utf8", "utf-8"];
 const MAX_CODING_LINE: usize = 1;
 const MIN_PLACEHOLDER_SIBLINGS: usize = 2;
+const FUTURE_IMPORT: &str = "future_import_statement";
+const ALIASED_IMPORT: &str = "aliased_import";
+const NAME_FIELD: &str = "name";
+const MANDATORY_FUTURE_FEATURES: [&str; 8] = [
+    "nested_scopes",
+    "generators",
+    "with_statement",
+    "division",
+    "absolute_import",
+    "print_function",
+    "unicode_literals",
+    "generator_stop",
+];
 
 static CODING_COMMENT: LazyLock<Option<Regex>> =
     LazyLock::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*(?<name>[-_.a-zA-Z0-9]+)").ok());
@@ -71,12 +84,30 @@ pub fn reports(root: Node<'_>, nodes: &[Node<'_>], source: &[u8]) -> Vec<Report>
                 found.push(Report::at(PythonRule::UP025, *node, ""));
             }
             CALL => found.extend(deprecated_unittest_alias(*node, source)),
+            FUTURE_IMPORT => found.extend(unnecessary_future_import(*node, source)),
             EXPRESSION_STATEMENT => found.extend(useless_comparison(*node)),
             BLOCK | MODULE => found.extend(unnecessary_placeholders(*node, source)),
             _ => {}
         }
     }
     found
+}
+
+// UP010: un `from __future__ import` de algo que ya es obligatorio en Python 3. Avisa una vez por
+// sentencia.
+fn unnecessary_future_import(statement: Node<'_>, source: &[u8]) -> Option<Report> {
+    let mut cursor = statement.walk();
+    let mandatory = statement
+        .children_by_field_name(NAME_FIELD, &mut cursor)
+        .filter_map(|name| {
+            if name.kind() == ALIASED_IMPORT {
+                name.child_by_field_name(NAME_FIELD)
+            } else {
+                Some(name)
+            }
+        })
+        .any(|name| MANDATORY_FUTURE_FEATURES.contains(&text(name, source)));
+    mandatory.then(|| Report::at(PythonRule::UP010, statement, ""))
 }
 
 // UP009: un `# -*- coding: utf-8 -*-` en las dos primeras líneas, que en Python 3 sobra.

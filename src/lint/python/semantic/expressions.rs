@@ -3,11 +3,13 @@ use tree_sitter::Node;
 use super::calls::{call_reports, is_first_element_subscript};
 use super::comparisons::comparison_reports;
 use super::conversions::conversion_reports;
+use super::isinstance_calls::{BOOLEAN_OPERATOR, duplicate_isinstance_reports};
 use super::literals::is_native_literal_call;
 use super::model::{BindingKind, Model, ScopeKind};
 use super::pep::is_pep585_generic;
 use super::qualified::{is_builtin_named, qualified_name};
 use super::targets::Store;
+use super::type_names::is_type_name;
 use super::{Mode, Visitor};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
@@ -44,100 +46,6 @@ const TYPE_BUILTIN: &str = "type";
 const EQUALITY: [&str; 2] = ["==", "!="];
 const DTYPE: &str = "dtype";
 const NUMPY_DTYPE: &str = "numpy.dtype";
-const TYPE_NAMES: [&str; 92] = [
-    "bool",
-    "bytearray",
-    "bytes",
-    "classmethod",
-    "complex",
-    "dict",
-    "enumerate",
-    "filter",
-    "float",
-    "frozenset",
-    "int",
-    "list",
-    "map",
-    "memoryview",
-    "object",
-    "property",
-    "range",
-    "reversed",
-    "set",
-    "slice",
-    "staticmethod",
-    "str",
-    "super",
-    "tuple",
-    "type",
-    "zip",
-    "ArithmeticError",
-    "AssertionError",
-    "AttributeError",
-    "BaseException",
-    "BlockingIOError",
-    "BrokenPipeError",
-    "BufferError",
-    "BytesWarning",
-    "ChildProcessError",
-    "ConnectionAbortedError",
-    "ConnectionError",
-    "ConnectionRefusedError",
-    "ConnectionResetError",
-    "DeprecationWarning",
-    "EnvironmentError",
-    "EOFError",
-    "Exception",
-    "FileExistsError",
-    "FileNotFoundError",
-    "FloatingPointError",
-    "FutureWarning",
-    "GeneratorExit",
-    "ImportError",
-    "ImportWarning",
-    "IndentationError",
-    "IndexError",
-    "InterruptedError",
-    "IOError",
-    "IsADirectoryError",
-    "KeyboardInterrupt",
-    "KeyError",
-    "LookupError",
-    "MemoryError",
-    "ModuleNotFoundError",
-    "NameError",
-    "NotADirectoryError",
-    "NotImplementedError",
-    "OSError",
-    "OverflowError",
-    "PendingDeprecationWarning",
-    "PermissionError",
-    "ProcessLookupError",
-    "RecursionError",
-    "ReferenceError",
-    "ResourceWarning",
-    "RuntimeError",
-    "RuntimeWarning",
-    "StopAsyncIteration",
-    "StopIteration",
-    "SyntaxError",
-    "SyntaxWarning",
-    "SystemError",
-    "SystemExit",
-    "TabError",
-    "TimeoutError",
-    "TypeError",
-    "UnboundLocalError",
-    "UnicodeDecodeError",
-    "UnicodeEncodeError",
-    "UnicodeError",
-    "UnicodeTranslateError",
-    "UnicodeWarning",
-    "UserWarning",
-    "ValueError",
-    "Warning",
-    "ZeroDivisionError",
-];
 
 pub trait Expressions<'tree> {
     fn expression(&mut self, node: Node<'tree>, mode: Mode);
@@ -204,6 +112,11 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
                 for part in parts {
                     self.expression(part, mode);
                 }
+            }
+            BOOLEAN_OPERATOR => {
+                self.reports
+                    .extend(duplicate_isinstance_reports(&self.model, self.source, node));
+                self.children(node, mode);
             }
             kind if COMPREHENSIONS.contains(&kind) => self.comprehension(node),
             _ => self.children(node, mode),
@@ -345,10 +258,6 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
             _ => false,
         }
     }
-}
-
-fn is_type_name(name: &str) -> bool {
-    TYPE_NAMES.contains(&name)
 }
 
 // C408: `dict()`, `list()` o `tuple()` del builtin, sin posicionales (y `dict` sin `**`), en vez del

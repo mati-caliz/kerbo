@@ -3,7 +3,7 @@ use tree_sitter::Node;
 use super::aliases::handler_alias_reports;
 use super::handlers::{CONTINUE, PASS, blind_except, is_silenced_exception};
 use super::model::{BindingKind, Resolution, ScopeKind, Site, UNPACKED};
-use super::{Mode, Visitor};
+use super::{Mode, Visitor, is_dummy};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ASSIGNMENT, ATTRIBUTE, CLASS, FUNCTION, IDENTIFIER, LEFT_FIELD, LIST, OBJECT_FIELD, PARENTHESIZED,
@@ -73,6 +73,7 @@ pub trait Targets<'tree> {
     fn delete_name(&mut self, name: Node<'tree>, statement: Node<'tree>);
     fn handler(&mut self, handler: Node<'tree>);
     fn bind_outside_branch(&mut self, name: Node<'tree>, store: Store<'tree>) -> usize;
+    fn redefines_argument(&self, id: usize) -> bool;
 }
 
 impl<'tree> Targets<'tree> for Visitor<'tree> {
@@ -204,7 +205,30 @@ impl<'tree> Targets<'tree> for Visitor<'tree> {
         };
         let id = self.model.add_binding(self.text(name), store.kind, site);
         self.model.flag(id, store.flags);
+        if self.redefines_argument(id) {
+            self.reports.push(Report::at(PythonRule::PLR1704, name, ""));
+        }
         id
+    }
+
+    // PLR1704: un `for`, un `with ... as` o un `except ... as` que pisa un parámetro de la función o
+    // de una que la contiene.
+    fn redefines_argument(&self, id: usize) -> bool {
+        let Some(binding) = self.model.binding(id) else {
+            return false;
+        };
+        let redefining = matches!(
+            binding.kind,
+            BindingKind::LoopVariable | BindingKind::WithItem | BindingKind::BoundException
+        );
+        redefining
+            && binding.site.node.is_some_and(|name| !is_dummy(self.text(name)))
+            && self
+                .model
+                .shadowed_in_scope(binding.scope, id)
+                .or_else(|| self.model.cross_shadowed.get(&id).copied())
+                .and_then(|shadowed| self.model.binding(shadowed))
+                .is_some_and(|shadowed| shadowed.kind == BindingKind::Argument)
     }
 
     fn delete_target(&mut self, target: Node<'tree>, statement: Node<'tree>) {

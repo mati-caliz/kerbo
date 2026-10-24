@@ -1,0 +1,138 @@
+from __future__ import annotations, division, print_function
+from __future__ import generator_stop
+
+import functools
+import math
+from functools import cache, lru_cache
+from typing import Any, Optional, Union
+
+
+def flatten(groups):
+    first = sum(groups, [])
+    second = sum(groups, start=[])
+    third = sum(groups, ())
+    fourth = sum(groups, list())
+    fifth = sum(groups, [1])
+    sixth = sum(groups)
+    return first, second, third, fourth, fifth, sixth
+
+
+letters = {"a", "b", "a", 'b', "c"}
+numbers = {1, 2, 1, 1.0, True}
+names = {letters, letters, flatten}
+calls = {flatten(), flatten()}
+empty = set()
+
+
+def checks(value, other):
+    if isinstance(value, int) or isinstance(value, str):
+        pass
+    if isinstance(value, int) or isinstance(other, int) or isinstance(value, float):
+        pass
+    if isinstance(value, (int, float)) or isinstance(value, str):
+        pass
+    if isinstance(value, int) and isinstance(value, str):
+        pass
+    if isinstance(value, int) or isinstance(value, str, extra=1):
+        pass
+    if isinstance(value.x, int) or isinstance(value.x, str):
+        pass
+
+
+class Service:
+    @lru_cache
+    def bare(self):
+        return 1
+
+    @lru_cache(maxsize=10)
+    def called(self):
+        return 1
+
+    @functools.cache
+    def qualified(self):
+        return 1
+
+    @cache
+    @staticmethod
+    def static():
+        return 1
+
+    @classmethod
+    @functools.lru_cache()
+    def klass(cls):
+        return 1
+
+
+@lru_cache
+def module_function():
+    return 1
+
+
+def redefinitions(item, path, error, handle, _ignored):
+    for item in range(3):
+        print(item)
+    with open(path) as handle:
+        print(handle)
+    try:
+        pass
+    except ValueError as error:
+        print(error)
+    for _ignored in range(2):
+        pass
+    for (path, other) in []:
+        print(path, other)
+
+    def inner(value):
+        for item in range(value):
+            print(item)
+
+    return inner
+
+
+def conversions(value, items):
+    first = int(1)
+    second = int(len(items))
+    third = int(round(value))
+    fourth = int(round(value, 2))
+    fifth = int(math.floor(value))
+    sixth = int(math.ceil(value))
+    seventh = int(int(value))
+    eighth = int(value)
+    ninth = int(round(value, None))
+    tenth = int(math.trunc(value))
+    eleventh = int(ord("a"))
+    return first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth, eleventh
+
+
+def implicit(
+    a: int = None,
+    b: Optional[int] = None,
+    c: int | None = None,
+    d: Any = None,
+    e: object = None,
+    f: "int" = None,
+    g: Union[int, str] = None,
+    h: Union[int, None] = None,
+    i: list[int] = None,
+    j: None = None,
+    k: int = 1,
+    *,
+    m: str = None,
+):
+    pass
+
+
+def arithmetic(value):
+    return int((1 << 31) - 1), int(-2**31), int(2**34 / 2), int(value - 1)
+
+
+def outer_parameter(index, values):
+    def scan():
+        for index in values:
+            print(index)
+
+    return scan
+
+
+def third_party(value: "numpy.ndarray[int]" = None, other: dict[str, int] = None):
+    pass

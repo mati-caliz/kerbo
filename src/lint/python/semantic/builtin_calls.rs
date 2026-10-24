@@ -36,9 +36,9 @@ const REPLACE: &str = "replace";
 const ASTIMEZONE: &str = "astimezone";
 const DICTIONARY_SPLAT: &str = "dictionary_splat";
 
-struct Arguments<'tree> {
-    positional: Vec<Node<'tree>>,
-    keywords: Vec<Node<'tree>>,
+pub struct Arguments<'tree> {
+    pub positional: Vec<Node<'tree>>,
+    pub keywords: Vec<Node<'tree>>,
 }
 
 // UP003 (`type("")`), UP022 (`subprocess.run` con `stdout` y `stderr` en `PIPE`) y B004
@@ -223,7 +223,7 @@ fn is_unreliable_callable_check(
     arguments.keywords.is_empty() && names_call && valid
 }
 
-fn arguments(call: Node<'_>) -> Arguments<'_> {
+pub fn arguments(call: Node<'_>) -> Arguments<'_> {
     let items = call
         .child_by_field_name(ARGUMENTS_FIELD)
         .map(|list| {
@@ -241,7 +241,11 @@ fn arguments(call: Node<'_>) -> Arguments<'_> {
     Arguments { positional, keywords }
 }
 
-fn keyword_value<'tree>(arguments: &Arguments<'tree>, keyword: &str, source: &[u8]) -> Option<Node<'tree>> {
+pub fn keyword_value<'tree>(
+    arguments: &Arguments<'tree>,
+    keyword: &str,
+    source: &[u8],
+) -> Option<Node<'tree>> {
     keyword_argument(arguments, keyword, source)
         .and_then(|argument| argument.child_by_field_name(VALUE_FIELD))
 }

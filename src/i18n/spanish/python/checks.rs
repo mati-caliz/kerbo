@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 30] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 38] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -271,6 +271,78 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 30] = [
             "escribí *X en vez de Unpack[X]",
             "Desde Python 3.11 (PEP 646) un tipo variádico se desempaqueta con *, que es más corto y se lee como el resto del lenguaje.",
             "def f(*args: Unpack[Ts]): pasa a def f(*args: *Ts):.",
+        ),
+    ),
+    (
+        PythonRule::UP010,
+        RuleText::new(
+            "Import de __future__ que sobra",
+            "sacá la característica del import",
+            "Todas las características de este import ya son obligatorias en Python 3, así que no cambia nada.",
+            "from __future__ import print_function se borra.",
+        ),
+    ),
+    (
+        PythonRule::RUF017,
+        RuleText::new(
+            "Listas aplanadas con sum()",
+            "usá itertools.chain.from_iterable o una comprensión",
+            "sum() con una lista vacía como inicio copia la lista acumulada en cada paso, que lleva tiempo cuadrático.",
+            "sum(groups, []) pasa a list(itertools.chain.from_iterable(groups)).",
+        ),
+    ),
+    (
+        PythonRule::B033,
+        RuleText::new(
+            "Elemento repetido en un conjunto escrito",
+            "sacá el elemento repetido",
+            "Un conjunto guarda cada valor una sola vez, así que el repetido se descarta en silencio y suele esconder un error de tipeo.",
+            "{\"a\", \"b\", \"a\"} pasa a {\"a\", \"b\"}.",
+        ),
+    ),
+    (
+        PythonRule::SIM101,
+        RuleText::new(
+            "Llamadas a isinstance repetidas sobre el mismo valor",
+            "juntalas en un solo isinstance con una tupla",
+            "isinstance acepta una tupla de tipos, así que una sola llamada dice lo mismo sin repetir.",
+            "isinstance(x, int) or isinstance(x, str) pasa a isinstance(x, (int, str)).",
+        ),
+    ),
+    (
+        PythonRule::B019,
+        RuleText::new(
+            "Decorador de caché en un método",
+            "cacheá una función del módulo o usá cached_property",
+            "functools.cache y lru_cache guardan self en la caché, así que las instancias no se liberan nunca.",
+            "@lru_cache en def total(self) pasa a @cached_property.",
+        ),
+    ),
+    (
+        PythonRule::PLR1704,
+        RuleText::new(
+            "Parámetro pisado por un for, un with o un except",
+            "usá otro nombre para la variable nueva",
+            "La variable del for, del with o del except pisa el parámetro y el resto de la función ya no ve el valor que recibió.",
+            "for item in items: dentro de def f(item) pasa a for element in items:.",
+        ),
+    ),
+    (
+        PythonRule::RUF046,
+        RuleText::new(
+            "int() de un valor que ya es entero",
+            "sacá la llamada a int()",
+            "El valor ya es un int (un entero escrito, len(), round() sin decimales, math.floor() y compañía), así que la conversión no hace nada.",
+            "int(len(items)) pasa a len(items).",
+        ),
+    ),
+    (
+        PythonRule::RUF013,
+        RuleText::new(
+            "Optional implícito",
+            "sumá None al tipo: X | None",
+            "Un parámetro que por defecto vale None tiene que decirlo en el tipo; PEP 484 prohíbe el Optional implícito.",
+            "def f(x: int = None) pasa a def f(x: int | None = None).",
         ),
     ),
 ];

@@ -29,9 +29,9 @@ const STARRED: [&str; 2] = ["list_splat", "parenthesized_list_splat"];
 
 #[derive(Debug, Clone)]
 pub struct Content {
-    value: String,
-    simple: bool,
-    origin: Point,
+    pub value: String,
+    pub simple: bool,
+    pub origin: Point,
 }
 
 pub trait Annotations<'tree> {

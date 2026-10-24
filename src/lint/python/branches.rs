@@ -84,7 +84,7 @@ fn body_comments<'source>(branch: Node<'_>, source: &'source [u8]) -> Vec<&'sour
 
 // `ComparableStmt` de ruff, aproximado sobre el árbol: mismos nodos y tokens, sin comentarios ni
 // paréntesis de agrupación, y los strings por su valor.
-fn equivalent(first: Node<'_>, second: Node<'_>, source: &[u8]) -> bool {
+pub fn equivalent(first: Node<'_>, second: Node<'_>, source: &[u8]) -> bool {
     let first = without_parentheses(first);
     let second = without_parentheses(second);
     if first.kind() != second.kind() {

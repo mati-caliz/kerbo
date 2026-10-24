@@ -38,7 +38,7 @@ const CONTAINERS: [&str; 7] = [
 const STARRED: [&str; 2] = ["list_splat", "list_splat_pattern"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MethodKind {
+pub enum MethodKind {
     Instance,
     Class,
     New,
@@ -120,7 +120,7 @@ fn bad_static_argument(function: Node<'_>, source: &[u8]) -> Option<Report> {
 
 // `function_type::classify` de ruff, con los decoradores reconocidos por nombre; `None` si la
 // función no está definida directamente en una clase.
-fn method_kind(function: Node<'_>, source: &[u8]) -> Option<MethodKind> {
+pub fn method_kind(function: Node<'_>, source: &[u8]) -> Option<MethodKind> {
     let holder = function
         .parent()
         .filter(|parent| parent.kind() == DECORATED)

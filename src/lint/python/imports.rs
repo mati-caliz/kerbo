@@ -6,7 +6,7 @@ mod model;
 mod normalize;
 mod order;
 mod sections;
-mod stdlib;
+pub mod stdlib;
 
 use std::path::Path;
 

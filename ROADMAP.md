@@ -1422,12 +1422,23 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     UP044 (`Unpack[X]` adentro de un subíndice o como tipo de `*args`, también entre comillas).
     Paridad exacta: 172 y 183. Los casos quedaron en `fixtures/quoted.py`,
     `fixtures/quoted_future.py` y `fixtures/unpack.py`.
+  - Hechas UP010 (`from __future__` de algo ya obligatorio), RUF017 (`sum(listas, [])`), B033
+    (elemento repetido en un conjunto escrito, comparado por valor como el `HashableExpr` de ruff:
+    `1`, `1.0` y `True` son el mismo), SIM101 (`isinstance` seguidos sobre el mismo valor en un
+    `or`), B019 (`functools.cache` o `lru_cache` en un método de instancia, salvo en enumeraciones),
+    PLR1704 (un `for`, `with` o `except` que pisa un parámetro de la función o de una que la
+    contiene), RUF046 (`int()` de algo que ya es entero, con la aritmética entre enteros) y RUF013
+    (`Optional` implícito, con el `TypingTarget` de ruff: lo que no es builtin ni de la biblioteca
+    estándar cuenta como `Any`). Paridad exacta en B019 (37), B033 (29), RUF013 (96), RUF017 (19),
+    RUF046 (107) y UP010 (22); 81 de 87 PLR1704 y 28 de 29 SIM101, sin avisos de más: lo que falta
+    está en archivos de CPython con `lazy import`. Los casos quedaron en `fixtures/batch_misc.py`.
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
-  - Lo que queda del conjunto por defecto (2026-10-24): 141 reglas con unos 3.300 avisos en el
+  - Lo que queda del conjunto por defecto (2026-10-24): 133 reglas con unos 2.900 avisos en el
     corpus, contra más de 100.000 ya cubiertos. RUF100 (`noqa` sin uso) suma 1.437; el resto tiene
-    menos de 100 cada una: RUF046 107, RUF013 96, PLR1704 87, PLC0206 78, PYI061 70, PYI032 63,
-    PLR1730 56, PYI063 54, UP028 49, PYI036 47, PIE810 46 y una cola de reglas con menos de 45.
+    menos de 80 cada una: PLC0206 78, PYI061 70, PYI032 63, PLR1730 56, PYI063 54, UP028 49, PYI036
+    47, PIE810 46 y una cola de reglas con menos de 45. Se hacen en tandas de 15 a 25 reglas por
+    tema, con un solo gate y una sola medición por tanda.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

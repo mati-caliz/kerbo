@@ -30,6 +30,7 @@ mod raises;
 mod redundancies;
 mod rewrites;
 mod semantic;
+mod set_literals;
 mod simplify;
 mod slots;
 mod splits;
@@ -153,6 +154,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(raises::reports(&nodes, source));
     reports.extend(encodings::reports(&nodes, source));
     reports.extend(redundancies::reports(&nodes, source));
+    reports.extend(set_literals::reports(&nodes, source));
     reports.extend(exception_flow::reports(&nodes, source));
     reports.extend(methods::reports(&nodes, source));
     reports.extend(loops::loop_variable_overrides(&nodes, source));

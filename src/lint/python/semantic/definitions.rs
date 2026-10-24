@@ -1,9 +1,11 @@
 use tree_sitter::Node;
 
 use super::defaults::default_reports;
+use super::implicit_optional::implicit_optional_reports;
 use super::mutability::Resolver;
 
 use super::builtin_calls::lru_cache_reports;
+use super::cached_methods::cached_instance_method;
 use super::model::{BindingKind, MODULE_SCOPE, ScopeKind, Site};
 use super::qualified::is_builtin_named;
 use super::returns::{unnecessary_return_none, useless_return};
@@ -72,6 +74,12 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
                 let returns = unnecessary_return_none(&self.model, self.source, function, &decorators);
                 self.reports
                     .extend(lru_cache_reports(&self.model, self.source, &decorators));
+                self.reports.extend(cached_instance_method(
+                    &self.model,
+                    self.source,
+                    function,
+                    &decorators,
+                ));
                 self.reports.extend(returns);
                 self.reports.extend(useless_return(self.source, function));
                 self.function(function);
@@ -96,6 +104,8 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
         };
         let defaults = default_reports(&resolver, &parameters, !self.file.stub);
         self.reports.extend(defaults);
+        let implicit = implicit_optional_reports(self, &parameters);
+        self.reports.extend(implicit);
         for default in parameters
             .iter()
             .filter(|parameter| DEFAULTED.contains(&parameter.kind()))
