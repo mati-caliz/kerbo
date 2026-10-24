@@ -1378,6 +1378,16 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     Paridad: 65 de 66, 56 de 56, 56 de 56, 40 de 40, 53 de 55 y 55 de 55, sin avisos de más; lo que
     falta está en archivos de CPython con `lazy import`. Los casos quedaron en
     `fixtures/declarations.py`.
+  - Hechas TRY201 (`raise error` en su propio `except`), UP012 (`"x".encode("utf-8")`), C400
+    (`list(x for x in y)`), C409 (`tuple([1, 2])`), C413 (`list(sorted(x))`) y C419
+    (`any([x for x in y])`). Paridad: 45 de 45, 61 de 61, 33 de 34, 24 de 24, 21 de 22 y 24 de 24,
+    sin avisos de más. Faltan un C413 en un archivo con `lazy import` y un C400 en
+    `list(await 2 for _ in [])` de `test_builtin.py`, que tree-sitter no arma como generador. Los
+    casos quedaron en `fixtures/collections_calls.py`. Con 128 reglas, `wrap_python` (que arma la
+    lista de reglas en tiempo de compilación) pasó a ser un loop: la recursión superaba el límite
+    de llamadas anidadas de la evaluación `const`.
+  - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
+    `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
   - Siguiente, la cola de reglas chicas: UP044, UP037, RUF013, PLR1704, PLC0206 y siguientes.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que

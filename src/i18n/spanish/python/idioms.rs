@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: modismos de pylint, refurb, flake8-logging y
 // compañía.
-pub const IDIOM_TEXTS: [(PythonRule, RuleText); 28] = [
+pub const IDIOM_TEXTS: [(PythonRule, RuleText); 34] = [
     (
         PythonRule::FURB167,
         RuleText::new(
@@ -259,6 +259,60 @@ else:
             "pasá el número como string",
             "El float se redondea antes de que Decimal lo vea, así que Decimal(0.1) no es 0.1.",
             "Decimal(0.1) pasa a Decimal(\"0.1\").",
+        ),
+    ),
+    (
+        PythonRule::TRY201,
+        RuleText::new(
+            "raise error adentro de su propio except",
+            "escribí raise a secas",
+            "Un raise a secas vuelve a lanzar la misma excepción sin sumar esta línea al traceback.",
+            "except ValueError as error:\n    raise error pasa a raise.",
+        ),
+    ),
+    (
+        PythonRule::UP012,
+        RuleText::new(
+            "encode(\"utf-8\") sobre un string fijo",
+            "escribí un literal de bytes, o llamá a encode() sin la codificación",
+            "UTF-8 ya es la codificación por defecto, y un literal ASCII se puede escribir directamente como bytes.",
+            "\"abc\".encode(\"utf-8\") pasa a b\"abc\".",
+        ),
+    ),
+    (
+        PythonRule::C400,
+        RuleText::new(
+            "Generador pasado a list() en vez de una comprensión de lista",
+            "escribí una comprensión de lista",
+            "Una comprensión arma la lista directamente y se lee como lista de un vistazo.",
+            "list(x * 2 for x in y) pasa a [x * 2 for x in y].",
+        ),
+    ),
+    (
+        PythonRule::C409,
+        RuleText::new(
+            "tuple() alrededor de una lista o tupla escrita",
+            "escribí la tupla directamente",
+            "El literal ya dice que es una tupla sin armar una colección intermedia.",
+            "tuple([1, 2]) pasa a (1, 2).",
+        ),
+    ),
+    (
+        PythonRule::C413,
+        RuleText::new(
+            "list() o reversed() alrededor de sorted()",
+            "usá sorted() solo, con reverse=True si hace falta",
+            "sorted() ya devuelve una lista nueva y puede ordenar al revés por sí mismo.",
+            "list(sorted(x)) pasa a sorted(x).",
+        ),
+    ),
+    (
+        PythonRule::C419,
+        RuleText::new(
+            "Comprensión adentro de any() o all()",
+            "pasá un generador",
+            "Con un generador, any() y all() cortan en el primer elemento que decide en vez de armar la lista entera.",
+            "any([x > 0 for x in y]) pasa a any(x > 0 for x in y).",
         ),
     ),
 ];

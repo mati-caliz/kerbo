@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::collection_calls::collection_call_reports;
 use super::decimals::{decimal_from_float_literal, verbose_decimal_constructor};
 use super::format_calls::format_call_report;
 use super::idioms::idiom_reports;
@@ -67,6 +68,7 @@ pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Rep
     reports.extend(format_call_report(model, source, call));
     reports.extend(verbose_decimal_constructor(model, source, call));
     reports.extend(decimal_from_float_literal(model, source, call));
+    reports.extend(collection_call_reports(model, source, call));
     if call
         .child_by_field_name(FUNCTION_FIELD)
         .and_then(|function| qualified_name(model, function, source))

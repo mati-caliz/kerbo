@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: modismos de pylint, refurb, flake8-logging y
 // compañía.
-pub const IDIOM_TEXTS: [(PythonRule, RuleText); 28] = [
+pub const IDIOM_TEXTS: [(PythonRule, RuleText); 34] = [
     (
         PythonRule::FURB167,
         RuleText::new(
@@ -259,6 +259,60 @@ else:
             "pass the number as a string",
             "The float is rounded before Decimal sees it, so Decimal(0.1) is not 0.1.",
             "Decimal(0.1) becomes Decimal(\"0.1\").",
+        ),
+    ),
+    (
+        PythonRule::TRY201,
+        RuleText::new(
+            "raise error inside its own except",
+            "write a plain raise",
+            "A plain raise re-raises the same exception without adding this line to the traceback.",
+            "except ValueError as error:\n    raise error becomes raise.",
+        ),
+    ),
+    (
+        PythonRule::UP012,
+        RuleText::new(
+            "encode(\"utf-8\") on a literal string",
+            "write a bytes literal, or call encode() without the encoding",
+            "UTF-8 is already the default, and an ASCII literal can be written as bytes directly.",
+            "\"abc\".encode(\"utf-8\") becomes b\"abc\".",
+        ),
+    ),
+    (
+        PythonRule::C400,
+        RuleText::new(
+            "Generator passed to list() instead of a list comprehension",
+            "write a list comprehension",
+            "A comprehension builds the list directly and reads as a list at a glance.",
+            "list(x * 2 for x in y) becomes [x * 2 for x in y].",
+        ),
+    ),
+    (
+        PythonRule::C409,
+        RuleText::new(
+            "tuple() around a list or tuple literal",
+            "write the tuple literal",
+            "The literal already says it is a tuple without building an intermediate collection.",
+            "tuple([1, 2]) becomes (1, 2).",
+        ),
+    ),
+    (
+        PythonRule::C413,
+        RuleText::new(
+            "list() or reversed() around sorted()",
+            "use sorted() alone, with reverse=True if needed",
+            "sorted() already returns a new list, and it can sort in reverse order by itself.",
+            "list(sorted(x)) becomes sorted(x).",
+        ),
+    ),
+    (
+        PythonRule::C419,
+        RuleText::new(
+            "Comprehension inside any() or all()",
+            "pass a generator instead",
+            "A generator lets any() and all() stop at the first decisive element instead of building the whole list.",
+            "any([x > 0 for x in y]) becomes any(x > 0 for x in y).",
         ),
     ),
 ];

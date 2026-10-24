@@ -3,6 +3,7 @@ mod boundary;
 mod calls;
 mod checks;
 mod classes;
+mod collection_calls;
 mod comparisons;
 mod conversions;
 mod decimals;

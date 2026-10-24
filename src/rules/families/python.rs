@@ -58,6 +58,12 @@ rule_family!(PythonRule {
     UP039 => "up039",
     UP020 => "up020",
     RUF032 => "ruf032",
+    TRY201 => "try201",
+    UP012 => "up012",
+    C400 => "c400",
+    C409 => "c409",
+    C413 => "c413",
+    C419 => "c419",
     UP004 => "up004",
     UP005 => "up005",
     UP009 => "up009",
@@ -127,13 +133,21 @@ rule_family!(PythonRule {
     E743 => "e743",
 });
 
-pub const fn wrap_python<'slots>(slots: &'slots mut [RuleId], rules: &[PythonRule]) -> &'slots mut [RuleId] {
-    match (slots, rules) {
-        ([slot, free @ ..], [rule, others @ ..]) => {
-            *slot = RuleId::Python(*rule);
-            wrap_python(free, others)
+// Con un loop y no recursiva: con más de 128 reglas la recursión pasa el límite de llamadas
+// anidadas que permite la evaluación en tiempo de compilación.
+pub const fn wrap_python<'slots>(
+    mut slots: &'slots mut [RuleId],
+    mut rules: &[PythonRule],
+) -> &'slots mut [RuleId] {
+    loop {
+        match (slots, rules) {
+            ([slot, free @ ..], [rule, others @ ..]) => {
+                *slot = RuleId::Python(*rule);
+                slots = free;
+                rules = others;
+            }
+            (free, _) => return free,
         }
-        (free, _) => free,
     }
 }
 
