@@ -1,0 +1,46 @@
+from typing import TYPE_CHECKING, Generic, List, Optional, TypeAlias, TypeVar, cast
+
+T = TypeVar("T")
+
+
+class Node(Generic[T]):
+    parent: "Node[T]"
+    children: List["Node[T]"] = []
+
+    def walk(self, other: "Node[T]") -> "Optional[Node[T]]":
+        local: "Node[T]" = other
+        nested: "List['Node[T]']" = []
+        pair: "Node" "[T]" = other
+        broken: "Node[" = other
+        escaped: "Node\x5bT]" = other
+
+        def inner() -> None:
+            deep: "Node[T]" = other
+            print(deep)
+
+        class Inside:
+            field: "Node[T]"
+
+        lambda_value = lambda: cast("Node[T]", other)
+        print(local, nested, pair, broken, escaped, inner, Inside, lambda_value)
+        return None
+
+
+module_level: "Node[int]"
+Alias: TypeAlias = "Node[int]"
+type Other = "Node[str]"
+
+if TYPE_CHECKING:
+    checked: "Node[bytes]"
+
+    def checked_function(value: "Node[bytes]") -> None:
+        inner: "Node[bytes]" = value
+        print(inner)
+
+
+def multiline() -> None:
+    value: """
+    Node[int]
+    """ = Node()
+    literal: "Literal['a']" = "a"
+    print(value, literal)

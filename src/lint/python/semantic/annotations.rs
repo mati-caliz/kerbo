@@ -5,7 +5,7 @@ use crate::lint::python::semantic::annotations::embedded::EmbeddedAnnotations;
 use crate::lint::python::semantic::expressions::Expressions;
 use tree_sitter::{Node, Point};
 
-use super::pep::{is_typing_only, pep604_rule};
+use super::pep::{is_pep646_unpack, is_typing_only, is_typing_only_annotation, pep604_rule};
 use super::qualified::{is_typing, qualified_name};
 use super::{Mode, Pending, Visitor};
 use crate::lint::python::Report;
@@ -81,7 +81,7 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
         self.slices(Some(*value), slices, mode);
     }
 
-    // UP045 y UP007: `Optional[X]` y `Union[X, Y]`, que en 3.10 se escriben con `|`.
+    // UP045 y UP007: `Optional[X]` y `Union[X, Y]`, que en 3.10 se escriben con `|`; UP044: `Unpack[X]`.
     fn pep604_operator(
         &mut self,
         subscript: Node<'tree>,
@@ -96,6 +96,9 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
         let qualify = |node: Node<'_>| qualified_name(&self.model, node, self.source);
         if let Some(rule) = pep604_rule(&name, slices, &qualify, typing_context) {
             self.reports.push(Report::at(rule, subscript, ""));
+        }
+        if is_pep646_unpack(&name, subscript, slices) {
+            self.reports.push(Report::at(PythonRule::UP044, subscript, ""));
         }
     }
 
@@ -184,11 +187,17 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
                 .push(Report::at(PythonRule::F722, string, value.trim()));
             return;
         };
+        let typing_only =
+            is_typing_only_annotation(string, self.boundaries.future_annotations() || self.file.stub);
+        if typing_only {
+            self.reports.push(Report::at(PythonRule::UP037, string, ""));
+        }
         let context = Embedded {
             source: wrapped.as_bytes(),
             placement: placement.wrapped(),
             literal: false,
             locals: Vec::new(),
+            typing_only,
         };
         self.embedded_loads(expression, &context);
     }

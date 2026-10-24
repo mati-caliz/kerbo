@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 28] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 30] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -253,6 +253,24 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 28] = [
             "recorré una tupla o una lista",
             "Un conjunto no tiene orden definido y se arma sólo para recorrerlo, así que una tupla dice lo mismo y mantiene el orden.",
             "for x in {1, 2}: pasa a for x in (1, 2):.",
+        ),
+    ),
+    (
+        PythonRule::UP037,
+        RuleText::new(
+            "Anotación entre comillas que nunca se evalúa",
+            "sacá las comillas",
+            "Python no evalúa esta anotación al ejecutar (con from __future__ import annotations, en un stub o en una variable local), así que las comillas sólo agregan ruido.",
+            "def f(x: \"Node\"): con el import del futuro pasa a def f(x: Node):.",
+        ),
+    ),
+    (
+        PythonRule::UP044,
+        RuleText::new(
+            "Unpack[] donde alcanza con *",
+            "escribí *X en vez de Unpack[X]",
+            "Desde Python 3.11 (PEP 646) un tipo variádico se desempaqueta con *, que es más corto y se lee como el resto del lenguaje.",
+            "def f(*args: Unpack[Ts]): pasa a def f(*args: *Ts):.",
         ),
     ),
 ];

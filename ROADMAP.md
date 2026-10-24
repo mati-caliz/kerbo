@@ -1417,9 +1417,17 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     `os.environ`) y PLC0208 (recorrer un conjunto escrito). Paridad: 7 de 8 S112 y exacta en el
     resto (10, 9, 10, 9, 7, 7, 8, 10 y 8); el S112 que falta está en un archivo de CPython con
     `lazy import`. Los casos quedaron en `fixtures/builtins_misc.py`.
+  - Hechas UP037 (comillas de más en una anotación que Python no evalúa: con el import del futuro,
+    en un stub o en una variable local de una función; también en un string adentro de otro) y
+    UP044 (`Unpack[X]` adentro de un subíndice o como tipo de `*args`, también entre comillas).
+    Paridad exacta: 172 y 183. Los casos quedaron en `fixtures/quoted.py`,
+    `fixtures/quoted_future.py` y `fixtures/unpack.py`.
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
-  - Siguiente, la cola de reglas chicas: UP044, UP037, RUF013, PLR1704, PLC0206 y siguientes.
+  - Lo que queda del conjunto por defecto (2026-10-24): 141 reglas con unos 3.300 avisos en el
+    corpus, contra más de 100.000 ya cubiertos. RUF100 (`noqa` sin uso) suma 1.437; el resto tiene
+    menos de 100 cada una: RUF046 107, RUF013 96, PLR1704 87, PLC0206 78, PYI061 70, PYI032 63,
+    PLR1730 56, PYI063 54, UP028 49, PYI036 47, PIE810 46 y una cola de reglas con menos de 45.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.

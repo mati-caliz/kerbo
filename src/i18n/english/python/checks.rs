@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 28] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 30] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -253,6 +253,24 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 28] = [
             "iterate over a tuple or list",
             "A set has no defined order and is built only to be traversed, so a tuple says the same and keeps the order.",
             "for x in {1, 2}: becomes for x in (1, 2):.",
+        ),
+    ),
+    (
+        PythonRule::UP037,
+        RuleText::new(
+            "Quoted annotation that is never evaluated",
+            "remove the quotes",
+            "Python does not evaluate this annotation at runtime (from __future__ import annotations, a stub or a local variable), so the quotes only add noise.",
+            "def f(x: \"Node\"): with the future import becomes def f(x: Node):.",
+        ),
+    ),
+    (
+        PythonRule::UP044,
+        RuleText::new(
+            "Unpack[] where * is enough",
+            "write *X instead of Unpack[X]",
+            "Since Python 3.11 (PEP 646) a variadic type is unpacked with *, which is shorter and reads like the rest of the language.",
+            "def f(*args: Unpack[Ts]): becomes def f(*args: *Ts):.",
         ),
     ),
 ];

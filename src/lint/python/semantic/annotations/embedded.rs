@@ -1,5 +1,5 @@
 use crate::lint::python::Report;
-use crate::lint::python::semantic::pep::{is_pep585_generic, pep604_rule};
+use crate::lint::python::semantic::pep::{is_pep585_generic, is_pep646_unpack, pep604_rule};
 use crate::rules::PythonRule;
 use tree_sitter::{Node, Point};
 
@@ -61,6 +61,7 @@ pub struct Embedded<'source> {
     pub placement: Placement,
     pub literal: bool,
     pub locals: Vec<String>,
+    pub typing_only: bool,
 }
 
 impl Embedded<'_> {
@@ -147,6 +148,16 @@ impl EmbeddedAnnotations for Visitor<'_> {
                 "",
             ));
         }
+        if name
+            .as_deref()
+            .is_some_and(|name| is_pep646_unpack(name, node, &slices))
+        {
+            self.reports.push(Report::at_point(
+                PythonRule::UP044,
+                context.placement.map(node.start_position()),
+                "",
+            ));
+        }
         let is_literal = context.literal || name.as_deref().is_some_and(|name| is_typing(name, LITERAL));
         let is_annotated = name.as_deref().is_some_and(|name| is_typing(name, ANNOTATED));
         for (index, slice) in fields(node, SUBSCRIPT_FIELD).into_iter().enumerate() {
@@ -208,11 +219,20 @@ impl EmbeddedAnnotations for Visitor<'_> {
         };
         let wrapped = wrap(&value);
         if let Some(tree) = parse_snippet(SnippetLanguage::Python, &wrapped) {
+            // UP037 también en una anotación entre comillas adentro de otra.
+            if context.typing_only && !tree.root_node().has_error() && !value.trim().is_empty() {
+                self.reports.push(Report::at_point(
+                    PythonRule::UP037,
+                    context.placement.map(start),
+                    "",
+                ));
+            }
             let nested = Embedded {
                 source: wrapped.as_bytes(),
                 placement: placement.wrapped(),
                 literal: false,
                 locals: context.locals.clone(),
+                typing_only: context.typing_only,
             };
             self.embedded_loads(tree.root_node(), &nested);
         }

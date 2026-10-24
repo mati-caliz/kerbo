@@ -97,6 +97,8 @@ rule_family!(PythonRule {
     UP033 => "up033",
     B003 => "b003",
     PLC0208 => "plc0208",
+    UP037 => "up037",
+    UP044 => "up044",
     UP004 => "up004",
     UP005 => "up005",
     UP009 => "up009",

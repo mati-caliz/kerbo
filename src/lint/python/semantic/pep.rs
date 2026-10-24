@@ -2,7 +2,8 @@ use tree_sitter::Node;
 
 use super::qualified::is_typing;
 use crate::lint::python::ast::{
-    ASSIGNMENT, CLASS, CONCATENATED_STRING, FUNCTION, MODULE, STRING, TUPLE, named, text, unparenthesized,
+    ASSIGNMENT, ATTRIBUTE, CLASS, CONCATENATED_STRING, FUNCTION, IDENTIFIER, MODULE, STRING, SUBSCRIPT,
+    SUBSCRIPT_FIELD, TUPLE, fields, named, text, unparenthesized,
 };
 use crate::rules::PythonRule;
 
@@ -33,6 +34,12 @@ const TYPE_CHECKING: &str = "TYPE_CHECKING";
 const QUALIFIED_TYPE_CHECKING: &str = ".TYPE_CHECKING";
 const ANNOTATED_HOLDERS: [&str; 3] = ["typed_parameter", "typed_default_parameter", FUNCTION];
 const SCOPE_OWNERS: [&str; 3] = [FUNCTION, CLASS, MODULE];
+const UNPACK: &str = "Unpack";
+const UNPACKABLE: [&str; 5] = [IDENTIFIER, ATTRIBUTE, SUBSCRIPT, "generic_type", "member_type"];
+const TYPE_PARAMETER: &str = "type_parameter";
+const TYPED_PARAMETER: &str = "typed_parameter";
+const LIST_SPLAT_PATTERN: &str = "list_splat_pattern";
+const TYPE_FIELD: &str = "type";
 
 // UP006: `List`, `Dict` y compañía de `typing`.
 pub fn is_pep585_generic(qualified: &str) -> bool {
@@ -64,6 +71,48 @@ pub fn pep604_rule(
         .iter()
         .any(|element| qualify(*element).is_some_and(|name| is_typing(&name, NAMED_TUPLE)));
     ((typing_context || !quoted) && !starred && !named_tuple).then_some(rule)
+}
+
+// UP044: `Unpack[X]` donde Python 3.11 acepta `*X`, adentro de un subíndice o como tipo de `*args`.
+pub fn is_pep646_unpack(value: &str, subscript: Node<'_>, slices: &[Node<'_>]) -> bool {
+    let [slice] = slices else {
+        return false;
+    };
+    is_typing(value, UNPACK) && UNPACKABLE.contains(&unwrap_type(*slice).kind()) && accepts_star(subscript)
+}
+
+fn accepts_star(node: Node<'_>) -> bool {
+    let mut child = node;
+    let mut parent = node.parent();
+    while let Some(wrapper) = parent.filter(|wrapper| wrapper.kind() == TYPE_NODE) {
+        child = wrapper;
+        parent = wrapper.parent();
+    }
+    let Some(parent) = parent else {
+        return false;
+    };
+    match parent.kind() {
+        TYPE_PARAMETER => true,
+        SUBSCRIPT => is_subscript_index(parent, child),
+        TUPLE => parent
+            .parent()
+            .is_some_and(|subscript| subscript.kind() == SUBSCRIPT && is_subscript_index(subscript, parent)),
+        TYPED_PARAMETER => {
+            named(parent)
+                .first()
+                .is_some_and(|target| target.kind() == LIST_SPLAT_PATTERN)
+                && parent
+                    .child_by_field_name(TYPE_FIELD)
+                    .is_some_and(|annotation| annotation.id() == child.id())
+        }
+        _ => false,
+    }
+}
+
+fn is_subscript_index(subscript: Node<'_>, child: Node<'_>) -> bool {
+    fields(subscript, SUBSCRIPT_FIELD)
+        .iter()
+        .any(|index| index.id() == child.id())
 }
 
 // Los elementos de un subíndice como los ve ruff: `X[a, b]` es una tupla de dos.
@@ -108,6 +157,19 @@ pub fn is_typing_only(node: Node<'_>, future_annotations: bool, source: &[u8]) -
         child = ancestor;
     }
     false
+}
+
+// `in_typing_only_annotation` de ruff: adentro de una anotación que Python no evalúa. A diferencia de
+// `is_typing_only`, un `if TYPE_CHECKING:` no cuenta.
+pub fn is_typing_only_annotation(node: Node<'_>, deferred_annotations: bool) -> bool {
+    std::iter::successors(node.parent(), Node::parent)
+        .filter(|ancestor| ancestor.kind() == TYPE_NODE)
+        .find_map(|ancestor| {
+            ancestor
+                .parent()
+                .and_then(|holder| annotation_context(holder, deferred_annotations))
+        })
+        .unwrap_or(false)
 }
 
 // Si la anotación que cuelga de `holder` se evalúa en ejecución o no; `None` si no es una anotación.
