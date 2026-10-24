@@ -15,6 +15,7 @@ use super::targets::Store;
 use super::type_hints::{Hints, type_hint_reports};
 use super::type_names::is_type_name;
 use super::type_unions::redundant_type_union;
+use super::version_checks::{is_six_py3, version_subscript};
 use super::{Mode, Visitor};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
@@ -96,6 +97,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
                 if is_first_element_subscript(&self.model, self.source, node) {
                     self.reports.push(Report::at(PythonRule::RUF015, node, ""));
                 }
+                self.reports
+                    .extend(version_subscript(&self.model, self.source, node));
                 self.subscript(node, mode);
             }
             GENERIC_TYPE => self.generic_type(node, mode),
@@ -235,6 +238,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
             self.reports.push(Report::at(PythonRule::FURB167, node, ""));
         } else if is_typing(&name, TEXT_ALIAS) {
             self.reports.push(Report::at(PythonRule::UP019, node, ""));
+        } else if is_six_py3(&name) {
+            self.reports.push(Report::at(PythonRule::YTT202, node, ""));
         }
     }
 

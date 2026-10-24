@@ -159,13 +159,15 @@ mod eslint;
 mod go;
 mod java;
 mod python;
+mod python_slots;
 mod shell;
 mod taint;
 
 pub use eslint::{EslintRule, eslint_index};
 pub use go::{GoRule, go_index};
 pub use java::{JavaRule, java_index};
-pub use python::{PythonRule, python_index};
+pub use python::PythonRule;
+pub use python_slots::python_index;
 pub use shell::{ShellRule, shell_index};
 pub use taint::{TaintRule, taint_index};
 
@@ -185,7 +187,7 @@ pub const fn with_families<const CODE: usize, const TOTAL: usize>(code: [RuleId;
     let free = wrap_migrations(free, &MigrationRule::ALL);
     let free = wrap_dockerfile(free, &DockerfileRule::ALL);
     let free = wrap_compose(free, &ComposeRule::ALL);
-    let free = python::wrap_python(free, &PythonRule::ALL);
+    let free = python_slots::wrap_python(free, &PythonRule::ALL);
     let free = eslint::wrap_eslint(free, &EslintRule::ALL);
     let free = shell::wrap_shell(free, &ShellRule::ALL);
     let free = go::wrap_go(free, &GoRule::ALL);

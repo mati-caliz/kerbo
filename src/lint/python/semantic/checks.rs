@@ -1,3 +1,4 @@
+mod assert_bindings;
 mod redefinitions;
 mod removal;
 mod type_checking_imports;
@@ -66,6 +67,7 @@ fn scope_reports(visitor: &Visitor<'_>, scope: ScopeId) -> Vec<Report> {
     latest.sort_unstable_by_key(|(_, id)| *id);
     let mut reports = redefinitions::reports(visitor, scope, &latest);
     reports.extend(super::private_types::unused_private_types(visitor, &latest));
+    reports.extend(assert_bindings::assignments_in_assert(visitor, &latest));
     if matches!(kind, ScopeKind::Module | ScopeKind::Function) {
         reports.extend(removal::unused_imports(visitor, &latest));
         if !visitor.file.stub {

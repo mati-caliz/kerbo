@@ -7,6 +7,7 @@ use tree_sitter::{Node, Point};
 
 use super::Report;
 use super::ast::{COMMENT, STRING, text};
+use crate::rules::PythonRule;
 use crate::syntax::descendants;
 use ruff_codes::REDIRECTS;
 pub use unused::unused_directives;
@@ -158,15 +159,77 @@ fn directive_after(rest: &str) -> Option<Directive> {
     let Some(listed) = rest.trim_start().strip_prefix(CODES_MARKER) else {
         return Some(Directive::All);
     };
-    let codes: Vec<String> = listed
-        .split(CODE_SEPARATORS)
-        .map(str::trim)
-        .skip_while(|code| code.is_empty())
-        .take_while(|code| code.is_empty() || is_code(code))
-        .filter(|code| !code.is_empty())
-        .map(str::to_owned)
+    let codes: Vec<String> = listed_codes(listed)
+        .into_iter()
+        .map(|(_, code)| code.to_owned())
         .collect();
     (!codes.is_empty()).then_some(Directive::Codes(codes))
+}
+
+// Los códigos de la lista después de `noqa:`, con dónde empieza cada uno adentro de `listed`. La lista
+// termina en la primera palabra que no es un código.
+fn listed_codes(listed: &str) -> Vec<(usize, &str)> {
+    let mut words = Vec::new();
+    let mut start = None;
+    for (index, letter) in listed.char_indices().chain(std::iter::once((listed.len(), ' '))) {
+        let separator = CODE_SEPARATORS.contains(&letter) || letter.is_whitespace();
+        match (separator, start) {
+            (true, Some(first)) => {
+                words.extend(listed.get(first..index).map(|word| (first, word)));
+                start = None;
+            }
+            (false, None) => start = Some(index),
+            _ => {}
+        }
+    }
+    words.into_iter().take_while(|(_, word)| is_code(word)).collect()
+}
+
+// RUF101: un código viejo en un `noqa` que ruff redirige al de otra regla. Avisa en el código.
+pub fn redirected_codes(root: Node<'_>, source: &[u8]) -> Vec<Report> {
+    let mut reports = Vec::new();
+    for comment in descendants(root)
+        .into_iter()
+        .filter(|node| node.kind() == COMMENT)
+    {
+        let content = text(comment, source);
+        let Some(listed) = codes_suffix(content) else {
+            continue;
+        };
+        let offset = content.len().saturating_sub(listed.len());
+        let start = comment.start_position();
+        for (position, code) in listed_codes(listed) {
+            if redirected(code) != code {
+                let at = Point {
+                    row: start.row,
+                    column: start.column.saturating_add(offset).saturating_add(position),
+                };
+                reports.push(Report::at_point(PythonRule::RUF101, at, code));
+            }
+        }
+    }
+    reports
+}
+
+// Lo que sigue al `:` de un `# noqa:` o un `# ruff: noqa:`, como sufijo del comentario.
+fn codes_suffix(comment: &str) -> Option<&str> {
+    let body = comment.trim_start_matches(COMMENT_MARKER).trim_start();
+    let lowered = body.to_lowercase();
+    let after = if let Some(prefix) = FILE_PREFIXES.iter().find(|prefix| lowered.starts_with(*prefix)) {
+        let rest = body.get(prefix.len()..)?.trim_start();
+        rest.get(..NOQA.len())
+            .filter(|word| word.eq_ignore_ascii_case(NOQA))
+            .and_then(|_| rest.get(NOQA.len()..))?
+    } else {
+        comment.match_indices(COMMENT_MARKER).find_map(|(index, _)| {
+            let rest = comment.get(index.saturating_add(1)..)?.trim_start();
+            rest.get(..NOQA.len())
+                .filter(|word| word.eq_ignore_ascii_case(NOQA))
+                .and_then(|_| rest.get(NOQA.len()..))
+                .filter(|after| directive_after(after).is_some())
+        })?
+    };
+    after.trim_start().strip_prefix(CODES_MARKER)
 }
 
 fn is_code(word: &str) -> bool {

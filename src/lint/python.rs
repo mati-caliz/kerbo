@@ -22,6 +22,7 @@ mod formatter_comments;
 mod fstrings;
 mod import_self;
 mod imports;
+mod index_types;
 mod known_types;
 mod literal_checks;
 mod loop_else;
@@ -31,6 +32,7 @@ mod loops;
 mod methods;
 mod modern;
 mod module_names;
+mod module_upgrades;
 mod names;
 mod natural;
 mod negations;
@@ -155,55 +157,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
         found.extend(imports::reports(root, &nodes, &import_file));
         found
     };
-    reports.extend(compound::reports(root, source));
-    reports.extend(statements::reports(&nodes, source));
-    reports.extend(flow::reports(&nodes));
-    reports.extend(names::reports(&nodes, source));
-    reports.extend(comparisons::reports(&nodes, source));
-    reports.extend(fstrings::reports(&nodes, source));
-    reports.extend(formats::reports(&nodes, source));
-    reports.extend(dicts::reports(&nodes, source));
-    reports.extend(modern::reports(root, &nodes, source));
-    reports.extend(simplify::reports(&nodes, source));
-    reports.extend(splits::reports(&nodes, source));
-    reports.extend(slots::reports(&nodes, source));
-    reports.extend(loop_else::reports(&nodes));
-    reports.extend(parentheses::reports(root));
-    reports.extend(declarations::reports(&nodes, source));
-    reports.extend(raises::reports(&nodes, source));
-    reports.extend(encodings::reports(&nodes, source));
-    reports.extend(redundancies::reports(&nodes, source));
-    reports.extend(set_literals::reports(&nodes, source));
-    reports.extend(literal_checks::reports(&nodes, source));
-    reports.extend(special_methods::reports(&nodes, source));
-    reports.extend(statement_checks::reports(&nodes, source));
-    reports.extend(collection_loops::reports(&nodes, source));
-    reports.extend(pytest_checks::reports(&nodes, source));
-    reports.extend(tail_statements::reports(&nodes, source));
-    reports.extend(loop_lookups::reports(&nodes, source));
-    reports.extend(container_checks::reports(&nodes, source));
-    reports.extend(context_checks::reports(&nodes, source));
-    reports.extend(dunder_all::reports(&nodes, source));
-    reports.extend(raw_text::reports(&nodes, source));
-    reports.extend(import_self::reports(&nodes, source, path));
-    reports.extend(typing_names::reports(&nodes, source));
-    reports.extend(exception_flow::reports(&nodes, source));
-    reports.extend(methods::reports(&nodes, source));
-    reports.extend(loops::loop_variable_overrides(&nodes, source));
-    reports.extend(loops::iteration_over_set(&nodes, source));
-    reports.extend(deprecated::reports(&nodes, source));
-    reports.extend(concatenation::reports(&nodes));
-    reports.extend(branches::reports(&nodes, source));
-    reports.extend(loops::reports(&nodes, source));
-    reports.extend(dunders::reports(&nodes, source));
-    reports.extend(negations::reports(&nodes, source));
-    reports.extend(comments::reports(&nodes, source));
-    reports.extend(formatter_comments::reports(root, &nodes, source));
-    reports.extend(pylint_scopes::reports(&nodes, source));
-    reports.extend(string_characters::reports(&nodes, source));
-    reports.extend(stub_bodies::reports(&nodes, source, file.stub));
-    reports.extend(rewrites::reports(&nodes, source));
-    reports.extend(module_names::invalid_module_name(path));
+    reports.extend(syntax_reports(root, &nodes, source, path));
     let mut found: Vec<LintFinding> = suppressed(root, source, reports, &enabled)
         .into_iter()
         .map(|report| {
@@ -217,6 +171,76 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
         .collect();
     found.sort_by_key(|finding| (finding.line, finding.column));
     found
+}
+
+// Las reglas que miran el árbol sin el modelo semántico; corren aunque tree-sitter haya devuelto
+// errores.
+fn syntax_reports(root: Node<'_>, nodes: &[Node<'_>], source: &[u8], path: Option<&Path>) -> Vec<Report> {
+    let mut reports = Vec::new();
+    reports.extend(compound::reports(root, source));
+    reports.extend(statements::reports(nodes, source));
+    reports.extend(flow::reports(nodes));
+    reports.extend(names::reports(nodes, source));
+    reports.extend(comparisons::reports(nodes, source));
+    reports.extend(fstrings::reports(nodes, source));
+    reports.extend(formats::reports(nodes, source));
+    reports.extend(dicts::reports(nodes, source));
+    reports.extend(modern::reports(root, nodes, source));
+    reports.extend(simplify::reports(nodes, source));
+    reports.extend(splits::reports(nodes, source));
+    reports.extend(slots::reports(nodes, source));
+    reports.extend(loop_else::reports(nodes));
+    reports.extend(parentheses::reports(root));
+    reports.extend(declarations::reports(nodes, source));
+    reports.extend(raises::reports(nodes, source));
+    reports.extend(encodings::reports(nodes, source));
+    reports.extend(redundancies::reports(nodes, source));
+    reports.extend(set_literals::reports(nodes, source));
+    reports.extend(literal_checks::reports(nodes, source));
+    reports.extend(special_methods::reports(nodes, source));
+    reports.extend(statement_checks::reports(nodes, source));
+    reports.extend(collection_loops::reports(nodes, source));
+    reports.extend(pytest_checks::reports(nodes, source));
+    reports.extend(tail_statements::reports(nodes, source));
+    reports.extend(loop_lookups::reports(nodes, source));
+    reports.extend(container_checks::reports(nodes, source));
+    reports.extend(context_checks::reports(nodes, source));
+    reports.extend(more_syntax_reports(root, nodes, source, path));
+    reports
+}
+
+fn more_syntax_reports(
+    root: Node<'_>,
+    nodes: &[Node<'_>],
+    source: &[u8],
+    path: Option<&Path>,
+) -> Vec<Report> {
+    let mut reports = Vec::new();
+    reports.extend(dunder_all::reports(nodes, source));
+    reports.extend(raw_text::reports(nodes, source));
+    reports.extend(import_self::reports(nodes, source, path));
+    reports.extend(typing_names::reports(nodes, source));
+    reports.extend(exception_flow::reports(nodes, source));
+    reports.extend(methods::reports(nodes, source));
+    reports.extend(loops::loop_variable_overrides(nodes, source));
+    reports.extend(loops::iteration_over_set(nodes, source));
+    reports.extend(deprecated::reports(nodes, source));
+    reports.extend(concatenation::reports(nodes));
+    reports.extend(branches::reports(nodes, source));
+    reports.extend(loops::reports(nodes, source));
+    reports.extend(dunders::reports(nodes, source));
+    reports.extend(negations::reports(nodes, source));
+    reports.extend(comments::reports(nodes, source));
+    reports.extend(formatter_comments::reports(root, nodes, source));
+    reports.extend(pylint_scopes::reports(nodes, source));
+    reports.extend(string_characters::reports(nodes, source));
+    reports.extend(stub_bodies::reports(nodes, source, file_kind(path).stub));
+    reports.extend(noqa::redirected_codes(root, source));
+    reports.extend(module_upgrades::reports(nodes, source));
+    reports.extend(index_types::reports(nodes, source));
+    reports.extend(rewrites::reports(nodes, source));
+    reports.extend(module_names::invalid_module_name(path));
+    reports
 }
 
 // Lo que queda después de los `noqa`, más los `noqa` sin uso (RUF100) que se calculan con los avisos

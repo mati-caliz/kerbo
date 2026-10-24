@@ -1,5 +1,3 @@
-use super::{ComposeRule, DockerfileRule, MigrationRule, RuleId};
-
 rule_family!(PythonRule {
     F401 => "f401",
     F402 => "f402",
@@ -283,6 +281,28 @@ rule_family!(PythonRule {
     PYI049 => "pyi049",
     PYI052 => "pyi052",
     PYI066 => "pyi066",
+    UP001 => "up001",
+    UP023 => "up023",
+    UP026 => "up026",
+    RUF008 => "ruf008",
+    RUF016 => "ruf016",
+    RUF018 => "ruf018",
+    RUF024 => "ruf024",
+    RUF026 => "ruf026",
+    RUF030 => "ruf030",
+    RUF033 => "ruf033",
+    RUF048 => "ruf048",
+    RUF049 => "ruf049",
+    RUF058 => "ruf058",
+    RUF101 => "ruf101",
+    YTT101 => "ytt101",
+    YTT102 => "ytt102",
+    YTT103 => "ytt103",
+    YTT202 => "ytt202",
+    YTT204 => "ytt204",
+    YTT301 => "ytt301",
+    YTT302 => "ytt302",
+    YTT303 => "ytt303",
     UP004 => "up004",
     UP005 => "up005",
     UP009 => "up009",
@@ -351,29 +371,3 @@ rule_family!(PythonRule {
     E742 => "e742",
     E743 => "e743",
 });
-
-// Con un loop y no recursiva: con más de 128 reglas la recursión pasa el límite de llamadas
-// anidadas que permite la evaluación en tiempo de compilación.
-pub const fn wrap_python<'slots>(
-    mut slots: &'slots mut [RuleId],
-    mut rules: &[PythonRule],
-) -> &'slots mut [RuleId] {
-    loop {
-        match (slots, rules) {
-            ([slot, free @ ..], [rule, others @ ..]) => {
-                *slot = RuleId::Python(*rule);
-                slots = free;
-                rules = others;
-            }
-            (free, _) => return free,
-        }
-    }
-}
-
-pub fn python_index(rule: PythonRule, code_rules: usize) -> usize {
-    code_rules
-        .saturating_add(MigrationRule::ALL.len())
-        .saturating_add(DockerfileRule::ALL.len())
-        .saturating_add(ComposeRule::ALL.len())
-        .saturating_add(rule.position())
-}

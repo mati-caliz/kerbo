@@ -1,8 +1,6 @@
-use std::collections::HashSet;
-
 use tree_sitter::Node;
 
-use super::classes::any_base;
+use super::dataclass_checks::is_enumeration;
 use super::model::{MODULE_SCOPE, Model};
 use super::mutability::{Resolver, without_subscript};
 use super::qualified::{is_typing, qualified_name_from};
@@ -63,15 +61,6 @@ const TYPE_ALIAS: &str = "TypeAlias";
 const FINAL: &str = "Final";
 const ANY: &str = "Any";
 const PRIVATE_PREFIX: char = '_';
-const ENUMS: [&str; 7] = [
-    "enum.Enum",
-    "enum.IntEnum",
-    "enum.StrEnum",
-    "enum.Flag",
-    "enum.IntFlag",
-    "enum.ReprEnum",
-    "enum.EnumCheck",
-];
 
 // Las asignaciones de un stub fuera de las funciones: PYI001 (`TypeVar` sin `_`), PYI015 (valor que no
 // es simple), PYI052 (valor simple sin anotación), PYI017 (varios destinos o un atributo), PYI026
@@ -199,16 +188,7 @@ impl<'model> Context<'model, '_> {
     }
 
     fn in_enum(&self) -> bool {
-        self.owner.kind() == CLASS
-            && any_base(
-                &self.resolver,
-                self.owner,
-                &mut |base| {
-                    self.qualified(without_subscript(base))
-                        .is_some_and(|name| ENUMS.contains(&name.as_str()))
-                },
-                &mut HashSet::new(),
-            )
+        self.owner.kind() == CLASS && is_enumeration(&self.resolver, self.owner)
     }
 
     fn is_annotatable_type_alias(&self, value: Node<'_>) -> bool {

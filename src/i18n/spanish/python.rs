@@ -10,6 +10,7 @@ mod small_checks;
 mod stub_rules;
 mod tail_checks;
 mod typing;
+mod upgrade_rules;
 
 use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
@@ -25,6 +26,7 @@ use small_checks::SMALL_CHECK_TEXTS;
 use stub_rules::STUB_RULE_TEXTS;
 use tail_checks::TAIL_CHECK_TEXTS;
 use typing::TYPING_TEXTS;
+use upgrade_rules::UPGRADE_RULE_TEXTS;
 
 const UNKNOWN: RuleText = RuleText::new(
     "Regla de ruff",
@@ -39,6 +41,7 @@ pub fn python(rule: PythonRule) -> RuleText {
         .chain(MODERN_TEXTS.iter())
         .chain(IDIOM_TEXTS.iter())
         .chain(CHECK_TEXTS.iter())
+        .chain(UPGRADE_RULE_TEXTS.iter())
         .chain(STUB_RULE_TEXTS.iter())
         .chain(PYLINT_ERROR_TEXTS.iter())
         .chain(ASSORTED_CHECK_TEXTS.iter())

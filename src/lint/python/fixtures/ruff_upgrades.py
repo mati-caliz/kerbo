@@ -1,0 +1,169 @@
+import collections
+import dataclasses
+import enum
+import itertools
+import sys
+import typing
+import xml.etree.cElementTree as ET
+from collections import defaultdict
+from dataclasses import dataclass, field
+from itertools import starmap
+from typing import ClassVar, Generator, Generic, TypeAlias, TypeVar
+from xml.etree import cElementTree as CET
+from xml.etree.cElementTree import XML
+
+import mock
+import mock.mock
+import six
+from mock import patch
+
+T = TypeVar("T")
+
+sys.version[:3]
+sys.version[:1]
+sys.version[:2]
+sys.version[2]
+sys.version[0]
+sys.version[1]
+sys.version >= "3"
+sys.version < "3.5"
+sys.version_info.minor > 7
+sys.version_info.minor == 7
+sys.version_info.major > 2
+six.PY3
+if six.PY3:
+    pass
+
+mock.mock.patch
+mock.patch
+
+
+class Meta:
+    __metaclass__ = type
+
+
+class OtherMeta:
+    __metaclass__ = object
+
+
+__metaclass__ = type
+
+Alias: TypeAlias = int
+
+
+def generator() -> Generator[int, None, None]:
+    yield 1
+
+
+class Box(Generic[T]):
+    pass
+
+
+def identity(value: T) -> T:
+    return value
+
+
+@dataclass
+class Data:
+    items: list[int] = []
+    mapping: dict = {}
+    fixed: ClassVar[list[int]] = []
+    tupled: tuple[int, ...] = ()
+    plain = []
+    factory: list[int] = field(default_factory=list)
+    defaulted: list[int] = field(default=[])
+
+
+@dataclasses.dataclass(frozen=True)
+class Frozen:
+    values: set[int] = set()
+
+
+class NotData:
+    items: list[int] = []
+
+
+[1, 2][1.0]
+[1, 2]["a"]
+"text"[None]
+(1, 2)[1:"b"]
+[x for x in range(3)][{}]
+b"bytes"[1j]
+f"text"[[1]]
+[1, 2][True]
+[1, 2][1:2:None]
+[1, 2][...]
+values = [1, 2]
+values["a"]
+
+
+def check(value):
+    assert (result := value)
+    assert (alone := value) and alone
+    print(result)
+
+
+dict.fromkeys(range(3), [])
+dict.fromkeys(range(3), {})
+dict.fromkeys(range(3), 0)
+dict.fromkeys(range(3), set())
+dict.fromkeys(range(3))
+
+collections.defaultdict(default_factory=list)
+defaultdict(default_factory=int)
+defaultdict(default_factory=[])
+defaultdict(list, default_factory=int)
+defaultdict(default_factory="x")
+
+assert True, print("message")
+assert True, print
+assert True, "message"
+
+
+@dataclass
+class PostInit:
+    value: int = 0
+
+    def __post_init__(self, extra: int = 1, *, other=2) -> None:
+        pass
+
+
+class NotDataPostInit:
+    def __post_init__(self, extra=1) -> None:
+        pass
+
+
+__version__ = "1.2.3"
+map(int, __version__.split("."))
+map(int, package.__version__.split("."))
+map(int, __version__.split(sep="."))
+map(int, version.split("."))
+map(int, __version__.split("-"))
+map(float, __version__.split("."))
+
+
+@dataclass
+class Color(enum.Enum):
+    RED = 1
+
+
+@dataclass
+class Plain:
+    value: int
+
+
+class Mixed[S](Generic[T]):
+    pass
+
+
+starmap(pow, zip([1], [2]))
+itertools.starmap(pow, zip([1], [2]))
+itertools.starmap(pow, zip(*pairs))
+itertools.starmap(pow, zip([1], [2], strict=True))
+itertools.starmap(pow, pairs)
+itertools.starmap(pow, zip())
+
+value = 1  # noqa: F401, T001
+other = 2  # noqa: TCH001
+third = 3  # noqa: E501
+fourth = 4  # noqa: RUF011

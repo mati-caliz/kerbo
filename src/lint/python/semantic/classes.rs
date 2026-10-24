@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 use super::Pending;
+use super::dataclass_checks::dataclass_reports;
 use super::dataclass_defaults::dataclass_call_defaults;
 use super::model::{BindingKind, MODULE_SCOPE, Model, Resolution};
 use super::mutability::{Resolver, unwrap_type, without_subscript};
@@ -98,6 +99,7 @@ pub fn mutable_class_defaults(model: &Model<'_>, source: &[u8], classes: &[Pendi
             let mut reports = class_reports(&resolver, &seen, class.node);
             if seen.dataclasses && dataclass_decorator(&resolver, class.node).is_some() {
                 reports.extend(dataclass_call_defaults(&resolver, &seen, class.node));
+                reports.extend(dataclass_reports(&resolver, &seen, class.node));
             }
             reports
         })

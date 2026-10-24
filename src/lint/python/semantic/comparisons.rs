@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
+use super::version_checks::version_comparison;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     CALL, COMMENT, CONCATENATED_STRING, FALSE, FUNCTION_FIELD, IDENTIFIER, NONE, STRING, TRUE, is_f_string,
@@ -40,6 +41,7 @@ pub fn comparison_reports(model: &Model<'_>, source: &[u8], comparison: Node<'_>
         .map(|operand| Report::at(PythonRule::PLW0177, *operand, ""))
         .collect();
     reports.extend(version_info_comparison(model, source, comparison, &operands));
+    reports.extend(version_comparison(model, source, comparison));
     for pair in operands.windows(2) {
         let [left, right] = pair else {
             continue;

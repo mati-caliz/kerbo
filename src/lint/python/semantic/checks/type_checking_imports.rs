@@ -76,7 +76,7 @@ impl Context<'_, '_> {
     }
 }
 
-fn node_at(root: Node<'_>, at: Point) -> Option<Node<'_>> {
+pub fn node_at(root: Node<'_>, at: Point) -> Option<Node<'_>> {
     let inside = Point {
         row: at.row,
         column: at.column.saturating_add(1),
