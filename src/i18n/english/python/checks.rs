@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 10] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 15] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -91,6 +91,51 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 10] = [
             "write @lru_cache without parentheses",
             "Since Python 3.8 lru_cache can be used directly as a decorator.",
             "@functools.lru_cache() becomes @functools.lru_cache.",
+        ),
+    ),
+    (
+        PythonRule::SIM202,
+        RuleText::new(
+            "not a != b instead of a == b",
+            "write a == b",
+            "Negating an inequality is a double negative that says a == b the long way.",
+            "not a != b becomes a == b.",
+        ),
+    ),
+    (
+        PythonRule::PIE794,
+        RuleText::new(
+            "Class attribute defined twice",
+            "remove the first definition",
+            "Only the last assignment survives, so the first one is dead code or a copy-paste mistake.",
+            "the second name = 1 in the class is removed.",
+        ),
+    ),
+    (
+        PythonRule::PIE807,
+        RuleText::new(
+            "lambda: [] or lambda: {} instead of list or dict",
+            "pass list or dict directly",
+            "The builtin already builds an empty container when called, without wrapping it in a lambda.",
+            "default_factory=lambda: [] becomes default_factory=list.",
+        ),
+    ),
+    (
+        PythonRule::PLW0128,
+        RuleText::new(
+            "Same name assigned twice in one statement",
+            "rename one of the targets",
+            "Only the last value survives, so the first target is almost always a typo.",
+            "a, a = 1, 2 becomes a, b = 1, 2.",
+        ),
+    ),
+    (
+        PythonRule::PLW0642,
+        RuleText::new(
+            "Assignment to self or cls in a method",
+            "use another local name",
+            "Reassigning self or cls only changes the local variable, not the object or the class.",
+            "self = other becomes current = other.",
         ),
     ),
 ];

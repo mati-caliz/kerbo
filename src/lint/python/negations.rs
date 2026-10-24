@@ -8,7 +8,7 @@ use crate::rules::PythonRule;
 
 const ARGUMENT_FIELD: &str = "argument";
 const OPERATORS_FIELD: &str = "operators";
-const EQUAL: &str = "==";
+const NEGATED_COMPARISONS: [(&str, PythonRule); 2] = [("==", PythonRule::SIM201), ("!=", PythonRule::SIM202)];
 const IF: &str = "if_statement";
 const RAISE: &str = "raise_statement";
 const CONSEQUENCE_FIELD: &str = "consequence";
@@ -24,29 +24,35 @@ const SCOPE_OWNERS: [&str; 7] = [
     "generator_expression",
 ];
 
-// SIM201: `not a == b`, donde alcanza con `a != b`.
+// SIM201 (`not a == b`, donde alcanza con `a != b`) y SIM202 (`not a != b`, que es `a == b`).
 pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     nodes
         .iter()
-        .filter(|node| node.kind() == NOT_OPERATOR && is_negated_equality(**node, source))
-        .filter(|node| !is_exception_check(**node) && !in_comparison_dunder(**node, source))
-        .map(|node| Report::at(PythonRule::SIM201, *node, ""))
+        .filter(|node| node.kind() == NOT_OPERATOR)
+        .filter_map(|node| negated_comparison(*node, source).map(|rule| (*node, rule)))
+        .filter(|(node, _)| !is_exception_check(*node) && !in_comparison_dunder(*node, source))
+        .map(|(node, rule)| Report::at(rule, node, ""))
         .collect()
 }
 
-fn is_negated_equality(negation: Node<'_>, source: &[u8]) -> bool {
-    negation
+// La regla de la comparación negada, si tiene un único operador `==` o `!=`.
+fn negated_comparison(negation: Node<'_>, source: &[u8]) -> Option<PythonRule> {
+    let comparison = negation
         .child_by_field_name(ARGUMENT_FIELD)
         .map(unparenthesized)
-        .filter(|operand| operand.kind() == COMPARISON)
-        .is_some_and(|comparison| {
-            let mut cursor = comparison.walk();
-            let operators: Vec<&str> = comparison
-                .children_by_field_name(OPERATORS_FIELD, &mut cursor)
-                .map(|operator| text(operator, source))
-                .collect();
-            operators == [EQUAL]
-        })
+        .filter(|operand| operand.kind() == COMPARISON)?;
+    let mut cursor = comparison.walk();
+    let operators: Vec<&str> = comparison
+        .children_by_field_name(OPERATORS_FIELD, &mut cursor)
+        .map(|operator| text(operator, source))
+        .collect();
+    let [operator] = operators.as_slice() else {
+        return None;
+    };
+    NEGATED_COMPARISONS
+        .iter()
+        .find(|(symbol, _)| symbol == operator)
+        .map(|(_, rule)| *rule)
 }
 
 // `is_exception_check`: la condición de un `if` cuyo cuerpo es sólo un `raise`.

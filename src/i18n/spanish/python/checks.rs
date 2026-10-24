@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 10] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 15] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -91,6 +91,51 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 10] = [
             "escribí @lru_cache sin paréntesis",
             "Desde Python 3.8 lru_cache se puede usar directamente como decorador.",
             "@functools.lru_cache() pasa a @functools.lru_cache.",
+        ),
+    ),
+    (
+        PythonRule::SIM202,
+        RuleText::new(
+            "not a != b en vez de a == b",
+            "escribí a == b",
+            "Negar una desigualdad es una doble negación que dice a == b por el camino largo.",
+            "not a != b pasa a a == b.",
+        ),
+    ),
+    (
+        PythonRule::PIE794,
+        RuleText::new(
+            "Atributo de clase definido dos veces",
+            "sacá la primera definición",
+            "Sólo sobrevive la última asignación, así que la primera es código muerto o un error de copiar y pegar.",
+            "el segundo nombre = 1 de la clase se borra.",
+        ),
+    ),
+    (
+        PythonRule::PIE807,
+        RuleText::new(
+            "lambda: [] o lambda: {} en vez de list o dict",
+            "pasá list o dict directamente",
+            "El builtin ya arma un contenedor vacío al llamarlo, sin envolverlo en una lambda.",
+            "default_factory=lambda: [] pasa a default_factory=list.",
+        ),
+    ),
+    (
+        PythonRule::PLW0128,
+        RuleText::new(
+            "El mismo nombre asignado dos veces en una sentencia",
+            "renombrá uno de los destinos",
+            "Sólo sobrevive el último valor, así que el primer destino casi siempre es un error de tipeo.",
+            "a, a = 1, 2 pasa a a, b = 1, 2.",
+        ),
+    ),
+    (
+        PythonRule::PLW0642,
+        RuleText::new(
+            "Asignación a self o cls en un método",
+            "usá otro nombre local",
+            "Reasignar self o cls sólo cambia la variable local, no el objeto ni la clase.",
+            "self = otro pasa a actual = otro.",
         ),
     ),
 ];

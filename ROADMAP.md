@@ -1403,6 +1403,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     (`hasattr(x, "__call__")`) y UP011 (`@lru_cache()`). Paridad: 34 de 35, 16 de 18, 17 de 17, 17
     de 17, 23 de 23 y 29 de 30, sin avisos de más; lo que falta está en archivos de CPython con
     `lazy import`. Los casos quedaron en `fixtures/aliases.py`.
+  - Hechas SIM202 (`not a != b`), PIE794 (atributo de clase repetido), PIE807 (`lambda: []`),
+    PLW0128 (el mismo nombre dos veces entre los destinos) y PLW0642 (asignar a `self` o `cls`, con
+    el `function_type::classify` de ruff y los decoradores reconocidos por nombre). Paridad exacta:
+    18, 20, 12, 19 y 68. Los casos quedaron en `fixtures/class_bodies.py`; la tabla de fixtures pasó
+    a `src/lint/python/tests/fixtures.rs`.
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
   - Siguiente, la cola de reglas chicas: UP044, UP037, RUF013, PLR1704, PLC0206 y siguientes.

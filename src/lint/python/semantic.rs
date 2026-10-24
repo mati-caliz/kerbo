@@ -39,6 +39,7 @@ use crate::lint::python::semantic::statements::Statements;
 use tree_sitter::{Node, Point};
 
 use super::{FileKind, Report};
+pub use checks::is_dummy;
 use model::{BranchId, Model, ScopeId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

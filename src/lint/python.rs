@@ -18,6 +18,7 @@ mod fstrings;
 mod imports;
 mod loop_else;
 mod loops;
+mod methods;
 mod modern;
 mod module_names;
 mod names;
@@ -153,6 +154,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(encodings::reports(&nodes, source));
     reports.extend(redundancies::reports(&nodes, source));
     reports.extend(exception_flow::reports(&nodes, source));
+    reports.extend(methods::reports(&nodes, source));
     reports.extend(loops::loop_variable_overrides(&nodes, source));
     reports.extend(deprecated::reports(&nodes, source));
     reports.extend(concatenation::reports(&nodes));
