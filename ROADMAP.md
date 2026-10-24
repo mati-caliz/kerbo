@@ -1459,12 +1459,24 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     repetido en un `enum.Enum` resuelto) y UP019 (`typing.Text`). Paridad exacta en todas salvo
     cuatro avisos de `test_compile.py`, uno de los archivos de CPython que tree-sitter no parsea.
     Los casos quedaron en `fixtures/small_checks.py`.
+  - Hechas 24 reglas más en una tanda: PLC0206 (`for k in d:` que lee `d[k]`; como ruff, no entra
+    en un subíndice que se lee pero sí en uno que se asigna), PERF402 (copiar una lista elemento
+    por elemento, salvo con `async for`), RUF051 (`if k in d: del d[k]`) y el tipo de la variable
+    con el `only_binding` de ruff (las asignaciones anteriores del alcance, `**kwargs`, el
+    desempaquetado y la anotación de un solo tipo), PT031 y PT014 (pytest), PLW0602 (`global` sin
+    asignar), RUF019, PLR1716, FURB192, FURB105, RUF057, PLE0605, PLW0131, RUF041, D419, FURB166,
+    UP014, G201, B035, B005, PLW0245, B021, B012 y B013. Paridad exacta salvo un D419 y un FURB105 en
+    dos archivos que no están en UTF-8 y que ruff no lee (su E902); kerbo los analiza igual. Los
+    casos quedaron en `fixtures/mixed_checks.py`.
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
-  - Lo que queda del conjunto por defecto (2026-10-24): 86 reglas con unos 2.200 avisos en el
+  - Lo que queda del conjunto por defecto (2026-10-24): 62 reglas con unos 1.900 avisos en el
     corpus, contra más de 100.000 ya cubiertos. RUF100 (`noqa` sin uso) suma 1.437; el resto tiene
-    menos de 80 cada una: PLC0206 78, UP028 49, PYI036 47, PIE810 46, UP036 44, PERF402 40, PT031 36,
-    PLW0602 34, y una cola de reglas con menos de 30. Se hacen en tandas de 15 a 25 reglas por
+    menos de 50 cada una: UP028 49, PYI036 47, PIE810 46, UP036 44, PYI034 26, PYI019 22,
+    SIM401 17, TC004 17, FURB122 15, PLE1300 12, C417 12, SIM113 11 y una cola de reglas con menos
+    de 10.
+  - Los archivos que no están en UTF-8 (ruff da E902 y no los analiza) se analizan igual: falta
+    saltearlos o avisar como ruff. Se hacen en tandas de 15 a 25 reglas por
     tema, con un solo gate y una sola medición por tanda.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que

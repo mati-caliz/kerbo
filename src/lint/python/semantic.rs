@@ -1,5 +1,6 @@
 mod aliases;
 mod annotations;
+mod boolean_chains;
 mod boundary;
 mod builtin_calls;
 mod cached_methods;
@@ -24,6 +25,7 @@ mod imports;
 mod integer_calls;
 mod isinstance_calls;
 mod literals;
+mod misc_calls;
 mod model;
 mod mutability;
 mod patterns;

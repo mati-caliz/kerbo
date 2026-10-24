@@ -8,6 +8,7 @@ use super::decimals::{decimal_from_float_literal, verbose_decimal_constructor};
 use super::format_calls::format_call_report;
 use super::idioms::idiom_reports;
 use super::integer_calls::integer_call_reports;
+use super::misc_calls::misc_call_reports;
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
 use super::resources::unmanaged_open;
@@ -78,6 +79,7 @@ pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Rep
     reports.extend(builtin_call_reports(model, source, call));
     reports.extend(integer_call_reports(model, source, call));
     reports.extend(cast_call_reports(model, source, call));
+    reports.extend(misc_call_reports(model, source, call));
     if let Some(function) = call.child_by_field_name(FUNCTION_FIELD) {
         reports.extend(called_alias_reports(model, source, function));
     }

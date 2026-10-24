@@ -1,0 +1,312 @@
+use tree_sitter::Node;
+
+use super::builtin_calls::{Arguments, arguments, keyword_value};
+use super::model::Model;
+use super::qualified::{is_builtin_named, is_typing, qualified_name};
+use super::type_hints::Hints;
+use crate::lint::python::Report;
+use crate::lint::python::ast::{
+    ASSIGNMENT, ATTRIBUTE, ATTRIBUTE_FIELD, CLASS, COMMENT, FUNCTION, FUNCTION_FIELD, IDENTIFIER,
+    KEYWORD_ARGUMENT, LAMBDA, LEFT_FIELD, NAME_FIELD, OBJECT_FIELD, RIGHT_FIELD, SUBSCRIPT, SUBSCRIPT_FIELD,
+    TRUE, TUPLE, VALUE_FIELD, is_string, named, text, unparenthesized,
+};
+use crate::lint::python::escapes::text_value;
+use crate::lint::python::methods::method_kind;
+use crate::rules::PythonRule;
+
+const INTEGER: &str = "integer";
+const NONE_LITERAL: &str = "none";
+const UNARY_OPERATOR: &str = "unary_operator";
+const SLICE: &str = "slice";
+const PARENTHESIZED: &str = "parenthesized_expression";
+const LIST: &str = "list";
+const ARGUMENT_FIELD: &str = "argument";
+const OPERATOR_FIELD: &str = "operator";
+const SORTED: &str = "sorted";
+const ROUND: &str = "round";
+const INT: &str = "int";
+const PRINT: &str = "print";
+const SUPER: &str = "super";
+const SEP: &str = "sep";
+const NDIGITS: &str = "ndigits";
+const ALLOWED_SORT_KEYWORDS: [&str; 2] = ["key", "reverse"];
+const PREFIXED_BASES: [&str; 3] = ["2", "8", "16"];
+const STRIPS: [&str; 3] = ["strip", "lstrip", "rstrip"];
+const NAMED_TUPLE: &str = "NamedTuple";
+const ERROR: &str = "error";
+const EXC_INFO: &str = "exc_info";
+const LOGGING: &str = "logging";
+const LOG_PREFIX: &str = "log";
+const LOGGER_SUFFIX: &str = "logger";
+const EXCEPT_CLAUSES: [&str; 2] = ["except_clause", "except_group_clause"];
+const SCOPES: [&str; 3] = [FUNCTION, CLASS, LAMBDA];
+const MINUS: &str = "-";
+
+// Llamadas sueltas: FURB192 (`sorted(x)[0]`), RUF057 (`round` que no cambia nada), FURB166
+// (`int(s[2:], 16)`), B005 (`strip` con caracteres repetidos), FURB105 (`print("")`), UP014
+// (`NamedTuple` funcional), G201 (`logging.error(..., exc_info=True)`) y PLW0245 (`super.x()`).
+pub fn misc_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Report> {
+    let Some(function) = call.child_by_field_name(FUNCTION_FIELD) else {
+        return Vec::new();
+    };
+    let hints = Hints { model, source };
+    let given = arguments(call);
+    let builtin = |name: &str| is_builtin_named(model, function, source, name);
+    let mut reports = Vec::new();
+    if builtin(SORTED) {
+        reports.extend(sorted_min_max(source, call, &given));
+    }
+    if builtin(ROUND) && is_unnecessary_round(&given, source) {
+        reports.push(Report::at(PythonRule::RUF057, call, ""));
+    }
+    if builtin(INT) && is_prefix_stripped_int(&given, source) {
+        reports.push(Report::at(PythonRule::FURB166, call, ""));
+    }
+    if builtin(PRINT) && is_unnecessary_print_argument(&given, source) {
+        reports.push(Report::at(PythonRule::FURB105, call, ""));
+    }
+    if is_repeated_strip(function, &given, source) {
+        reports.push(Report::at(PythonRule::B005, call, ""));
+    }
+    if is_functional_named_tuple(hints, call, function, &given) {
+        reports.extend(
+            call.parent()
+                .map(|assignment| Report::at(PythonRule::UP014, assignment, "")),
+        );
+    }
+    reports.extend(logging_exc_info(hints, call, function, &given));
+    reports.extend(super_without_call(model, source, call, function));
+    reports
+}
+
+fn is_integer(node: Node<'_>, source: &[u8], allow_negative: bool) -> bool {
+    let node = unparenthesized(node);
+    match node.kind() {
+        INTEGER => !text(node, source).ends_with(['j', 'J']),
+        UNARY_OPERATOR => {
+            let negative = node
+                .child_by_field_name(OPERATOR_FIELD)
+                .is_some_and(|operator| text(operator, source) == MINUS);
+            (allow_negative || !negative)
+                && node
+                    .child_by_field_name(ARGUMENT_FIELD)
+                    .is_some_and(|operand| is_integer(operand, source, allow_negative))
+        }
+        _ => false,
+    }
+}
+
+// FURB192: `sorted(x)[0]` o `sorted(x)[-1]`, que son `min` y `max`. Avisa en el subíndice.
+fn sorted_min_max(source: &[u8], call: Node<'_>, given: &Arguments<'_>) -> Option<Report> {
+    let mut value = call;
+    while let Some(parent) = value.parent().filter(|parent| parent.kind() == PARENTHESIZED) {
+        value = parent;
+    }
+    let subscript = value.parent().filter(|parent| {
+        parent.kind() == SUBSCRIPT
+            && parent
+                .child_by_field_name(VALUE_FIELD)
+                .is_some_and(|inner| inner.id() == value.id())
+    })?;
+    let [_] = given.positional.as_slice() else {
+        return None;
+    };
+    let keywords_allowed = given.keywords.iter().all(|keyword| {
+        keyword.kind() == KEYWORD_ARGUMENT
+            && keyword
+                .child_by_field_name(NAME_FIELD)
+                .is_some_and(|name| ALLOWED_SORT_KEYWORDS.contains(&text(name, source)))
+    });
+    let mut cursor = subscript.walk();
+    let indexes: Vec<Node<'_>> = subscript
+        .children_by_field_name(SUBSCRIPT_FIELD, &mut cursor)
+        .collect();
+    let [index] = indexes.as_slice() else {
+        return None;
+    };
+    let written = text(*index, source).replace(' ', "");
+    (keywords_allowed && matches!(written.as_str(), "0" | "-1"))
+        .then(|| Report::at(PythonRule::FURB192, subscript, ""))
+}
+
+// RUF057: `round` de un entero sin decimales negativos, que devuelve lo mismo.
+fn is_unnecessary_round(given: &Arguments<'_>, source: &[u8]) -> bool {
+    let Some(number) = given.positional.first().copied() else {
+        return false;
+    };
+    let ndigits = keyword_value(given, NDIGITS, source).or_else(|| given.positional.get(1).copied());
+    let digits_ok = ndigits.is_none_or(|digits| {
+        unparenthesized(digits).kind() == NONE_LITERAL || is_integer(digits, source, false)
+    });
+    given.positional.len() <= 2 && is_integer(number, source, true) && digits_ok
+}
+
+// FURB166: `int(s[2:], 16)` (o base 2 u 8), que es `int(s, 0)`.
+fn is_prefix_stripped_int(given: &Arguments<'_>, source: &[u8]) -> bool {
+    let [value, base] = given.positional.as_slice() else {
+        return false;
+    };
+    let value = unparenthesized(*value);
+    let starts_after_prefix = value.kind() == SUBSCRIPT
+        && {
+            let mut cursor = value.walk();
+            let slices: Vec<Node<'_>> = value
+                .children_by_field_name(SUBSCRIPT_FIELD, &mut cursor)
+                .collect();
+            matches!(slices.as_slice(), [slice] if slice.kind() == SLICE && text(*slice, source).replace(' ', "") == "2:")
+        };
+    starts_after_prefix && given.keywords.is_empty() && PREFIXED_BASES.contains(&text(*base, source))
+}
+
+// FURB105: `print("")` o un `sep` que no separa nada.
+fn is_unnecessary_print_argument(given: &Arguments<'_>, source: &[u8]) -> bool {
+    if given
+        .positional
+        .iter()
+        .any(|argument| argument.kind() == "list_splat")
+        || given.positional.len() > 1
+    {
+        return false;
+    }
+    let has_sep = keyword_value(given, SEP, source).is_some();
+    let empty_only = matches!(given.positional.as_slice(), [only] if is_string(*only)
+        && text_value(*only, source).is_some_and(|value| value.is_empty()));
+    has_sep || empty_only
+}
+
+// B005: `strip(".txt")`, que saca caracteres sueltos y no el sufijo.
+fn is_repeated_strip(function: Node<'_>, given: &Arguments<'_>, source: &[u8]) -> bool {
+    let is_strip = function.kind() == ATTRIBUTE
+        && function
+            .child_by_field_name(ATTRIBUTE_FIELD)
+            .is_some_and(|attribute| STRIPS.contains(&text(attribute, source)));
+    let [argument] = given.positional.as_slice() else {
+        return false;
+    };
+    let Some(value) = is_string(*argument)
+        .then(|| text_value(*argument, source))
+        .flatten()
+    else {
+        return false;
+    };
+    let letters: Vec<char> = value.chars().collect();
+    let repeated = letters.iter().enumerate().any(|(index, letter)| {
+        letters
+            .iter()
+            .skip(index.saturating_add(1))
+            .any(|other| other == letter)
+    });
+    is_strip && given.keywords.is_empty() && letters.len() > 1 && repeated
+}
+
+// UP014: `Point = NamedTuple("Point", [("x", int)])`, que se escribe como clase.
+fn is_functional_named_tuple(
+    hints: Hints<'_, '_, '_>,
+    call: Node<'_>,
+    function: Node<'_>,
+    given: &Arguments<'_>,
+) -> bool {
+    let assigned = call.parent().is_some_and(|parent| {
+        parent.kind() == ASSIGNMENT
+            && parent
+                .child_by_field_name(RIGHT_FIELD)
+                .is_some_and(|value| value.id() == call.id())
+            && parent
+                .child_by_field_name(LEFT_FIELD)
+                .is_some_and(|target| target.kind() == IDENTIFIER)
+    });
+    let is_named_tuple =
+        qualified_name(hints.model, function, hints.source).is_some_and(|name| is_typing(&name, NAMED_TUPLE));
+    if !assigned || !is_named_tuple {
+        return false;
+    }
+    match given.positional.as_slice() {
+        [name] => is_string(*name),
+        [name, fields] => {
+            is_string(*name) && given.keywords.is_empty() && are_field_pairs(*fields, hints.source)
+        }
+        _ => false,
+    }
+}
+
+fn are_field_pairs(fields: Node<'_>, source: &[u8]) -> bool {
+    let fields = unparenthesized(fields);
+    fields.kind() == LIST
+        && named(fields)
+            .into_iter()
+            .filter(|field| field.kind() != COMMENT)
+            .all(|field| {
+                let parts: Vec<Node<'_>> = named(field)
+                    .into_iter()
+                    .filter(|part| part.kind() != COMMENT)
+                    .collect();
+                field.kind() == TUPLE
+                    && matches!(parts.as_slice(), [name, _] if is_string(*name)
+                        && text_value(*name, source).is_some_and(|value| is_identifier(&value)))
+            })
+}
+
+fn is_identifier(value: &str) -> bool {
+    let mut letters = value.chars();
+    letters
+        .next()
+        .is_some_and(|first| first.is_alphabetic() || first == '_')
+        && letters.all(|letter| letter.is_alphanumeric() || letter == '_')
+}
+
+// G201: `logging.error(..., exc_info=True)` en un `except`, que es `logging.exception`. Avisa en el
+// método.
+fn logging_exc_info(
+    hints: Hints<'_, '_, '_>,
+    call: Node<'_>,
+    function: Node<'_>,
+    given: &Arguments<'_>,
+) -> Option<Report> {
+    let (model, source) = (hints.model, hints.source);
+    let method = function
+        .child_by_field_name(ATTRIBUTE_FIELD)
+        .filter(|method| function.kind() == ATTRIBUTE && text(*method, source) == ERROR)?;
+    let object = function.child_by_field_name(OBJECT_FIELD)?;
+    let exc_info =
+        keyword_value(given, EXC_INFO, source).is_some_and(|value| unparenthesized(value).kind() == TRUE);
+    let in_handler = std::iter::successors(call.parent(), Node::parent)
+        .take_while(|ancestor| !SCOPES.contains(&ancestor.kind()))
+        .any(|ancestor| EXCEPT_CLAUSES.contains(&ancestor.kind()));
+    (exc_info && in_handler && is_logger(model, source, object))
+        .then(|| Report::at(PythonRule::G201, method, ""))
+}
+
+// `is_logger_candidate` de ruff: el módulo `logging`, o un nombre del módulo que parece un logger.
+fn is_logger(model: &Model<'_>, source: &[u8], object: Node<'_>) -> bool {
+    if let Some(name) = qualified_name(model, object, source) {
+        return name == LOGGING;
+    }
+    let tail = if object.kind() == ATTRIBUTE {
+        object
+            .child_by_field_name(ATTRIBUTE_FIELD)
+            .map(|attribute| text(attribute, source))
+    } else {
+        (object.kind() == IDENTIFIER).then(|| text(object, source))
+    };
+    tail.map(str::to_ascii_lowercase)
+        .is_some_and(|tail| tail.starts_with(LOG_PREFIX) || tail.ends_with(LOGGER_SUFFIX))
+}
+
+// PLW0245: `super.metodo()` sin los paréntesis de `super()`, adentro de un método.
+fn super_without_call(
+    model: &Model<'_>,
+    source: &[u8],
+    call: Node<'_>,
+    function: Node<'_>,
+) -> Option<Report> {
+    let object = function
+        .child_by_field_name(OBJECT_FIELD)
+        .filter(|object| function.kind() == ATTRIBUTE && object.kind() == IDENTIFIER)?;
+    if !is_builtin_named(model, object, source, SUPER) {
+        return None;
+    }
+    let method = std::iter::successors(call.parent(), Node::parent)
+        .find(|ancestor| SCOPES.contains(&ancestor.kind()))?;
+    (method.kind() == FUNCTION && method_kind(method, source).is_some())
+        .then(|| Report::at(PythonRule::PLW0245, object, ""))
+}

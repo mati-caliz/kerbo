@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::boolean_chains::boolean_chain_reports;
 use super::calls::{call_reports, is_first_element_subscript};
 use super::comparisons::comparison_reports;
 use super::conversions::conversion_reports;
@@ -123,6 +124,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
                     .extend(duplicate_isinstance_reports(&self.model, self.source, node));
                 self.reports
                     .extend(short_circuit_reports(&self.model, self.source, node));
+                self.reports
+                    .extend(boolean_chain_reports(&self.model, self.source, node));
                 self.children(node, mode);
             }
             kind if COMPREHENSIONS.contains(&kind) => self.comprehension(node),

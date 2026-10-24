@@ -79,6 +79,14 @@ pub fn type_hint_reports(model: &Model<'_>, source: &[u8], node: Node<'_>, mode:
     {
         let mut members = Vec::new();
         hints.literal_members(node, &mut members);
+        let nested = subscript_parts(node)
+            .map(|(_, slices)| slices)
+            .unwrap_or_default()
+            .into_iter()
+            .any(|slice| hints.is_typing_subscript(slice, LITERAL));
+        if nested {
+            reports.push(Report::at(PythonRule::RUF041, node, ""));
+        }
         reports.extend(
             members
                 .iter()
