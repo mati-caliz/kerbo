@@ -12,6 +12,37 @@ const ARGUMENT_LIST: &str = "argument_list";
 const LIST_SPLAT: &str = "list_splat";
 const DICTIONARY_SPLAT: &str = "dictionary_splat";
 const MODULE_SEPARATOR: char = '.';
+const IMPORT_FROM: &str = "import_from_statement";
+const RELATIVE_IMPORT: &str = "relative_import";
+const DOTTED_NAME: &str = "dotted_name";
+const MODULE_NAME_FIELD: &str = "module_name";
+const DEBUGGER_MODULES: [&str; 8] = [
+    "pdb",
+    "pudb",
+    "ipdb",
+    "debugpy",
+    "ptvsd",
+    "IPython.terminal.embed",
+    "IPython.frontend.terminal.embed",
+    "celery.contrib.rdb",
+];
+pub const DEBUGGER_CALLS: [&str; 15] = [
+    "pdb.set_trace",
+    "pudb.set_trace",
+    "ipdb.set_trace",
+    "ipdb.sset_trace",
+    "IPython.terminal.embed.InteractiveShellEmbed",
+    "IPython.frontend.terminal.embed.InteractiveShellEmbed",
+    "celery.contrib.rdb.set_trace",
+    "builtins.breakpoint",
+    "debugpy.breakpoint",
+    "debugpy.listen",
+    "debugpy.wait_for_client",
+    "ptvsd.break_into_debugger",
+    "ptvsd.wait_for_attach",
+    "sys.breakpointhook",
+    "sys.__breakpointhook__",
+];
 
 pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     nodes
@@ -19,7 +50,12 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
         .flat_map(|node| match node.kind() {
             CALL => star_after_keyword(*node),
             CLASS => empty_class_parentheses(*node).into_iter().collect(),
-            IMPORT => manual_from_imports(*node, source),
+            IMPORT => {
+                let mut found = manual_from_imports(*node, source);
+                found.extend(debugger_imports(*node, None, source));
+                found
+            }
+            IMPORT_FROM => debugger_imports(*node, imported_module(*node, source), source),
             _ => Vec::new(),
         })
         .collect()
@@ -74,4 +110,43 @@ fn manual_from_imports(statement: Node<'_>, source: &[u8]) -> Vec<Report> {
         })
         .map(|alias| Report::at(PythonRule::PLR0402, alias, ""))
         .collect()
+}
+
+// T100: `import pdb` o `from pdb import set_trace`. Como ruff, de un `from` relativo mira el nombre
+// del módulo sin los puntos.
+fn debugger_imports(statement: Node<'_>, module: Option<&str>, source: &[u8]) -> Vec<Report> {
+    named(statement)
+        .into_iter()
+        .filter(|child| {
+            statement
+                .child_by_field_name(MODULE_NAME_FIELD)
+                .map(|module_name| module_name.id())
+                != Some(child.id())
+        })
+        .filter_map(|alias| match alias.kind() {
+            ALIASED_IMPORT => alias.child_by_field_name(NAME_FIELD),
+            DOTTED_NAME => Some(alias),
+            _ => None,
+        })
+        .filter(|name| {
+            let name = text(*name, source);
+            module.map_or_else(
+                || DEBUGGER_MODULES.contains(&name),
+                |module| DEBUGGER_CALLS.contains(&format!("{module}.{name}").as_str()),
+            )
+        })
+        .map(|_| Report::at(PythonRule::T100, statement, ""))
+        .collect()
+}
+
+fn imported_module<'source>(statement: Node<'_>, source: &'source [u8]) -> Option<&'source str> {
+    let module = statement.child_by_field_name(MODULE_NAME_FIELD)?;
+    let name = if module.kind() == RELATIVE_IMPORT {
+        named(module)
+            .into_iter()
+            .find(|child| child.kind() == DOTTED_NAME)?
+    } else {
+        module
+    };
+    Some(text(name, source))
 }

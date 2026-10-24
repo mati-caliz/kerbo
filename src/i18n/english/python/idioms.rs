@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: modismos de pylint, refurb, flake8-logging y
 // compañía.
-pub const IDIOM_TEXTS: [(PythonRule, RuleText); 34] = [
+pub const IDIOM_TEXTS: [(PythonRule, RuleText); 39] = [
     (
         PythonRule::FURB167,
         RuleText::new(
@@ -313,6 +313,51 @@ else:
             "pass a generator instead",
             "A generator lets any() and all() stop at the first decisive element instead of building the whole list.",
             "any([x > 0 for x in y]) becomes any(x > 0 for x in y).",
+        ),
+    ),
+    (
+        PythonRule::T100,
+        RuleText::new(
+            "Debugger call or import left in the code",
+            "remove the debugger before committing",
+            "A breakpoint left behind stops the program waiting for input wherever it runs.",
+            "import pdb; pdb.set_trace() is removed.",
+        ),
+    ),
+    (
+        PythonRule::B017,
+        RuleText::new(
+            "assertRaises(Exception) or pytest.raises(Exception)",
+            "expect the specific exception, or add match=",
+            "Any error passes the test, including a typo in the code under test.",
+            "pytest.raises(Exception) becomes pytest.raises(ValueError).",
+        ),
+    ),
+    (
+        PythonRule::B002,
+        RuleText::new(
+            "++x or --x, which does not increment",
+            "write x += 1 or x -= 1",
+            "Python has no increment operator: ++x is just +(+x) and leaves x unchanged.",
+            "++count becomes count += 1.",
+        ),
+    ),
+    (
+        PythonRule::PLW0127,
+        RuleText::new(
+            "Variable assigned to itself",
+            "remove the assignment",
+            "x = x does nothing, and usually hides a typo in one of the two names.",
+            "value = value is removed.",
+        ),
+    ),
+    (
+        PythonRule::PLW0133,
+        RuleText::new(
+            "Exception built but never raised",
+            "add raise in front",
+            "Creating an exception without raising it does nothing, so the error goes unnoticed.",
+            "ValueError(\"bad\") becomes raise ValueError(\"bad\").",
         ),
     ),
 ];

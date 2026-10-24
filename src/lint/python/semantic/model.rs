@@ -280,9 +280,11 @@ impl<'tree> Model<'tree> {
         }
     }
 
+    // Los alcances de clase no se ven desde adentro de sus funciones, así que no cuentan.
     fn outer_binding(&self, scope: ScopeId, name: &str) -> Option<BindingId> {
         self.ancestors(scope)
             .skip(1)
+            .filter(|outer| self.scope_of(*outer).kind != ScopeKind::Class)
             .find_map(|outer| self.scope_of(outer).names.get(name).copied())
     }
 

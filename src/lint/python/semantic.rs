@@ -25,6 +25,7 @@ mod resources;
 mod returns;
 mod statements;
 mod supers;
+mod suspicious_calls;
 mod targets;
 mod typecheck;
 

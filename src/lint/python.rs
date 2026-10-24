@@ -25,6 +25,7 @@ mod negations;
 mod noqa;
 mod parentheses;
 mod raises;
+mod redundancies;
 mod rewrites;
 mod semantic;
 mod simplify;
@@ -149,6 +150,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(declarations::reports(&nodes, source));
     reports.extend(raises::reports(&nodes, source));
     reports.extend(encodings::reports(&nodes, source));
+    reports.extend(redundancies::reports(&nodes, source));
     reports.extend(deprecated::reports(&nodes, source));
     reports.extend(concatenation::reports(&nodes));
     reports.extend(branches::reports(&nodes, source));

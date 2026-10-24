@@ -1386,6 +1386,13 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     casos quedaron en `fixtures/collections_calls.py`. Con 128 reglas, `wrap_python` (que arma la
     lista de reglas en tiempo de compilación) pasó a ser un loop: la recursión superaba el límite
     de llamadas anidadas de la evaluación `const`.
+  - Hechas T100 (depuradores, en llamadas e imports), B017 (`assertRaises(Exception)` y
+    `pytest.raises(Exception)`), B002 (`++x`), PLW0127 (`x = x`) y PLW0133 (una excepción construida
+    sin `raise`). Paridad: 39 de 40, 47 de 47, 25 de 25, 34 de 34 y 24 de 24, sin avisos de más. El
+    T100 que falta es `from . import embed` adentro de `IPython/terminal/`: ruff resuelve el import
+    relativo con el nombre de módulo del archivo, que kerbo todavía no calcula (como en SIM115). De
+    paso, F823 deja de mirar los alcances de clase al buscar qué nombre de afuera pisa una variable
+    local (no se ven desde adentro de sus métodos). Los casos quedaron en `fixtures/suspicious.py`.
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
   - Siguiente, la cola de reglas chicas: UP044, UP037, RUF013, PLR1704, PLC0206 y siguientes.

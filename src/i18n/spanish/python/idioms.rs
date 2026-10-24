@@ -3,7 +3,7 @@ use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: modismos de pylint, refurb, flake8-logging y
 // compañía.
-pub const IDIOM_TEXTS: [(PythonRule, RuleText); 34] = [
+pub const IDIOM_TEXTS: [(PythonRule, RuleText); 39] = [
     (
         PythonRule::FURB167,
         RuleText::new(
@@ -313,6 +313,51 @@ else:
             "pasá un generador",
             "Con un generador, any() y all() cortan en el primer elemento que decide en vez de armar la lista entera.",
             "any([x > 0 for x in y]) pasa a any(x > 0 for x in y).",
+        ),
+    ),
+    (
+        PythonRule::T100,
+        RuleText::new(
+            "Llamada o import del depurador que quedó en el código",
+            "sacá el depurador antes de commitear",
+            "Un breakpoint olvidado frena el programa esperando una entrada donde sea que corra.",
+            "import pdb; pdb.set_trace() se borra.",
+        ),
+    ),
+    (
+        PythonRule::B017,
+        RuleText::new(
+            "assertRaises(Exception) o pytest.raises(Exception)",
+            "esperá la excepción concreta, o agregá match=",
+            "Cualquier error hace pasar el test, incluso un error de tipeo en el código que se prueba.",
+            "pytest.raises(Exception) pasa a pytest.raises(ValueError).",
+        ),
+    ),
+    (
+        PythonRule::B002,
+        RuleText::new(
+            "++x o --x, que no incrementa",
+            "escribí x += 1 o x -= 1",
+            "Python no tiene operador de incremento: ++x es +(+x) y deja x igual.",
+            "++cuenta pasa a cuenta += 1.",
+        ),
+    ),
+    (
+        PythonRule::PLW0127,
+        RuleText::new(
+            "Variable asignada a sí misma",
+            "sacá la asignación",
+            "x = x no hace nada y suele esconder un error de tipeo en uno de los dos nombres.",
+            "valor = valor se borra.",
+        ),
+    ),
+    (
+        PythonRule::PLW0133,
+        RuleText::new(
+            "Excepción construida pero nunca lanzada",
+            "agregá raise adelante",
+            "Crear una excepción sin lanzarla no hace nada, así que el error pasa desapercibido.",
+            "ValueError(\"mal\") pasa a raise ValueError(\"mal\").",
         ),
     ),
 ];
