@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use super::defaults::default_reports;
 use super::mutability::Resolver;
 
+use super::builtin_calls::lru_cache_reports;
 use super::model::{BindingKind, MODULE_SCOPE, ScopeKind, Site};
 use super::qualified::is_builtin_named;
 use super::returns::{unnecessary_return_none, useless_return};
@@ -69,6 +70,8 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
         match definition {
             Some(function) if function.kind() == FUNCTION => {
                 let returns = unnecessary_return_none(&self.model, self.source, function, &decorators);
+                self.reports
+                    .extend(lru_cache_reports(&self.model, self.source, &decorators));
                 self.reports.extend(returns);
                 self.reports.extend(useless_return(self.source, function));
                 self.function(function);

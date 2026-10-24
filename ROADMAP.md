@@ -1398,6 +1398,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     else False`) y B020 (la variable del `for` pisa lo que se recorre, con el `NameFinder` de ruff).
     Paridad: 37 de 37, 33 de 33, 27 de 27 y 44 de 44. Los casos quedaron en
     `fixtures/exception_flow.py`; los textos, en un catálogo nuevo (`i18n/*/python/checks.rs`).
+  - Hechas UP024 (alias viejos de `OSError`) y UP041 (de `TimeoutError`, para 3.11) en el `except`,
+    el `raise` y la llamada; UP003 (`type("")`), UP022 (`stdout` y `stderr` en `PIPE`), B004
+    (`hasattr(x, "__call__")`) y UP011 (`@lru_cache()`). Paridad: 34 de 35, 16 de 18, 17 de 17, 17
+    de 17, 23 de 23 y 29 de 30, sin avisos de más; lo que falta está en archivos de CPython con
+    `lazy import`. Los casos quedaron en `fixtures/aliases.py`.
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
   - Siguiente, la cola de reglas chicas: UP044, UP037, RUF013, PLR1704, PLC0206 y siguientes.

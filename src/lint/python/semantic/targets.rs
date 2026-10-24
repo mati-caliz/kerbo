@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::aliases::handler_alias_reports;
 use super::handlers::{blind_except, is_silenced_exception};
 use super::model::{BindingKind, Resolution, ScopeKind, Site, UNPACKED};
 use super::{Mode, Visitor};
@@ -255,6 +256,8 @@ impl<'tree> Targets<'tree> for Visitor<'tree> {
         };
         if let Some(exception_type) = exception_type {
             self.expression(exception_type, Mode::Value);
+            let aliases = handler_alias_reports(&self.model, self.source, exception_type);
+            self.reports.extend(aliases);
         }
         if let Some(blind) = blind_except(&self.model, self.source, handler) {
             self.reports.push(Report::at(PythonRule::BLE001, blind, ""));

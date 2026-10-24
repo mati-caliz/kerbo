@@ -1,0 +1,158 @@
+use tree_sitter::Node;
+
+use super::model::Model;
+use super::qualified::{is_builtin_named, qualified_name};
+use crate::lint::python::Report;
+use crate::lint::python::ast::{
+    ARGUMENTS_FIELD, CALL, COMMENT, FALSE, FUNCTION_FIELD, KEYWORD_ARGUMENT, NAME_FIELD, STRING, TRUE,
+    VALUE_FIELD, is_string, named, string_prefix, text,
+};
+use crate::lint::python::escapes::text_value;
+use crate::rules::PythonRule;
+
+const TYPE_BUILTIN: &str = "type";
+const NUMBERS: [&str; 2] = ["integer", "float"];
+const TEMPLATE_PREFIXES: [char; 2] = ['t', 'T'];
+const FORMATTED_PREFIXES: [char; 2] = ['f', 'F'];
+const SUBPROCESS_RUN: &str = "subprocess.run";
+const SUBPROCESS_PIPE: &str = "subprocess.PIPE";
+const STDOUT: &str = "stdout";
+const STDERR: &str = "stderr";
+const CALL_DUNDER: &str = "__call__";
+const HASATTR: &str = "hasattr";
+const GETATTR: &str = "getattr";
+const LRU_CACHE: &str = "functools.lru_cache";
+const ARGUMENT_LIST: &str = "argument_list";
+const DICTIONARY_SPLAT: &str = "dictionary_splat";
+
+struct Arguments<'tree> {
+    positional: Vec<Node<'tree>>,
+    keywords: Vec<Node<'tree>>,
+}
+
+// UP003 (`type("")`), UP022 (`subprocess.run` con `stdout` y `stderr` en `PIPE`) y B004
+// (`hasattr(x, "__call__")`).
+pub fn builtin_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Report> {
+    let Some(function) = call.child_by_field_name(FUNCTION_FIELD) else {
+        return Vec::new();
+    };
+    let arguments = arguments(call);
+    let mut reports = Vec::new();
+    if let [argument] = arguments.positional.as_slice()
+        && is_primitive_literal(*argument, source)
+        && is_builtin_named(model, function, source, TYPE_BUILTIN)
+    {
+        reports.push(Report::at(PythonRule::UP003, call, ""));
+    }
+    let is_pipe = |keyword: &str| {
+        keyword_value(&arguments, keyword, source)
+            .and_then(|value| qualified_name(model, value, source))
+            .is_some_and(|name| name == SUBPROCESS_PIPE)
+    };
+    if qualified_name(model, function, source).as_deref() == Some(SUBPROCESS_RUN)
+        && is_pipe(STDOUT)
+        && is_pipe(STDERR)
+    {
+        reports.push(Report::at(PythonRule::UP022, call, ""));
+    }
+    if is_unreliable_callable_check(model, source, function, &arguments) {
+        reports.push(Report::at(PythonRule::B004, call, ""));
+    }
+    reports
+}
+
+// UP011: `@functools.lru_cache()` sin argumentos, que se escribe sin paréntesis. Avisa en los
+// paréntesis.
+pub fn lru_cache_reports(model: &Model<'_>, source: &[u8], decorators: &[Node<'_>]) -> Vec<Report> {
+    decorators
+        .iter()
+        .filter_map(|decorator| {
+            named(*decorator)
+                .into_iter()
+                .find(|child| child.kind() != COMMENT)
+                .filter(|expression| expression.kind() == CALL)
+        })
+        .filter_map(|call| {
+            let function = call.child_by_field_name(FUNCTION_FIELD)?;
+            let list = call.child_by_field_name(ARGUMENTS_FIELD)?;
+            let is_empty =
+                list.kind() == ARGUMENT_LIST && named(list).iter().all(|argument| argument.kind() == COMMENT);
+            let is_lru_cache = qualified_name(model, function, source).as_deref() == Some(LRU_CACHE);
+            (is_empty && is_lru_cache).then(|| Report::at(PythonRule::UP011, list, ""))
+        })
+        .collect()
+}
+
+// `Primitive::from_expr`: un booleano, un string, bytes o un número escrito.
+fn is_primitive_literal(node: Node<'_>, source: &[u8]) -> bool {
+    match node.kind() {
+        TRUE | FALSE => true,
+        kind if NUMBERS.contains(&kind) => true,
+        _ if is_string(node) => {
+            let parts = if node.kind() == STRING {
+                vec![node]
+            } else {
+                named(node)
+            };
+            let is_formatted = parts.iter().any(|part| {
+                let prefix = string_prefix(*part, source);
+                prefix.contains(TEMPLATE_PREFIXES) || prefix.contains(FORMATTED_PREFIXES)
+            });
+            !is_formatted
+        }
+        _ => false,
+    }
+}
+
+// `unreliable_callable_check`: `hasattr(x, "__call__")` o `getattr(x, "__call__"[, default])`.
+fn is_unreliable_callable_check(
+    model: &Model<'_>,
+    source: &[u8],
+    function: Node<'_>,
+    arguments: &Arguments<'_>,
+) -> bool {
+    let positional = &arguments.positional;
+    let [_, attribute, ..] = positional.as_slice() else {
+        return false;
+    };
+    let names_call = is_string(*attribute) && text_value(*attribute, source).as_deref() == Some(CALL_DUNDER);
+    let valid = if is_builtin_named(model, function, source, HASATTR) {
+        positional.len() == 2
+    } else if is_builtin_named(model, function, source, GETATTR) {
+        matches!(positional.len(), 2 | 3)
+    } else {
+        false
+    };
+    arguments.keywords.is_empty() && names_call && valid
+}
+
+fn arguments(call: Node<'_>) -> Arguments<'_> {
+    let items = call
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .map(|list| {
+            if list.kind() == ARGUMENT_LIST {
+                named(list)
+            } else {
+                vec![list]
+            }
+        })
+        .unwrap_or_default();
+    let (keywords, positional) = items
+        .into_iter()
+        .filter(|argument| argument.kind() != COMMENT)
+        .partition(|argument| matches!(argument.kind(), KEYWORD_ARGUMENT | DICTIONARY_SPLAT));
+    Arguments { positional, keywords }
+}
+
+fn keyword_value<'tree>(arguments: &Arguments<'tree>, keyword: &str, source: &[u8]) -> Option<Node<'tree>> {
+    arguments
+        .keywords
+        .iter()
+        .filter(|argument| argument.kind() == KEYWORD_ARGUMENT)
+        .find(|argument| {
+            argument
+                .child_by_field_name(NAME_FIELD)
+                .is_some_and(|name| text(name, source) == keyword)
+        })
+        .and_then(|argument| argument.child_by_field_name(VALUE_FIELD))
+}

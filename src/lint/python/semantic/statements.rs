@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
+use super::aliases::raise_reports;
 use super::effects::useless_expression;
-use super::handlers::vanilla_raise;
 use super::model::{BindingKind, GLOBAL, MODULE_SCOPE, NAME_ERROR, NONLOCAL, ScopeKind, Site};
 use super::qualified::is_builtin_named;
 use super::targets::Store;
@@ -94,9 +94,8 @@ impl<'tree> Statements<'tree> for Visitor<'tree> {
             TYPE_ALIAS => self.type_alias(statement),
             COMMENT => {}
             RAISE => {
-                let raised = vanilla_raise(&self.model, self.source, statement);
                 self.reports
-                    .extend(raised.map(|raised| Report::at(PythonRule::TRY002, raised, "")));
+                    .extend(raise_reports(&self.model, self.source, statement));
                 self.loads(statement);
             }
             _ => self.loads(statement),
