@@ -1,0 +1,191 @@
+import builtins
+import collections.abc
+import typing
+from collections.abc import AsyncGenerator, AsyncIterator, Generator, Iterator, Set
+from collections.abc import Set as AbstractSet
+from types import TracebackType
+from typing import (
+    Any,
+    ByteString,
+    Final,
+    Generic,
+    Literal,
+    NoReturn,
+    Optional,
+    ParamSpec,
+    Protocol,
+    TypeAlias,
+    TypeVar,
+    TypeVarTuple,
+    Union,
+)
+
+_T = TypeVar("_T")
+_Unused = TypeVar("_Unused")
+_UnusedSpec = ParamSpec("_UnusedSpec")
+_UnusedTuple = TypeVarTuple("_UnusedTuple")
+Public = TypeVar("Public")
+_Used = TypeVar("_Used")
+
+snake_alias: TypeAlias = int
+CamelAlias: TypeAlias = int
+_private_alias: TypeAlias = str
+type pep_alias = int
+type PepAlias = int
+
+none_literal: Literal[None]
+mixed_literal: Literal[1, None]
+optional_literal: Optional[Literal[None]]
+union_literal: Union[Literal[None], int]
+duplicate_literal: Literal[1, 2, 1, "a", "a"]
+nested_literal: Literal[1, Literal[1]]
+literal_union: Literal[1] | Literal[2]
+literal_union_three: Union[Literal["a"], Literal["b"], int]
+duplicate_union: int | str | int
+duplicate_typing_union: Union[int, str, int]
+nested_duplicate: Union[int, Union[int, str]]
+type_union: type[int] | type[str]
+builtin_type_union: builtins.type[int] | builtins.type[str]
+final_literal: Final[Literal[1]] = 1
+final_plain: Final = 1
+bytes_value: ByteString
+abc_bytes: collections.abc.ByteString
+
+
+def first(value: _Used) -> _Used:
+    return value
+
+
+def numbers(a: int | float, b: float | complex, c: Union[int, float, str], d: int | bool) -> int | float:
+    return 1
+
+
+def never(value: NoReturn, *args: typing.NoReturn) -> NoReturn:
+    raise ValueError
+
+
+def positional(__x: int, __y: int, z: int) -> None:
+    pass
+
+
+def dunder_name(__x__: int) -> None:
+    pass
+
+
+class Equal:
+    def __eq__(self, other: Any) -> bool:
+        return True
+
+    def __ne__(self, other: typing.Any) -> bool:
+        return False
+
+    def __lt__(self, other: Any) -> bool:
+        return False
+
+    def method(self, __x: int, __y: int) -> None:
+        pass
+
+    @staticmethod
+    def static(__x: int) -> None:
+        pass
+
+
+class Exit:
+    def __exit__(self, typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None:
+        pass
+
+
+class BadExit:
+    def __exit__(self, typ: int, exc: BaseException | None, tb: TracebackType | None) -> None:
+        pass
+
+    async def __aexit__(self, typ, exc, tb, extra) -> None:
+        pass
+
+
+class StarExit:
+    def __exit__(self, *args: object) -> None:
+        pass
+
+
+class ObjectExit:
+    def __exit__(self, typ: object, exc: object, tb: object) -> None:
+        pass
+
+
+class Base:
+    pass
+
+
+class WrongOrder(Generic[_T], Base):
+    pass
+
+
+class RightOrder(Base, Generic[_T]):
+    pass
+
+
+class _PrivateProtocol(Protocol):
+    def run(self) -> None: ...
+
+
+class _UsedProtocol(Protocol):
+    def run(self) -> None: ...
+
+
+def protocol_user(value: _UsedProtocol) -> None:
+    pass
+
+
+class Iterable:
+    def __iter__(self) -> Generator[int, None, None]:
+        yield 1
+
+    async def __aiter__(self) -> AsyncGenerator[int, None]:
+        yield 1
+
+
+class IterableOk:
+    def __iter__(self) -> Iterator[int]:
+        yield 1
+
+    def __aiter__(self) -> AsyncIterator[int]:
+        return self
+
+
+def set_types(a: Set[int], b: AbstractSet[int]) -> None:
+    pass
+
+
+import enum
+import functools
+
+
+class Color(enum.Enum):
+    RED = 1
+
+
+runtime_union = print(Union[int, int])
+camelAlias: TypeAlias = int
+final_member: Final[Literal[Color.RED]] = Color.RED
+final_negative: Final[Literal[-1]] = -1
+
+
+class LoopIterable:
+    def __iter__(self) -> Generator[int, None, None]:
+        for item in range(3):
+            yield item
+
+
+@functools.singledispatch
+def dispatch(arg: object) -> None:
+    pass
+
+
+@dispatch.register
+def _(arg: int | float) -> None:
+    pass
+
+
+def quoted_never(value: "NoReturn") -> None:
+    pass

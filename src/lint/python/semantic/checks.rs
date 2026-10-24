@@ -64,6 +64,7 @@ fn scope_reports(visitor: &Visitor<'_>, scope: ScopeId) -> Vec<Report> {
         .collect();
     latest.sort_unstable_by_key(|(_, id)| *id);
     let mut reports = redefinitions::reports(visitor, scope, &latest);
+    reports.extend(super::private_types::unused_private_types(visitor, &latest));
     if matches!(kind, ScopeKind::Module | ScopeKind::Function) {
         reports.extend(removal::unused_imports(visitor, &latest));
     }

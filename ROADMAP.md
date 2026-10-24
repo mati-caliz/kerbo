@@ -1432,12 +1432,26 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     estándar cuenta como `Any`). Paridad exacta en B019 (37), B033 (29), RUF013 (96), RUF017 (19),
     RUF046 (107) y UP010 (22); 81 de 87 PLR1704 y 28 de 29 SIM101, sin avisos de más: lo que falta
     está en archivos de CPython con `lazy import`. Los casos quedaron en `fixtures/batch_misc.py`.
+  - Hechas 17 reglas de `flake8-pyi`, en todos los archivos y no sólo en los stubs: PYI016 y PYI030
+    (miembro repetido y varios `Literal` en una unión, también en un `Union[...]` que se evalúa en
+    ejecución), PYI061 y PYI062 (`Literal[None]` y miembro repetido en un `Literal`), PYI064
+    (`Final[Literal[1]]`, sólo con un literal escrito), PYI057 (`ByteString`, en el import y en
+    `typing.ByteString`), PYI059 (`Generic[...]` que no es la última base), PYI050 (`NoReturn` en un
+    parámetro, también entre comillas), PYI041 (`int | float` en un parámetro, salvo con
+    `@f.register`), PYI032 (`Any` en `__eq__`), PYI063 (`__x` como sólo posicional), PYI058
+    (`__iter__` de una sola sentencia que devuelve `Generator`), PYI029 (`__str__` repetido en un
+    stub), PYI018 y PYI046 (`TypeVar` y protocolo privados sin usar), PYI042 (alias en minúscula,
+    con `TypeAlias` resuelto) y PYI025 (`collections.abc.Set` sin alias). Paridad exacta en 15; faltan
+    un PYI057 de CPython con `lazy import` y un PYI061 adentro de una anotación entre comillas
+    (`-> 'Literal[None]'`), que todavía no se mira. Los casos quedaron en `fixtures/typing_hints.py`
+    y `fixtures/typing_stub.pyi`. Quedan para otra tanda PYI034 y PYI019 (`Self`), PYI036 (la firma
+    de `__exit__`) y PYI055 (`type[A] | type[B]`, que ruff no marca fuera de un contexto de tipos).
   - Pendientes que piden más análisis: PIE810 (si un nombre está ligado a una tupla, con el
     `check_type` de ruff), UP028 (las referencias de cada nombre al cerrar el alcance) y C414.
-  - Lo que queda del conjunto por defecto (2026-10-24): 133 reglas con unos 2.900 avisos en el
+  - Lo que queda del conjunto por defecto (2026-10-24): 116 reglas con unos 2.500 avisos en el
     corpus, contra más de 100.000 ya cubiertos. RUF100 (`noqa` sin uso) suma 1.437; el resto tiene
-    menos de 80 cada una: PLC0206 78, PYI061 70, PYI032 63, PLR1730 56, PYI063 54, UP028 49, PYI036
-    47, PIE810 46 y una cola de reglas con menos de 45. Se hacen en tandas de 15 a 25 reglas por
+    menos de 80 cada una: PLC0206 78, PLR1730 56, UP028 49, PYI036 47, PIE810 46 y una cola de reglas
+    con menos de 45. Se hacen en tandas de 15 a 25 reglas por
     tema, con un solo gate y una sola medición por tanda.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que

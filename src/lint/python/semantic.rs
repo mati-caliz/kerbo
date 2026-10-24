@@ -26,13 +26,16 @@ mod model;
 mod mutability;
 mod patterns;
 mod pep;
+mod private_types;
 mod qualified;
 mod resources;
 mod returns;
 mod statements;
+mod stub_signatures;
 mod supers;
 mod suspicious_calls;
 mod targets;
+mod type_hints;
 mod type_names;
 mod typecheck;
 

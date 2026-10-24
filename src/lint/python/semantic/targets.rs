@@ -14,6 +14,7 @@ use crate::lint::python::semantic::annotations::Annotations;
 use crate::lint::python::semantic::checks::Exports;
 use crate::lint::python::semantic::expressions::Expressions;
 use crate::lint::python::semantic::statements::Statements;
+use crate::lint::python::typing_names::is_snake_case;
 use crate::rules::PythonRule;
 
 const DUNDER_ALL: &str = "__all__";
@@ -94,6 +95,13 @@ impl<'tree> Targets<'tree> for Visitor<'tree> {
         if let Some(value) = value {
             let alias = annotation.is_some_and(|annotation| self.is_type_alias(annotation));
             self.expression(value, if alias { Mode::TypeDefinition } else { Mode::Value });
+            if let Some(target) = targets
+                .first()
+                .filter(|target| alias && target.kind() == IDENTIFIER)
+                && is_snake_case(self.text(*target))
+            {
+                self.reports.push(Report::at(PythonRule::PYI042, *target, ""));
+            }
         }
         let exported = self.is_export(targets.first().copied());
         let kind = if annotation.is_some() && value.is_none() {

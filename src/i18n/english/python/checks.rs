@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 38] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 35] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -256,24 +256,6 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 38] = [
         ),
     ),
     (
-        PythonRule::UP037,
-        RuleText::new(
-            "Quoted annotation that is never evaluated",
-            "remove the quotes",
-            "Python does not evaluate this annotation at runtime (from __future__ import annotations, a stub or a local variable), so the quotes only add noise.",
-            "def f(x: \"Node\"): with the future import becomes def f(x: Node):.",
-        ),
-    ),
-    (
-        PythonRule::UP044,
-        RuleText::new(
-            "Unpack[] where * is enough",
-            "write *X instead of Unpack[X]",
-            "Since Python 3.11 (PEP 646) a variadic type is unpacked with *, which is shorter and reads like the rest of the language.",
-            "def f(*args: Unpack[Ts]): becomes def f(*args: *Ts):.",
-        ),
-    ),
-    (
         PythonRule::UP010,
         RuleText::new(
             "Unnecessary __future__ import",
@@ -334,15 +316,6 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 38] = [
             "remove the int() call",
             "The value is already an int (an integer literal, len(), round() without digits, math.floor() and the like), so the conversion does nothing.",
             "int(len(items)) becomes len(items).",
-        ),
-    ),
-    (
-        PythonRule::RUF013,
-        RuleText::new(
-            "Implicit Optional",
-            "add None to the type: X | None",
-            "A parameter that defaults to None must say so in its type; PEP 484 forbids the implicit Optional.",
-            "def f(x: int = None) becomes def f(x: int | None = None).",
         ),
     ),
 ];

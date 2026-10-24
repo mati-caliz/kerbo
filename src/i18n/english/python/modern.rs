@@ -2,7 +2,9 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 use super::checks::CHECK_TEXTS;
+use super::formats::FORMAT_TEXTS;
 use super::idioms::IDIOM_TEXTS;
+use super::typing::TYPING_TEXTS;
 
 // Las reglas del conjunto por defecto de ruff 0.17 fuera del clásico (pyupgrade, flake8-comprehensions
 // y compañía).
@@ -384,4 +386,6 @@ pub fn extended_texts() -> impl Iterator<Item = &'static (PythonRule, RuleText)>
         .iter()
         .chain(IDIOM_TEXTS.iter())
         .chain(CHECK_TEXTS.iter())
+        .chain(TYPING_TEXTS.iter())
+        .chain(FORMAT_TEXTS.iter())
 }

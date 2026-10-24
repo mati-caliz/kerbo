@@ -9,6 +9,7 @@ use super::model::{BindingKind, Model, ScopeKind};
 use super::pep::is_pep585_generic;
 use super::qualified::{is_builtin_named, qualified_name};
 use super::targets::Store;
+use super::type_hints::type_hint_reports;
 use super::type_names::is_type_name;
 use super::{Mode, Visitor};
 use crate::lint::python::Report;
@@ -66,6 +67,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
             self.deferred.annotations.push(self.snapshot(node));
             return;
         }
+        self.reports
+            .extend(type_hint_reports(&self.model, self.source, node, mode));
         match node.kind() {
             IDENTIFIER => {
                 self.model.resolve_load(self.text(node), node.start_position());

@@ -2,10 +2,10 @@ mod checks;
 mod formats;
 mod idioms;
 mod modern;
+mod typing;
 
 use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
-use formats::FORMAT_TEXTS;
 
 const SYNTAX_WHY: &str = "Python rejects it when compiling the module: the file cannot even be imported.";
 const ALWAYS_TRUE_WHY: &str = "A non-empty tuple is always truthy: the condition depends on nothing.";
@@ -392,7 +392,6 @@ const TEXTS: [(PythonRule, RuleText); 41] = [
 pub fn python(rule: PythonRule) -> RuleText {
     TEXTS
         .iter()
-        .chain(FORMAT_TEXTS.iter())
         .chain(modern::extended_texts())
         .find(|(candidate, _)| *candidate == rule)
         .map_or(UNKNOWN, |(_, text)| *text)

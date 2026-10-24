@@ -36,6 +36,7 @@ mod slots;
 mod splits;
 mod statements;
 pub mod taint;
+mod typing_names;
 
 use std::path::Path;
 
@@ -155,6 +156,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Pat
     reports.extend(encodings::reports(&nodes, source));
     reports.extend(redundancies::reports(&nodes, source));
     reports.extend(set_literals::reports(&nodes, source));
+    reports.extend(typing_names::reports(&nodes, source));
     reports.extend(exception_flow::reports(&nodes, source));
     reports.extend(methods::reports(&nodes, source));
     reports.extend(loops::loop_variable_overrides(&nodes, source));

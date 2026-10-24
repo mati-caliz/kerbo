@@ -9,7 +9,9 @@ use super::cached_methods::cached_instance_method;
 use super::model::{BindingKind, MODULE_SCOPE, ScopeKind, Site};
 use super::qualified::is_builtin_named;
 use super::returns::{unnecessary_return_none, useless_return};
+use super::stub_signatures::signature_reports;
 use super::targets::Store;
+use super::type_hints::Hints;
 use super::{Mode, Pending, Visitor};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
@@ -81,6 +83,12 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
                     &decorators,
                 ));
                 self.reports.extend(returns);
+                let hints = Hints {
+                    model: &self.model,
+                    source: self.source,
+                };
+                let signature = signature_reports(hints, function, &decorators, self.file.stub);
+                self.reports.extend(signature);
                 self.reports.extend(useless_return(self.source, function));
                 self.function(function);
             }

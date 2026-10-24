@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 38] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 35] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -256,24 +256,6 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 38] = [
         ),
     ),
     (
-        PythonRule::UP037,
-        RuleText::new(
-            "Anotación entre comillas que nunca se evalúa",
-            "sacá las comillas",
-            "Python no evalúa esta anotación al ejecutar (con from __future__ import annotations, en un stub o en una variable local), así que las comillas sólo agregan ruido.",
-            "def f(x: \"Node\"): con el import del futuro pasa a def f(x: Node):.",
-        ),
-    ),
-    (
-        PythonRule::UP044,
-        RuleText::new(
-            "Unpack[] donde alcanza con *",
-            "escribí *X en vez de Unpack[X]",
-            "Desde Python 3.11 (PEP 646) un tipo variádico se desempaqueta con *, que es más corto y se lee como el resto del lenguaje.",
-            "def f(*args: Unpack[Ts]): pasa a def f(*args: *Ts):.",
-        ),
-    ),
-    (
         PythonRule::UP010,
         RuleText::new(
             "Import de __future__ que sobra",
@@ -334,15 +316,6 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 38] = [
             "sacá la llamada a int()",
             "El valor ya es un int (un entero escrito, len(), round() sin decimales, math.floor() y compañía), así que la conversión no hace nada.",
             "int(len(items)) pasa a len(items).",
-        ),
-    ),
-    (
-        PythonRule::RUF013,
-        RuleText::new(
-            "Optional implícito",
-            "sumá None al tipo: X | None",
-            "Un parámetro que por defecto vale None tiene que decirlo en el tipo; PEP 484 prohíbe el Optional implícito.",
-            "def f(x: int = None) pasa a def f(x: int | None = None).",
         ),
     ),
 ];
