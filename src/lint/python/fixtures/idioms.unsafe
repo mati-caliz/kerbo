@@ -47,9 +47,9 @@ def runs(command):
 def negations(first, second):
     if not first == second:
         raise ValueError("x")
-    if not first == second:
+    if first != second:
         print(first)
-    print(not (first == second), not first != second, not first == second == 1)
+    print(first != second, first == second, not first == second == 1)
 
 
 class Comparable:

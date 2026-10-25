@@ -2,13 +2,19 @@ use tree_sitter::Node;
 
 use super::Report;
 use super::ast::{
-    ATTRIBUTE, CALL, COMMENT, FALSE, FUNCTION_FIELD, IDENTIFIER, LEFT_FIELD, RIGHT_FIELD, TRUE, TUPLE,
-    is_string, named, string_prefix, text, unparenthesized,
+    ATTRIBUTE, CALL, COMMENT, FALSE, FUNCTION_FIELD, IDENTIFIER, LEFT_FIELD, PARENTHESIZED, RIGHT_FIELD,
+    TRUE, TUPLE, is_string, named, string_prefix, text, unparenthesized,
 };
 use super::branches::equivalent;
+use super::codegen;
 use super::loop_variable_reads::is_read_in_scope;
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
+const BOOL: &str = "bool";
+const BOOLEAN_OPERATOR: &str = "boolean_operator";
+const IF_CLAUSE: &str = "if_clause";
+const TESTED_STATEMENTS: [&str; 3] = ["if_statement", "elif_clause", "while_statement"];
 const EXCEPT_CLAUSES: [&str; 2] = ["except_clause", "except_group_clause"];
 const RAISE: &str = "raise_statement";
 const ASSERT: &str = "assert_statement";
@@ -56,7 +62,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
             RAISE => found.extend(raised_literal(*node, source)),
             ASSERT => found.extend(asserted_string(*node)),
             DICTIONARY => found.extend(unnecessary_spreads(*node)),
-            NOT_OPERATOR => found.extend(double_negation(*node)),
+            NOT_OPERATOR => found.extend(double_negation(*node, source)),
             CONDITIONAL => found.extend(conditional_reports(*node, source)),
             FOR => found.extend(incorrect_dict_iterator(*node, source)),
             IF => found.extend(min_max_if(*node, source)),
@@ -125,10 +131,49 @@ fn unnecessary_spreads(dictionary: Node<'_>) -> Vec<Report> {
         .collect()
 }
 
-// SIM208: `not not x`.
-fn double_negation(operation: Node<'_>) -> Option<Report> {
+// SIM208: `not not x`. En una condición queda `x`; si no, `bool(x)`.
+fn double_negation(operation: Node<'_>, source: &[u8]) -> Option<Report> {
     let operand = unparenthesized(operation.child_by_field_name(ARGUMENT_FIELD)?);
-    (operand.kind() == NOT_OPERATOR).then(|| Report::at(PythonRule::SIM208, operation, ""))
+    if operand.kind() != NOT_OPERATOR {
+        return None;
+    }
+    let inner = unparenthesized(operand.child_by_field_name(ARGUMENT_FIELD)?);
+    let replacement = if in_boolean_test(operation) {
+        text(inner, source).to_owned()
+    } else {
+        format!("{BOOL}({})", codegen::unparse(inner, codegen::COMMA, source))
+    };
+    let fix = Fix::replace(operation, &replacement, source);
+    Some(Report::at(PythonRule::SIM208, operation, "").with_fix(Some(fix)))
+}
+
+// El `in_boolean_test` de ruff: la condición de un `if`, `elif`, `while`, `assert`, `x if c else y`
+// o un `if` de comprensión, pasando sólo por `and`, `or`, `not` y paréntesis.
+fn in_boolean_test(node: Node<'_>) -> bool {
+    let mut child = node;
+    for ancestor in std::iter::successors(node.parent(), Node::parent) {
+        match ancestor.kind() {
+            BOOLEAN_OPERATOR | NOT_OPERATOR | PARENTHESIZED => child = ancestor,
+            IF_CLAUSE => return true,
+            kind if TESTED_STATEMENTS.contains(&kind) => {
+                return ancestor
+                    .child_by_field_name(CONDITION_FIELD)
+                    .is_some_and(|condition| condition.id() == child.id());
+            }
+            ASSERT => {
+                return significant(ancestor)
+                    .first()
+                    .is_some_and(|test| test.id() == child.id());
+            }
+            CONDITIONAL => {
+                return significant(ancestor)
+                    .get(1)
+                    .is_some_and(|test| test.id() == child.id());
+            }
+            _ => return false,
+        }
+    }
+    false
 }
 
 // SIM211 (`False if x else True`) y RUF034 (las dos ramas iguales).

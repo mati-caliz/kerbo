@@ -233,7 +233,7 @@ z_cast = cast("A" | None, 1)
 T = TypeVar("T", bound="A" | None)
 AliasUnion: TypeAlias = "A" | None
 nested_union: "A" | (None | "B")
-union_in_union: typing.Union["A" | None, int]
+union_in_union: "A" | None | int
 fstring_union: "A" | None
 
 *a1, *b1 = (1, 2, 3)

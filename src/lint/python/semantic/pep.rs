@@ -116,7 +116,7 @@ fn is_subscript_index(subscript: Node<'_>, child: Node<'_>) -> bool {
 }
 
 // Los elementos de un subíndice como los ve ruff: `X[a, b]` es una tupla de dos.
-fn flattened(slice: Node<'_>) -> Vec<Node<'_>> {
+pub fn flattened(slice: Node<'_>) -> Vec<Node<'_>> {
     let inner = unwrap_type(unparenthesized(slice));
     if inner.kind() == TUPLE {
         named(inner)

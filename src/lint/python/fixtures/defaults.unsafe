@@ -1,7 +1,7 @@
 import collections
 import dataclasses
 import datetime
-from typing import NewType, Optional, Sequence, Union
+from typing import NewType, Sequence
 
 UserId = NewType("UserId", int)
 
@@ -10,7 +10,7 @@ def mutable(a=[], b={}, c=set(), d=collections.deque(), e=list[int](), f=(), g=N
     return a, b, c, d, e, f, g
 
 
-def annotated(a: Sequence[int] = [], b: Optional[int] = int(), c: Union[int, str] = len("x"), d: int | None = len("x")):
+def annotated(a: Sequence[int] = [], b: int | None = int(), c: int | str = len("x"), d: int | None = len("x")):
     return a, b, c, d
 
 
@@ -78,8 +78,7 @@ def attributes(target, name):
     fourth = getattr(target, "__private")
     fifth = target.__dunder__
     sixth = getattr(target, "value", None)
-    setattr(target, "value", 1)
-    (setattr(target, "value", 1))
+    target.value = 1
     result = setattr(target, "value", 1)
     setattr(target, "__debug__", 1)
     setattr(target, "class", 1)

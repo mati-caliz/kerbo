@@ -4,8 +4,12 @@ use super::Report;
 use super::ast::{
     CLASS, COMMENT, COMPARISON, FUNCTION, LAMBDA, NAME_FIELD, NOT_OPERATOR, named, text, unparenthesized,
 };
+use super::codegen;
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
+const EQUAL: &str = "==";
+const NOT_EQUAL: &str = "!=";
 const ARGUMENT_FIELD: &str = "argument";
 const OPERATORS_FIELD: &str = "operators";
 const NEGATED_COMPARISONS: [(&str, PythonRule); 2] = [("==", PythonRule::SIM201), ("!=", PythonRule::SIM202)];
@@ -31,8 +35,34 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
         .filter(|node| node.kind() == NOT_OPERATOR)
         .filter_map(|node| negated_comparison(*node, source).map(|rule| (*node, rule)))
         .filter(|(node, _)| !is_exception_check(*node) && !in_comparison_dunder(*node, source))
-        .map(|(node, rule)| Report::at(rule, node, ""))
+        .map(|(node, rule)| Report::at(rule, node, "").with_fix(flipped_comparison(node, rule, source)))
         .collect()
+}
+
+// `not a == b` pasa a `a != b` (y al revés), impreso con el generador; inseguro como en ruff.
+fn flipped_comparison(negation: Node<'_>, rule: PythonRule, source: &[u8]) -> Option<Fix> {
+    let comparison = negation
+        .child_by_field_name(ARGUMENT_FIELD)
+        .map(unparenthesized)?;
+    let operands: Vec<Node<'_>> = named(comparison)
+        .into_iter()
+        .filter(|child| child.kind() != COMMENT)
+        .collect();
+    let [left, right] = operands.as_slice() else {
+        return None;
+    };
+    let operator = if rule == PythonRule::SIM201 {
+        NOT_EQUAL
+    } else {
+        EQUAL
+    };
+    let operand_level = codegen::CMP.saturating_add(1);
+    let replacement = format!(
+        "{} {operator} {}",
+        codegen::unparse(*left, operand_level, source),
+        codegen::unparse(*right, operand_level, source)
+    );
+    Some(Fix::replace(negation, &replacement, source).marked_unsafe())
 }
 
 // La regla de la comparación negada, si tiene un único operador `==` o `!=`.

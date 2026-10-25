@@ -1,7 +1,9 @@
 use crate::fix::Fix;
 use crate::lint::python::Report;
+use crate::lint::python::fix_edits::pad;
 use crate::lint::python::semantic::call_fixes::builtin_available;
 use crate::lint::python::semantic::pep::{is_pep585_generic, is_pep646_unpack, pep604_rule};
+use crate::lint::python::semantic::pep604_fixes::pep604_replacement;
 use crate::lint::python::semantic::reference_fixes::pep585_builtin;
 use crate::rules::PythonRule;
 use tree_sitter::{Node, Point};
@@ -170,11 +172,17 @@ impl EmbeddedAnnotations for Visitor<'_> {
             .as_deref()
             .and_then(|name| pep604_rule(name, &slices, &qualify, true))
         {
-            self.reports.push(Report::at_point(
-                rule,
-                context.placement.map(node.start_position()),
-                "",
-            ));
+            let start = context.placement.map(node.start_position());
+            let fix = context
+                .placement
+                .simple
+                .then(|| pep604_replacement(rule, &slices, &qualify, context.source))
+                .flatten()
+                .map(|replacement| {
+                    let end = context.placement.map(node.end_position());
+                    Fix::replace_range(start, end, &pad(replacement, node, context.source), self.source)
+                });
+            self.reports.push(Report::at_point(rule, start, "").with_fix(fix));
         }
         if name
             .as_deref()

@@ -7,9 +7,9 @@ desnudo: list
 en_ejecucion = isinstance(valor, list)
 
 
-def funcion(a: Optional[int], b: Union[int, str]) -> Optional["Clase"]:
-    local: Optional[Clase] = None
-    union_local: Union[A, int] = 1
+def funcion(a: int | None, b: int | str) -> Optional["Clase"]:
+    local: Clase | None = None
+    union_local: A | int = 1
     return local
 
 
@@ -17,15 +17,15 @@ opcional = Optional[int]
 union_runtime = Union["A", "B"]
 con_tupla = Optional[NamedTuple]
 estrella = Union[*tipos]
-texto: "Optional[list[int]]" = None
-anidado: "dict[str, Union[int, str]]" = {}
+texto: "list[int] | None" = None
+anidado: "dict[str, int | str]" = {}
 
 
 class Modelo:
     campo: Optional["Clase"] = None
 
     def metodo(self):
-        self.atributo: Optional[Clase] = None
+        self.atributo: Clase | None = None
 
 
 if TYPE_CHECKING:

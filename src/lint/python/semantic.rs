@@ -45,6 +45,7 @@ mod mutability;
 mod parameters;
 mod patterns;
 mod pep;
+mod pep604_fixes;
 mod private_types;
 mod pylint_calls;
 mod pylint_definitions;

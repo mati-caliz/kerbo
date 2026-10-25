@@ -1665,9 +1665,20 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Pendientes de esa tanda: UP006 adentro de un string no arregla `Deque` ni `DefaultDict` (piden el
     import) ni un builtin tapado; G010 sobre `from logging import warn` deja `warning` sin importarlo,
     como ruff.
-  - Pendientes: 121 arreglos que aparecen en el corpus, en tandas por tema. Falta una pieza: un
-    generador de código como el de ruff, que vuelve a imprimir expresiones (UP007, UP045, SIM201,
-    SIM202, SIM208, B010 y casi todas las C4).
+  - Tanda 3 (6 arreglos y el generador, idénticos a ruff en 57 fixtures): `codegen.rs` es el
+    `unparse_expr` del generador de ruff sobre el árbol de tree-sitter (precedencias, `and`/`or` en
+    cadena, tuplas sin paréntesis donde no hacen falta, `(1).real`, las anotaciones de tree-sitter
+    como `generic_type` y `union_type`); los strings y números quedan como en el código, y ruff los
+    vuelve a escribir desde el valor (sólo cambia con escapes o números en otra base). Con él: UP007 y
+    UP045 (también adentro de una anotación entre comillas simple; ruff sólo los arregla en una
+    definición de tipo), SIM201, SIM202, SIM208 y B010.
+  - B010 no arregla `(setattr(x, "a", v))`: quedaría `(x.a = v)`, que no es Python. Ruff lo arregla
+    igual, ve el error de sintaxis y revierte todos los arreglos del archivo; ese caso quedó solo en
+    `fixtures/parenthesized_setattr.py`.
+  - Pendientes de esa tanda: SIM208 en una expresión que no es una condición pone `bool(x)` sin mirar
+    si `bool` está tapado (ruff entonces no arregla).
+  - Pendientes: 115 arreglos que aparecen en el corpus, en tandas por tema. Las C4 de ruff arreglan
+    con libcst, que respeta el formato del código, y algunas usan la comilla preferida del archivo.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

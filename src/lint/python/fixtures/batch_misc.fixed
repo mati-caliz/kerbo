@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import math
 from functools import cache, lru_cache
-from typing import Any, Optional, Union
+from typing import Any
 
 
 def flatten(groups):
@@ -105,13 +105,13 @@ def conversions(value, items):
 
 def implicit(
     a: int = None,
-    b: Optional[int] = None,
+    b: int | None = None,
     c: int | None = None,
     d: Any = None,
     e: object = None,
     f: int = None,
-    g: Union[int, str] = None,
-    h: Union[int, None] = None,
+    g: int | str = None,
+    h: int | None = None,
     i: list[int] = None,
     j: None = None,
     k: int = 1,

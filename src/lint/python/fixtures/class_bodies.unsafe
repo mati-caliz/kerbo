@@ -5,10 +5,10 @@ a = b = 1
 
 
 def negations(x, y):
-    if not x != y:
+    if x == y:
         return 1
-    z = not x != y
-    w = not (x != y)
+    z = x == y
+    w = x == y
     v = not x != y != 1
     if not x != y:
         raise ValueError

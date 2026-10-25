@@ -1,6 +1,7 @@
 mod ast;
 mod branches;
 mod builtins;
+mod codegen;
 mod collection_loops;
 mod comments;
 mod comparisons;

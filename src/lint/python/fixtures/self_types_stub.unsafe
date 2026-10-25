@@ -1,5 +1,5 @@
 from types import TracebackType
-from typing import TypeVar, Union
+from typing import TypeVar
 
 _S = TypeVar("_S")
 
@@ -9,9 +9,9 @@ class Shape:
     def copy(self: _S) -> _S: ...
 
 field: type[int] | type[float] | str
-union: Union[type[int], type[float]]
+union: type[int] | type[float]
 nested: type[int] | (type[str] | type[bytes])
-mixed: Union[type[int], int | type[str]]
+mixed: type[int] | (int | type[str])
 tuple_type: type[int, str] | type[str]
 def function(kind: type[int] | type[str]) -> type[int] | type[str]: ...
 alias = type[int] | type[str]

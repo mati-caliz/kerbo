@@ -3,7 +3,7 @@ use tree_sitter::Node;
 use super::aliases::called_alias_reports;
 use super::async_blocking::async_blocking_reports;
 use super::builtin_calls::builtin_call_reports;
-use super::call_fixes::{getattr_fix, open_alias_fix, range_start_fix, super_arguments_fix};
+use super::call_fixes::{getattr_fix, open_alias_fix, range_start_fix, setattr_fix, super_arguments_fix};
 use super::cast_calls::cast_call_reports;
 use super::collection_calls::collection_call_reports;
 use super::decimals::{decimal_from_float_literal, verbose_decimal_constructor};
@@ -34,6 +34,7 @@ use crate::lint::python::escapes::text_value;
 use crate::rules::PythonRule;
 
 const RANGE: &str = "range";
+const PARENTHESIZED: &str = "parenthesized_expression";
 const IO_OPEN: &str = "io.open";
 const GETATTR: &str = "getattr";
 const SETATTR: &str = "setattr";
@@ -119,12 +120,19 @@ pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Rep
     reports
 }
 
-// Los arreglos de PIE808 y B009; B010 y RUF015 todavía no tienen.
+// `(setattr(x, "a", v))` quedaría `(x.a = v)`, que no es Python: ruff lo arregla igual y después
+// revierte el archivo entero.
+fn is_parenthesized(call: Node<'_>) -> bool {
+    call.parent().is_some_and(|parent| parent.kind() == PARENTHESIZED)
+}
+
+// Los arreglos de PIE808, B009 y B010; RUF015 todavía no tiene.
 fn call_rule_fix(source: &[u8], call: Node<'_>, rule: PythonRule) -> Option<Fix> {
     let arguments = call_arguments(call);
     match (rule, arguments.positional.as_slice()) {
         (PythonRule::PIE808, [start, _]) => range_start_fix(call, *start, source),
         (PythonRule::B009, [object, name]) => getattr_fix(call, *object, unparenthesized(*name), source),
+        (PythonRule::B010, [_, _, _]) if !is_parenthesized(call) => setattr_fix(call, source),
         _ => None,
     }
 }

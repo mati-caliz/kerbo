@@ -1,15 +1,19 @@
 use tree_sitter::{Node, Point};
 
+use super::builtin_calls::arguments;
 use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
 use super::model::{Model, Resolution};
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, ATTRIBUTE, CALL, FALSE, IDENTIFIER, SUBSCRIPT, TRUE, is_bytes, is_string, text,
+    unparenthesized,
 };
+use crate::lint::python::codegen;
 use crate::lint::python::escapes::text_value;
 use crate::lint::python::fix_edits::{Parentheses, commented_unsafe, pad, remove_argument};
 
 const OPEN: &str = "open";
+const ASSIGN_LEVEL: u8 = 3;
 const BUILTINS: &str = "builtins";
 const STR: &str = "str";
 const PLAIN_ATTRIBUTE_OBJECTS: [&str; 4] = [IDENTIFIER, ATTRIBUTE, SUBSCRIPT, CALL];
@@ -41,6 +45,28 @@ pub fn getattr_fix(call: Node<'_>, object: Node<'_>, name: Node<'_>, source: &[u
     };
     let fix = Fix::replace(call, &pad(content, call, source), source);
     let fix = commented_unsafe(fix, call, source);
+    Some(if attribute.is_ascii() {
+        fix
+    } else {
+        fix.marked_unsafe()
+    })
+}
+
+// B010: `setattr(x, "a", v)` como sentencia pasa a `x.a = v`, impreso con el generador.
+pub fn setattr_fix(call: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let given = arguments(call);
+    let [object, name, value] = given.positional.as_slice() else {
+        return None;
+    };
+    let (object, value) = (*object, *value);
+    let attribute = text_value(unparenthesized(*name), source)?;
+    let target = if object.kind() == INTEGER {
+        format!("({}).{attribute}", text(object, source))
+    } else {
+        format!("{}.{attribute}", codegen::unparse(object, codegen::MAX, source))
+    };
+    let assignment = format!("{target} = {}", codegen::unparse(value, ASSIGN_LEVEL, source));
+    let fix = commented_unsafe(Fix::replace(call, &assignment, source), call, source);
     Some(if attribute.is_ascii() {
         fix
     } else {

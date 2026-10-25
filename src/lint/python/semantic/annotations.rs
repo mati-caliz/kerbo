@@ -6,6 +6,7 @@ use crate::lint::python::semantic::expressions::Expressions;
 use tree_sitter::{Node, Point};
 
 use super::pep::{is_pep646_unpack, is_typing_only, is_typing_only_annotation, pep604_rule};
+use super::pep604_fixes::pep604_replacement;
 use super::qualified::{is_typing, qualified_name};
 use super::{Mode, Pending, Visitor};
 use crate::fix::Fix;
@@ -15,6 +16,7 @@ use crate::lint::python::ast::{
     is_f_string, named, string_prefix, text,
 };
 use crate::lint::python::escapes::decoded;
+use crate::lint::python::fix_edits::{commented_unsafe, pad};
 use crate::rules::PythonRule;
 use crate::syntax::{SnippetLanguage, parse_snippet};
 use embedded::{Embedded, Placement, wrap};
@@ -42,7 +44,7 @@ pub trait Annotations<'tree> {
     fn subscript(&mut self, subscript: Node<'tree>, mode: Mode);
     fn generic_type(&mut self, generic: Node<'tree>, mode: Mode);
     fn slices(&mut self, value: Option<Node<'tree>>, slices: Vec<Node<'tree>>, mode: Mode);
-    fn pep604_operator(&mut self, subscript: Node<'tree>, value: Option<Node<'tree>>, slices: &[Node<'tree>]);
+    fn pep604_operator(&mut self, subscript: Node<'tree>, slices: &[Node<'tree>], mode: Mode);
     fn string_annotation(&mut self, pending: Pending<'tree>);
     fn content(&self, part: Node<'_>) -> Content;
     fn parse_annotation(&mut self, value: &str, placement: Placement, string: Node<'_>);
@@ -68,7 +70,7 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
         if let Some(value) = value {
             self.expression(value, mode);
         }
-        self.pep604_operator(subscript, value, &fields(subscript, SUBSCRIPT_FIELD));
+        self.pep604_operator(subscript, &fields(subscript, SUBSCRIPT_FIELD), mode);
         self.slices(value, fields(subscript, SUBSCRIPT_FIELD), mode);
     }
 
@@ -79,17 +81,15 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
         };
         self.expression(*value, mode);
         let slices: Vec<Node<'tree>> = rest.iter().flat_map(|parameters| named(*parameters)).collect();
-        self.pep604_operator(generic, Some(*value), &slices);
+        self.pep604_operator(generic, &slices, mode);
         self.slices(Some(*value), slices, mode);
     }
 
     // UP045 y UP007: `Optional[X]` y `Union[X, Y]`, que en 3.10 se escriben con `|`; UP044: `Unpack[X]`.
-    fn pep604_operator(
-        &mut self,
-        subscript: Node<'tree>,
-        value: Option<Node<'tree>>,
-        slices: &[Node<'tree>],
-    ) {
+    fn pep604_operator(&mut self, subscript: Node<'tree>, slices: &[Node<'tree>], mode: Mode) {
+        let value = subscript
+            .child_by_field_name(VALUE_FIELD)
+            .or_else(|| named(subscript).first().copied());
         let Some(name) = value.and_then(|value| qualified_name(&self.model, value, self.source)) else {
             return;
         };
@@ -97,7 +97,15 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
             self.file.stub || is_typing_only(subscript, self.boundaries.future_annotations(), self.source);
         let qualify = |node: Node<'_>| qualified_name(&self.model, node, self.source);
         if let Some(rule) = pep604_rule(&name, slices, &qualify, typing_context) {
-            self.reports.push(Report::at(rule, subscript, ""));
+            let fix = mode
+                .defines_types()
+                .then(|| pep604_replacement(rule, slices, &qualify, self.source))
+                .flatten()
+                .map(|replacement| {
+                    let fix = Fix::replace(subscript, &pad(replacement, subscript, self.source), self.source);
+                    commented_unsafe(fix, subscript, self.source)
+                });
+            self.reports.push(Report::at(rule, subscript, "").with_fix(fix));
         }
         if is_pep646_unpack(&name, subscript, slices) {
             self.reports.push(Report::at(PythonRule::UP044, subscript, ""));

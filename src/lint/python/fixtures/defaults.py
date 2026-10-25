@@ -79,7 +79,6 @@ def attributes(target, name):
     fifth = getattr(target, "__dunder__")
     sixth = getattr(target, "value", None)
     setattr(target, "value", 1)
-    (setattr(target, "value", 1))
     result = setattr(target, "value", 1)
     setattr(target, "__debug__", 1)
     setattr(target, "class", 1)
