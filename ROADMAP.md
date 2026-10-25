@@ -1613,9 +1613,12 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     lugares distintos compartían el resultado, aunque N999, PLW0406 y los stubs dependen de la ruta.
     Ahora la clave suma la ruta y el permiso de ejecución, como Shell suma su dialecto.
 - Pendientes de Python contra ruff:
-  - Del conjunto clásico sólo queda E902, que no es una regla. Del conjunto por defecto de ruff 0.17
-    sólo queda B031 (reusar el generador de `itertools.groupby`): pide seguir los usos del grupo por
-    ramas y loops.
+  - Hecha B031 (2026-10-25), el grupo de `itertools.groupby` usado más de una vez, con el
+    `GroupNameFinder` de ruff traducido al árbol de tree-sitter: cuenta por rama en `if` y `match`,
+    vuelve a cero con `return`, `break` y `continue`, y deja de buscar cuando se reasigna el nombre.
+    Paridad exacta en `fixtures/groupby_reuse.py` (25 avisos); en el corpus no aparece. Con esto
+    están todas las reglas del conjunto por defecto de ruff 0.17 que pueden salir con Python 3.11;
+    del clásico sólo queda E902, que no es una regla.
   - EXE002 en el corpus: kerbo da 10.905 avisos que ruff no, porque el corpus se analiza montado
     desde Windows en Docker, donde todo archivo aparece como ejecutable, y ruff corre en Windows, donde
     la regla no existe. Ruff en ese mismo contenedor daría lo mismo (no es WSL), así que no se tocó;

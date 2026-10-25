@@ -26,6 +26,7 @@ mod expressions;
 mod file_loops;
 mod format_calls;
 mod gettext_calls;
+mod groupby_reuse;
 mod handlers;
 mod idioms;
 mod if_blocks;

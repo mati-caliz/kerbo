@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::file_loops::loop_writes;
+use super::groupby_reuse::groupby_reuse;
 use super::if_blocks::if_reports;
 use super::model::Model;
 use super::ruff_calls::assert_with_print;
@@ -16,12 +17,16 @@ const WITH: &str = "with_statement";
 const ASSERT: &str = "assert_statement";
 
 // Chequeos de sentencias que necesitan resolver nombres, antes de recorrerlas: UP036, PYI006 y SIM401
-// en un `if`, FURB122 en un `for`, ASYNC100 en un `with`, y en un stub las condiciones y las
+// en un `if`, FURB122 y B031 en un `for`, ASYNC100 en un `with`, y en un stub las condiciones y las
 // asignaciones que sólo se miran ahí.
 pub fn compound_reports(model: &Model<'_>, source: &[u8], statement: Node<'_>, stub: bool) -> Vec<Report> {
     let mut reports = match statement.kind() {
         IF => if_reports(model, source, statement),
-        FOR => loop_writes(model, source, statement).into_iter().collect(),
+        FOR => {
+            let mut reports: Vec<Report> = loop_writes(model, source, statement).into_iter().collect();
+            reports.extend(groupby_reuse(model, source, statement));
+            reports
+        }
         WITH => timeout_without_checkpoint(model, source, statement)
             .into_iter()
             .collect(),

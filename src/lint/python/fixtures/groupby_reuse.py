@@ -1,0 +1,167 @@
+import itertools
+from itertools import groupby
+
+shoppers = ["Jane", "Joe", "Sarah"]
+items = [("lettuce", "greens"), ("tomatoes", "greens"), ("cucumber", "greens"), ("chicken", "meat")]
+
+
+def collect_shop_items(shopper, items):
+    pass
+
+
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    for shopper in shoppers:
+        collect_shop_items(shopper, section_items)
+
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    collect_shop_items("Jane", section_items)
+    collect_shop_items("Joe", section_items)
+
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    countdown = 3
+    while countdown > 0:
+        collect_shop_items(shoppers[countdown - 1], section_items)
+        countdown -= 1
+
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    for shopper in shoppers:
+        if shopper == "Jane":
+            collect_shop_items(shopper, section_items)
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    for item in section_items:
+        pass
+    for other in section_items:
+        pass
+
+for _section, section_items in groupby(items):
+    collected = [collect_shop_items(shopper, section_items) for shopper in shoppers]
+    lookup = {shopper: section_items for shopper in shoppers}
+    lazy = (collect_shop_items(shopper, section_items) for shopper in shoppers)
+
+for _section, section_items in groupby(items):
+    if _section == "greens":
+        collect_shop_items(shoppers[0], section_items)
+    elif _section == "meat":
+        collect_shop_items(shoppers[1], section_items)
+    else:
+        collect_shop_items(shoppers[2], section_items)
+
+for _section, section_items in groupby(items):
+    if _section == "greens":
+        collect_shop_items(shoppers[0], section_items)
+        collect_shop_items(shoppers[0], section_items)
+    collect_shop_items(shoppers[1], section_items)
+
+for _section, section_items in groupby(items):
+    match _section:
+        case "greens":
+            collect_shop_items(shoppers[0], section_items)
+        case "meat":
+            collect_shop_items(shoppers[1], section_items)
+        case _:
+            collect_shop_items(shoppers[2], section_items)
+            collect_shop_items(shoppers[2], section_items)
+
+for _section, section_items in groupby(items):
+    if _section == "greens":
+        collect_shop_items(shoppers[0], section_items)
+        continue
+    collect_shop_items(shoppers[1], section_items)
+
+for _section, section_items in groupby(items):
+    if _section == "greens":
+        collect_shop_items(shoppers[0], section_items)
+        break
+    collect_shop_items(shoppers[1], section_items)
+
+
+def returns_early():
+    for _section, section_items in groupby(items):
+        if _section == "greens":
+            return collect_shop_items(shoppers[0], section_items)
+        collect_shop_items(shoppers[1], section_items)
+
+
+for _section, section_items in groupby(items):
+    section_items = list(section_items)
+    collect_shop_items(shoppers[0], section_items)
+    collect_shop_items(shoppers[1], section_items)
+
+for _section, section_items in groupby(items):
+    collect_shop_items(shoppers[0], section_items)
+    section_items: list = []
+    collect_shop_items(shoppers[1], section_items)
+
+for _section, section_items in groupby(items):
+    collect_shop_items(shoppers[0], section_items)
+    for section_items in []:
+        pass
+    collect_shop_items(shoppers[1], section_items)
+
+for _section, section_items in groupby(items):
+    if (section_items := list(section_items)):
+        collect_shop_items(shoppers[0], section_items)
+    collect_shop_items(shoppers[1], section_items)
+
+for _section, section_items in groupby(items):
+    print(section_items.count, section_items)
+    print(key=section_items)
+    collect_shop_items(section_items=1, shopper=section_items)
+
+for _section, section_items in groupby(items):
+    try:
+        collect_shop_items(shoppers[0], section_items)
+    except ValueError as section_items:
+        pass
+    with open("f") as handle:
+        handle.write(section_items)
+
+for _section, section_items in groupby(items):
+
+    def inner(section_items=section_items):
+        return section_items
+
+    lambda section_items: section_items
+    collect_shop_items(shoppers[0], section_items)
+
+for _section, section_items in groupby(items):
+    [x for x in section_items]
+    [y for y in section_items if section_items]
+    for item in list(section_items):
+        pass
+    else:
+        collect_shop_items(shoppers[0], section_items)
+
+for _section, section_items in groupby(items):
+    section_items += []
+    del section_items
+
+for [_section, section_items] in groupby(items):
+    collect_shop_items(shoppers[0], section_items)
+    collect_shop_items(shoppers[1], section_items)
+
+for (_section, section_items) in groupby(items):
+    collect_shop_items(shoppers[0], section_items)
+    collect_shop_items(shoppers[1], section_items)
+
+for _section, section_items in sorted(items):
+    collect_shop_items(shoppers[0], section_items)
+    collect_shop_items(shoppers[1], section_items)
+
+for _section, section_items, _extra in groupby(items):
+    collect_shop_items(shoppers[0], section_items)
+    collect_shop_items(shoppers[1], section_items)
+
+for _section, section_items in groupby(items):
+    while True:
+        collect_shop_items(shoppers[0], section_items)
+    collect_shop_items(shoppers[1], section_items)
+    collect_shop_items(shoppers[2], section_items)
+
+
+for _section, section_items in groupby(items):
+    [section_items for shopper in shoppers]
+    [section_items.count for shopper in shoppers]
+    {section_items: 1 for shopper in shoppers}
+    [shopper(section_items) for shopper in shoppers]

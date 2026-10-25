@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::PythonRule;
 
 // Más reglas del conjunto por defecto de ruff 0.17: chequeos de excepciones, loops y llamadas.
-pub const CHECK_TEXTS: [(PythonRule, RuleText); 42] = [
+pub const CHECK_TEXTS: [(PythonRule, RuleText); 43] = [
     (
         PythonRule::TRY203,
         RuleText::new(
@@ -379,6 +379,15 @@ pub const CHECK_TEXTS: [(PythonRule, RuleText); 42] = [
             "poné el comentario al lado de una sentencia, o borralo",
             "El formateador sólo lee fmt: off, fmt: on y fmt: skip en ciertos lugares; en cualquier otro el código se formatea igual.",
             "Un # fmt: off entre dos elementos de una lista no se toma; va antes de la sentencia entera.",
+        ),
+    ),
+    (
+        PythonRule::B031,
+        RuleText::new(
+            "Grupo de groupby usado más de una vez",
+            "guardá el grupo en una lista antes",
+            "El grupo de itertools.groupby es un generador que se vacía con el primer uso, así que los siguientes no ven nada.",
+            "for clave, grupo in groupby(items): valores = list(grupo), y después usá valores.",
         ),
     ),
 ];
