@@ -36,7 +36,7 @@ def compute():
 "{x}".format(y=name)
 "{0} {0}".format(compute())
 "{0} {0}".format(name)
-"{a} {a}".format(a=list())
+"{a} {a}".format(a=[])
 "{}{}".format(compute(), compute())
 "{".format(name)
 "}".format(name)

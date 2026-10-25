@@ -2,7 +2,7 @@ use tree_sitter::Node;
 
 use super::builtin_calls::{Arguments, arguments, keyword_value};
 use super::comprehension_fixes::{
-    dict_comprehension_fix, list_call_fix, list_comprehension_set_fix, literal_dict_fix,
+    dict_comprehension_fix, double_cast_fix, list_call_fix, list_comprehension_set_fix, literal_dict_fix,
 };
 use super::model::Model;
 use super::qualified::{is_typing, qualified_name};
@@ -116,6 +116,8 @@ fn collection_wrapper(
             Some(list_call_fix(call, *raw, hints.source))
         } else if rule == PythonRule::C404 {
             dict_comprehension_fix(call, *raw, hints.source)
+        } else if rule == PythonRule::C414 {
+            double_cast_fix(argument, hints.source)
         } else {
             None
         };

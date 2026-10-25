@@ -1,7 +1,8 @@
 use tree_sitter::Node;
 
 use super::comprehension_fixes::{
-    comprehension_argument_fix, comprehension_in_call_fix, generator_fix, literal_list_fix, literal_tuple_fix,
+    call_around_sorted_fix, comprehension_argument_fix, comprehension_in_call_fix, generator_fix,
+    literal_dict_pairs_fix, literal_list_fix, literal_tuple_fix,
 };
 use super::model::Model;
 use super::qualified::is_builtin_named;
@@ -12,6 +13,7 @@ use crate::lint::python::ast::{
 };
 use crate::rules::PythonRule;
 
+const REVERSED: &str = "reversed";
 const LIST_BUILTIN: &str = "list";
 const TUPLE_BUILTIN: &str = "tuple";
 const DICT_BUILTIN: &str = "dict";
@@ -83,13 +85,19 @@ pub fn collection_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>)
             .all(|element| element.kind() == TUPLE && named(element).len() == PAIR_LENGTH)
         && is_builtin(DICT_BUILTIN)
     {
-        reports.push(Report::at(PythonRule::C406, call, ""));
+        let raw = arguments.positional.first().copied();
+        let fix = raw
+            .filter(|raw| raw.id() == single.id())
+            .and_then(|_| literal_dict_pairs_fix(call, single, source));
+        reports.push(Report::at(PythonRule::C406, call, "").with_fix(fix));
     }
     if let Some(first) = first
         && AROUND_SORTED.iter().any(|name| is_builtin(name))
         && is_sorted_call(model, source, first)
     {
-        reports.push(Report::at(PythonRule::C413, call, ""));
+        let reversed = named_function == Some(REVERSED);
+        let fix = call_around_sorted_fix(call, first, reversed, source);
+        reports.push(Report::at(PythonRule::C413, call, "").with_fix(fix));
     }
     if let Some(first) = first
         && !arguments.has_keywords

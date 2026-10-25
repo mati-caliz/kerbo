@@ -1,0 +1,14 @@
+items = [3, 1, 2]
+flag = True
+first = sorted(items, reverse=False)
+second = sorted(items, reverse=flag)
+third = sorted(items, reverse=not flag)
+fourth = sorted((x for x in items), reverse=True)
+fifth = sorted(items, key=len,reverse=True)
+sixth = sorted(items)
+pairs = {1: 2, 3: 4}
+spread = {1: 2,
+    3: 4,}
+tight = {1: 2,}
+cast = sorted(items, key=len)
+nested = set(items)

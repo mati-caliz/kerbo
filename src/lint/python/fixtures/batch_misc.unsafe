@@ -10,7 +10,7 @@ def flatten(groups):
     first = sum(groups, [])
     second = sum(groups, start=[])
     third = sum(groups, ())
-    fourth = sum(groups, list())
+    fourth = sum(groups, [])
     fifth = sum(groups, [1])
     sixth = sum(groups)
     return first, second, third, fourth, fifth, sixth

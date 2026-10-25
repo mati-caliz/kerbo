@@ -52,15 +52,15 @@ def dictionaries(mapping):
 
 def casts(items):
     return (
-        list(list(items)),
-        list(tuple(items)),
-        set(sorted(items)),
-        sorted(list(items)),
+        list(items),
+        list(items),
+        set(items),
+        sorted(items),
         sorted(sorted(items, reverse=True)),
         tuple(reversed(items)),
-        set(reversed(items)),
-        list(sorted(items)),
-        sorted(reversed(items)),
+        set(items),
+        sorted(items),
+        sorted(items),
         {item for item in items},
         {item: item for item in items},
         [item for item in items],

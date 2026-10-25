@@ -86,7 +86,7 @@ ContextVar("name", default=[])
 contextvars.ContextVar("name", default={})
 ContextVar("name", default=set())
 ContextVar("name", default=compute())
-ContextVar("name", default=tuple())
+ContextVar("name", default=())
 ContextVar("name", default=1)
 ContextVar("name", [])
 

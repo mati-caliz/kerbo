@@ -41,7 +41,7 @@ def globals_assign():
 
 def dictionaries(items: dict, unknown, values):
     mapping = {"a": 1}
-    built = dict(a=1)
+    built = {"a": 1}
     for key in mapping:
         print(mapping[key])
     for key in built:

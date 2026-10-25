@@ -32,9 +32,9 @@ def loops():
 []
 list([1], key=1)
 list(items)
-dict([("a", 1), ("b", 2)])
-dict((("a", 1),))
-dict([])
+{"a": 1, "b": 2}
+{"a": 1,}
+{}
 dict([("a", 1, 2)])
 dict([["a", 1]])
 dict([("a", 1)], b=2)

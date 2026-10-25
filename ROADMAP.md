@@ -1685,8 +1685,13 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Pendientes de esa tanda: C402 y C404 no se arreglan si el argumento tiene paréntesis de más, y C419
     con un solo argumento no se arregla si la comprensión tiene comentarios o saltos de línea (libcst
     los reubica).
-  - Pendientes: 104 arreglos que aparecen en el corpus. Siguen C406, C408, C413, C414 y C417, que en
-    ruff arma libcst, y C408 además usa la comilla preferida del archivo.
+  - Tanda 5 (4 arreglos de comprehensions, entre ellos el más frecuente del corpus, idénticos a ruff
+    en 60 fixtures; `quote_style.py` y `collection_edges.py` juntan los bordes): C408 (`dict(a=1)` pasa
+    a `{"a": 1}` con la comilla del primer string del archivo que no es triple, o la otra adentro de un
+    f-string), C406, C413 (sólo con un nombre suelto afuera, como ruff; `reversed(...)` invierte o suma
+    `reverse=` con la negación sin paréntesis de libcst) y C414.
+  - Pendientes: 100 arreglos que aparecen en el corpus; C417 (`map(lambda ...)`) queda para la tanda
+    de libcst más pesada.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

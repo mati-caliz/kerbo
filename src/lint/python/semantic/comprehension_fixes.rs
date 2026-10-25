@@ -309,7 +309,9 @@ pub fn literal_dict_fix(call: Node<'_>, argument: Node<'_>, source: &[u8]) -> Fi
 }
 
 mod calls;
+mod collections;
 
 pub use calls::{
     comprehension_argument_fix, comprehension_in_call_fix, dict_comprehension_fix, list_call_fix,
 };
+pub use collections::{call_around_sorted_fix, collection_call_fix, double_cast_fix, literal_dict_pairs_fix};

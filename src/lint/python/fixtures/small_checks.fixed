@@ -59,7 +59,7 @@ def casts(items):
         sorted(sorted(items, reverse=True)),
         tuple(reversed(items)),
         set(reversed(items)),
-        list(sorted(items)),
+        sorted(items),
         sorted(reversed(items)),
         set([item for item in items]),
         dict([(item, item) for item in items]),

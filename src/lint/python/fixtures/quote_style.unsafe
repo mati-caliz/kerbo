@@ -1,0 +1,9 @@
+name = 'kerbo'
+first = {'a': 1, 'b': 2}
+second = {
+    'a': 1,
+    'b': 2,
+}
+third = f"{ {'a': 1} }"
+fourth = f'{ {} }'
+empty = [ ]

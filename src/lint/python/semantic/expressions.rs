@@ -4,7 +4,7 @@ use super::boolean_chains::boolean_chain_reports;
 use super::call_fixes::text_alias_fix;
 use super::calls::{call_reports, is_first_element_subscript};
 use super::comparisons::comparison_reports;
-use super::comprehension_fixes::literal_set_fix;
+use super::comprehension_fixes::{collection_call_fix, literal_set_fix};
 use super::conversions::conversion_reports;
 use super::if_blocks::dict_get_expression;
 use super::isinstance_calls::{BOOLEAN_OPERATOR, duplicate_isinstance_reports};
@@ -224,7 +224,9 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         if let Some(function) = function
             && let Some(collection) = unnecessary_collection(&self.model, self.source, function, arguments)
         {
-            self.reports.push(Report::at(PythonRule::C408, call, collection));
+            let fix = collection_call_fix(call, collection, self.source);
+            self.reports
+                .push(Report::at(PythonRule::C408, call, collection).with_fix(fix));
         }
         if let Some(function) = function
             && is_literal_set_call(&self.model, self.source, function, arguments)

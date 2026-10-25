@@ -47,8 +47,8 @@ def expresiones(x, lista):
     -x
     not x
     lista()
-    list()
-    dict()
+    []
+    {}
     [x, x]
     x, x
     b"bytes"
