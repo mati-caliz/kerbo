@@ -1,15 +1,15 @@
-from typing import TYPE_CHECKING, Generic, List, Optional, TypeAlias, TypeVar, cast
+from typing import TYPE_CHECKING, Generic, Optional, TypeAlias, TypeVar, cast
 
 T = TypeVar("T")
 
 
 class Node(Generic[T]):
     parent: "Node[T]"
-    children: List["Node[T]"] = []
+    children: list["Node[T]"] = []
 
     def walk(self, other: "Node[T]") -> "Optional[Node[T]]":
         local: Node[T] = other
-        nested: List[Node[T]] = []
+        nested: list[Node[T]] = []
         pair: Node[T] = other
         broken: "Node[" = other
         escaped: Node[T] = other

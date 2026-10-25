@@ -2,6 +2,7 @@ use tree_sitter::{Node, Point};
 
 use super::Report;
 use super::ast::{COMMENT, STRING, named, string_prefix, text};
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const STRING_CONTENT: &str = "string_content";
@@ -106,7 +107,16 @@ fn misplaced_shebang(comment: Node<'_>, source: &[u8]) -> Option<Report> {
     if !only_whitespace {
         return Some(Report::at(PythonRule::EXE005, comment, ""));
     }
-    (!before.is_empty()).then(|| Report::at_point(PythonRule::EXE004, Point::default(), ""))
+    if before.is_empty() {
+        return None;
+    }
+    let fix = Fix::replace_range(Point::default(), comment.start_position(), "", source);
+    let fix = if before.contains(&b'\n') {
+        fix.marked_unsafe()
+    } else {
+        fix
+    };
+    Some(Report::at_point(PythonRule::EXE004, Point::default(), "").with_fix(Some(fix)))
 }
 
 fn bidirectional_lines(source: &[u8]) -> Vec<Report> {

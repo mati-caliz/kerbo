@@ -1,47 +1,47 @@
-  #!/usr/bin/env python
+#!/usr/bin/env python
 from __future__ import braces
 from __future__ import barry_as_FLUFL, unknown_feature
 
 import logging
 import sys
-from logging import WARN, exception, getLogger, warn
+from logging import exception, getLogger
 
 import flask
 from flask import current_app
 
-logger = logging.getLogger(__file__)
-other = getLogger(__cached__)
-named = logging.getLogger(name=__file__)
+logger = logging.getLogger(__name__)
+other = getLogger(__name__)
+named = logging.getLogger(name=__name__)
 fine = logging.getLogger(__name__)
-level = logging.WARN
-level2 = WARN
+level = logging.WARNING
+level2 = logging.WARNING
 logging.basicConfig(level=logging.WARNING)
-logging.warn("a")
-logger.warn("a")
+logging.warning("a")
+logger.warning("a")
 LOGGER = logging.getLogger("x")
-LOGGER.warn("a")
+LOGGER.warning("a")
 Logger = LOGGER
 Logger.warn("a")
 my_logging = LOGGER
-my_logging.warn("x")
-current_app.logger.warn("x")
-flask.current_app.logger.warn("x")
-logging.getLogger().warn("x")
-logging.Logger("x").warn("x")
-warn("x")
+my_logging.warning("x")
+current_app.logger.warning("x")
+flask.current_app.logger.warning("x")
+logging.getLogger().warning("x")
+logging.Logger("x").warning("x")
+warning("x")
 logger.fatal("x", exc_info=True)
 logging.info("x", extra={"name": 1, "other": 2, "msg": 3})
 logging.info("x", extra=dict(name=1, levelname=2, ok=3))
 logger.info("x", extra={"message": "m", **{"lineno": 1}})
-logging.warning("x", exc_info=True)
-logging.warning("x", exc_info=1)
-logging.warning("x", exc_info="yes")
+logging.warning("x")
+logging.warning("x")
+logging.warning("x")
 logging.warning("x", exc_info=0)
 logging.warning("x", exc_info=None)
 logging.warning("x", exc_info=sys.exc_info())
 logging.log(logging.INFO, "x", exc_info=True)
 logger.log(logging.INFO, "x", exc_info=True)
-exception("x", exc_info=True)
+exception("x")
 something.warning("x", exc_info=True)
 
 
@@ -61,12 +61,12 @@ def handler():
             logging.warning("x", exc_info=True)
 
     else:
-        logging.warning("x", exc_info=True)
+        logging.warning("x")
     finally:
-        logging.warning("x", exc_info=True)
+        logging.warning("x")
 
 
-lambda: logging.warning("x", exc_info=True)
+lambda: logging.warning("x")
 
 
 from gettext import gettext, ngettext
@@ -95,11 +95,10 @@ other(f"x {name}")
 translate(f"x {name}")
 
 import pytest
-from pytest import mark, raises, yield_fixture
-from pytest.mark import usefixtures
+from pytest import raises, yield_fixture
 import pytest as pt
 
-from pytest import mark, raises, yield_fixture
+from pytest import raises, yield_fixture
 import pytest as pt
 
 
@@ -135,36 +134,31 @@ def fixture_three():
     yield 1
 
 
-@pytest.mark.usefixtures("a")
 @pytest.fixture()
 def fixture_four(a):
     pass
 
 
 @pytest.fixture()
-@pytest.mark.usefixtures("a")
-@mark.usefixtures
 def fixture_five(a):
     pass
 
 
-@pytest.mark.usefixtures("a")
 @pytest.yield_fixture
 def fixture_six(a):
     yield 1
 
 
-@pytest.mark.usefixtures()
+
 def test_one():
     pass
 
 
-@pytest.mark.usefixtures
+
 def test_two():
     pass
 
 
-@pt.mark.usefixtures()
 @pytest.fixture
 def fixture_seven():
     pass
@@ -172,7 +166,7 @@ def fixture_seven():
 
 @pytest.mark.usefixtures()
 class TestClass:
-    @pytest.mark.usefixtures()
+    
     def test_method(self):
         pass
 
@@ -182,7 +176,7 @@ def test_three():
     pass
 
 
-@usefixtures()
+
 def test_four():
     pass
 

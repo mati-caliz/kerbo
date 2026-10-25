@@ -82,7 +82,7 @@ def exceptions():
     ValueError("bad")
     Exception()
     ExceptionGroup("x", [])
-    EnvironmentError()
+    OSError()
     (KeyError("k"))
     print(ValueError())
     raise ValueError()

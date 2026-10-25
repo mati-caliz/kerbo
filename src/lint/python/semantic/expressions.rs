@@ -12,6 +12,7 @@ use super::model::{BindingKind, Model, ScopeKind};
 use super::pep::is_pep585_generic;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::redundant_tests::negated_operands;
+use super::reference_fixes::{pep585_fix, regex_flag_fix, utc_fix, warn_constant_fix};
 use super::short_circuit::short_circuit_reports;
 use super::targets::Store;
 use super::type_hints::{Hints, type_hint_reports};
@@ -248,12 +249,19 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         let Some(name) = qualified_name(&self.model, node, self.source) else {
             return;
         };
+        let (model, source) = (&self.model, self.source);
         if is_pep585_generic(&name) {
-            self.reports.push(Report::at(PythonRule::UP006, node, ""));
+            let fix = pep585_fix(model, node, &name, source);
+            self.reports
+                .push(Report::at(PythonRule::UP006, node, "").with_fix(fix));
         } else if name == UTC_ALIAS {
-            self.reports.push(Report::at(PythonRule::UP017, node, ""));
+            let fix = utc_fix(model, node, source);
+            self.reports
+                .push(Report::at(PythonRule::UP017, node, "").with_fix(fix));
         } else if REGEX_FLAG_ALIASES.contains(&name.as_str()) {
-            self.reports.push(Report::at(PythonRule::FURB167, node, ""));
+            let fix = regex_flag_fix(model, node, &name, source);
+            self.reports
+                .push(Report::at(PythonRule::FURB167, node, "").with_fix(fix));
         } else if is_typing(&name, TEXT_ALIAS) {
             let fix = text_alias_fix(&self.model, node, self.source);
             self.reports
@@ -261,7 +269,9 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         } else if is_six_py3(&name) {
             self.reports.push(Report::at(PythonRule::YTT202, node, ""));
         } else if name == LOGGING_WARN {
-            self.reports.push(Report::at(PythonRule::LOG009, node, ""));
+            let fix = warn_constant_fix(&self.model, node, self.source);
+            self.reports
+                .push(Report::at(PythonRule::LOG009, node, "").with_fix(fix));
         }
     }
 

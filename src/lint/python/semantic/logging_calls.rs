@@ -1,15 +1,19 @@
 use tree_sitter::Node;
 
 use super::builtin_calls::{Arguments, arguments, keyword_argument, keyword_value};
+use super::call_fixes::builtin_available;
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
 use super::short_circuit::literal_truthiness;
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
-    ATTRIBUTE, ATTRIBUTE_FIELD, CALL, CLASS, FUNCTION, FUNCTION_FIELD, IDENTIFIER, KEYWORD_ARGUMENT, LAMBDA,
-    NAME_FIELD, OBJECT_FIELD, TRUE, VALUE_FIELD, is_string, named, text, unparenthesized,
+    ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, CLASS, FUNCTION, FUNCTION_FIELD, IDENTIFIER,
+    KEYWORD_ARGUMENT, LAMBDA, NAME_FIELD, OBJECT_FIELD, TRUE, VALUE_FIELD, is_string, named, text,
+    unparenthesized,
 };
 use crate::lint::python::escapes::text_value;
+use crate::lint::python::fix_edits::{Parentheses, remove_argument};
 use crate::rules::PythonRule;
 
 const LOGGING: &str = "logging";
@@ -20,6 +24,8 @@ const LOGGER_PREFIXES: [&str; 2] = ["log", "LOG"];
 const LOGGER_SUFFIXES: [&str; 4] = ["logger", "logging", "LOGGER", "LOGGING"];
 const LOG_METHOD: &str = "log";
 const WARN: &str = "warn";
+const WARNING: &str = "warning";
+const MODULE_NAME: &str = "__name__";
 const ERROR: &str = "error";
 const EXCEPTION: &str = "exception";
 const LEVELS: [&str; 7] = ["debug", "info", WARN, "warning", ERROR, EXCEPTION, "critical"];
@@ -87,7 +93,8 @@ pub fn logging_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
         return reports;
     };
     if logging.method == WARN {
-        reports.push(Report::at(PythonRule::G010, logging.at, ""));
+        let fix = Fix::replace(logging.at, WARNING, source);
+        reports.push(Report::at(PythonRule::G010, logging.at, "").with_fix(Some(fix)));
     }
     if let Some(extra) = keyword_value(&given, EXTRA, source) {
         reports.extend(extra_attribute_clashes(model, source, extra));
@@ -258,7 +265,13 @@ fn exc_info_outside_handler(source: &[u8], logged: &Logged<'_>) -> Option<Report
     }
     let keyword = keyword_argument(given, EXC_INFO, source)?;
     let value = keyword.child_by_field_name(VALUE_FIELD)?;
-    (literal_truthiness(value, source) == Some(true)).then(|| Report::at(PythonRule::LOG014, keyword, ""))
+    if literal_truthiness(value, source) != Some(true) {
+        return None;
+    }
+    let fix = call
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .map(|arguments| remove_argument(keyword, arguments, Parentheses::Preserve, source).marked_unsafe());
+    Some(Report::at(PythonRule::LOG014, keyword, "").with_fix(fix))
 }
 
 // LOG002: `logging.getLogger(__file__)` o con `__cached__`, que dan una ruta y no el nombre del módulo.
@@ -273,6 +286,11 @@ fn file_logger_name(
     let is_file_dunder = name.kind() == IDENTIFIER
         && FILE_DUNDERS.contains(&text(name, source))
         && is_builtin_named(model, name, source, text(name, source));
-    (is_file_dunder && qualified_name(model, function, source).is_some_and(|callee| callee == GET_LOGGER))
-        .then(|| Report::at(PythonRule::LOG002, name, ""))
+    if !(is_file_dunder && qualified_name(model, function, source).is_some_and(|callee| callee == GET_LOGGER))
+    {
+        return None;
+    }
+    let fix = builtin_available(model, MODULE_NAME)
+        .then(|| Fix::replace(name, MODULE_NAME, source).marked_unsafe());
+    Some(Report::at(PythonRule::LOG002, name, "").with_fix(fix))
 }

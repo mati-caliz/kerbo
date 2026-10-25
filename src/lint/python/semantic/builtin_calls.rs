@@ -1,9 +1,10 @@
 use tree_sitter::Node;
 
 use super::call_fixes::type_of_primitive_fix;
+use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
-use crate::fix::Fix;
+use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, COMMENT, FALSE, FUNCTION_FIELD, KEYWORD_ARGUMENT,
@@ -13,6 +14,8 @@ use crate::lint::python::ast::{
 use crate::lint::python::escapes::text_value;
 use crate::rules::PythonRule;
 
+const FUNCTOOLS: &str = "functools";
+const CACHE: &str = "cache";
 const TYPE_BUILTIN: &str = "type";
 const NUMBERS: [&str; 2] = ["integer", "float"];
 const TEMPLATE_PREFIXES: [char; 2] = ['t', 'T'];
@@ -166,7 +169,21 @@ pub fn lru_cache_reports(model: &Model<'_>, source: &[u8], decorators: &[Node<'_
                     Report::at(PythonRule::UP011, list, "").with_fix(Some(Fix::replace(list, "", source))),
                 ),
                 [keyword] if is_unbounded_maxsize(*keyword, source) => {
-                    Some(Report::at(PythonRule::UP033, list, ""))
+                    let request = ImportRequest {
+                        module: FUNCTOOLS,
+                        member: CACHE,
+                        style: ImportStyle::Import,
+                    };
+                    let fix = call.parent().and_then(|decorator| {
+                        let (name, import) = get_or_import_member(model, source, decorator, request)?;
+                        let reference = TextEdit {
+                            start: TextPoint::from_point(call.start_position()),
+                            end: TextPoint::from_point(call.end_position()),
+                            replacement: name,
+                        };
+                        Some(Fix::from_edits(source, vec![reference, import]))
+                    });
+                    Some(Report::at(PythonRule::UP033, list, "").with_fix(fix))
                 }
                 _ => None,
             }

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Annotated, List, Literal, TypeVar, cast
+from typing import Annotated, Literal, TypeVar, cast
 
 T = TypeVar("T")
 
 
 class Node:
     parent: Node
-    children: List[Node] = []
+    children: list[Node] = []
     meta: Annotated[Node, "metadata"]
     kind: Literal["leaf", "branch"]
 

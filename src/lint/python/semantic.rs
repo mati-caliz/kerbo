@@ -51,6 +51,7 @@ mod pylint_definitions;
 mod pytest_calls;
 mod qualified;
 mod redundant_tests;
+mod reference_fixes;
 mod resources;
 mod returns;
 mod ruff_calls;

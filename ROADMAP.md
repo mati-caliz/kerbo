@@ -1655,10 +1655,19 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     paréntesis adentro del comentario.
   - Pendientes de esa tanda: PIE807 no mira si `list` o `dict` están tapados (ruff usa
     `builtins.list`); B009 marca inseguro cualquier nombre no ASCII, y ruff sólo los que cambia NFKC.
-  - Pendientes: 136 arreglos que aparecen en el corpus, en tandas por tema. Los que siguen piden dos
-    piezas más: el resto del importer (`from módulo import miembro`, sumándolo a un import que ya
-    está; lo usan UP006, UP017, UP035, LOG009 y otros) y un generador de código como el de ruff, que
-    vuelve a imprimir expresiones (UP007, UP045, SIM201, SIM202, SIM208, B010 y casi todas las C4).
+  - Tanda 2 (15 arreglos, idénticos a ruff en 56 fixtures; `fixtures/import_fixes.py` junta los casos
+    del importer): UP006 (también adentro de una anotación entre comillas simple), UP017, UP024, UP033,
+    UP041, FURB167, LOG002, LOG009, LOG014, G010, PT025, PT026 y EXE004. El importer quedó completo
+    como el de ruff: `from módulo import miembro` (sumándolo con libcst a un `from` que ya está, con la
+    misma coma que el último), `import módulo.sub` sirve para `módulo.x`, entre varios gana el último
+    del alcance, y no hay arreglo si el import está después del uso o es sólo de tipado y el uso en
+    ejecución. PT020 no tiene arreglo en ruff sin preview.
+  - Pendientes de esa tanda: UP006 adentro de un string no arregla `Deque` ni `DefaultDict` (piden el
+    import) ni un builtin tapado; G010 sobre `from logging import warn` deja `warning` sin importarlo,
+    como ruff.
+  - Pendientes: 121 arreglos que aparecen en el corpus, en tandas por tema. Falta una pieza: un
+    generador de código como el de ruff, que vuelve a imprimir expresiones (UP007, UP045, SIM201,
+    SIM202, SIM208, B010 y casi todas las C4).
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

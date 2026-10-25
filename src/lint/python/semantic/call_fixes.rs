@@ -1,6 +1,6 @@
 use tree_sitter::{Node, Point};
 
-use super::importer::{ImportRequest, get_or_import_member};
+use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
 use super::model::{Model, Resolution};
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::ast::{
@@ -82,6 +82,7 @@ pub fn builtin_fix(model: &Model<'_>, node: Node<'_>, builtin: &str, source: &[u
     let request = ImportRequest {
         module: BUILTINS,
         member: builtin,
+        style: ImportStyle::Import,
     };
     let (name, import) = get_or_import_member(model, source, node, request)?;
     let reference = TextEdit {

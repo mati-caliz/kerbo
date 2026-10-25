@@ -1,4 +1,4 @@
-from typing import Annotated, List, Literal, NamedTuple, TypeAlias, TypedDict, TypeVar, cast
+from typing import Annotated, Literal, NamedTuple, TypeAlias, TypedDict, TypeVar, cast
 import typing
 
 
@@ -11,7 +11,7 @@ def escaped(a: "Missing6", b: "Missing" "7", c: """Missing8""") -> None:
     pass
 
 
-def nested(a: "List['Missing9']", b: Literal["not_a_name"], c: Annotated[int, "metadata"]) -> None:
+def nested(a: "list['Missing9']", b: Literal["not_a_name"], c: Annotated[int, "metadata"]) -> None:
     pass
 
 
@@ -38,19 +38,19 @@ class Later:
 
 Runtime: TypeAlias = "dict[str, Missing17]"
 Recursive: TypeAlias = list[Recursive]
-runtime_generic = List["Missing18"]
+runtime_generic = list["Missing18"]
 runtime_other = Unknown["not_parsed"]
 annotated_runtime = Annotated["Missing19", "metadata"]
 
 
 def global_first():
     Later = 2
-    value = List["Later"]
+    value = list["Later"]
     return value
 
 
 def local_only():
-    value = List["LocalOnly"]
+    value = list["LocalOnly"]
     LocalOnly = int
     return value
 

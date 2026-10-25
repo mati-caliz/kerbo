@@ -1,7 +1,4 @@
-import asyncio
 import functools
-import os
-import socket
 import subprocess
 from functools import lru_cache
 from subprocess import PIPE, run
@@ -10,11 +7,11 @@ from subprocess import PIPE, run
 def errors():
     try:
         pass
-    except IOError:
+    except OSError:
         pass
     try:
         pass
-    except (EnvironmentError, ValueError):
+    except (OSError, ValueError):
         pass
     try:
         pass
@@ -22,29 +19,29 @@ def errors():
         pass
     try:
         pass
-    except os.error:
+    except OSError:
         pass
     try:
         pass
-    except socket.timeout:
+    except TimeoutError:
         pass
     try:
         pass
-    except (asyncio.TimeoutError, socket.error):
+    except (TimeoutError, OSError):
         pass
     try:
         pass
-    except IOError as error:
+    except OSError as error:
         raise error
-    raise IOError
-    raise IOError("x")
-    raise socket.timeout from None
-    raise (EnvironmentError)
+    raise OSError
+    raise OSError("x")
+    raise TimeoutError from None
+    raise (OSError)
 
 
-IOError("x")
-socket.error()
-asyncio.TimeoutError()
+OSError("x")
+OSError()
+TimeoutError()
 
 str
 bytes
@@ -82,7 +79,7 @@ def cached_too():
     return 1
 
 
-@lru_cache(maxsize=None)
+@functools.cache
 def bounded():
     return 1
 

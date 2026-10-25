@@ -1,7 +1,6 @@
 import logging
 import re
 import subprocess
-from re import I
 
 #
 # bloque con texto
@@ -26,7 +25,7 @@ def comparisons(first, second):
 
 
 def flags(text):
-    return re.match("x", text, re.I | re.M), re.IGNORECASE, I
+    return re.match("x", text, re.IGNORECASE | re.MULTILINE), re.IGNORECASE, re.IGNORECASE
 
 
 def runs(command):

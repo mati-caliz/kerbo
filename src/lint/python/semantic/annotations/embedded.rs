@@ -1,5 +1,8 @@
+use crate::fix::Fix;
 use crate::lint::python::Report;
+use crate::lint::python::semantic::call_fixes::builtin_available;
 use crate::lint::python::semantic::pep::{is_pep585_generic, is_pep646_unpack, pep604_rule};
+use crate::lint::python::semantic::reference_fixes::pep585_builtin;
 use crate::rules::PythonRule;
 use tree_sitter::{Node, Point};
 
@@ -135,13 +138,24 @@ impl EmbeddedAnnotations for Visitor<'_> {
 
     // UP006 adentro de una anotación entre comillas.
     fn embedded_pep585(&mut self, node: Node<'_>, context: &Embedded<'_>) {
-        if qualified_name(&self.model, node, context.source).is_some_and(|name| is_pep585_generic(&name)) {
-            self.reports.push(Report::at_point(
-                PythonRule::UP006,
-                context.placement.map(node.start_position()),
-                "",
-            ));
-        }
+        let Some(name) =
+            qualified_name(&self.model, node, context.source).filter(|name| is_pep585_generic(name))
+        else {
+            return;
+        };
+        let start = context.placement.map(node.start_position());
+        let fix = context
+            .placement
+            .simple
+            .then(|| pep585_builtin(&name))
+            .flatten()
+            .filter(|builtin| builtin_available(&self.model, builtin))
+            .map(|builtin| {
+                let end = context.placement.map(node.end_position());
+                Fix::replace_range(start, end, builtin, self.source)
+            });
+        self.reports
+            .push(Report::at_point(PythonRule::UP006, start, "").with_fix(fix));
     }
 
     fn embedded_subscript(&mut self, node: Node<'_>, context: &Embedded<'_>) {

@@ -1,7 +1,6 @@
 import builtins
 import datetime
 import os as os
-from datetime import timezone
 from os import path as path
 
 
@@ -72,8 +71,8 @@ def keys(mapping, self):
 
 
 def utc():
-    first = datetime.timezone.utc
-    second = timezone.utc
+    first = datetime.UTC
+    second = datetime.UTC
     return first, second, datetime.UTC
 
 

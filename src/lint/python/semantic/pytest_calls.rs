@@ -1,8 +1,9 @@
-use tree_sitter::Node;
+use tree_sitter::{Node, Point};
 
 use super::builtin_calls::{arguments, keyword_value};
 use super::model::Model;
 use super::qualified::qualified_name;
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{ATTRIBUTE, CALL, COMMENT, FUNCTION_FIELD, named};
 use crate::rules::PythonRule;
@@ -54,13 +55,28 @@ pub fn pytest_decorator_reports(model: &Model<'_>, source: &[u8], decorators: &[
             continue;
         }
         if fixture.is_some() {
-            reports.push(Report::at(PythonRule::PT025, *decorator, ""));
+            let fix = full_lines_deletion(*decorator, source);
+            reports.push(Report::at(PythonRule::PT025, *decorator, "").with_fix(Some(fix)));
         }
         if decorator_expression(*decorator).is_some_and(is_empty_mark) {
-            reports.push(Report::at(PythonRule::PT026, *decorator, ""));
+            let fix = Fix::replace(*decorator, "", source).marked_unsafe();
+            reports.push(Report::at(PythonRule::PT026, *decorator, "").with_fix(Some(fix)));
         }
     }
     reports
+}
+
+// PT025 borra las líneas enteras del decorador.
+fn full_lines_deletion(decorator: Node<'_>, source: &[u8]) -> Fix {
+    let start = Point {
+        row: decorator.start_position().row,
+        column: 0,
+    };
+    let end = Point {
+        row: decorator.end_position().row.saturating_add(1),
+        column: 0,
+    };
+    Fix::replace_range(start, end, "", source)
 }
 
 fn decorator_expression(decorator: Node<'_>) -> Option<Node<'_>> {

@@ -1,0 +1,45 @@
+"""Casos del importer en los arreglos."""
+
+# comentario después del docstring
+
+import datetime as dt
+import re as regex
+from collections import (
+    OrderedDict,
+    abc,
+deque,
+defaultdict,
+)
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import logging
+
+stamp = dt.UTC
+other = dt.UTC
+flags = regex.IGNORECASE | regex.MULTILINE
+queue: deque[int] = []
+table: defaultdict[str, int] = {}
+items: list[int] = []
+ordered = OrderedDict()
+print(abc)
+
+
+def uses_late():
+    return os.path.join("a", "b"), late.error
+
+
+def logs():
+    return logging.WARN
+
+
+import os
+import os.path
+import socket as late
+
+try:
+    pass
+except (OSError, ValueError):
+    pass
+except OSError:
+    pass

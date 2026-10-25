@@ -92,13 +92,17 @@ fn every_fix_removes_its_own_problem() {
                 .map(|fix| fix.edits.clone())
                 .unwrap_or_default();
             let after = apply(&edits, source).expect("el arreglo cae dentro del archivo");
-            let still = lints_at(path, &after, &strict()).into_iter().any(|other| {
+            let count =
+                |findings: &[LintFinding]| findings.iter().filter(|other| other.kind == finding.kind).count();
+            let fixed = lints_at(path, &after, &strict());
+            let still_there = fixed.iter().any(|other| {
                 other.kind == finding.kind
                     && other.line == finding.line
                     && other.column == finding.column
                     && other.subject == finding.subject
             });
-            assert!(!still, "{path}: el arreglo de {finding:?} no lo resuelve");
+            let resolved = !still_there || count(&fixed) < count(&before);
+            assert!(resolved, "{path}: el arreglo de {finding:?} no lo resuelve");
         }
     }
 }

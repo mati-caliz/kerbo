@@ -1,0 +1,20 @@
+from __future__ import annotations as _annotations
+
+
+
+def forward(a: Later, b: list[AlsoLater]) -> Later:
+    c: Missing = 1
+    return c
+
+
+x: Later = 1
+y: NeverDefined = 2
+
+
+class Later:
+    def method(self) -> Later:
+        return self
+
+
+class AlsoLater:
+    pass

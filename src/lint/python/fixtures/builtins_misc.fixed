@@ -1,0 +1,83 @@
+import datetime
+import functools
+import os
+import subprocess
+
+items = [1, 2]
+
+
+def loops():
+    for item in items:
+        try:
+            pass
+        except Exception:
+            continue
+        try:
+            pass
+        except ValueError:
+            continue
+        try:
+            pass
+        except:
+            continue
+        try:
+            pass
+        except (Exception, ValueError):
+            # comentario
+            continue
+
+
+list([1, 2])
+list((1, 2))
+list([])
+list([1], key=1)
+list(items)
+dict([("a", 1), ("b", 2)])
+dict((("a", 1),))
+dict([])
+dict([("a", 1, 2)])
+dict([["a", 1]])
+dict([("a", 1)], b=2)
+
+datetime.datetime.utcnow()
+datetime.datetime.utcnow().astimezone()
+
+exit(1)
+quit()
+exit
+
+subprocess.run(["ls"], universal_newlines=True)
+subprocess.run(["ls"], text=True)
+subprocess.Popen(["ls"], preexec_fn=os.setsid)
+subprocess.Popen(["ls"], preexec_fn=None)
+
+
+@functools.cache
+def unbounded():
+    return 1
+
+
+@functools.lru_cache(maxsize=128)
+def bounded():
+    return 1
+
+
+os.environ = {}
+os.environ["A"] = "1"
+other = os.environ = {}
+environment = os
+environment.environ = {}
+
+for value in {1, 2, 3}:
+    pass
+for value in {1, 1}:
+    pass
+for value in {items[0], 2}:
+    pass
+squares = [value for value in {"a", "b"}]
+for value in ({1, 2}):
+    pass
+
+
+def shadowed(exit):
+    exit(1)

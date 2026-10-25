@@ -1,12 +1,10 @@
-import typing
-from typing import TYPE_CHECKING, Dict, List, NamedTuple, Optional, Union
-import typing_extensions
+from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 
-lista: List[int] = []
-diccionario: typing.Dict[str, int] = {}
-tipo: typing_extensions.Type[int]
-desnudo: List
-en_ejecucion = isinstance(valor, List)
+lista: list[int] = []
+diccionario: dict[str, int] = {}
+tipo: type[int]
+desnudo: list
+en_ejecucion = isinstance(valor, list)
 
 
 def funcion(a: Optional[int], b: Union[int, str]) -> Optional["Clase"]:
@@ -19,8 +17,8 @@ opcional = Optional[int]
 union_runtime = Union["A", "B"]
 con_tupla = Optional[NamedTuple]
 estrella = Union[*tipos]
-texto: "Optional[List[int]]" = None
-anidado: "Dict[str, Union[int, str]]" = {}
+texto: "Optional[list[int]]" = None
+anidado: "dict[str, Union[int, str]]" = {}
 
 
 class Modelo:
@@ -33,4 +31,4 @@ class Modelo:
 if TYPE_CHECKING:
     Alias = Union["A", "B"]
 
-Lista = List
+Lista = list
