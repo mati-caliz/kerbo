@@ -93,7 +93,7 @@ def first_elements(values):
         [value for value in values][0],
         [*values][0],
         list(values).pop(0),
-        list(value for value in values)[0],
+        list(values)[0],
         sorted(values)[0],
         list(values, )[0],
     ]

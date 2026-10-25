@@ -25,10 +25,10 @@ class Prueba(TestCase):
         self.assertEqual(1, 1)
 
 
-conjunto = set([1, 2])
-conjunto_tupla = set((1, 2))
-conjunto_vacio = set([])
-conjunto_generador = set(x for x in lista)
+conjunto = {1, 2}
+conjunto_tupla = {1, 2}
+conjunto_vacio = set()
+conjunto_generador = set(lista)
 
 
 def sombra(set):

@@ -13,6 +13,7 @@ mod classes;
 mod collection_calls;
 mod comparisons;
 mod compound_checks;
+mod comprehension_fixes;
 mod conversions;
 mod dataclass_checks;
 mod dataclass_defaults;

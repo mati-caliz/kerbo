@@ -27,9 +27,9 @@ def loops():
             continue
 
 
-list([1, 2])
-list((1, 2))
-list([])
+[1, 2]
+[1, 2]
+[]
 list([1], key=1)
 list(items)
 dict([("a", 1), ("b", 2)])

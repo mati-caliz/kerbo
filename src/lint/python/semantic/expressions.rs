@@ -4,6 +4,7 @@ use super::boolean_chains::boolean_chain_reports;
 use super::call_fixes::text_alias_fix;
 use super::calls::{call_reports, is_first_element_subscript};
 use super::comparisons::comparison_reports;
+use super::comprehension_fixes::literal_set_fix;
 use super::conversions::conversion_reports;
 use super::if_blocks::dict_get_expression;
 use super::isinstance_calls::{BOOLEAN_OPERATOR, duplicate_isinstance_reports};
@@ -22,8 +23,8 @@ use super::version_checks::{is_six_py3, version_subscript};
 use super::{Mode, Visitor};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
-    ATTRIBUTE, CALL, COMPARISON, CONCATENATED_STRING, IDENTIFIER, INTERPOLATION, KEYWORD_ARGUMENT, LAMBDA,
-    NAME_FIELD, OBJECT_FIELD, OPERATORS_FIELD, STRING, SUBSCRIPT, VALUE_FIELD, fields, named, text,
+    ATTRIBUTE, CALL, COMMENT, COMPARISON, CONCATENATED_STRING, IDENTIFIER, INTERPOLATION, KEYWORD_ARGUMENT,
+    LAMBDA, NAME_FIELD, OBJECT_FIELD, OPERATORS_FIELD, STRING, SUBSCRIPT, VALUE_FIELD, fields, named, text,
 };
 use crate::lint::python::semantic::annotations::Annotations;
 use crate::lint::python::semantic::annotations::typing::TypingCalls;
@@ -228,7 +229,12 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         if let Some(function) = function
             && is_literal_set_call(&self.model, self.source, function, arguments)
         {
-            self.reports.push(Report::at(PythonRule::C405, call, ""));
+            let fix = named(arguments)
+                .into_iter()
+                .find(|argument| argument.kind() != COMMENT)
+                .and_then(|argument| literal_set_fix(call, argument, self.source));
+            self.reports
+                .push(Report::at(PythonRule::C405, call, "").with_fix(fix));
         }
         if let Some(function) = function
             && is_native_literal_call(&self.model, self.source, function, arguments)

@@ -61,11 +61,11 @@ def casts(items):
         set(reversed(items)),
         list(sorted(items)),
         sorted(reversed(items)),
-        set([item for item in items]),
-        dict([(item, item) for item in items]),
-        list([item for item in items]),
-        dict({}),
-        dict({"a": 1}),
+        {item for item in items},
+        {item: item for item in items},
+        [item for item in items],
+        {},
+        {"a": 1},
         set({item for item in items}),
     )
 

@@ -146,7 +146,7 @@ def timestamps():
 def loops(items):
     for item in list(items):
         print(item)
-    for item in list((1, 2)):
+    for item in [1, 2]:
         print(item)
     for item in list(items):
         items.append(item)

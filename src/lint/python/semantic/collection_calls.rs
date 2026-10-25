@@ -1,5 +1,8 @@
 use tree_sitter::Node;
 
+use super::comprehension_fixes::{
+    comprehension_argument_fix, comprehension_in_call_fix, generator_fix, literal_list_fix, literal_tuple_fix,
+};
 use super::model::Model;
 use super::qualified::is_builtin_named;
 use crate::lint::python::Report;
@@ -49,21 +52,27 @@ pub fn collection_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>)
         && single.kind() == GENERATOR
         && is_builtin(LIST_BUILTIN)
     {
-        reports.push(Report::at(PythonRule::C400, call, ""));
+        let fix = arguments
+            .positional
+            .first()
+            .and_then(|argument| generator_fix(call, *argument, LIST_BUILTIN, source));
+        reports.push(Report::at(PythonRule::C400, call, "").with_fix(fix));
     }
     if let Some(single) = single
         && named_function == Some(TUPLE_BUILTIN)
         && matches!(single.kind(), TUPLE | LIST)
         && is_builtin(TUPLE_BUILTIN)
     {
-        reports.push(Report::at(PythonRule::C409, call, ""));
+        let fix = Some(literal_tuple_fix(call, single, source));
+        reports.push(Report::at(PythonRule::C409, call, "").with_fix(fix));
     }
     if let Some(single) = single
         && named_function == Some(LIST_BUILTIN)
         && matches!(single.kind(), TUPLE | LIST)
         && is_builtin(LIST_BUILTIN)
     {
-        reports.push(Report::at(PythonRule::C410, call, ""));
+        let fix = Some(literal_list_fix(call, single, source));
+        reports.push(Report::at(PythonRule::C410, call, "").with_fix(fix));
     }
     if let Some(single) = single
         && named_function == Some(DICT_BUILTIN)
@@ -88,7 +97,12 @@ pub fn collection_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>)
         && COMPREHENSIONS.contains(&first.kind())
         && is_synchronous(first)
     {
-        reports.push(Report::at(PythonRule::C419, first, ""));
+        let fix = if arguments.positional.len() > 1 {
+            Some(comprehension_in_call_fix(first, source))
+        } else {
+            comprehension_argument_fix(call, first, source)
+        };
+        reports.push(Report::at(PythonRule::C419, first, "").with_fix(fix));
     }
     reports
 }

@@ -1677,8 +1677,16 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     `fixtures/parenthesized_setattr.py`.
   - Pendientes de esa tanda: SIM208 en una expresión que no es una condición pone `bool(x)` sin mirar
     si `bool` está tapado (ruff entonces no arregla).
-  - Pendientes: 115 arreglos que aparecen en el corpus, en tandas por tema. Las C4 de ruff arreglan
-    con libcst, que respeta el formato del código, y algunas usan la comilla preferida del archivo.
+  - Tanda 4 (11 arreglos de comprehensions, idénticos a ruff en 57 fixtures; todos inseguros, como
+    en ruff): C400, C401, C402, C403, C404, C405, C409, C410, C411, C418 y C419, en
+    `semantic/comprehension_fixes.rs`. Las de ruff que cambian llaves o corchetes trabajan sobre
+    tokens y quedaron calcadas; las que usan libcst (C402, C404, C411, C419 con un argumento) se
+    imitan conservando los espacios como lo hace libcst.
+  - Pendientes de esa tanda: C402 y C404 no se arreglan si el argumento tiene paréntesis de más, y C419
+    con un solo argumento no se arregla si la comprensión tiene comentarios o saltos de línea (libcst
+    los reubica).
+  - Pendientes: 104 arreglos que aparecen en el corpus. Siguen C406, C408, C413, C414 y C417, que en
+    ruff arma libcst, y C408 además usa la comilla preferida del archivo.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::comprehension_fixes::{dict_comprehension_fix, generator_fix};
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
 use crate::lint::python::Report;
@@ -50,10 +51,12 @@ pub fn idiom_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Re
     let named_function = (function.kind() == IDENTIFIER).then(|| text(function, source));
     if let Some(generator) = single_generator(call) {
         if named_function == Some(SET) && is_builtin_named(model, function, source, SET) {
-            reports.push(Report::at(PythonRule::C401, call, ""));
+            let fix = generator_fix(call, generator, SET, source);
+            reports.push(Report::at(PythonRule::C401, call, "").with_fix(fix));
         }
         if named_function == Some(DICT) && yields_pairs(generator) {
-            reports.push(Report::at(PythonRule::C402, call, ""));
+            let fix = dict_comprehension_fix(call, generator, source);
+            reports.push(Report::at(PythonRule::C402, call, "").with_fix(fix));
         }
     }
     reports

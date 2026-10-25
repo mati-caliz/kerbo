@@ -1,6 +1,9 @@
 use tree_sitter::Node;
 
 use super::builtin_calls::{Arguments, arguments, keyword_value};
+use super::comprehension_fixes::{
+    dict_comprehension_fix, list_call_fix, list_comprehension_set_fix, literal_dict_fix,
+};
 use super::model::Model;
 use super::qualified::{is_typing, qualified_name};
 use super::type_hints::Hints;
@@ -91,10 +94,10 @@ fn collection_wrapper(
     outer: &str,
     given: &Arguments<'_>,
 ) -> Option<Report> {
-    let [argument] = given.positional.as_slice() else {
+    let [raw] = given.positional.as_slice() else {
         return None;
     };
-    let argument = unparenthesized(*argument);
+    let argument = unparenthesized(*raw);
     let only_positional = given.keywords.is_empty();
     let rule = match (outer, argument.kind()) {
         ("set", LIST_COMPREHENSION) if only_positional => Some(PythonRule::C403),
@@ -104,7 +107,20 @@ fn collection_wrapper(
         (_, CALL) => double_cast(hints, outer, given, argument),
         _ => None,
     };
-    rule.map(|rule| Report::at(rule, call, ""))
+    rule.map(|rule| {
+        let fix = if rule == PythonRule::C403 {
+            list_comprehension_set_fix(call, *raw, hints.source)
+        } else if rule == PythonRule::C418 {
+            Some(literal_dict_fix(call, *raw, hints.source))
+        } else if rule == PythonRule::C411 {
+            Some(list_call_fix(call, *raw, hints.source))
+        } else if rule == PythonRule::C404 {
+            dict_comprehension_fix(call, *raw, hints.source)
+        } else {
+            None
+        };
+        Report::at(rule, call, "").with_fix(fix)
+    })
 }
 
 fn yields_pairs(comprehension: Node<'_>) -> bool {
