@@ -25,6 +25,13 @@ pub fn unused_variable_fix(model: &Model<'_>, source: &[u8], binding: &Binding<'
     fix.map(Fix::marked_unsafe)
 }
 
+// RUF059: `a, b = f()` con `b` sin usar pasa a `a, _b = f()`, inseguro como en ruff.
+pub fn unpacked_variable_fix(source: &[u8], binding: &Binding<'_>) -> Option<Fix> {
+    let name = binding.site.node?;
+    let statement = binding.site.statement?;
+    dummy_rename(source, name, statement).map(Fix::marked_unsafe)
+}
+
 fn assignment_fix(model: &Model<'_>, source: &[u8], binding: &Binding<'_>) -> Option<Fix> {
     let name = binding.site.node?;
     let statement = binding.site.statement?;

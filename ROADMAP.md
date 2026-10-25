@@ -1690,8 +1690,14 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     a `{"a": 1}` con la comilla del primer string del archivo que no es triple, o la otra adentro de un
     f-string), C406, C413 (sólo con un nombre suelto afuera, como ruff; `reversed(...)` invierte o suma
     `reverse=` con la negación sin paréntesis de libcst) y C414.
-  - Pendientes: 100 arreglos que aparecen en el corpus; C417 (`map(lambda ...)`) queda para la tanda
-    de libcst más pesada.
+  - Tanda 6 (7 arreglos sueltos, idénticos a ruff en 61 fixtures; `small_fixes.py` junta los
+    bordes): RUF059 (`_x`, inseguro), PLC0414 (inseguro), PLR2044 (la línea entera, desde el código o
+    detrás de una continuación), B033 (el `remove_member` de ruff, que comparte la mitad de
+    `remove_argument`), RET501, PLR1711 (respeta un comentario al lado y deja `pass` si queda sola) y
+    FURB157 (signo, ceros y separadores `_` como ruff). PLW1510 no va: el arreglo de ruff es sólo para
+    mostrar y nunca se aplica.
+  - Pendientes: 93 arreglos que aparecen en el corpus; C417 (`map(lambda ...)`) queda para la tanda de
+    libcst más pesada.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

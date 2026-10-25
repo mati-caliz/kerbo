@@ -2,8 +2,7 @@
 from __future__ import annotations
 import os
 import os
-import sys as sys
-from alias import same as same
+import sys
 import package.module.leaf
 import package.module.other
 import repeated.sub

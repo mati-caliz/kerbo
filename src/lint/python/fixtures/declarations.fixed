@@ -48,12 +48,10 @@ Decimal(value=0.1)
 
 def trailing():
     print(1)
-    return
 
 
 def trailing_none():
     print(1)
-    return None
 
 
 def only_return():
@@ -68,7 +66,6 @@ def documented():
 def documented_more():
     """Doc."""
     print(1)
-    return None
 
 
 def several(flag):
@@ -93,7 +90,6 @@ def nested():
         return
 
     print(1)
-    return
 
 
 def in_branch(flag):
@@ -104,4 +100,3 @@ def in_branch(flag):
 
 def fstring_doc():
     f"""Doc."""
-    return

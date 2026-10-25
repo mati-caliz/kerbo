@@ -16,8 +16,8 @@ def flatten(groups):
     return first, second, third, fourth, fifth, sixth
 
 
-letters = {"a", "b", "a", 'b', "c"}
-numbers = {1, 2, 1, 1.0, True}
+letters = {"a", "b", "c"}
+numbers = {1, 2}
 names = {letters, letters, flatten}
 calls = {flatten(), flatten()}
 empty = set()

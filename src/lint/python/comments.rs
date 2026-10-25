@@ -2,12 +2,16 @@ use tree_sitter::Node;
 
 use super::Report;
 use super::ast::{COMMENT, text};
+use super::fix_edits::delete_between;
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const HASH: char = '#';
 const PYTHON_WHITESPACE: [char; 3] = [' ', '\t', '\u{c}'];
 const CARRIAGE_RETURN: char = '\r';
 const NEWLINE: u8 = b'\n';
+const CARRIAGE_RETURN_BYTE: u8 = b'\r';
+const BACKSLASH: u8 = b'\\';
 const MINIMUM_BLOCK: usize = 2;
 
 // Un comentario y lo que ruff necesita de su línea.
@@ -32,8 +36,49 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
         .iter()
         .zip(in_blocks)
         .filter(|(comment, in_block)| comment.empty && !in_block)
-        .map(|(comment, _)| Report::at(PythonRule::PLR2044, comment.node, ""))
+        .map(|(comment, _)| {
+            Report::at(PythonRule::PLR2044, comment.node, "")
+                .with_fix(Some(empty_comment_fix(comment.node, source)))
+        })
         .collect()
+}
+
+// Como ruff: con código antes en la línea, desde el final de ese código; detrás de una continuación
+// `\`, desde el `#`; si no, la línea entera.
+fn empty_comment_fix(comment: Node<'_>, source: &[u8]) -> Fix {
+    let start = comment.start_byte();
+    let line_start = source
+        .get(..start)
+        .and_then(|before| before.iter().rposition(|byte| *byte == NEWLINE))
+        .map_or(0, |newline| newline.saturating_add(1));
+    let line_end = source
+        .get(start..)
+        .and_then(|rest| rest.iter().position(|byte| *byte == NEWLINE))
+        .map_or(source.len(), |newline| start.saturating_add(newline));
+    let line_end = if source.get(line_end.saturating_sub(1)) == Some(&CARRIAGE_RETURN_BYTE) {
+        line_end.saturating_sub(1)
+    } else {
+        line_end
+    };
+    let before = source.get(line_start..start).unwrap_or_default();
+    let code_end = before
+        .iter()
+        .rposition(|byte| !matches!(*byte, b' ' | b'\t' | b'\x0c' | b'#'))
+        .map(|index| line_start.saturating_add(index).saturating_add(1));
+    let continued = line_start > 1 && source.get(line_start.saturating_sub(2)) == Some(&BACKSLASH);
+    match code_end {
+        Some(code_end) => delete_between(code_end, line_end, source),
+        None if continued => delete_between(start, line_end, source),
+        None => {
+            let next_line = source
+                .get(start..)
+                .and_then(|rest| rest.iter().position(|byte| *byte == NEWLINE))
+                .map_or(source.len(), |newline| {
+                    start.saturating_add(newline).saturating_add(1)
+                });
+            delete_between(line_start, next_line, source)
+        }
+    }
 }
 
 fn describe<'tree>(node: Node<'tree>, source: &[u8]) -> Comment<'tree> {

@@ -1,7 +1,5 @@
 import builtins
 import datetime
-import os as os
-from os import path as path
 
 
 def raising(flag):
@@ -118,11 +116,11 @@ def formats(first, second, values):
 
 
 def unpacking(pair, rows):
-    first, second = pair
+    first, _second = pair
     (third, _fourth), _fifth = pair, rows
-    _, sixth = pair
+    _, _sixth = pair
     for key, value in rows:
         print(key)
-    with open(pair) as (handle, other):
+    with open(pair) as (handle, _other):
         print(handle)
     return first, third

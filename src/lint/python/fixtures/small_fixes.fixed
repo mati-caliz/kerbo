@@ -1,0 +1,26 @@
+import os as os
+from decimal import Decimal
+
+x = 1
+y = 2 \
+    
+
+
+def unpack():
+    first, second = os.getcwd(), os.sep
+    third, fourth_ = os.path.split("a/b")
+    return first
+
+
+def bare():
+    print(1)
+    # sin valor
+
+
+def alone():
+    return None
+
+
+values = {1, 2, 3}
+single = {1}
+amounts = [Decimal(1_000), Decimal(-1), Decimal(+42), Decimal(0), Decimal("nan")]

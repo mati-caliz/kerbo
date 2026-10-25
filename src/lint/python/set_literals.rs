@@ -6,6 +6,7 @@ use super::ast::{
     text,
 };
 use super::escapes::text_value;
+use super::fix_edits::{commented_unsafe, remove_member};
 use crate::rules::PythonRule;
 
 const INTEGER: &str = "integer";
@@ -43,7 +44,8 @@ fn duplicates(set: Node<'_>, source: &[u8]) -> Vec<Report> {
             continue;
         };
         if seen.contains(&value) {
-            found.push(Report::at(PythonRule::B033, element, ""));
+            let fix = commented_unsafe(remove_member(element, set, source), set, source);
+            found.push(Report::at(PythonRule::B033, element, "").with_fix(Some(fix)));
         } else {
             seen.push(value);
         }

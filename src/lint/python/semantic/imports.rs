@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::Visitor;
 use super::model::{BindingKind, EXPLICIT_EXPORT, Site};
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ALIAS_FIELD, ALIASED_IMPORT, DOTTED_NAME, MODULE_NAME_FIELD, NAME_FIELD, WILDCARD_IMPORT, children,
@@ -202,7 +203,9 @@ impl<'tree> Imports<'tree> for Visitor<'tree> {
             .child_by_field_name(ALIAS_FIELD)
             .map(|alias| self.text(alias));
         if original.is_some() && original == alias {
-            self.reports.push(Report::at(PythonRule::PLC0414, name, ""));
+            let fix = alias.map(|alias| Fix::replace(name, alias, self.source).marked_unsafe());
+            self.reports
+                .push(Report::at(PythonRule::PLC0414, name, "").with_fix(fix));
         }
     }
 }

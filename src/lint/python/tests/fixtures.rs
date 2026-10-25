@@ -1,5 +1,5 @@
 // Cada archivo de ejemplo con la salida de ruff 0.17 al lado.
-pub const FIXTURES: [(&str, &str, &str); 59] = [
+pub const FIXTURES: [(&str, &str, &str); 60] = [
     (
         "scopes.py",
         include_str!("../fixtures/scopes.py"),
@@ -289,6 +289,11 @@ pub const FIXTURES: [(&str, &str, &str); 59] = [
         "collection_edges.py",
         include_str!("../fixtures/collection_edges.py"),
         include_str!("../fixtures/collection_edges.ruff"),
+    ),
+    (
+        "small_fixes.py",
+        include_str!("../fixtures/small_fixes.py"),
+        include_str!("../fixtures/small_fixes.ruff"),
     ),
     (
         "package/__init__.py",

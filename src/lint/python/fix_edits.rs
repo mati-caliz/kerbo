@@ -21,6 +21,23 @@ pub fn remove_argument(
     parentheses: Parentheses,
     source: &[u8],
 ) -> Fix {
+    if let Some(fix) = remove_listed(argument, arguments, source) {
+        return fix;
+    }
+    match parentheses {
+        Parentheses::Remove => Fix::replace(arguments, "", source),
+        Parentheses::Preserve => Fix::replace(arguments, EMPTY_ARGUMENTS, source),
+    }
+}
+
+// El `remove_member` de ruff: como `remove_argument`, pero si es el único elemento se borra sólo él.
+pub fn remove_member(element: Node<'_>, container: Node<'_>, source: &[u8]) -> Fix {
+    remove_listed(element, container, source).unwrap_or_else(|| Fix::replace(element, "", source))
+}
+
+// Los dos primeros casos de `remove_argument` y `remove_member`: hasta lo que sigue a la coma si hay
+// elementos después, o desde la coma anterior si es el último.
+fn remove_listed(argument: Node<'_>, arguments: Node<'_>, source: &[u8]) -> Option<Fix> {
     let children = all_children(arguments);
     let position = children
         .iter()
@@ -31,7 +48,7 @@ pub fn remove_argument(
     if children.iter().skip(position.saturating_add(1)).any(is_argument) {
         let mut rest = after.skip_while(|child| child.kind() != COMMA).skip(1);
         if let Some(next) = rest.next() {
-            return delete_between(argument.start_byte(), next.start_byte(), source);
+            return Some(delete_between(argument.start_byte(), next.start_byte(), source));
         }
     }
     let previous = children.iter().take(position).rposition(is_argument);
@@ -42,12 +59,9 @@ pub fn remove_argument(
             .take(position.saturating_sub(previous))
             .find(|child| child.kind() == COMMA)
     }) {
-        return delete_between(comma.start_byte(), argument.end_byte(), source);
+        return Some(delete_between(comma.start_byte(), argument.end_byte(), source));
     }
-    match parentheses {
-        Parentheses::Remove => Fix::replace(arguments, "", source),
-        Parentheses::Preserve => Fix::replace(arguments, EMPTY_ARGUMENTS, source),
-    }
+    None
 }
 
 fn all_children(node: Node<'_>) -> Vec<Node<'_>> {

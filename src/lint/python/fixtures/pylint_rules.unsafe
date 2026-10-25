@@ -112,8 +112,8 @@ else:
 
 def none_only(flag):
     if flag:
-        return None
-    return None
+        return
+    return
 
 
 def mixed(flag):
@@ -125,7 +125,7 @@ def mixed(flag):
 def bare(flag):
     if flag:
         return
-    return None
+    return
 
 
 def single():
@@ -146,35 +146,30 @@ def annotated(flag) -> int:
 
 def annotated_none(flag) -> None:
     if flag:
-        return (None)
-    return None
+        return
+    return
 
 
 class Holder:
     @property
     def attribute(self):
         print(self)
-        return None
 
     @functools.cached_property
     def cached(self):
         print(self)
-        return None
 
     @abc.abstractproperty
     def abstract(self):
         print(self)
-        return None
 
     @enum_property
     def member(self):
         print(self)
-        return None
 
     @staticmethod
     def static():
         print(1)
-        return None
 
 
 def outer(flag):
@@ -182,8 +177,8 @@ def outer(flag):
         return 1
 
     if flag:
-        return None
-    return None
+        return
+    return
 
 
 def nested_generator(flag):
@@ -191,8 +186,8 @@ def nested_generator(flag):
         yield 1
 
     if flag:
-        return None
-    return None
+        return
+    return
 
 
 def lambda_yield(flag):

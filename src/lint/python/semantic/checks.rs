@@ -14,7 +14,7 @@ use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::builtins::is_builtin;
 use crate::rules::PythonRule;
-use unused_variables::unused_variable_fix;
+use unused_variables::{unpacked_variable_fix, unused_variable_fix};
 
 const PATH_GLOBAL: &str = "__path__";
 const TRACEBACK_NAMES: [&str; 4] = [
@@ -103,6 +103,7 @@ fn unused_locals(visitor: &Visitor<'_>, scope: ScopeId, latest: &[(&str, Binding
             }
             Some(if binding.has(UNPACKED) {
                 Report::at_point(PythonRule::RUF059, binding.site.at, name)
+                    .with_fix(unpacked_variable_fix(visitor.source, binding))
             } else {
                 Report::at_point(PythonRule::F841, binding.site.at, name).with_fix(unused_variable_fix(
                     model,
