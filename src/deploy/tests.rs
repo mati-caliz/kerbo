@@ -37,7 +37,7 @@ fn turns_violations_into_diagnostics_with_stable_fingerprints() {
         violation(drop, ""),
     ];
     let diagnostics: Vec<_> =
-        violation_diagnostics(&file(), &found, Limits::default().with_rule(drop, Some(0))).collect();
+        violation_diagnostics(&file(), &found, &Limits::default().with_rule(drop, Some(0))).collect();
     let fingerprints: Vec<&str> = diagnostics
         .iter()
         .map(|diagnostic| diagnostic.fingerprint.as_str())
@@ -63,7 +63,7 @@ fn turns_violations_into_diagnostics_with_stable_fingerprints() {
         "Borra una columna que el código desplegado todavía puede leer"
     );
     assert_eq!(
-        violation_diagnostics(&file(), &found, Limits::default()).count(),
+        violation_diagnostics(&file(), &found, &Limits::default()).count(),
         0
     );
 }

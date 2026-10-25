@@ -146,7 +146,7 @@ mod tests {
             &mut parser,
             Language::Python,
             source.as_bytes(),
-            Limits::default(),
+            &Limits::default(),
         )
         .expect("el archivo se parsea")
         .functions

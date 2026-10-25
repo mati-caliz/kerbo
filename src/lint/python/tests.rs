@@ -17,7 +17,7 @@ fn strict() -> Limits {
     Preset::Strict.limits(Language::Python, false)
 }
 
-fn lints_at(path: &str, source: &str, limits: Limits) -> Vec<LintFinding> {
+fn lints_at(path: &str, source: &str, limits: &Limits) -> Vec<LintFinding> {
     let mut parser = Parser::new();
     parser
         .set_language(&Language::Python.grammar().expect("tiene gramática"))
@@ -27,7 +27,7 @@ fn lints_at(path: &str, source: &str, limits: Limits) -> Vec<LintFinding> {
 }
 
 fn lints(source: &str) -> Vec<LintFinding> {
-    lints_at("module.py", source, strict())
+    lints_at("module.py", source, &strict())
 }
 
 fn rendered(findings: &[LintFinding]) -> Vec<String> {
@@ -66,7 +66,7 @@ fn fixed(source: &str, rule: PythonRule) -> String {
 fn reports_exactly_what_ruff_reports_with_its_default_rules() {
     for (path, source, golden) in FIXTURES {
         assert_eq!(
-            rendered(&lints_at(path, source, strict())),
+            rendered(&lints_at(path, source, &strict())),
             expected(golden),
             "{path} contra ruff 0.17 (E4, E7, E9, F y las del conjunto nuevo)"
         );
@@ -76,7 +76,7 @@ fn reports_exactly_what_ruff_reports_with_its_default_rules() {
 #[test]
 fn every_fix_removes_its_own_problem() {
     for (path, source, _) in FIXTURES {
-        let before = lints_at(path, source, strict());
+        let before = lints_at(path, source, &strict());
         for finding in before.iter().filter(|finding| finding.fix.is_some()) {
             let edits = finding
                 .fix
@@ -84,7 +84,7 @@ fn every_fix_removes_its_own_problem() {
                 .map(|fix| fix.edits.clone())
                 .unwrap_or_default();
             let after = apply(&edits, source).expect("el arreglo cae dentro del archivo");
-            let still = lints_at(path, &after, strict()).into_iter().any(|other| {
+            let still = lints_at(path, &after, &strict()).into_iter().any(|other| {
                 other.kind == finding.kind
                     && other.line == finding.line
                     && other.column == finding.column
@@ -153,7 +153,7 @@ fn imports_sharing_a_line_or_in_a_package_have_no_fix() {
     let shared = lints("import os; x = 1\n");
     assert_eq!(rendered(&shared), ["1:1 I001", "1:10 E702", "1:8 F401"]);
     assert!(shared.iter().all(|finding| finding.fix.is_none()));
-    let package = lints_at("pkg/__init__.py", "import os\n", strict());
+    let package = lints_at("pkg/__init__.py", "import os\n", &strict());
     assert_eq!(rendered(&package), ["1:8 F401"]);
     assert_eq!(package.first().and_then(|finding| finding.fix.clone()), None);
 }
@@ -199,16 +199,16 @@ fn unparsed_files_only_flag_noqa_codes_that_do_not_need_findings() {
 fn presets_and_switches_turn_rules_off() {
     let source = "import os\nx = 1;\n";
     let minimal = Preset::Minimal.limits(Language::Python, false);
-    assert_eq!(rendered(&lints_at("module.py", source, minimal)), ["1:8 F401"]);
+    assert_eq!(rendered(&lints_at("module.py", source, &minimal)), ["1:8 F401"]);
     let without = strict().with_rule(RuleId::Python(PythonRule::F401), None);
     assert_eq!(
-        rendered(&lints_at("module.py", source, without)),
+        rendered(&lints_at("module.py", source, &without)),
         ["1:1 I001", "2:6 E703"]
     );
     let everything_off = PythonRule::ALL.into_iter().fold(strict(), |limits, rule| {
         limits.with_rule(RuleId::Python(rule), None)
     });
-    assert_eq!(lints_at("module.py", source, everything_off), Vec::new());
+    assert_eq!(lints_at("module.py", source, &everything_off), Vec::new());
     assert_eq!(relaxed_by(Preset::Recommended), Vec::<RuleId>::new());
     assert!(relaxed_by(Preset::Minimal).contains(&RuleId::Python(PythonRule::E741)));
 }
@@ -258,7 +258,7 @@ fn module_names_are_checked_only_inside_packages() {
                 &path.to_string_lossy(),
                 "x = 1
 ",
-                strict(),
+                &strict(),
             )
             .iter()
             .any(|finding| finding.kind == LintKind::Python(PythonRule::N999))
@@ -293,7 +293,7 @@ import os
 ";
     let found = |relative: &str, source: &str| {
         let path = tree.path().join(relative);
-        let mut lines = rendered(&lints_at(&path.to_string_lossy(), source, strict()));
+        let mut lines = rendered(&lints_at(&path.to_string_lossy(), source, &strict()));
         lines.retain(|line| line.ends_with("PLW0406"));
         lines
     };

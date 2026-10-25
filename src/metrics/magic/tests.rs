@@ -12,7 +12,7 @@ fn magic_numbers(language: Language, source: &str) -> Vec<(usize, String)> {
         .set_language(&language.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let limits = Limits::default().with_rule(RuleId::MagicNumber, Some(0));
-    analyze(&mut parser, language, source.as_bytes(), limits)
+    analyze(&mut parser, language, source.as_bytes(), &limits)
         .expect("el archivo se parsea")
         .magic_numbers
         .into_iter()
@@ -182,7 +182,7 @@ fn skips_magic_numbers_when_the_rule_is_off() {
         &mut parser,
         Language::Go,
         b"package a\n\nfunc f() int { return 5 }\n",
-        Limits::default(),
+        &Limits::default(),
     )
     .expect("el archivo se parsea");
     assert_eq!(analysis.magic_numbers, Vec::new());

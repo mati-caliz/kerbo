@@ -200,7 +200,7 @@ impl<'tree> Context<'tree, '_> {
     }
 }
 
-pub fn reported(root: Node<'_>, file: SourceFile<'_>, limits: Limits) -> Vec<LintFinding> {
+pub fn reported(root: Node<'_>, file: SourceFile<'_>, limits: &Limits) -> Vec<LintFinding> {
     let enabled = |rule: EslintRule| limits.get(RuleId::Eslint(rule)).is_some();
     if !EslintRule::ALL.into_iter().any(enabled) {
         return Vec::new();

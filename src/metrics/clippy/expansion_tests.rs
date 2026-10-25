@@ -20,11 +20,14 @@ fn entries(measured: &[FunctionMetrics]) -> Vec<Entry> {
 }
 
 fn nesting_lines(source: &str) -> Vec<usize> {
-    analyze_rust(source, Limits::default().with_rule(RuleId::NestingDepth, Some(1)))
-        .nesting
-        .iter()
-        .map(|finding| finding.line)
-        .collect()
+    analyze_rust(
+        source,
+        &Limits::default().with_rule(RuleId::NestingDepth, Some(1)),
+    )
+    .nesting
+    .iter()
+    .map(|finding| finding.line)
+    .collect()
 }
 
 #[test]

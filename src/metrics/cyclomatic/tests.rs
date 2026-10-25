@@ -13,7 +13,7 @@ fn python_complexities(source: &str) -> Vec<(String, Option<usize>, Option<usize
         &mut parser,
         Language::Python,
         source.as_bytes(),
-        Limits::default(),
+        &Limits::default(),
     )
     .expect("el archivo se parsea")
     .functions

@@ -171,7 +171,7 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
     let limits = file
         .language
         .map(|language| config.limits_for(relative, language, file.is_test));
-    let mut diagnostics = secret_scan::profile(&file.identity, config, limits)
+    let mut diagnostics = secret_scan::profile(&file.identity, config, limits.as_ref())
         .map(|profile| secret_scan::diagnostics(&file.identity, &profile, source, None))
         .unwrap_or_default();
     let (Some(language), Some(limits)) = (file.language, limits) else {
@@ -186,9 +186,9 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
         path: Some(&file.identity.absolute),
         crate_macros: crate_macros.as_ref(),
     };
-    let mut analysis = analyze_unit(&mut parser, unit, limits).ok()?;
-    let pooled = pooling::pooled_file(&file.identity, &mut analysis, limits);
-    diagnostics.extend(evaluate(&file.identity, &analysis, limits));
+    let mut analysis = analyze_unit(&mut parser, unit, &limits).ok()?;
+    let pooled = pooling::pooled_file(&file.identity, &mut analysis, &limits);
+    diagnostics.extend(evaluate(&file.identity, &analysis, &limits));
     let (mut diagnostics, _suppressed) = split(source, diagnostics);
     diagnostics.extend(find_duplicates(pooled.into_iter().collect()));
     Some(diagnostics)
@@ -322,7 +322,7 @@ fn check_file(
     };
     let cached = request
         .cache
-        .map(|cache| (cache, cache.analysis_key(subject, limits)));
+        .map(|cache| (cache, cache.analysis_key(subject, &limits)));
     let unit = SourceUnit {
         language,
         source: &source,
@@ -330,18 +330,18 @@ fn check_file(
         crate_macros: crate_macros.as_ref(),
     };
     let mut analysis =
-        cached_or_fresh(cached, || analyze_unit(parser, unit, limits)).map_err(|ParseFailed| {
+        cached_or_fresh(cached, || analyze_unit(parser, unit, &limits)).map_err(|ParseFailed| {
             ScanFailure {
                 problem: Problem::Unparsable {
                     path: file.identity.display.clone(),
                 },
             }
         })?;
-    let pooled = pooling::pooled_file(&file.identity, &mut analysis, limits);
-    let (indexed, tainted) = project::summaries(&file.identity, file.is_test, &mut analysis, limits);
+    let pooled = pooling::pooled_file(&file.identity, &mut analysis, &limits);
+    let (indexed, tainted) = project::summaries(&file.identity, file.is_test, &mut analysis, &limits);
     let go_package = go_packages::package_file(&file.identity, &mut analysis);
-    let mut diagnostics = evaluate(&file.identity, &analysis, limits);
-    if let Some(profile) = secret_scan::profile(&file.identity, request.config, Some(limits)) {
+    let mut diagnostics = evaluate(&file.identity, &analysis, &limits);
+    if let Some(profile) = secret_scan::profile(&file.identity, request.config, Some(&limits)) {
         diagnostics.extend(secret_scan::diagnostics(
             &file.identity,
             &profile,

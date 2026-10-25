@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::aliases::called_alias_reports;
+use super::async_blocking::async_blocking_reports;
 use super::builtin_calls::builtin_call_reports;
 use super::cast_calls::cast_call_reports;
 use super::collection_calls::collection_call_reports;
@@ -9,6 +10,7 @@ use super::file_loops::readlines_in_for;
 use super::format_calls::format_call_report;
 use super::idioms::idiom_reports;
 use super::integer_calls::integer_call_reports;
+use super::library_calls::library_call_reports;
 use super::misc_calls::misc_call_reports;
 use super::model::Model;
 use super::pylint_calls::pylint_call_reports;
@@ -86,6 +88,8 @@ pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Rep
     reports.extend(misc_call_reports(model, source, call));
     reports.extend(pylint_call_reports(model, source, call));
     reports.extend(ruff_call_reports(model, source, call));
+    reports.extend(library_call_reports(model, source, call));
+    reports.extend(async_blocking_reports(model, source, call));
     reports.extend(tail_call_reports(model, source, call));
     reports.extend(readlines_in_for(model, source, call));
     if let Some(function) = call.child_by_field_name(FUNCTION_FIELD) {

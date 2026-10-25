@@ -221,7 +221,7 @@ fn slice_start<'source>(node: Node<'_>, source: &'source [u8]) -> Option<(&'sour
     Some((text(value, source), start))
 }
 
-fn is_assigned(call: Node<'_>) -> bool {
+pub fn is_assigned(call: Node<'_>) -> bool {
     call.parent().is_some_and(|parent| {
         parent.kind() == ASSIGNMENT
             && parent

@@ -52,7 +52,7 @@ const RUST_COUNTING_BRANCH: &str = "        $total += 1;\n";
 const RUST_CONDITIONAL_BRANCH: &str = "        if $flag {\n            $total += 1;\n        }\n";
 const TYPESCRIPT_SOURCE: &str = "function pick(flag: boolean, value: number) {\n  if (flag) {\n    value = value + 1;\n    return value * 3;\n  } else {\n    value = value + 1;\n    return value * 3;\n  }\n}\n";
 
-fn analysis_of(language: Language, source: &str, limits: Limits) -> FileAnalysis {
+fn analysis_of(language: Language, source: &str, limits: &Limits) -> FileAnalysis {
     let mut parser = Parser::new();
     parser
         .set_language(&language.grammar().expect("tiene gramática"))
@@ -172,7 +172,7 @@ fn every_kind_of_analysis_decodes_to_the_same_value() {
         (Language::Rust, "fn main() {\n    let total = 1;\n}\n".to_owned()),
     ];
     for (language, source) in samples {
-        let analysis = analysis_of(language, &source, strict(language));
+        let analysis = analysis_of(language, &source, &strict(language));
         let encoded = analysis_codec::encode(&analysis);
         let decoded = analysis_codec::decode(&encoded).expect("se decodifica");
         assert_eq!(format!("{decoded:?}"), format!("{analysis:?}"), "{language:?}");
@@ -190,27 +190,27 @@ fn the_key_changes_with_content_language_and_limits() {
     let tree = TempTree::new("cache-keys");
     let cache = AnalysisCache::open(tree.path().to_path_buf(), DEFAULT_MAX_BYTES);
     let limits = strict(Language::Java);
-    let base = cache.analysis_key(subject(Language::Java, b"class A {}", None), limits);
+    let base = cache.analysis_key(subject(Language::Java, b"class A {}", None), &limits);
     assert_eq!(
         base,
-        cache.analysis_key(subject(Language::Java, b"class A {}", None), limits)
+        cache.analysis_key(subject(Language::Java, b"class A {}", None), &limits)
     );
     assert_ne!(
         base,
-        cache.analysis_key(subject(Language::Java, b"class B {}", None), limits)
+        cache.analysis_key(subject(Language::Java, b"class B {}", None), &limits)
     );
     assert_ne!(
         base,
-        cache.analysis_key(subject(Language::Go, b"class A {}", None), limits)
+        cache.analysis_key(subject(Language::Go, b"class A {}", None), &limits)
     );
     let looser = limits.with_rule(RuleId::NestingDepth, Some(SMALL_DUPLICATE_LIMIT));
     assert_ne!(
         base,
-        cache.analysis_key(subject(Language::Java, b"class A {}", None), looser)
+        cache.analysis_key(subject(Language::Java, b"class A {}", None), &looser)
     );
     assert_ne!(
         base,
-        cache.analysis_key(subject(Language::Java, b"class A {}", Some(0)), limits)
+        cache.analysis_key(subject(Language::Java, b"class A {}", Some(0)), &limits)
     );
 }
 
@@ -326,7 +326,7 @@ fn a_cached_scan_reports_exactly_what_a_fresh_one_does() {
     assert_ne!(shard_files(&directory).len(), 0);
     let warm = AnalysisCache::open(directory.clone(), DEFAULT_MAX_BYTES);
     let limits = strict(Language::Go).with_override(DUPLICATE_OVERRIDE[0]);
-    let key = warm.analysis_key(subject(Language::Go, GO_SOURCE.as_bytes(), None), limits);
+    let key = warm.analysis_key(subject(Language::Go, GO_SOURCE.as_bytes(), None), &limits);
     assert!(warm.analysis(key).is_some());
     assert_eq!(summary(&scan_project(tree.path(), Some(&warm))), fresh);
     for shard in shard_files(&directory) {

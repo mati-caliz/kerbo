@@ -14,7 +14,7 @@ fn nesting_of(language: Language, source: &str, limit: usize) -> Vec<(usize, usi
         &mut parser,
         language,
         source.as_bytes(),
-        Limits::default().with_rule(RuleId::NestingDepth, Some(limit)),
+        &Limits::default().with_rule(RuleId::NestingDepth, Some(limit)),
     )
     .expect("el archivo se parsea")
     .nesting

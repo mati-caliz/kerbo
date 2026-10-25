@@ -10,6 +10,7 @@ use super::literals::is_native_literal_call;
 use super::model::{BindingKind, Model, ScopeKind};
 use super::pep::is_pep585_generic;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
+use super::redundant_tests::negated_operands;
 use super::short_circuit::short_circuit_reports;
 use super::targets::Store;
 use super::type_hints::{Hints, type_hint_reports};
@@ -140,6 +141,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
                     .extend(short_circuit_reports(&self.model, self.source, node));
                 self.reports
                     .extend(boolean_chain_reports(&self.model, self.source, node));
+                self.reports
+                    .extend(negated_operands(&self.model, self.source, node));
                 self.children(node, mode);
             }
             kind if COMPREHENSIONS.contains(&kind) => self.comprehension(node),

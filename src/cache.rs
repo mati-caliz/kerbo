@@ -83,7 +83,7 @@ impl AnalysisCache {
         }
     }
 
-    pub fn analysis_key(&self, subject: AnalysisSubject<'_>, limits: Limits) -> CacheKey {
+    pub fn analysis_key(&self, subject: AnalysisSubject<'_>, limits: &Limits) -> CacheKey {
         let AnalysisSubject {
             language,
             source,

@@ -93,7 +93,7 @@ pub fn analyze(
     parser: &mut Parser,
     language: Language,
     source: &[u8],
-    limits: Limits,
+    limits: &Limits,
 ) -> Result<FileAnalysis, ParseFailed> {
     let unit = SourceUnit {
         language,
@@ -107,7 +107,7 @@ pub fn analyze(
 pub fn analyze_unit(
     parser: &mut Parser,
     unit: SourceUnit<'_>,
-    limits: Limits,
+    limits: &Limits,
 ) -> Result<FileAnalysis, ParseFailed> {
     let SourceUnit { language, source, .. } = unit;
     if let Some(violations) =

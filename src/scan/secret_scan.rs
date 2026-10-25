@@ -13,7 +13,7 @@ const LARGEST_PLAIN_FILE_BYTES: u64 = 32 * 1024 * 1024;
 const FOUND_ONCE: usize = 1;
 const NOTHING_ALLOWED: usize = 0;
 
-pub fn profile(identity: &FileIdentity, config: &Config, limits: Option<Limits>) -> Option<PathProfile> {
+pub fn profile(identity: &FileIdentity, config: &Config, limits: Option<&Limits>) -> Option<PathProfile> {
     let enabled = limits.map_or_else(
         || config.reports(Path::new(&identity.relative), RuleId::CommittedSecret),
         |limits| limits.get(RuleId::CommittedSecret).is_some(),

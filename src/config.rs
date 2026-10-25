@@ -190,7 +190,7 @@ impl Config {
 
     pub fn limits_for(&self, relative: &Path, language: Language, is_test: bool) -> Limits {
         self.adjusted(
-            self.preset.limits(language, is_test),
+            &self.preset.limits(language, is_test),
             Some(language.stack()),
             relative,
         )
@@ -198,15 +198,15 @@ impl Config {
 
     pub fn reports(&self, relative: &Path, rule: RuleId) -> bool {
         let base = Limits::default().with_rule(rule, REPORT_EVERY_OCCURRENCE);
-        self.adjusted(base, None, relative).get(rule).is_some()
+        self.adjusted(&base, None, relative).get(rule).is_some()
     }
 
-    fn adjusted(&self, base: Limits, stack: Option<Stack>, relative: &Path) -> Limits {
+    fn adjusted(&self, base: &Limits, stack: Option<Stack>, relative: &Path) -> Limits {
         let adjusted = self
             .adjustments
             .iter()
             .filter(|adjustment| adjustment.stack.is_none_or(|only| Some(only) == stack))
-            .fold(base, |limits, adjustment| {
+            .fold(*base, |limits, adjustment| {
                 limits.with_rule(adjustment.rule, adjustment.max)
             });
         self.exceptions

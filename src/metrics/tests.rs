@@ -10,7 +10,7 @@ fn analyze_source(language: Language, source: &str) -> FileAnalysis {
     parser
         .set_language(&language.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
-    analyze(&mut parser, language, source.as_bytes(), Limits::default()).expect("el archivo se parsea")
+    analyze(&mut parser, language, source.as_bytes(), &Limits::default()).expect("el archivo se parsea")
 }
 
 fn function_named<'analysis>(analysis: &'analysis FileAnalysis, name: &str) -> &'analysis FunctionMetrics {

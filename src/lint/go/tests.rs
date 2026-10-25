@@ -20,7 +20,7 @@ fn lints(source: &str) -> Vec<LintFinding> {
     findings(
         tree.root_node(),
         source.as_bytes(),
-        Preset::Strict.limits(Language::Go, false),
+        &Preset::Strict.limits(Language::Go, false),
     )
 }
 
@@ -169,7 +169,7 @@ fn package_facts_keep_the_declared_names_and_the_capitalized_words() {
     let facts = super::package_facts(
         tree.root_node(),
         ERROR_STRINGS.as_bytes(),
-        Preset::Strict.limits(Language::Go, false),
+        &Preset::Strict.limits(Language::Go, false),
     )
     .expect("ST1005 está prendida");
     assert_eq!(facts.package, "store");

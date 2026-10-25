@@ -28,7 +28,7 @@ fn a_private_field_assigned_only_once_may_be_final() {
     }
 }
 ";
-    let found = rendered_where(&lints(source, strict()), |rule| {
+    let found = rendered_where(&lints(source, &strict()), |rule| {
         rule == RuleId::Java(JavaRule::FieldMayBeFinal)
     });
     assert_eq!(

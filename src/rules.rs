@@ -55,7 +55,7 @@ struct Finding<'function> {
     function: Option<&'function FunctionMetrics>,
 }
 
-pub fn evaluate(file: &FileIdentity, analysis: &FileAnalysis, limits: Limits) -> Vec<Diagnostic> {
+pub fn evaluate(file: &FileIdentity, analysis: &FileAnalysis, limits: &Limits) -> Vec<Diagnostic> {
     let file_finding = limits
         .get(RuleId::FileLength)
         .filter(|&limit| analysis.file_lines > limit)
@@ -91,7 +91,7 @@ pub fn evaluate(file: &FileIdentity, analysis: &FileAnalysis, limits: Limits) ->
 fn nesting_diagnostics<'analysis>(
     file: &'analysis FileIdentity,
     analysis: &'analysis FileAnalysis,
-    limits: Limits,
+    limits: &Limits,
 ) -> impl Iterator<Item = Diagnostic> + 'analysis {
     let limit = limits.get(RuleId::NestingDepth);
     let mut occurrences: HashMap<usize, usize> = HashMap::new();
@@ -198,7 +198,11 @@ fn commented_code_diagnostics<'analysis>(
     })
 }
 
-fn function_findings(function: &FunctionMetrics, limits: Limits) -> impl Iterator<Item = Finding<'_>> {
+fn function_findings<'function>(
+    function: &'function FunctionMetrics,
+    limits: &Limits,
+) -> impl Iterator<Item = Finding<'function>> + use<'function> {
+    let limits = *limits;
     let measured = [
         (RuleId::FunctionLength, function.lines),
         (RuleId::CyclomaticComplexity, function.cyclomatic),

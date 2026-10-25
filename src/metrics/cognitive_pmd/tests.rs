@@ -9,7 +9,7 @@ fn cognitive_by_line(source: &str) -> Vec<(usize, Option<usize>)> {
     parser
         .set_language(&Language::Java.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
-    analyze(&mut parser, Language::Java, source.as_bytes(), Limits::default())
+    analyze(&mut parser, Language::Java, source.as_bytes(), &Limits::default())
         .expect("el archivo se parsea")
         .functions
         .into_iter()

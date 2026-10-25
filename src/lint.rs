@@ -121,7 +121,7 @@ pub fn find_lints(
     root: Node<'_>,
     unit: SourceUnit<'_>,
     style: LintStyle,
-    limits: Limits,
+    limits: &Limits,
 ) -> Vec<LintFinding> {
     match style {
         LintStyle::Unmeasured => Vec::new(),
@@ -154,7 +154,7 @@ fn is_declaration_file(path: &Path) -> bool {
         })
 }
 
-fn java_lints(root: Node<'_>, source: &[u8], limits: Limits) -> Vec<LintFinding> {
+fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding> {
     let family_off = JavaRule::ALL
         .into_iter()
         .all(|rule| limits.get(RuleId::Java(rule)).is_none());

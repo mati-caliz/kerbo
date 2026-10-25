@@ -89,7 +89,7 @@ fn unit(source: &str) -> SourceUnit<'_> {
     }
 }
 
-pub(super) fn lints(source: &str, limits: Limits) -> Vec<LintFinding> {
+pub(super) fn lints(source: &str, limits: &Limits) -> Vec<LintFinding> {
     let mut parser = Parser::new();
     parser
         .set_language(&Language::Java.grammar().expect("tiene gramática"))
@@ -130,7 +130,7 @@ pub(super) fn expected(golden: &str) -> Vec<String> {
 fn reports_exactly_what_checkstyle_reports_with_sun_checks() {
     for (name, source, golden) in FIXTURES {
         assert_eq!(
-            rendered(&lints(source, strict())),
+            rendered(&lints(source, &strict())),
             expected(golden),
             "{name}.java contra Checkstyle 14.3"
         );
@@ -140,7 +140,7 @@ fn reports_exactly_what_checkstyle_reports_with_sun_checks() {
 #[test]
 fn every_fix_leaves_the_file_without_that_problem() {
     for (name, source, _) in FIXTURES {
-        let before = lints(source, strict());
+        let before = lints(source, &strict());
         let count = |findings: &[LintFinding], finding: &LintFinding| {
             findings
                 .iter()
@@ -151,7 +151,7 @@ fn every_fix_leaves_the_file_without_that_problem() {
             let Some(fix) = &finding.fix else { continue };
             let fixed = apply(&fix.edits, source).expect("el arreglo cae dentro del archivo");
             assert!(
-                count(&lints(&fixed, strict()), finding) < count(&before, finding),
+                count(&lints(&fixed, &strict()), finding) < count(&before, finding),
                 "{name}.java: el arreglo de {finding:?} no lo resuelve"
             );
         }
@@ -161,7 +161,7 @@ fn every_fix_leaves_the_file_without_that_problem() {
 #[test]
 fn star_imports_have_no_mechanical_fix() {
     let source = "import java.util.*;\nclass A { List<String> names; }\n";
-    let found: Vec<LintFinding> = lints(source, strict())
+    let found: Vec<LintFinding> = lints(source, &strict())
         .into_iter()
         .filter(|finding| LINT_RULES.contains(&finding.kind.rule()))
         .collect();
@@ -176,7 +176,7 @@ fn star_imports_have_no_mechanical_fix() {
 #[test]
 fn columns_count_bytes_where_checkstyle_expands_tabs() {
     let source = "class A {\n\tvoid m(int value) {}\n}\n";
-    let found: Vec<LintFinding> = lints(source, strict())
+    let found: Vec<LintFinding> = lints(source, &strict())
         .into_iter()
         .filter(|finding| LINT_RULES.contains(&finding.kind.rule()))
         .collect();
@@ -191,19 +191,22 @@ fn columns_count_bytes_where_checkstyle_expands_tabs() {
 fn respects_each_rule_switch_and_other_languages() {
     let source = "import a.B;\nclass A { void m(int value) { } }\n";
     let without_final = strict().with_rule(RuleId::FinalParameter, None);
-    assert_eq!(rendered(&lints(source, without_final)), ["1:8 unused-import a.B"]);
+    assert_eq!(
+        rendered(&lints(source, &without_final)),
+        ["1:8 unused-import a.B"]
+    );
     let everything_off = LINT_RULES
         .iter()
         .fold(strict(), |limits, &rule| limits.with_rule(rule, None));
-    assert_eq!(lints(source, everything_off), Vec::new());
+    assert_eq!(lints(source, &everything_off), Vec::new());
     let recommended = Preset::Recommended.limits(Language::Java, false);
-    assert_eq!(rendered(&lints(source, recommended)), ["1:8 unused-import a.B"]);
+    assert_eq!(rendered(&lints(source, &recommended)), ["1:8 unused-import a.B"]);
     let mut parser = Parser::new();
     parser
         .set_language(&Language::Java.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let tree = parser.parse(source, None).expect("el archivo se parsea");
-    let unmeasured = find_lints(tree.root_node(), unit(source), LintStyle::Unmeasured, strict());
+    let unmeasured = find_lints(tree.root_node(), unit(source), LintStyle::Unmeasured, &strict());
     assert_eq!(unmeasured, Vec::new());
 }
 
@@ -211,13 +214,13 @@ fn respects_each_rule_switch_and_other_languages() {
 fn names_literals_and_empty_statements_match_checkstyle() {
     let source = include_str!("fixtures/Names.java");
     assert_eq!(
-        rendered_where(&lints(source, strict()), |rule| {
+        rendered_where(&lints(source, &strict()), |rule| {
             matches!(rule, RuleId::Java(java) if FIRST_JAVA_RULES.contains(&java))
         }),
         expected(include_str!("fixtures/Names.checkstyle")),
         "Names.java contra Checkstyle 14.3"
     );
-    let fixed = lints(source, strict())
+    let fixed = lints(source, &strict())
         .into_iter()
         .filter_map(|finding| finding.fix)
         .fold(source.to_owned(), |text, fix| {
@@ -226,7 +229,7 @@ fn names_literals_and_empty_statements_match_checkstyle() {
     assert!(fixed.contains("= 10L;"));
     let minimal = Preset::Minimal.limits(Language::Java, false);
     assert!(
-        lints(source, minimal)
+        lints(source, &minimal)
             .iter()
             .all(|finding| !matches!(finding.kind.rule(), RuleId::Java(_))),
         "minimal no pide estilo de nombres"
@@ -237,7 +240,7 @@ fn names_literals_and_empty_statements_match_checkstyle() {
 fn declarations_flow_and_text_match_checkstyle() {
     let source = include_str!("fixtures/Shapes.java");
     assert_eq!(
-        rendered_where(&lints(source, strict()), |rule| {
+        rendered_where(&lints(source, &strict()), |rule| {
             matches!(rule, RuleId::Java(java)
                 if !DESIGN_JAVA_RULES.contains(&java)
                     && !SPACING_JAVA_RULES.contains(&java)
@@ -246,7 +249,7 @@ fn declarations_flow_and_text_match_checkstyle() {
         expected(include_str!("fixtures/Shapes.checkstyle")),
         "Shapes.java contra Checkstyle 14.3"
     );
-    let found = lints(source, strict());
+    let found = lints(source, &strict());
     let chosen = compatible(found.iter().filter_map(|finding| finding.fix.as_ref()));
     let fixed = apply(&edits_of(&chosen), source).expect("los arreglos caen en el archivo");
     assert!(
@@ -263,7 +266,7 @@ fn declarations_flow_and_text_match_checkstyle() {
 fn design_rules_match_checkstyle() {
     let source = include_str!("fixtures/Design.java");
     assert_eq!(
-        rendered_where(&lints(source, strict()), |rule| {
+        rendered_where(&lints(source, &strict()), |rule| {
             matches!(rule, RuleId::Java(java) if DESIGN_JAVA_RULES.contains(&java))
         }),
         expected(include_str!("fixtures/Design.checkstyle")),
@@ -279,7 +282,7 @@ fn is_spacing_rule(rule: RuleId) -> bool {
 fn spacing_rules_match_checkstyle() {
     let source = include_str!("fixtures/Spacing.java");
     assert_eq!(
-        rendered_where(&lints(source, strict()), is_spacing_rule),
+        rendered_where(&lints(source, &strict()), is_spacing_rule),
         expected(include_str!("fixtures/Spacing.checkstyle")),
         "Spacing.java contra Checkstyle 14.3"
     );
@@ -288,7 +291,7 @@ fn spacing_rules_match_checkstyle() {
 #[test]
 fn every_spacing_fix_removes_its_own_problem() {
     let source = include_str!("fixtures/Spacing.java");
-    let before = lints(source, strict());
+    let before = lints(source, &strict());
     let same_rule = |findings: &[LintFinding], finding: &LintFinding| {
         findings
             .iter()
@@ -302,7 +305,7 @@ fn every_spacing_fix_removes_its_own_problem() {
         let Some(fix) = &finding.fix else { continue };
         let fixed = apply(&fix.edits, source).expect("el arreglo cae dentro del archivo");
         assert!(
-            same_rule(&lints(&fixed, strict()), finding) < same_rule(&before, finding),
+            same_rule(&lints(&fixed, &strict()), finding) < same_rule(&before, finding),
             "el arreglo de {finding:?} no lo resuelve"
         );
     }
@@ -332,7 +335,7 @@ fn same_parameter_value_follows_intellij_for_private_code() {
     int callVisible() { return visible(1); }
 }
 "#;
-    let found: Vec<String> = rendered_where(&lints(source, strict()), |rule| {
+    let found: Vec<String> = rendered_where(&lints(source, &strict()), |rule| {
         rule == RuleId::Java(JavaRule::SameParameterValue)
     });
     assert_eq!(
@@ -353,7 +356,7 @@ fn optional_get_is_reported_only_right_after_what_creates_the_optional() {
     }
 }
 ";
-    let found = rendered_where(&lints(source, strict()), |rule| {
+    let found = rendered_where(&lints(source, &strict()), |rule| {
         rule == RuleId::Java(JavaRule::OptionalGetWithoutIsPresent)
     });
     assert_eq!(

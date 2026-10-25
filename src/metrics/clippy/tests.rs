@@ -6,7 +6,7 @@ use crate::limits::Limits;
 use crate::metrics::FunctionMetrics;
 use crate::rules::RuleId;
 
-pub(super) fn analyze_rust(source: &str, limits: Limits) -> FileAnalysis {
+pub(super) fn analyze_rust(source: &str, limits: &Limits) -> FileAnalysis {
     let mut parser = Parser::new();
     parser
         .set_language(&Language::Rust.grammar().expect("tiene gramática"))
@@ -15,7 +15,7 @@ pub(super) fn analyze_rust(source: &str, limits: Limits) -> FileAnalysis {
 }
 
 pub(super) fn functions(source: &str) -> Vec<FunctionMetrics> {
-    analyze_rust(source, Limits::default()).functions
+    analyze_rust(source, &Limits::default()).functions
 }
 
 pub(super) fn named<'list>(functions: &'list [FunctionMetrics], name: &str) -> &'list FunctionMetrics {
@@ -177,7 +177,7 @@ mod inner {
     fn flat() {}
 }
 ",
-        Limits::default().with_rule(RuleId::NestingDepth, Some(2)),
+        &Limits::default().with_rule(RuleId::NestingDepth, Some(2)),
     );
     let lines: Vec<(usize, usize)> = analysis
         .nesting
@@ -249,7 +249,7 @@ fn skips_unsafe_blocks_when_nesting() {
     }
 }
 ",
-        Limits::default().with_rule(RuleId::NestingDepth, Some(1)),
+        &Limits::default().with_rule(RuleId::NestingDepth, Some(1)),
     );
     assert_eq!(
         analysis.nesting.len(),

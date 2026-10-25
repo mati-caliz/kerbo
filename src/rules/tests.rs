@@ -49,7 +49,7 @@ fn reports_every_limit_exceeded_with_its_value() {
     let diagnostics = evaluate(
         &file("a.go"),
         &analysis,
-        Preset::Strict.limits(Language::Go, false),
+        &Preset::Strict.limits(Language::Go, false),
     );
     let rules: Vec<RuleId> = diagnostics.iter().map(|diagnostic| diagnostic.rule).collect();
     assert_eq!(
@@ -109,7 +109,7 @@ fn fingerprints_ignore_lines_and_number_repeated_symbols() {
         ],
     };
     let limits = Limits::default().with_rule(RuleId::CyclomaticComplexity, Some(1));
-    let fingerprints: Vec<String> = evaluate(&file("src/a.ts"), &analysis, limits)
+    let fingerprints: Vec<String> = evaluate(&file("src/a.ts"), &analysis, &limits)
         .into_iter()
         .map(|diagnostic| diagnostic.fingerprint)
         .collect();
@@ -142,7 +142,7 @@ fn skips_rules_without_limit_or_measure() {
     let diagnostics = evaluate(
         &file("a.py"),
         &analysis,
-        Preset::Strict.limits(Language::Python, false),
+        &Preset::Strict.limits(Language::Python, false),
     );
     let rules: Vec<RuleId> = diagnostics.iter().map(|diagnostic| diagnostic.rule).collect();
     assert_eq!(rules, [RuleId::CyclomaticComplexity]);
@@ -178,7 +178,7 @@ fn values_at_the_limit_pass() {
         evaluate(
             &file("A.java"),
             &analysis,
-            Preset::Strict.limits(Language::Java, false)
+            &Preset::Strict.limits(Language::Java, false)
         )
         .is_empty()
     );
@@ -193,8 +193,8 @@ fn anonymous_functions_keep_their_fingerprint_and_translate_their_name() {
     let source = "export default function (a, b, c, d, e) { return a; }\n";
     let limits = Limits::default().with_rule(RuleId::ParameterCount, Some(1));
     let analysis =
-        analyze(&mut parser, Language::TypeScript, source.as_bytes(), limits).expect("el archivo se parsea");
-    let diagnostics = evaluate(&file("src/a.ts"), &analysis, limits);
+        analyze(&mut parser, Language::TypeScript, source.as_bytes(), &limits).expect("el archivo se parsea");
+    let diagnostics = evaluate(&file("src/a.ts"), &analysis, &limits);
     let anonymous = diagnostics
         .iter()
         .find(|diagnostic| diagnostic.rule == RuleId::ParameterCount)

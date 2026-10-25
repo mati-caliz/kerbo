@@ -121,11 +121,11 @@ pub fn summaries(
     identity: &FileIdentity,
     in_tests: bool,
     analysis: &mut FileAnalysis,
-    limits: Limits,
+    limits: &Limits,
 ) -> (Option<IndexedFile>, Option<TaintedFile>) {
     let indexed = analysis.java_summary.take().map(|summary| IndexedFile {
         identity: identity.clone(),
-        limits,
+        limits: *limits,
         summary,
         in_tests,
     });
@@ -134,7 +134,7 @@ pub fn summaries(
         .zip(analysis.taints.take())
         .map(|(family, taints)| TaintedFile {
             identity: identity.clone(),
-            limits,
+            limits: *limits,
             family,
             taints,
         });

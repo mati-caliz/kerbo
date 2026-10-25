@@ -9,7 +9,7 @@ use crate::rules::{Diagnostic, FileIdentity, RuleId};
 pub fn pooled_file(
     identity: &FileIdentity,
     analysis: &mut FileAnalysis,
-    limits: Limits,
+    limits: &Limits,
 ) -> Option<PooledFile> {
     Some(PooledFile {
         identity: identity.clone(),

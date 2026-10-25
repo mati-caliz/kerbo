@@ -16,13 +16,13 @@ pub use error_strings::{CapitalizedError, GoPackageFacts};
 use error_strings::{ErrorStringProblem, error_strings};
 pub use nolint::ranges as nolint_ranges;
 
-fn analyzable(root: Node<'_>, source: &[u8], limits: Limits, rules: &[GoRule]) -> bool {
+fn analyzable(root: Node<'_>, source: &[u8], limits: &Limits, rules: &[GoRule]) -> bool {
     rules.iter().any(|rule| limits.get(RuleId::Go(*rule)).is_some())
         && !root.has_error()
         && !generated::is_generated(root, source)
 }
 
-pub fn findings(root: Node<'_>, source: &[u8], limits: Limits) -> Vec<LintFinding> {
+pub fn findings(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding> {
     let mut found = Vec::new();
     if analyzable(root, source, limits, &[GoRule::Ineffassign]) {
         let file = ast::file(root, source);
@@ -58,7 +58,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: Limits) -> Vec<LintFindin
 
 // Lo que el archivo aporta a ST1005 en su paquete: los mensajes con mayúscula y lo que declara. Un
 // archivo generado no avisa pero sus nombres cuentan, como en golangci-lint.
-pub fn package_facts(root: Node<'_>, source: &[u8], limits: Limits) -> Option<GoPackageFacts> {
+pub fn package_facts(root: Node<'_>, source: &[u8], limits: &Limits) -> Option<GoPackageFacts> {
     if limits.get(RuleId::Go(GoRule::St1005)).is_none() || root.has_error() {
         return None;
     }

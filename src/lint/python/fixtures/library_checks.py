@@ -1,0 +1,184 @@
+import contextlib
+import contextvars
+import datetime
+import hashlib
+import os
+import pathlib
+import subprocess
+import typing
+import urllib.request
+from contextvars import ContextVar
+from pathlib import Path
+from typing import ParamSpec, TypeVar
+
+import anyio
+import httpx
+import requests
+import trio
+
+
+async def trio_calls():
+    trio.sleep(1)
+    await trio.sleep(1)
+    await (trio.sleep(1))
+    trio.lowlevel.checkpoint()
+    trio.open_file("x")
+    trio.current_time()
+    await trio.sleep(86401)
+    await trio.sleep(86400)
+    await trio.sleep(seconds=100000.5)
+    await anyio.sleep(delay=90000)
+    await anyio.sleep(1e10)
+    await trio.sleep(1, 2)
+
+
+def sync_trio():
+    trio.sleep(1)
+
+
+async def blocking():
+    requests.get("url")
+    httpx.post("url")
+    urllib.request.urlopen("url")
+    requests.Session()
+    subprocess.Popen(["ls"])
+    os.popen("ls")
+    subprocess.run(["ls"])
+    os.system("ls")
+    subprocess.check_output(["ls"])
+    os.spawnl(os.P_NOWAIT, "ls")
+    os.spawnl(os.P_WAIT, "ls")
+    os.spawnl()
+
+    def inner():
+        requests.get("url")
+
+    return inner
+
+
+def not_async():
+    requests.get("url")
+    subprocess.run(["ls"])
+
+
+try:
+    pass
+except (ValueError, ValueError):
+    pass
+except (TypeError, KeyError, TypeError):
+    pass
+except ValueError:
+    pass
+except os.error:
+    pass
+except os.error:
+    pass
+except ():
+    pass
+
+with contextlib.suppress():
+    pass
+with contextlib.suppress(ValueError):
+    pass
+contextlib.suppress()
+
+ContextVar("name", default=[])
+contextvars.ContextVar("name", default={})
+ContextVar("name", default=set())
+ContextVar("name", default=compute())
+ContextVar("name", default=tuple())
+ContextVar("name", default=1)
+ContextVar("name", [])
+
+values = [1, 2]
+reversed(values[::-1])
+set(values[::-1])
+sorted(values[::-1])
+sorted(values[::-2])
+list(values[::-1])
+sorted(values[1::-1])
+
+
+def finally_return():
+    try:
+        return 1
+    except ValueError:
+        pass
+    finally:
+        return 2
+
+
+def finally_after_except():
+    try:
+        pass
+    except ValueError:
+        return 1
+    finally:
+        return 2
+
+
+def finally_without():
+    try:
+        pass
+    finally:
+        return 3
+
+
+a = b = 1
+a and not a
+not a and a
+a and not b
+a or not a
+f() and not f()
+x.y and not x.y
+a and b and not a
+
+mapping = {"a": 1}
+zip(mapping.keys(), mapping.values())
+zip(mapping.keys(), mapping.values(), strict=True)
+zip(mapping.keys(), other.values())
+zip(other.keys(), other.values())
+
+type(a) == type(None)
+type(None) is type(a)
+type(a) != type(None)
+type(a) is not type(None)
+type(a) == type(b)
+type(None) == type(None)
+
+Path().resolve()
+pathlib.Path(".").resolve()
+Path("").resolve()
+Path("src").resolve()
+Path().resolve(strict=True)
+
+hashlib.sha256(b"x").digest().hex()
+hashlib.md5().digest().hex()
+hashlib.new("md5").digest().hex()
+
+Path("file").with_suffix("txt")
+Path("file").with_suffix(".")
+Path("file").with_suffix(".txt")
+Path("file").with_suffix("")
+target = Path("file")
+target.with_suffix("py")
+unknown.with_suffix("py")
+Path("file").with_suffix(suffix="md")
+
+mocked.assert_called_once
+mocked.assert_awaited
+mocked.assert_called_once()
+assert mocked.called_once_with(1)
+assert mocked.not_called
+assert mocked.called
+mocked.called_once_with(1)
+
+T = TypeVar("T", covariant=True, contravariant=True)
+P = ParamSpec("P", covariant=True, contravariant=True)
+U = typing.TypeVar("U", covariant=True, contravariant=False)
+TypeVar("V", covariant=True, contravariant=True)
+
+datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+datetime.datetime.fromisoformat(stamp.rstrip("Z") + "+00:00")
+datetime.datetime.fromisoformat(stamp[:-1] + "-0000")
+datetime.datetime.fromisoformat(stamp.replace("Z", "+01:00"))

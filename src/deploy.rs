@@ -172,8 +172,9 @@ pub fn alembic_violations(root: Node<'_>, source: &[u8]) -> Vec<Violation> {
 pub fn violation_diagnostics<'analysis>(
     file: &'analysis FileIdentity,
     violations: &'analysis [Violation],
-    limits: Limits,
-) -> impl Iterator<Item = Diagnostic> + 'analysis {
+    limits: &Limits,
+) -> impl Iterator<Item = Diagnostic> + use<'analysis> {
+    let limits = *limits;
     let mut occurrences: HashMap<(RuleId, &str), usize> = HashMap::new();
     violations
         .iter()

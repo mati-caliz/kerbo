@@ -1570,22 +1570,35 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     valores por defecto), RUF048 (`map(int, __version__.split("."))`), RUF049 (dataclass que es un
     `enum`), RUF058 (`starmap` sobre un `zip`) y RUF101 (código viejo en un `noqa`). Cero avisos de más
     en el corpus. UP040, UP043, UP046, UP047 y RUF053 no hacen falta: ruff sólo las da con Python 3.12
-    o 3.13 como versión mínima, y su conjunto por defecto supone 3.10. RUF200 valida el
+    o 3.13 como versión mínima, y por defecto supone 3.11. RUF200 valida el
     `pyproject.toml`, que kerbo no lee como Python.
   - Pendientes de esa tanda: ninguna trae arreglo (ruff lo tiene en UP001, UP023, UP026, RUF024,
     RUF026, RUF030, RUF033, RUF058 y RUF101). RUF018 sólo mira el último binding de cada nombre.
+  - Hechas 22 reglas más que no aparecen en el corpus, medidas con `fixtures/library_checks.py`:
+    ASYNC105 (función async de trio sin `await`), ASYNC116 (`sleep` de más de un día), ASYNC210,
+    ASYNC220 y ASYNC221 (HTTP y procesos que bloquean en una función async), B014, B025 y B029
+    (excepciones repetidas o una tupla vacía en un `except`), B022 (`contextlib.suppress()` vacío),
+    B039 (`ContextVar` con un default mutable), C415 (`sorted(x[::-1])`), SIM107 (`return` en el
+    `finally`), SIM220 y SIM221 (`a and not a`, `a or not a`), SIM911 (`zip(d.keys(), d.values())`),
+    FURB162 (el `Z` reemplazado a mano antes de `fromisoformat`), FURB169 (`type(x) == type(None)`),
+    FURB177 (`Path().resolve()`), FURB181 (`.digest().hex()`), PTH210 (`with_suffix` sin punto),
+    PGH005 (métodos de un mock sin llamar o que no existen) y PLC0131 (`TypeVar` covariante y
+    contravariante). Cero avisos de más en el corpus. De paso, `Limits` pasó los 256 bytes con las
+    reglas nuevas y ahora se pasa por referencia en todo el código.
+  - Pendientes de esa tanda: B031 (reusar el generador de `itertools.groupby`) quedó afuera: pide
+    seguir los usos del grupo por ramas y loops. Ninguna trae arreglo (ruff lo tiene en B014, SIM911,
+    FURB162, FURB169, FURB177, FURB181, PTH210 y ASYNC105). PTH210 sólo reconoce un nombre ligado a una
+    llamada a `Path(...)`, no a una anotación.
   - Los archivos que no están en UTF-8 (ruff da E902 y no los analiza) se analizan igual: falta
     saltearlos o avisar como ruff. Se hacen en tandas de 15 a 25 reglas por
     tema, con un solo gate y una sola medición por tanda.
 - Pendientes de Python contra ruff:
   - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
     no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.
-  - Del conjunto por defecto de ruff 0.17 (407 reglas) quedan 42, más las cuatro del conjunto
+  - Del conjunto por defecto de ruff 0.17 (407 reglas) quedan 20, más las cuatro del conjunto
     clásico de arriba, todas con cero avisos en el corpus, así que su paridad sólo se puede medir con
-    fixtures: ASYNC105, ASYNC116, ASYNC210, ASYNC220, ASYNC221, B014, B022, B025, B029, B031, B039,
-    C415, EXE001, EXE002, EXE004, FA100, FA102, INT001, INT003, LOG002, LOG009, LOG014, G010, G101,
-    G202, PT010, PT020, PT025, PT026, SIM107, SIM220, SIM221, SIM911, TC007, TC010, PTH210, PGH005,
-    PLC0131, FURB162, FURB169, FURB177 y FURB181.
+    fixtures: B031, EXE001, EXE002, EXE004, FA100, FA102, INT001, INT003, LOG002, LOG009, LOG014, G010,
+    G101, G202, PT010, PT020, PT025, PT026, TC007 y TC010.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

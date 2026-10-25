@@ -11,7 +11,7 @@ fn short_names(language: Language, source: &str) -> Vec<(usize, String)> {
         .set_language(&language.grammar().expect("tiene gramática"))
         .expect("la gramática carga");
     let limits = Limits::default().with_rule(RuleId::ShortName, Some(0));
-    analyze(&mut parser, language, source.as_bytes(), limits)
+    analyze(&mut parser, language, source.as_bytes(), &limits)
         .expect("el archivo se parsea")
         .short_names
         .into_iter()

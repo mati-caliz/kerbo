@@ -56,6 +56,7 @@ mod string_characters;
 mod stub_bodies;
 mod tail_statements;
 pub mod taint;
+mod try_checks;
 mod typing_names;
 
 use std::path::Path;
@@ -138,7 +139,7 @@ pub fn relaxed_by(preset: Preset) -> Vec<RuleId> {
     relaxed.iter().copied().map(RuleId::Python).collect()
 }
 
-pub fn findings(root: Node<'_>, source: &[u8], limits: Limits, path: Option<&Path>) -> Vec<LintFinding> {
+pub fn findings(root: Node<'_>, source: &[u8], limits: &Limits, path: Option<&Path>) -> Vec<LintFinding> {
     let enabled = |rule: PythonRule| limits.get(RuleId::Python(rule)).is_some();
     if !PythonRule::ALL.into_iter().any(enabled) {
         return Vec::new();
@@ -238,6 +239,7 @@ fn more_syntax_reports(
     reports.extend(noqa::redirected_codes(root, source));
     reports.extend(module_upgrades::reports(nodes, source));
     reports.extend(index_types::reports(nodes, source));
+    reports.extend(try_checks::reports(nodes, source));
     reports.extend(rewrites::reports(nodes, source));
     reports.extend(module_names::invalid_module_name(path));
     reports
