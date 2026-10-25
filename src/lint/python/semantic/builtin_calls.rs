@@ -1,7 +1,9 @@
 use tree_sitter::Node;
 
+use super::call_fixes::type_of_primitive_fix;
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, COMMENT, FALSE, FUNCTION_FIELD, KEYWORD_ARGUMENT,
@@ -53,7 +55,8 @@ pub fn builtin_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
         && is_primitive_literal(*argument, source)
         && is_builtin_named(model, function, source, TYPE_BUILTIN)
     {
-        reports.push(Report::at(PythonRule::UP003, call, ""));
+        let fix = type_of_primitive_fix(model, call, *argument, source);
+        reports.push(Report::at(PythonRule::UP003, call, "").with_fix(fix));
     }
     let is_pipe = |keyword: &str| {
         keyword_value(&arguments, keyword, source)
@@ -159,7 +162,9 @@ pub fn lru_cache_reports(model: &Model<'_>, source: &[u8], decorators: &[Node<'_
                 .filter(|argument| argument.kind() != COMMENT)
                 .collect();
             match given.as_slice() {
-                [] => Some(Report::at(PythonRule::UP011, list, "")),
+                [] => Some(
+                    Report::at(PythonRule::UP011, list, "").with_fix(Some(Fix::replace(list, "", source))),
+                ),
                 [keyword] if is_unbounded_maxsize(*keyword, source) => {
                     Some(Report::at(PythonRule::UP033, list, ""))
                 }

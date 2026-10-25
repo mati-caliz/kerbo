@@ -1642,7 +1642,23 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     asignación, dejar el valor si tiene efectos, `_x` al desempaquetar una tupla literal y sacar el
     `as x` de un `with`; el del `except` sigue seguro), E711 y E712 (inseguros, y `x == True` pasa a
     `x`), F541 (inseguro en posición de docstring), F632, E713, E714, E703 y F901.
-  - Pendientes: los 206 arreglos que faltan, en tandas por tema, sumando cada regla a `--fixable`.
+  - Tanda 1 (19 arreglos, idénticos a ruff en los 55 fixtures; `fixtures/fix_edges.py` junta los
+    casos borde): UP003, UP004, UP005, UP008, UP009, UP010, UP011, UP012, UP019, UP020, UP025, UP034,
+    UP037, UP039, PIE790, PIE807, PIE808, B009 y SIM118. Piezas nuevas que usan las tandas que siguen:
+    `fix_edits.rs` (el `remove_argument` y el `pad` de ruff, y la regla de que un comentario en lo que
+    se borra vuelve inseguro el arreglo) y `semantic/importer.rs` (el `get_or_import_symbol` de ruff
+    para `import módulo`: reusa un import que ya está, con un no-op sobre él para chocar con un F401 de
+    la misma vuelta, o inserta el import después del último de primer nivel, del último
+    `from __future__` o del docstring y los comentarios del principio). Dos arreglos que se tocan
+    ahora chocan, como en ruff (`a = b = 1` sin usar se borra en dos vueltas). De paso, una anotación
+    entre comillas que termina en un comentario daba F722: el envoltorio que la parsea cerraba el
+    paréntesis adentro del comentario.
+  - Pendientes de esa tanda: PIE807 no mira si `list` o `dict` están tapados (ruff usa
+    `builtins.list`); B009 marca inseguro cualquier nombre no ASCII, y ruff sólo los que cambia NFKC.
+  - Pendientes: 136 arreglos que aparecen en el corpus, en tandas por tema. Los que siguen piden dos
+    piezas más: el resto del importer (`from módulo import miembro`, sumándolo a un import que ya
+    está; lo usan UP006, UP017, UP035, LOG009 y otros) y un generador de código como el de ruff, que
+    vuelve a imprimir expresiones (UP007, UP045, SIM201, SIM202, SIM208, B010 y casi todas las C4).
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

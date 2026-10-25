@@ -91,7 +91,7 @@ fn edit(line: usize, start: usize, end: usize, replacement: &str) -> Fix {
 }
 
 #[test]
-fn keeps_only_the_fixes_that_do_not_touch_each_other() {
+fn keeps_only_the_fixes_that_neither_overlap_nor_touch() {
     let first_word = edit(1, 1, 4, "");
     let overlapping = edit(1, 3, 6, "x");
     let same_start = edit(1, 1, 1, "y");
@@ -99,9 +99,9 @@ fn keeps_only_the_fixes_that_do_not_touch_each_other() {
     let other_line = edit(2, 1, 1, "final ");
     let fixes = [first_word, overlapping, same_start, touching, other_line];
     let chosen = compatible(&fixes);
-    assert_eq!(chosen.len(), 3);
+    assert_eq!(chosen.len(), 2);
     let fixed_text = apply(&edits_of(&chosen), "abcde\nint a;\n").expect("caen en el texto");
-    assert_eq!(fixed_text, "ze\nfinal int a;\n");
+    assert_eq!(fixed_text, "de\nfinal int a;\n");
 }
 
 #[test]

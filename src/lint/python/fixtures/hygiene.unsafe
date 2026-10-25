@@ -45,7 +45,6 @@ def silenced():
         pass
     except Exception:
         pass
-        pass
 
 
 def executing(code, exec_code):
@@ -55,11 +54,11 @@ def executing(code, exec_code):
 
 
 def keys(mapping, self):
-    if "a" in mapping.keys():
+    if "a" in mapping:
         pass
-    if "a" not in mapping.keys():
+    if "a" not in mapping:
         pass
-    if ("a") in (mapping.keys()):
+    if ("a") in (mapping):
         pass
     if "a" in self.keys():
         pass
@@ -67,9 +66,9 @@ def keys(mapping, self):
         pass
     if "a" in mapping.keys() in mapping:
         pass
-    for key in mapping.keys():
+    for key in mapping:
         pass
-    return [key for key in mapping.keys()]
+    return [key for key in mapping]
 
 
 def utc():

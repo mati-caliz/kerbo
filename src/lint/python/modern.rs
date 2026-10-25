@@ -9,26 +9,31 @@ use super::ast::{
     FUNCTION, FUNCTION_FIELD, IDENTIFIER, MODULE, OBJECT_FIELD, STRING, named, string_prefix, text,
     unparenthesized,
 };
+use crate::fix::Fix;
 use crate::rules::PythonRule;
+use fixes::{future_import_fix, line_deletion, placeholder_fix, unicode_prefix_fix};
+
+mod fixes;
 
 const UNICODE_PREFIX: char = 'u';
+pub const NON_TEXT_PREFIXES: [char; 6] = ['f', 'F', 'b', 'B', 't', 'T'];
 const SELF: &str = "self";
-const DEPRECATED_UNITTEST_ALIASES: [&str; 15] = [
-    "assertAlmostEquals",
-    "assertEquals",
-    "assertNotAlmostEquals",
-    "assertNotEquals",
-    "assertNotRegexpMatches",
-    "assertRaisesRegexp",
-    "assertRegexpMatches",
-    "assert_",
-    "failIf",
-    "failIfAlmostEqual",
-    "failIfEqual",
-    "failUnless",
-    "failUnlessAlmostEqual",
-    "failUnlessEqual",
-    "failUnlessRaises",
+const DEPRECATED_UNITTEST_ALIASES: [(&str, &str); 15] = [
+    ("assertAlmostEquals", "assertAlmostEqual"),
+    ("assertEquals", "assertEqual"),
+    ("assertNotAlmostEquals", "assertNotAlmostEqual"),
+    ("assertNotEquals", "assertNotEqual"),
+    ("assertNotRegexpMatches", "assertNotRegex"),
+    ("assertRaisesRegexp", "assertRaisesRegex"),
+    ("assertRegexpMatches", "assertRegex"),
+    ("assert_", "assertTrue"),
+    ("failIf", "assertFalse"),
+    ("failIfAlmostEqual", "assertNotAlmostEqual"),
+    ("failIfEqual", "assertNotEqual"),
+    ("failUnless", "assertTrue"),
+    ("failUnlessAlmostEqual", "assertAlmostEqual"),
+    ("failUnlessEqual", "assertEqual"),
+    ("failUnlessRaises", "assertRaises"),
 ];
 const PASS: &str = "pass_statement";
 const ELLIPSIS: &str = "ellipsis";
@@ -49,9 +54,9 @@ const UTF8_NAMES: [&str; 2] = ["utf8", "utf-8"];
 const MAX_CODING_LINE: usize = 1;
 const MIN_PLACEHOLDER_SIBLINGS: usize = 2;
 const FUTURE_IMPORT: &str = "future_import_statement";
-const ALIASED_IMPORT: &str = "aliased_import";
-const NAME_FIELD: &str = "name";
-const MANDATORY_FUTURE_FEATURES: [&str; 8] = [
+pub const ALIASED_IMPORT: &str = "aliased_import";
+pub const NAME_FIELD: &str = "name";
+pub const MANDATORY_FUTURE_FEATURES: [&str; 8] = [
     "nested_scopes",
     "generators",
     "with_statement",
@@ -82,7 +87,10 @@ pub fn reports(root: Node<'_>, nodes: &[Node<'_>], source: &[u8]) -> Vec<Report>
                     .to_ascii_lowercase()
                     .contains(UNICODE_PREFIX) =>
             {
-                found.push(Report::at(PythonRule::UP025, *node, ""));
+                found.push(
+                    Report::at(PythonRule::UP025, *node, "")
+                        .with_fix(Some(unicode_prefix_fix(*node, source))),
+                );
             }
             CALL => found.extend(deprecated_unittest_alias(*node, source)),
             FUTURE_IMPORT => {
@@ -100,10 +108,13 @@ pub fn reports(root: Node<'_>, nodes: &[Node<'_>], source: &[u8]) -> Vec<Report>
 // UP010: un `from __future__ import` de algo que ya es obligatorio en Python 3. Avisa una vez por
 // sentencia.
 fn unnecessary_future_import(statement: Node<'_>, source: &[u8]) -> Option<Report> {
-    let mandatory = future_features(statement)
-        .into_iter()
-        .any(|name| MANDATORY_FUTURE_FEATURES.contains(&text(name, source)));
-    mandatory.then(|| Report::at(PythonRule::UP010, statement, ""))
+    let features = future_features(statement);
+    let mandatory = features
+        .iter()
+        .any(|name| MANDATORY_FUTURE_FEATURES.contains(&text(*name, source)));
+    mandatory.then(|| {
+        Report::at(PythonRule::UP010, statement, "").with_fix(Some(future_import_fix(statement, source)))
+    })
 }
 
 // F407: `from __future__ import braces`, una característica que Python no conoce. Avisa en cada una.
@@ -149,7 +160,9 @@ fn coding_comment(root: Node<'_>, source: &[u8]) -> Option<Report> {
         (remaining.next(), remaining.next()),
         (Some(Coding::Other), _) | (Some(Coding::Absent), Some(Coding::Other))
     );
-    (!other_follows).then(|| Report::at_point(PythonRule::UP009, start, ""))
+    (!other_follows).then(|| {
+        Report::at_point(PythonRule::UP009, start, "").with_fix(Some(line_deletion(start.row, source)))
+    })
 }
 
 // Los comentarios del principio del archivo, cada uno sólo en su línea y sin código antes.
@@ -204,11 +217,14 @@ fn deprecated_unittest_alias(call: Node<'_>, source: &[u8]) -> Option<Report> {
     let is_self = function
         .child_by_field_name(OBJECT_FIELD)
         .is_some_and(|object| object.kind() == IDENTIFIER && text(object, source) == SELF);
-    let alias = function
-        .child_by_field_name(ATTRIBUTE_FIELD)
-        .map(|attribute| text(attribute, source))?;
-    (is_self && DEPRECATED_UNITTEST_ALIASES.contains(&alias))
-        .then(|| Report::at(PythonRule::UP005, function, alias))
+    let attribute = function.child_by_field_name(ATTRIBUTE_FIELD)?;
+    let alias = text(attribute, source);
+    let (_, replacement) = DEPRECATED_UNITTEST_ALIASES
+        .iter()
+        .find(|(deprecated, _)| *deprecated == alias)
+        .filter(|_| is_self)?;
+    let fix = Fix::replace(attribute, replacement, source);
+    Some(Report::at(PythonRule::UP005, function, alias).with_fix(Some(fix)))
 }
 
 // B015: una comparación suelta como sentencia, cuyo resultado se descarta.
@@ -233,12 +249,18 @@ fn unnecessary_placeholders(block: Node<'_>, source: &[u8]) -> Vec<Report> {
     let mut found = Vec::new();
     for statement in statements {
         if statement.kind() == PASS {
-            found.push(Report::at(PythonRule::PIE790, statement, ""));
+            found.push(
+                Report::at(PythonRule::PIE790, statement, "")
+                    .with_fix(Some(placeholder_fix(statement, source))),
+            );
         } else if is_ellipsis_statement(statement) {
             if in_type_checking_block(block, source) || in_protocol_or_abstract_method(block, source) {
                 return found;
             }
-            found.push(Report::at(PythonRule::PIE790, statement, ""));
+            found.push(
+                Report::at(PythonRule::PIE790, statement, "")
+                    .with_fix(Some(placeholder_fix(statement, source))),
+            );
         }
     }
     found

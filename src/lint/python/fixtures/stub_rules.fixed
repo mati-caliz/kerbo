@@ -1,0 +1,146 @@
+import enum
+import math
+import sys
+import typing
+from __future__ import annotations
+from collections.abc import AsyncIterable, Iterable, Iterator
+from typing import Any, Final, ParamSpec, TypeAlias, TypedDict, TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+_T = TypeVar("_T")
+U = typing.TypeVar("U")
+
+if sys.version_info >= (3, 9):
+    pass
+if sys.version_info < (3, 9):
+    x: int
+else:
+    x: str
+if sys.version_info < (3, 9):
+    y: int
+if sys.version_info > (3, 9):
+    z: int
+if sys.version_info == (3, 9, 1):
+    w: int
+if sys.version_info[:1] == (3, 9):
+    v: int
+if sys.version_info[:2] == (3,):
+    u: int
+if sys.version_info[0] == "3":
+    t: int
+if sys.version_info[1] >= 9:
+    s: int
+if sys.version_info >= (3, 9.0):
+    r: int
+if sys.version_info == 3:
+    q: int
+if sys.platform == "linux":
+    p: int
+if sys.platform == "linus":
+    o: int
+if sys.platform.startswith("linux"):
+    n: int
+if sys.platform in ("linux", "darwin"):
+    m: int
+if sys.platform == "linux" and sys.version_info >= (3, 9):
+    l2: int
+if typing.TYPE_CHECKING:
+    k: int
+if sys.maxsize > 2**32:
+    j: int
+if sys.version_info >= (3, 10) or sys.platform != "win32":
+    i2: int
+
+def passes() -> None:
+    pass
+
+def body() -> None:
+    print("x")
+
+def ellipsis() -> None: ...
+
+def docstring() -> None:
+    """Docstring."""
+
+def two() -> None:
+    x = 1
+    return x
+
+class PassAlone:
+    pass
+
+class PassAndMore:
+    value: int
+
+class EllipsisAndMore:
+    value: int
+
+class EllipsisAlone: ...
+
+class Special:
+    __match_args__: tuple[str, ...]
+    __slots__: tuple[str, ...]
+    __match_args__ = ("a",)
+
+__all__: list[str]
+__all__ = ["T"]
+
+default_int: int = 1
+default_call: int = int()
+default_str = "text"
+default_list = [1, 2]
+default_big: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+default_neg: float = -math.inf
+default_math: float = math.pi
+default_complex: complex = 1 + 2j
+default_sys = sys.stdin
+default_final: Final = default_int
+default_expr = 1 + 2
+default_name = default_int
+default_none = None
+default_union = int | None
+default_subscript = list[int]
+default_any = Any
+alias: TypeAlias = int | str
+a, b = 1, 2
+c = d = 3
+obj.attr = 1
+
+class Members(enum.Enum):
+    first = 1
+    second = None
+
+class Regular:
+    attribute = 1
+    other = None
+    alias = list[int]
+
+_PrivateT: TypeAlias = int
+_Private2T: TypeAlias = int
+_PrivateType: TypeAlias = int
+PublicT: TypeAlias = int
+_UnusedAlias: TypeAlias = str
+
+class _UnusedDict(TypedDict):
+    key: int
+
+class _UsedDict(TypedDict):
+    key: int
+
+_FunctionalDict = TypedDict("_FunctionalDict", {"key": int})
+
+def uses(value: _UsedDict, other: _PrivateT, third: _Private2T, fourth: _PrivateType) -> None: ...
+
+class Iterate:
+    def __iter__(self) -> Iterable[int]: ...
+    def __aiter__(self) -> AsyncIterable[int]: ...
+
+class IterateFine:
+    def __iter__(self) -> Iterator[int]: ...
+
+value = 1  # type: int
+ignored = 1  # type: ignore
+spaced = 1  #   type:   ignore[misc]
+other = 1  # type: list[int]  # comment

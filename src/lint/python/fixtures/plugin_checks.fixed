@@ -1,5 +1,5 @@
   #!/usr/bin/env python
-from __future__ import nested_scopes, braces, generator_stop
+from __future__ import braces
 from __future__ import barry_as_FLUFL, unknown_feature
 
 import logging
@@ -217,7 +217,7 @@ u: b"A" | None
 
 
 def f(a: "A" | None, b: "B") -> "C" | None:
-    local: "A" | None = None
+    local: A | None = None
     return local
 
 

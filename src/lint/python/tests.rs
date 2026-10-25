@@ -14,6 +14,10 @@ use crate::rules::{PythonRule, RuleId};
 use crate::test_support::TempTree;
 use fixtures::FIXTURES;
 
+// Arreglos que, como en ruff, pueden dejar el mismo aviso en el mismo lugar para la vuelta siguiente:
+// `((x))` pierde un par de paréntesis por vuelta.
+const REPEATED_FIXES: [LintKind; 1] = [LintKind::Python(PythonRule::UP034)];
+
 fn strict() -> Limits {
     Preset::Strict.limits(Language::Python, false)
 }
@@ -78,7 +82,10 @@ fn reports_exactly_what_ruff_reports_with_its_default_rules() {
 fn every_fix_removes_its_own_problem() {
     for (path, source, _) in FIXTURES {
         let before = lints_at(path, source, &strict());
-        for finding in before.iter().filter(|finding| finding.fix.is_some()) {
+        for finding in before
+            .iter()
+            .filter(|finding| finding.fix.is_some() && !REPEATED_FIXES.contains(&finding.kind))
+        {
             let edits = finding
                 .fix
                 .as_ref()

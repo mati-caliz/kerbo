@@ -10,7 +10,7 @@ en_ejecucion = isinstance(valor, List)
 
 
 def funcion(a: Optional[int], b: Union[int, str]) -> Optional["Clase"]:
-    local: Optional["Clase"] = None
+    local: Optional[Clase] = None
     return local
 
 
@@ -26,7 +26,7 @@ class Modelo:
     campo: Optional["Clase"] = None
 
     def metodo(self):
-        self.atributo: Optional["Clase"] = None
+        self.atributo: Optional[Clase] = None
 
 
 if TYPE_CHECKING:

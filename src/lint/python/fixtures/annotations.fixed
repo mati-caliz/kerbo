@@ -1,0 +1,68 @@
+from typing import Annotated, List, Literal, NamedTuple, TypeAlias, TypedDict, TypeVar, cast
+import typing
+
+
+def strings(a: "Missing1", b: "list[Missing2]", c: "Missing3 | None") -> "Missing4":
+    d: Missing5 = 1
+    return d
+
+
+def escaped(a: "Missing6", b: "Missing" "7", c: """Missing8""") -> None:
+    pass
+
+
+def nested(a: "List['Missing9']", b: Literal["not_a_name"], c: Annotated[int, "metadata"]) -> None:
+    pass
+
+
+def calls(value):
+    cast("Missing10", value)
+    cast(Missing11, value)
+    TypeVar("T", "Missing12", bound="Missing13")
+    NamedTuple("Pair", [("left", "Missing14"), ("right", int)])
+    TypedDict("Movie", {"title": "Missing15"})
+    typing.cast("Missing16", value)
+
+
+def broken(a: "List[int", b: "", c: "*Starred", d: "*Starred, int") -> None:
+    pass
+
+
+def forward(a: Later) -> Later:
+    pass
+
+
+class Later:
+    pass
+
+
+Runtime: TypeAlias = "dict[str, Missing17]"
+Recursive: TypeAlias = list[Recursive]
+runtime_generic = List["Missing18"]
+runtime_other = Unknown["not_parsed"]
+annotated_runtime = Annotated["Missing19", "metadata"]
+
+
+def global_first():
+    Later = 2
+    value = List["Later"]
+    return value
+
+
+def local_only():
+    value = List["LocalOnly"]
+    LocalOnly = int
+    return value
+
+
+class Fields(TypedDict):
+    title: Annotated["Annotated[Missing20, 'metadata']", "more"]
+    lazy: """Annotated[
+        int,
+        Field(factory=lambda name, _: name, extra=missing_extra)
+    ]"""
+
+
+def annotation_without_value():
+    unused_annotation: int
+    _ignored: int

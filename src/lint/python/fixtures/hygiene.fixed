@@ -45,7 +45,6 @@ def silenced():
         pass
     except Exception:
         pass
-        pass
 
 
 def executing(code, exec_code):

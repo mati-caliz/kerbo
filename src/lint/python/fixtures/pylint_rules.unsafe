@@ -5,21 +5,21 @@ from enum import property as enum_property
 value = 1
 items = [1, 2]
 
-print((value))
-print(((value)))
-x = ((value))
+print(value)
+print(value)
+x = (value)
 y = ((value, value))
 z = (())
-w = ((yield_value for yield_value in items))
-v = ((
+w = (yield_value for yield_value in items)
+v = (
     value
-))
+)
 u = (  # comentario
-    (value)
+    value
 )
 t = ((value) + 1)
 s = [(value)]
-r = f"{((value))}"
+r = f"{(value)}"
 q = ((value)[0])
 p = (value)
 

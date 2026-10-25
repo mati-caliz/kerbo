@@ -1,0 +1,227 @@
+import enum
+import os
+from typing import TypeVar
+
+T = TypeVar("T", covariant=True)
+U = TypeVar("U", contravariant=True)
+V_co = TypeVar("V_co")
+W_contra = TypeVar("W_contra", covariant=True)
+X_co = TypeVar("X_co", covariant=True)
+Y = TypeVar("Y")
+Z = TypeVar("Z", bound=int, covariant=True, contravariant=True)
+named: str = "a"
+qualified: str = "b"
+
+
+def bounds(value, highest, lowest, items):
+    if value > highest:
+        highest = value
+    if value < lowest:
+        lowest = value
+    if highest < value:
+        highest = value
+    if value >= highest:
+        highest = value
+    if value > highest:
+        highest = value
+    else:
+        pass
+    if value > highest:
+        highest = other = value
+    if value > items[0]:
+        items[0] = value
+    if value.x > highest.y:
+        highest.y = value.x
+    return highest, lowest, other
+
+
+def dictionaries(mapping):
+    for key, value in mapping.items():
+        print(value)
+    for key, value in mapping.items():
+        print(key)
+    for key, _ in mapping.items():
+        print(key)
+    for _, value in mapping.items():
+        print(value)
+    for key, value in mapping.items():
+        print(key, value)
+    for (key, value) in mapping.items():
+        print(value)
+
+
+def casts(items):
+    return (
+        list(list(items)),
+        list(tuple(items)),
+        set(sorted(items)),
+        sorted(list(items)),
+        sorted(sorted(items, reverse=True)),
+        tuple(reversed(items)),
+        set(reversed(items)),
+        list(sorted(items)),
+        sorted(reversed(items)),
+        set([item for item in items]),
+        dict([(item, item) for item in items]),
+        list([item for item in items]),
+        dict({}),
+        dict({"a": 1}),
+        set({item for item in items}),
+    )
+
+
+def booleans(x, y):
+    return (
+        x or True,
+        x or True or y,
+        x and False,
+        y and False and x,
+        not not x,
+        not (not y),
+        False if x else True,
+        True if x else False,
+        x or [1],
+        x or "",
+        "value" if x else "value",
+        1 if x else 2,
+    )
+
+
+def environment():
+    return os.getenv("A", 1), os.getenv("B", "1"), os.getenv("C", None), os.getenv("D", default=2.0)
+
+
+def pairs(items):
+    return zip(items, items[1:]), zip(items, items[2:]), zip(items[1:], items), list(zip(items, items[1:]))
+
+
+def errors():
+    try:
+        pass
+    except 1:
+        pass
+    try:
+        pass
+    except (ValueError, "text"):
+        pass
+    raise "boom"
+
+
+def asserts(value):
+    assert "always"
+    assert ""
+    assert value, "message"
+    return value == float("nan"), value != float("NaN"), value == float("inf")
+
+
+def spreads(base):
+    return {**base, **{"a": 1}}, {**base, **{}}, {**{"b": 2}}
+
+
+class Methods:
+    def __init__(self):
+        return 1
+
+    def __len__(self):
+        return "2"
+
+    def __bool__(self):
+        return 1
+
+    def __index__(self):
+        return "x"
+
+    def __str__(self):
+        return 3
+
+    def __bytes__(self):
+        return "text"
+
+    def __hash__(self):
+        return 1.5
+
+    @property
+    def size(self, scale):
+        return scale
+
+
+class Correct:
+    def __init__(self):
+        return None
+
+    def __len__(self):
+        return 2
+
+    def __bool__(self):
+        return False
+
+    def __index__(self):
+        return 1
+
+    def __str__(self):
+        return "text"
+
+    def __bytes__(self):
+        return b"text"
+
+    def __hash__(self):
+        return 1
+
+    @property
+    def size(self):
+        return 1
+
+
+class Color(enum.Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 1
+    OTHER = "a"
+    LAST = "a"
+
+
+from enum import Enum as AliasedEnum
+
+
+class Aliased(AliasedEnum):
+    ONE = 1
+    UNO = 1
+
+
+class Implicit:
+    def __bool__(self):
+        assert False
+
+    def __len__(self):
+        raise NotImplementedError
+
+    def __index__(self):
+        ...
+
+    def __hash__(self):
+        raise TypeError("unhashable")
+
+
+def more(cache, environment, values):
+    for key, (send, close) in cache.items():
+        print(key)
+    try:
+        pass
+    except (ValueError,) + values:
+        pass
+    return (
+        environment.get("A", 1),
+        TypeVar(name="Name", covariant=True),
+        TypeVar("Inferred", covariant=True, infer_variance=True),
+        not 1 and 1 and 1,
+    )
+
+
+def nested_scope(mapping):
+    for path, args in mapping.items():
+        print(args)
+
+    def inner(path):
+        return path
+
+    return inner

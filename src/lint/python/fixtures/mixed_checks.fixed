@@ -1,0 +1,205 @@
+"""Más chequeos sueltos."""
+
+import logging
+import math
+from typing import Literal, NamedTuple
+
+import pytest
+
+__all__ = "Name"
+
+counter = 0
+Point = NamedTuple("Point", [("x", int), ("y", int)])
+Keyword = NamedTuple("Keyword", x=int)
+Dynamic = NamedTuple("Dynamic", fields)
+Nested = Literal[Literal["a"], "b"]
+Flat = Literal["a", "b"]
+logger = logging.getLogger(__name__)
+
+
+def empty():
+    """"""
+
+
+def blank():
+    """   """
+
+
+def formatted():
+    f"""docstring {counter}"""
+
+
+def globals_use():
+    global counter
+    print(counter)
+
+
+def globals_assign():
+    global counter
+    counter += 1
+
+
+def dictionaries(items: dict, unknown, values):
+    mapping = {"a": 1}
+    built = dict(a=1)
+    for key in mapping:
+        print(mapping[key])
+    for key in built:
+        print(key, built[key])
+    for key in items:
+        print(items[key])
+    for key in unknown:
+        print(unknown[key])
+    for key in mapping:
+        print(mapping[key])
+    for key in mapping:
+        mapping[key] = 1
+    result = []
+    for value in values:
+        result.append(value)
+    other = []
+    for value in values:
+        other.append(value + 1)
+    for value in values:
+        if value:
+            result.append(value)
+    if "key" in mapping and mapping["key"]:
+        pass
+    if "key" in mapping:
+        del mapping["key"]
+    return {"static": value for value in values}, {value: value for value in values}
+
+
+def numbers(values, a, b, c, text):
+    return (
+        sorted(values)[0],
+        sorted(values)[-1],
+        sorted(values, reverse=True)[0],
+        sorted(values)[1],
+        a < b and b < c,
+        a < b and c < b,
+        a > b and b > c,
+        a < b and b > c,
+        round(1),
+        round(1, 0),
+        round(1, -1),
+        round(a),
+        round(1.5),
+        int(text[2:], 16),
+        int(text[2:], 10),
+        int(text[1:], 16),
+        text.strip("xyz"),
+        text.strip("xx"),
+        text.lstrip("a"),
+        text.rstrip(".txt"),
+    )
+
+
+def printing():
+    print("")
+    print("", "")
+    print("a", sep="")
+    print("a", "b", sep="")
+    print(sep="")
+    (named := 42)
+    print(named)
+
+
+def handlers():
+    try:
+        pass
+    except (ValueError,):
+        pass
+    try:
+        pass
+    except ValueError:
+        logging.error("failed", exc_info=True)
+        logger.error("failed", exc_info=True)
+        logger.warning("failed", exc_info=True)
+    try:
+        pass
+    finally:
+        return 1
+
+
+def supers(value):
+    return super.method(value)
+
+
+def test_warns():
+    with pytest.warns(UserWarning):
+        print("setup")
+        print("action")
+    with pytest.warns(UserWarning):
+        print("only")
+    with pytest.warns(UserWarning):
+        for _ in range(3):
+            pass
+
+
+@pytest.mark.parametrize("value", [1, 2, 1])
+def test_duplicates(value):
+    pass
+
+
+@pytest.mark.parametrize(("first", "second"), [(1, 2), (1, 2), (2, 1)])
+def test_pairs(first, second):
+    pass
+
+
+math.floor(1)
+
+
+__all__ = math.__all__ + ["extra"]
+__all__ = names + ["extra"]
+Empty = NamedTuple("Empty", [])
+Tupled = NamedTuple("Tupled", (("x", int),))
+
+
+def corpus_cases(values, **kwargs):
+    for key in kwargs:
+        print(kwargs[key])
+    grid = {(1, 2): 3}
+    for row, column in grid:
+        print(grid[(row, column)])
+    first, rows = values, []
+    for row in values:
+        rows.append(row)
+    later = []
+    for row in values:
+        later.append(row)
+    later = None
+    jobs = {}
+    for job in jobs:
+        print(jobs[job])
+        del jobs[job]
+    return (sorted(values))[0], later
+
+
+async def asynchronous(values):
+    results = []
+    async for value in values:
+        results.append(value)
+    return results
+
+
+def test_nested_warns(optional: dict | None):
+    with pytest.warns(UserWarning):
+        with pytest.raises(ValueError):
+            print("one")
+    with pytest.warns(UserWarning):
+        with pytest.raises(ValueError):
+
+            class Inside:
+                pass
+
+    for key in optional:
+        print(optional[key])
+
+
+def nested_indexes(column):
+    table = {}
+    for name in table:
+        print(table[name][column])
+    for name in table:
+        table[name][column] = 1

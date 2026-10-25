@@ -7,6 +7,7 @@ use super::ast::{
     TYPE_FIELD, named, text, unparenthesized,
 };
 use super::semantic::is_dummy;
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const UNARY: &str = "unary_operator";
@@ -25,6 +26,8 @@ const TARGET_CONTAINERS: [&str; 8] = [
     "list_splat_pattern",
 ];
 const DICTIONARY: &str = "dictionary";
+const LIST_BUILTIN: &str = "list";
+const DICT_BUILTIN: &str = "dict";
 const PARAMETERS_FIELD: &str = "parameters";
 const OS_MODULE: &str = "os";
 const ENVIRON: &str = "environ";
@@ -42,7 +45,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
                 found
             }
             CLASS => duplicate_class_fields(*node, source),
-            LAMBDA => empty_container_lambda(*node).into_iter().collect(),
+            LAMBDA => empty_container_lambda(*node, source).into_iter().collect(),
             _ => Vec::new(),
         })
         .collect()
@@ -229,14 +232,21 @@ fn reads_name(node: Node<'_>, name: &str, source: &[u8]) -> bool {
 }
 
 // PIE807: `lambda: []` o `lambda: {}`, que es `list` o `dict`.
-fn empty_container_lambda(lambda: Node<'_>) -> Option<Report> {
+fn empty_container_lambda(lambda: Node<'_>, source: &[u8]) -> Option<Report> {
     if lambda.child_by_field_name(PARAMETERS_FIELD).is_some() {
         return None;
     }
     let body = lambda.child_by_field_name(BODY_FIELD).map(unparenthesized)?;
     let is_empty_container =
         matches!(body.kind(), LIST | DICTIONARY) && named(body).iter().all(|child| child.kind() == COMMENT);
-    is_empty_container.then(|| Report::at(PythonRule::PIE807, lambda, ""))
+    let builtin = if body.kind() == LIST {
+        LIST_BUILTIN
+    } else {
+        DICT_BUILTIN
+    };
+    is_empty_container.then(|| {
+        Report::at(PythonRule::PIE807, lambda, "").with_fix(Some(Fix::replace(lambda, builtin, source)))
+    })
 }
 
 // B003: `os.environ = {...}`, que reemplaza el objeto en vez de cambiar el entorno del proceso.

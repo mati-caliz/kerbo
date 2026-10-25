@@ -1,29 +1,26 @@
-# -*- coding: utf-8 -*-
 """Módulo de prueba."""
-import builtins
 import typing
 from typing import TYPE_CHECKING, Protocol
 from abc import abstractmethod
 
-saludo = u"hola"
+saludo = "hola"
 bytes_saludo = b"hola"
-juntos = u"a" "b"
+juntos = "a" "b"
 
 
-class Viejo(object):
+class Viejo:
     pass
 
 
-class Calificado(builtins.object, Base):
+class Calificado(Base):
     """Doc."""
 
-    pass
 
 
 class Prueba(TestCase):
     def test_algo(self):
-        self.assertEquals(1, 1)
-        self.failUnless(True)
+        self.assertEqual(1, 1)
+        self.assertTrue(True)
         otro.assertEquals(1, 1)
         self.assertEqual(1, 1)
 
@@ -56,14 +53,12 @@ def expresiones(x, lista):
     x, x
     b"bytes"
     f"{x}"
-    ...
     lambda: llamada()
     lambda: x
 
 
 def placeholders():
     """Doc."""
-    pass
 
 
 def solo_pass():

@@ -7,9 +7,12 @@ use super::ast::{
     unparenthesized,
 };
 use super::escapes::text_value;
+use super::fix_edits::{Parentheses, pad, remove_argument};
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const ENCODE: &str = "encode";
+const UNICODE_PREFIXES: [char; 2] = ['u', 'U'];
 const ENCODING_KEYWORD: &str = "encoding";
 const UTF8_NAMES: [&str; 6] = ["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 const ARGUMENT_LIST: &str = "argument_list";
@@ -63,14 +66,51 @@ fn unnecessary_encode_utf8(call: Node<'_>, source: &[u8]) -> Option<Report> {
         return None;
     }
     let encoding = encoding_argument(call, source)?;
-    let reported = if parts.iter().any(|part| is_f_string(*part, source)) {
+    let formatted = parts.iter().any(|part| is_f_string(*part, source));
+    let ascii = !formatted && text_value(object, source)?.is_ascii();
+    let reported = if formatted {
         encoding == EncodingArgument::Given
     } else {
-        let value = text_value(object, source)?;
         let only_string_escapes = parts.iter().any(|part| has_string_only_escapes(*part, source));
-        !only_string_escapes && (value.is_ascii() || encoding == EncodingArgument::Given)
+        !only_string_escapes && (ascii || encoding == EncodingArgument::Given)
     };
-    reported.then(|| Report::at(PythonRule::UP012, call, ""))
+    if !reported {
+        return None;
+    }
+    let fix = if ascii {
+        Some(bytes_literal_fix(call, function, &parts, source))
+    } else {
+        encoding_removal(call, source)
+    };
+    Some(Report::at(PythonRule::UP012, call, "").with_fix(fix))
+}
+
+// `"texto".encode()` pasa a `b"texto"`: cada parte del string con `b` adelante y sin la `u`.
+fn bytes_literal_fix(call: Node<'_>, function: Node<'_>, parts: &[Node<'_>], source: &[u8]) -> Fix {
+    let object = function.child_by_field_name(OBJECT_FIELD).unwrap_or(function);
+    let mut replacement = String::new();
+    let mut previous = object.start_byte();
+    for part in parts {
+        replacement.push_str(&String::from_utf8_lossy(
+            source.get(previous..part.start_byte()).unwrap_or_default(),
+        ));
+        replacement.push('b');
+        replacement.push_str(text(*part, source).trim_start_matches(UNICODE_PREFIXES));
+        previous = part.end_byte();
+    }
+    replacement.push_str(&String::from_utf8_lossy(
+        source.get(previous..object.end_byte()).unwrap_or_default(),
+    ));
+    Fix::replace(call, &pad(replacement, call, source), source)
+}
+
+// Sacar el `"utf-8"` (posicional o `encoding=`), que es el valor por defecto.
+fn encoding_removal(call: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let list = call.child_by_field_name(ARGUMENTS_FIELD)?;
+    let argument = named(list)
+        .into_iter()
+        .find(|argument| argument.kind() != COMMENT)?;
+    Some(remove_argument(argument, list, Parentheses::Preserve, source))
 }
 
 // `match_encoding_arg`: sin argumentos, o un único `"utf-8"` posicional o como `encoding=`.

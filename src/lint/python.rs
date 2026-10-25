@@ -17,6 +17,7 @@ mod encodings;
 mod escapes;
 mod exception_flow;
 mod executable_bits;
+mod fix_edits;
 mod flow;
 mod formats;
 mod formatter_comments;
@@ -206,7 +207,7 @@ fn syntax_reports(root: Node<'_>, nodes: &[Node<'_>], source: &[u8], path: Optio
     reports.extend(splits::reports(nodes, source));
     reports.extend(slots::reports(nodes, source));
     reports.extend(loop_else::reports(nodes));
-    reports.extend(parentheses::reports(root));
+    reports.extend(parentheses::reports(root, source));
     reports.extend(declarations::reports(nodes, source));
     reports.extend(raises::reports(nodes, source));
     reports.extend(encodings::reports(nodes, source));

@@ -1,0 +1,103 @@
+from __future__ import annotations
+import os; import sys
+
+x = "" ""
+y = "a" "b"
+
+
+class Base(metaclass=type):
+    pass
+
+
+class Commented(  # comentario
+    object
+):
+    pass
+
+
+class Empty:
+    pass
+
+
+class Spaced(
+    # comentario
+):
+    pass
+
+
+class Child(Base):
+    def method(self):
+        super().method()
+        super().method()
+
+
+value = (1).real
+other = sys.path
+chained = os.environ.copy()
+spanning = sys.argv
+padded = 1 if sys.path else 2
+kind = str or int
+complex_kind = complex
+encoded = b"texto"
+unicode_encoded = "año".encode()
+keyword_encoded = "año".encode()
+joined = (b"a" b"b")
+prefixed = b"a"
+formatted = f"{x}".encode()
+print(x)
+print(x)
+data = {"a": 1}
+if "a" in data:
+    pass
+if "a" in data and x:
+    pass
+if "a" in sys.modules.keys():
+    pass
+for key in range(3):
+    pass
+for key in range(0, 3, 1):
+    pass
+
+
+def placeholders():
+    """Doc."""
+    # comentario
+
+
+def before_docstring():
+    pass
+    "no es un docstring"
+
+
+def ellipsis_body():
+    x = 1
+
+
+def unused_values():
+    a = b = 1
+    c = sys.exit(0)
+    d: int = 1
+    e: int = sys.exit(0)
+    with open("f") as handle, open("g") as other_handle:
+        print(handle)
+    first, second = 1, 2
+    print(first)
+
+
+def annotated(argument: int, other: 
+    int
+):
+    local: list[int] = []
+    multiline: (
+        int
+    ) = 1
+    commented: (int  # comentario
+) = 1
+    return local, multiline, commented
+
+
+factory = list
+mapping = dict
+text_alias: str = ""
+qualified: str = ""
+stream = open("f")

@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::boolean_chains::boolean_chain_reports;
+use super::call_fixes::text_alias_fix;
 use super::calls::{call_reports, is_first_element_subscript};
 use super::comparisons::comparison_reports;
 use super::conversions::conversion_reports;
@@ -254,7 +255,9 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         } else if REGEX_FLAG_ALIASES.contains(&name.as_str()) {
             self.reports.push(Report::at(PythonRule::FURB167, node, ""));
         } else if is_typing(&name, TEXT_ALIAS) {
-            self.reports.push(Report::at(PythonRule::UP019, node, ""));
+            let fix = text_alias_fix(&self.model, node, self.source);
+            self.reports
+                .push(Report::at(PythonRule::UP019, node, "").with_fix(fix));
         } else if is_six_py3(&name) {
             self.reports.push(Report::at(PythonRule::YTT202, node, ""));
         } else if name == LOGGING_WARN {

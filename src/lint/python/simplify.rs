@@ -8,6 +8,8 @@ use super::ast::{
     IDENTIFIER, LEFT_FIELD, OBJECT_FIELD, RIGHT_FIELD, STRING, TRUE, named, text, unparenthesized,
 };
 use super::escapes::text_value;
+use super::known_types::{Known, is_known};
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 use needless_bool::needless_bool;
 
@@ -17,6 +19,7 @@ const WITH: &str = "with_statement";
 const FOR: &str = "for_statement";
 const FOR_IN: &str = "for_in_clause";
 const KEYS: &str = "keys";
+const DOT: &str = ".";
 const SELF: &str = "self";
 const MEMBERSHIP_OPERATORS: [&[&str]; 2] = [&["in"], &["not", "in"]];
 const WITH_CLAUSE: &str = "with_clause";
@@ -305,5 +308,26 @@ fn in_dict_keys(target: Node<'_>, iterable: Node<'_>, source: &[u8]) -> Option<R
     let on_self = function
         .child_by_field_name(OBJECT_FIELD)
         .is_some_and(|object| object.kind() == IDENTIFIER && text(object, source) == SELF);
-    (no_arguments && is_keys && !on_self).then(|| Report::at(PythonRule::SIM118, target, ""))
+    if !(no_arguments && is_keys && !on_self) {
+        return None;
+    }
+    let fix = keys_removal(call, function, source);
+    Some(Report::at(PythonRule::SIM118, target, "").with_fix(fix))
+}
+
+// Borra desde el punto hasta el final de `.keys()` (con un espacio si después viene una letra); sólo
+// es seguro si el objeto es un nombre que se sabe que es un `dict`.
+fn keys_removal(call: Node<'_>, function: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let mut cursor = function.walk();
+    let dot = function.children(&mut cursor).find(|child| child.kind() == DOT)?;
+    let replacement = if source.get(call.end_byte()).is_some_and(u8::is_ascii_alphabetic) {
+        " "
+    } else {
+        ""
+    };
+    let fix = Fix::replace_range(dot.start_position(), call.end_position(), replacement, source);
+    let is_dict = function
+        .child_by_field_name(OBJECT_FIELD)
+        .is_some_and(|object| is_known(object, Known::Dict, source));
+    Some(if is_dict { fix } else { fix.marked_unsafe() })
 }

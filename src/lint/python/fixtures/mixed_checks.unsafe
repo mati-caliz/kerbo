@@ -50,7 +50,7 @@ def dictionaries(items: dict, unknown, values):
         print(items[key])
     for key in unknown:
         print(unknown[key])
-    for key in mapping.keys():
+    for key in mapping:
         print(mapping[key])
     for key in mapping:
         mapping[key] = 1

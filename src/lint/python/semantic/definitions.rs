@@ -23,6 +23,7 @@ use crate::lint::python::ast::{
     BODY_FIELD, CLASS, DECORATED, FUNCTION, IDENTIFIER, LEFT_FIELD, NAME_FIELD, RIGHT_FIELD, TYPE_FIELD,
     VALUE_FIELD, named,
 };
+use crate::lint::python::fix_edits::{Parentheses, commented_unsafe, remove_argument};
 use crate::lint::python::semantic::annotations::Annotations;
 use crate::lint::python::semantic::expressions::Expressions;
 use crate::lint::python::semantic::statements::Statements;
@@ -176,7 +177,10 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
                 .into_iter()
                 .filter(|base| is_builtin_named(&self.model, *base, self.source, OBJECT_BUILTIN))
             {
-                self.reports.push(Report::at(PythonRule::UP004, base, ""));
+                let fix = remove_argument(base, arguments, Parentheses::Remove, self.source);
+                let fix = commented_unsafe(fix, arguments, self.source);
+                self.reports
+                    .push(Report::at(PythonRule::UP004, base, "").with_fix(Some(fix)));
             }
         }
         self.model.push_scope(ScopeKind::Class);

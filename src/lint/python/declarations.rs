@@ -5,6 +5,8 @@ use super::ast::{
     ALIAS_FIELD, ALIASED_IMPORT, CALL, CLASS, COMMENT, FUNCTION_FIELD, IMPORT, KEYWORD_ARGUMENT, LAMBDA,
     NAME_FIELD, named, text, unparenthesized,
 };
+use super::fix_edits::commented_unsafe;
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const ARGUMENTS_FIELD: &str = "arguments";
@@ -54,7 +56,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
                 found.extend(direct_lambda_call(*node));
                 found
             }
-            CLASS => empty_class_parentheses(*node).into_iter().collect(),
+            CLASS => empty_class_parentheses(*node, source).into_iter().collect(),
             IMPORT => {
                 let mut found = manual_from_imports(*node, source);
                 found.extend(debugger_imports(*node, None, source));
@@ -96,12 +98,15 @@ fn direct_lambda_call(call: Node<'_>) -> Option<Report> {
 }
 
 // UP039: `class Clase():`, con paréntesis vacíos.
-fn empty_class_parentheses(class: Node<'_>) -> Option<Report> {
+fn empty_class_parentheses(class: Node<'_>, source: &[u8]) -> Option<Report> {
     let arguments = class.child_by_field_name(SUPERCLASSES_FIELD)?;
     named(arguments)
         .iter()
         .all(|argument| argument.kind() == COMMENT)
-        .then(|| Report::at(PythonRule::UP039, arguments, ""))
+        .then(|| {
+            let fix = commented_unsafe(Fix::replace(arguments, "", source), arguments, source);
+            Report::at(PythonRule::UP039, arguments, "").with_fix(Some(fix))
+        })
 }
 
 // PLR0402: `import a.b as b`, que se escribe `from a import b`.

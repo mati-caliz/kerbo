@@ -3,7 +3,7 @@ import typing
 
 
 def strings(a: "Missing1", b: "list[Missing2]", c: "Missing3 | None") -> "Missing4":
-    d: "Missing5" = 1
+    d: Missing5 = 1
     return d
 
 

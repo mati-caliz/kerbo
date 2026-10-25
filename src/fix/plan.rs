@@ -23,6 +23,8 @@ fn conflicts(fix: &Fix, other: &Fix) -> bool {
         .any(|edit| other.edits.iter().any(|known| overlaps(edit, known)))
 }
 
+// Como ruff, dos ediciones que se tocan también chocan: `a = b = 1` sin usar no puede borrar `a = ` y
+// `b = ` en la misma vuelta.
 fn overlaps(edit: &TextEdit, other: &TextEdit) -> bool {
-    edit.start == other.start || (edit.start < other.end && other.start < edit.end)
+    edit.start <= other.end && other.start <= edit.end
 }

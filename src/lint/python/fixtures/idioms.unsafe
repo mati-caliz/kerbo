@@ -1,0 +1,97 @@
+import logging
+import re
+import subprocess
+from re import I
+
+#
+# bloque con texto
+#
+
+value = 1  #
+#
+
+
+def comparisons(first, second):
+    return [
+        first == first,
+        first < second < second,
+        len(first) == len(first),
+        len(first) == len(second),
+        1 == 1,
+        "a" != "b",
+        None is None,
+        -1 == -1,
+        f"{first}" == "x",
+    ]
+
+
+def flags(text):
+    return re.match("x", text, re.I | re.M), re.IGNORECASE, I
+
+
+def runs(command):
+    subprocess.run(command)
+    subprocess.run(command, check=True)
+    logging.info("raíz")
+    logging.getLogger(__name__).info("propio")
+    return (
+        set(x for x in command),
+        set(x for x in command),
+        set(x for x in command if x),
+        dict((x, x) for x in command),
+        dict((x, x) for x in command),
+        dict((x, *x) for x in command),
+        dict(x for x in command),
+    )
+
+
+def negations(first, second):
+    if not first == second:
+        raise ValueError("x")
+    if not first == second:
+        print(first)
+    print(not (first == second), not first != second, not first == second == 1)
+
+
+class Comparable:
+    def __eq__(self, other):
+        return not self == other
+
+    def __ne__(self, other):
+        return not self == other
+
+
+def joins(first, second, items):
+    return [
+        " ".join([first, second]),
+        "".join(("a", "b")),
+        ", ".join([first, "x", 1, True, second.name, second.load()]),
+        " ".join([first, second.load(1)]),
+        " ".join(items),
+        " ".join([*items]),
+        " ".join([first, f"{second}"]),
+        "'".join([first, '"']),
+        b" ".join([first, second]),
+        " ".join([]),
+    ]
+
+
+def keywords(function, options):
+    function(**{"a": 1, "b": 2})
+    function(**{})
+    function(**{**options})
+    function(**{"not valid": 1})
+    function(**{"class": 1})
+    function(**options)
+
+
+def conversions(value, values):
+    return [
+        f"{str(value)} {repr(value)} {ascii(value)}",
+        f"{str(value)!r}",
+        f"{str(object=value)}",
+        f"{repr(object=value)}",
+        f"{str(value)=}",
+        f"{str(*values)} {repr(value)}",
+        f"{str(value, 'utf-8')}",
+    ]

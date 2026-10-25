@@ -41,7 +41,7 @@ def runtime_uses():
 
 def annotations_only(value: Fraction) -> "Path":
     pattern: Pattern = None
-    other: "UUID" = None
+    other: UUID = None
     return pattern, other
 
 

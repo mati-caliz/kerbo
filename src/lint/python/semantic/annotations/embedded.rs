@@ -16,7 +16,8 @@ use crate::lint::python::escapes::decoded;
 use crate::syntax::{SnippetLanguage, parse_snippet};
 
 pub const OPENING: &str = "(";
-const CLOSING: &str = ")";
+// El salto de línea evita que un comentario al final de la anotación se coma el paréntesis.
+const CLOSING: &str = "\n)";
 const QUOTES: [&str; 2] = ["\"", "'"];
 const PARAMETERS_FIELD: &str = "parameters";
 const BODY_FIELD: &str = "body";

@@ -6,25 +6,25 @@ T = TypeVar("T")
 
 
 class Node:
-    parent: "Node"
-    children: List["Node"] = []
-    meta: Annotated["Node", "metadata"]
+    parent: Node
+    children: List[Node] = []
+    meta: Annotated[Node, "metadata"]
     kind: Literal["leaf", "branch"]
 
-    def walk(self, other: "Node") -> "Node | None":
-        local: "Node" = other
+    def walk(self, other: Node) -> Node | None:
+        local: Node = other
         print(cast("Node", local))
         return None
 
 
-def outer(value: list["Node"], *args: "int", **kwargs: "str") -> "dict[str, Node]":
+def outer(value: list[Node], *args: int, **kwargs: str) -> dict[str, Node]:
     return {}
 
 
-value: "Node"
+value: Node
 broken: "Node[" = None
-fstring: "Node" = None
+fstring: Node = None
 bytes_value: b"Node" = None
 
 
-future_union: "Foo" | None = None
+future_union: Foo | None = None

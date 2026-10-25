@@ -2,12 +2,12 @@ import asyncio
 import os
 import sys
 import subprocess
-from io import open
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar, NewType
 import trio
 import py
 from gettext import gettext as _, ngettext
+import builtins
 
 
 if TYPE_CHECKING:
@@ -98,7 +98,7 @@ def dict_lookups(key, default):
 
 
 def file_writes(lines, pairs):
-    with open("file", "w") as handle:
+    with builtins.open("file", "w") as handle:
         for line in lines:
             handle.write(line)
         for line in lines:
@@ -119,7 +119,7 @@ def file_writes(lines, pairs):
         for kept in lines:
             handle.write(kept)
         print(kept)
-    stream = open("file")
+    stream = builtins.open("file")
     for line in lines:
         stream.write(line)
     not_a_file = object()
@@ -127,7 +127,7 @@ def file_writes(lines, pairs):
         not_a_file.write(line)
     for line in stream.readlines():
         pass
-    for line in open("x").readlines():
+    for line in builtins.open("x").readlines():
         pass
     for line in stream.readlines(10):
         pass
@@ -137,7 +137,7 @@ def file_writes(lines, pairs):
 
 
 async def async_writes(lines):
-    with open("file", "w") as handle:
+    with builtins.open("file", "w") as handle:
         async for line in lines:
             handle.write(line)
 
@@ -232,9 +232,9 @@ async def timeouts():
         await asyncio.sleep(1)
     with trio.move_on_after(1):
         print(1)
-    with trio.fail_after(1), open("x"):
+    with trio.fail_after(1), builtins.open("x"):
         print(1)
-    async with asyncio.timeout(1), open("x"):
+    async with asyncio.timeout(1), builtins.open("x"):
         print(1)
     with trio.CancelScope():
         yield 1

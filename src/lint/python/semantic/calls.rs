@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use super::aliases::called_alias_reports;
 use super::async_blocking::async_blocking_reports;
 use super::builtin_calls::builtin_call_reports;
+use super::call_fixes::{getattr_fix, open_alias_fix, range_start_fix, super_arguments_fix};
 use super::cast_calls::cast_call_reports;
 use super::collection_calls::collection_call_reports;
 use super::decimals::{decimal_from_float_literal, verbose_decimal_constructor};
@@ -23,6 +24,7 @@ use super::ruff_calls::ruff_call_reports;
 use super::supers::is_super_with_parameters;
 use super::suspicious_calls::suspicious_call_reports;
 use super::tail_calls::tail_call_reports;
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, COMMENT, EXPRESSION_STATEMENT, FUNCTION_FIELD,
@@ -69,7 +71,7 @@ pub fn call_arguments(call: Node<'_>) -> CallArguments<'_> {
 // UP008.
 pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Report> {
     let mut reports: Vec<Report> = call_rule(model, source, call)
-        .map(|(rule, at)| Report::at(rule, at, ""))
+        .map(|(rule, at)| Report::at(rule, at, "").with_fix(call_rule_fix(source, call, rule)))
         .into_iter()
         .collect();
     reports
@@ -77,7 +79,10 @@ pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Rep
     if is_super_with_parameters(model, source, call)
         && let Some(arguments) = call.child_by_field_name(ARGUMENTS_FIELD)
     {
-        reports.push(Report::at(PythonRule::UP008, arguments, ""));
+        reports.push(
+            Report::at(PythonRule::UP008, arguments, "")
+                .with_fix(Some(super_arguments_fix(arguments, source))),
+        );
     }
     reports.extend(idiom_reports(model, source, call));
     reports.extend(format_call_report(model, source, call));
@@ -106,9 +111,22 @@ pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Rep
         .and_then(|function| qualified_name(model, function, source))
         .is_some_and(|name| name == IO_OPEN)
     {
-        reports.push(Report::at(PythonRule::UP020, call, ""));
+        let fix = call
+            .child_by_field_name(FUNCTION_FIELD)
+            .and_then(|function| open_alias_fix(model, function, source));
+        reports.push(Report::at(PythonRule::UP020, call, "").with_fix(fix));
     }
     reports
+}
+
+// Los arreglos de PIE808 y B009; B010 y RUF015 todavía no tienen.
+fn call_rule_fix(source: &[u8], call: Node<'_>, rule: PythonRule) -> Option<Fix> {
+    let arguments = call_arguments(call);
+    match (rule, arguments.positional.as_slice()) {
+        (PythonRule::PIE808, [start, _]) => range_start_fix(call, *start, source),
+        (PythonRule::B009, [object, name]) => getattr_fix(call, *object, unparenthesized(*name), source),
+        _ => None,
+    }
 }
 
 // PIE808 (`range(0, n)`), B009 (`getattr(x, "a")`), B010 (`setattr(x, "a", v)` como sentencia) y

@@ -1,6 +1,7 @@
 use tree_sitter::{Node, Point};
 
 use super::ast::{BLOCK, COMMENT, named};
+use super::fix_edits::point_of;
 use crate::fix::{Fix, TextEdit, TextPoint};
 
 const PASS: &str = "pass";
@@ -13,7 +14,16 @@ const INLINE_SPACE: &[u8] = b" \t\x0c";
 // `;`, sólo ella y su separador; si no, las líneas enteras, con su comentario. Queda aislada con las
 // demás del mismo bloque.
 pub fn delete_statement(statement: Node<'_>, source: &[u8]) -> Fix {
-    let fix = if is_lone_child(statement) {
+    deletion(statement, source, is_lone_child(statement))
+}
+
+// Como `delete_stmt` sin padre: nunca deja un `pass` en su lugar.
+pub fn delete_statement_only(statement: Node<'_>, source: &[u8]) -> Fix {
+    deletion(statement, source, false)
+}
+
+fn deletion(statement: Node<'_>, source: &[u8], lone: bool) -> Fix {
+    let fix = if lone {
         Fix::replace(statement, PASS, source)
     } else if let Some(end) = trailing_semicolon(statement, source) {
         byte_range_fix(statement.start_byte(), end, source)
@@ -120,12 +130,4 @@ fn byte_points_fix(start: Point, end: usize, source: &[u8]) -> Fix {
             replacement: String::new(),
         }],
     )
-}
-
-fn point_of(source: &[u8], offset: usize) -> TextPoint {
-    let before = source.get(..offset).unwrap_or(source);
-    let mut lines = before.split(|byte| *byte == LINE_FEED);
-    let column = lines.next_back().map_or(0, <[u8]>::len);
-    let row = lines.count();
-    TextPoint::from_point(Point { row, column })
 }

@@ -8,16 +8,18 @@ use tree_sitter::{Node, Point};
 use super::pep::{is_pep646_unpack, is_typing_only, is_typing_only_annotation, pep604_rule};
 use super::qualified::{is_typing, qualified_name};
 use super::{Mode, Pending, Visitor};
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
-    PARENTHESIZED, STRING, SUBSCRIPT_FIELD, TUPLE, VALUE_FIELD, fields, is_bytes, is_f_string, named,
-    string_prefix, text,
+    COMMENT, FUNCTION, PARENTHESIZED, STRING, SUBSCRIPT_FIELD, TUPLE, VALUE_FIELD, fields, is_bytes,
+    is_f_string, named, string_prefix, text,
 };
 use crate::lint::python::escapes::decoded;
 use crate::rules::PythonRule;
 use crate::syntax::{SnippetLanguage, parse_snippet};
 use embedded::{Embedded, Placement, wrap};
 
+const PARAMETERS: &str = "parameters";
 const LITERAL: &str = "Literal";
 const ANNOTATED: &str = "Annotated";
 const TYPE_ALIAS: &str = "TypeAlias";
@@ -193,7 +195,9 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
         let typing_only =
             is_typing_only_annotation(string, self.boundaries.future_annotations() || self.file.stub);
         if typing_only {
-            self.reports.push(Report::at(PythonRule::UP037, string, ""));
+            let fix = unquoted_annotation(value, root, string, self.source);
+            self.reports
+                .push(Report::at(PythonRule::UP037, string, "").with_fix(Some(fix)));
         }
         let context = Embedded {
             source: wrapped.as_bytes(),
@@ -236,4 +240,24 @@ fn is_starred(expression: Node<'_>) -> bool {
             && named(expression)
                 .into_iter()
                 .any(|element| STARRED.contains(&element.kind())))
+}
+
+// UP037 deja la anotación sin comillas; si ocupa varias líneas va entre paréntesis (salvo en un
+// parámetro), y si termina en un comentario el paréntesis cierra en la línea siguiente.
+fn unquoted_annotation(value: &str, parsed: Node<'_>, string: Node<'_>, source: &[u8]) -> Fix {
+    let last_content = value.trim_end().len().saturating_add(1);
+    let ends_in_comment = crate::syntax::descendants(parsed)
+        .iter()
+        .any(|node| node.kind() == COMMENT && node.end_byte() == last_content);
+    let multiline = value.contains(['\n', '\r']);
+    let in_parameter = std::iter::successors(string.parent(), Node::parent).any(|ancestor| {
+        ancestor.kind() == PARAMETERS && ancestor.parent().is_some_and(|owner| owner.kind() == FUNCTION)
+    });
+    let content = match (multiline, ends_in_comment) {
+        (_, false) if in_parameter => value.to_owned(),
+        (false, false) => value.to_owned(),
+        (true, false) => format!("({value})"),
+        (_, true) => format!("({value}\n)"),
+    };
+    Fix::replace(string, &content, source)
 }

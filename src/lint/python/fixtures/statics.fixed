@@ -1,0 +1,131 @@
+import sys
+from decimal import Decimal
+from decimal import Decimal as D
+from typing import TYPE_CHECKING
+
+import decimal
+
+
+def positive(x):
+    if x > 0:
+        return True
+    return False
+
+
+def inverted(x):
+    if x > 0:
+        return False
+    else:
+        return True
+
+
+def chained(x):
+    if x > 0:
+        return 1
+    elif x < 0:
+        return True
+    else:
+        return False
+
+
+def same(x):
+    if x:
+        return True
+    return True
+
+
+def commented(x):
+    if x:  # comentario
+        return True
+    # otro
+    return False
+
+
+def parenthesized(x):
+    if x:
+        return (True)
+    else:
+        return (False)
+
+
+def with_more(x):
+    if x:
+        print(x)
+        return True
+    return False
+
+
+def not_return(x):
+    if x:
+        return True
+    print(x)
+
+
+def only_elif(x):
+    if x:
+        return True
+    elif not x:
+        return False
+
+
+def version():
+    if sys.version_info >= (3, 11):
+        return True
+    return False
+
+
+def checking():
+    if TYPE_CHECKING:
+        return True
+    return False
+
+
+def platform():
+    if x and sys.platform == "linux":
+        return False
+    return True
+
+
+"a b c".split()
+"a,b,c".split(",")
+"a b c".rsplit()
+"a b c".split(None)
+"a b c".split(maxsplit=1)
+"a b c".split(" ", 1)
+"a b c".split(" ", -1)
+"a b c".split(" ", 0x10)
+"a b c".split(" ", 1_000)
+"a b c".split(" ", 99999999999)
+"a b c".split(" ", x)
+"a b c".split(sep)
+"a b c".split(*args)
+"a b c".split(**kwargs)
+("a" "b").split()
+b"a b".split()
+f"{x} b".split()
+"a b c".split(sep=",", maxsplit=-2)
+"a b c".split(maxsplit=+1)
+"a b c".splitlines()
+
+Decimal("0")
+Decimal("10")
+Decimal("-10")
+Decimal("-0")
+Decimal("+0")
+Decimal(" 1_000 ")
+Decimal("_1")
+Decimal("1.5")
+Decimal("1e3")
+Decimal("")
+Decimal(10)
+Decimal(value="5")
+Decimal(float("nan"))
+Decimal(float("-Infinity"))
+Decimal(float("1.5"))
+Decimal(float(" inf "))
+Decimal(float("nan", ))
+D("3")
+decimal.Decimal("4")
+Decimal("7")
+Decimal("0x10")
+Decimal("٣")

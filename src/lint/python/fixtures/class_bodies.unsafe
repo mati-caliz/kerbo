@@ -40,11 +40,11 @@ class Comparisons:
         return not self != other
 
 
-factory = lambda: []
-mapping = lambda: {}
+factory = list
+mapping = dict
 filled = lambda: [1]
 taking = lambda x: []
-grouped = defaultdict(lambda: ([]))
+grouped = defaultdict(list)
 
 
 def redeclared():

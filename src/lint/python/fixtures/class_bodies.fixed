@@ -1,0 +1,108 @@
+import abc
+from collections import defaultdict
+
+a = b = 1
+
+
+def negations(x, y):
+    if not x != y:
+        return 1
+    z = not x != y
+    w = not (x != y)
+    v = not x != y != 1
+    if not x != y:
+        raise ValueError
+    return z, w, v
+
+
+class Fields:
+    name = 1
+    other = 2
+    name = 3
+    count: int
+    count: int = 0
+    total = 1
+    total = total + 1
+    a = b = 1
+    a = 2
+    if a:
+        name = 4
+
+    def method(self):
+        pass
+
+    def method(self):
+        pass
+
+
+class Comparisons:
+    def __ne__(self, other):
+        return not self != other
+
+
+factory = list
+mapping = dict
+filled = lambda: [1]
+taking = lambda x: []
+grouped = defaultdict(list)
+
+
+def redeclared():
+    x, x = 1, 2
+    (y, [y, z]) = 1, [2, 3]
+    m = m = 1
+    _, _ = 1, 2
+    *rest, rest = [1, 2]
+    k: int = 1
+    return x, y, z, m, rest, k
+
+
+class Methods:
+    def instance(self):
+        self = 1
+        self, other = 1, 2
+        cls = 3
+        return self, other, cls
+
+    @classmethod
+    def build(cls):
+        cls = 1
+        self = 2
+        return cls, self
+
+    @staticmethod
+    def helper(self):
+        self = 1
+        return self
+
+    def __new__(cls):
+        cls = 1
+        return cls
+
+    def __init_subclass__(cls):
+        cls = 1
+
+    @abc.abstractclassmethod
+    def abstract(cls):
+        cls = 1
+
+    def nested(self):
+        def inner(self):
+            self = 1
+            return self
+
+        return inner
+
+    def renamed(this):
+        this = 1
+        return this
+
+    if True:
+        def conditional(self):
+            self = 1
+            return self
+
+
+def function(self):
+    self = 1
+    return self
