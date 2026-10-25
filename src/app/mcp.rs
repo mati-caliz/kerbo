@@ -43,6 +43,8 @@ struct FixArguments {
     languages: Vec<Stack>,
     #[serde(default)]
     dry_run: bool,
+    #[serde(default)]
+    unsafe_fixes: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -133,6 +135,7 @@ fn tools(lang: Lang) -> Value {
                     "rules": { "type": "array", "items": { "type": "string", "enum": rules }, "description": lang.text(Text::McpRulesDescription) },
                     "languages": { "type": "array", "items": { "type": "string", "enum": ["typescript", "python", "java", "go"] } },
                     "dry_run": { "type": "boolean", "description": lang.text(Text::McpDryRunDescription) },
+                    "unsafe_fixes": { "type": "boolean", "description": lang.text(Text::HelpUnsafeFixes) },
                 },
             },
         },
@@ -202,6 +205,7 @@ fn run_fix(arguments: FixArguments, directory: &Path, lang: Lang) -> Result<Stri
         config: None,
         write: !arguments.dry_run,
         since: None,
+        unsafe_fixes: arguments.unsafe_fixes,
     };
     let outcome = fix_files(&request, directory)?;
     let mut text = outcome.patch();

@@ -85,6 +85,8 @@ fn edit(line: usize, start: usize, end: usize, replacement: &str) -> Fix {
             replacement: replacement.to_owned(),
         }],
         hunk: String::new(),
+        safe: true,
+        isolation: None,
     }
 }
 

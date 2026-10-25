@@ -3,7 +3,10 @@ use super::{Fix, TextEdit};
 pub fn compatible<'fix>(fixes: impl IntoIterator<Item = &'fix Fix>) -> Vec<&'fix Fix> {
     let mut chosen: Vec<&Fix> = Vec::new();
     for fix in fixes {
-        if !fix.edits.is_empty() && chosen.iter().all(|other| !conflicts(fix, other)) {
+        let isolated = fix
+            .isolation
+            .is_some_and(|group| chosen.iter().any(|other| other.isolation == Some(group)));
+        if !fix.edits.is_empty() && !isolated && chosen.iter().all(|other| !conflicts(fix, other)) {
             chosen.push(fix);
         }
     }

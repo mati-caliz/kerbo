@@ -1,0 +1,153 @@
+import contextlib
+import pathlib
+import tempfile
+import unittest
+
+
+def opening(path):
+    handle = open(path)
+    with open(path) as managed:
+        print(managed)
+    open(path).close()
+    data = open(path).read()
+    temporary = tempfile.NamedTemporaryFile()
+    other = pathlib.Path(path).open()
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(open(path))
+    stack = contextlib.ExitStack()
+    stack.enter_context(open(path))
+    return handle, data, temporary, other
+
+
+def returning(path):
+    return open(path)
+
+
+async def asynchronous(path):
+    async with contextlib.AsyncExitStack() as stack:
+        await stack.enter_async_context(open(path))
+
+
+class Wrapper:
+    def __enter__(self):
+        self.handle = open("x")
+        return self
+
+
+class Case(unittest.TestCase):
+    def test(self):
+        self.enterContext(open("x"))
+
+
+def validate(value, items):
+    if isinstance(value, int):
+        raise ValueError("no")
+    if not isinstance(value, str):
+        raise ValueError("no")
+    if isinstance(value, int) and callable(value):
+        raise RuntimeError
+    elif issubclass(type(value), int):
+        raise Exception("x")
+    else:
+        raise ValueError("y")
+    if isinstance(value, int):
+        raise TypeError("ok")
+    if value > 1:
+        raise ValueError("no es de tipo")
+    if isinstance(value, int):
+        if items:
+            return None
+        raise ValueError("despues de un return")
+    if isinstance(value, int):
+        for item in items:
+            if isinstance(item, int):
+                raise ValueError("adentro")
+    if value:
+        if isinstance(value, int):
+            raise ValueError("el if de afuera no chequea tipos")
+    if isinstance(value, int):
+        if isinstance(value, bool):
+            raise ValueError("los dos chequean tipos")
+    if isinstance(value, int):
+        pass
+    elif value:
+        raise ValueError("elif sin chequeo")
+
+
+
+
+CONCATENATED = [
+    "a" "b",
+    "c",
+    ("d" "e"),
+    f"{CONCATENATED}" "g",
+]
+PAIR = "a" "b", "c"
+GROUP = {"a" "b", "c"}
+TUPLE = ("a" "b", "c")
+INDEXED = {}["a" "b", "c"]
+CALLED = print("a" "b", "c")
+
+
+def arms(value):
+    if value == 1:
+        print("uno")
+    elif value == 2:
+        print('uno')
+    elif value == 3:
+        print("tres")
+    elif value == 4:
+        print(("tres"))
+    else:
+        print("tres")
+    if value:
+        # comentario
+        print(value)
+    elif not value:
+        print(value)
+    if value:
+        print(value + 1)
+    elif value > 2:
+        print(value - 1)
+
+
+def closures(values):
+    functions = []
+    for value in values:
+        functions.append(lambda: value)
+        functions.append(lambda value=value: value)
+        functions.append(lambda other: other + value)
+
+        def inner():
+            return value
+
+        def shadowed(value):
+            return value
+
+        def local():
+            value = 1
+            return value
+
+        functions.append(inner)
+        print((lambda: value)())
+        print(list(map(lambda item: item + value, values)))
+        print(sorted(values, key=lambda item: item - value))
+        total = value * 2
+        functions.append(lambda: total)
+    index = 0
+    while index < 3:
+        functions.append(lambda: index)
+        index += 1
+    for first, (second, *rest) in values:
+        functions.append(lambda: first + second + len(rest))
+    with open("x") as handle:
+        functions.append(lambda: handle)
+    for value in values:
+        functions.append(lambda: [value for value in values])
+    return [lambda: item for item in values], functions
+
+
+def returned(values):
+    for value in values:
+        return lambda: value
+    return None

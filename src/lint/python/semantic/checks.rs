@@ -2,6 +2,7 @@ mod assert_bindings;
 mod redefinitions;
 mod removal;
 mod type_checking_imports;
+mod unused_variables;
 
 use tree_sitter::{Node, Point};
 
@@ -13,6 +14,7 @@ use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::builtins::is_builtin;
 use crate::rules::PythonRule;
+use unused_variables::unused_variable_fix;
 
 const PATH_GLOBAL: &str = "__path__";
 const TRACEBACK_NAMES: [&str; 4] = [
@@ -96,12 +98,18 @@ fn unused_locals(visitor: &Visitor<'_>, scope: ScopeId, latest: &[(&str, Binding
                 && !uses_locals
                 && !binding.has(GLOBAL | NONLOCAL)
                 && !TRACEBACK_NAMES.contains(&name);
-            let rule = if binding.has(UNPACKED) {
-                PythonRule::RUF059
+            if !reported {
+                return None;
+            }
+            Some(if binding.has(UNPACKED) {
+                Report::at_point(PythonRule::RUF059, binding.site.at, name)
             } else {
-                PythonRule::F841
-            };
-            reported.then(|| Report::at_point(rule, binding.site.at, name))
+                Report::at_point(PythonRule::F841, binding.site.at, name).with_fix(unused_variable_fix(
+                    model,
+                    visitor.source,
+                    binding,
+                ))
+            })
         })
         .collect()
 }

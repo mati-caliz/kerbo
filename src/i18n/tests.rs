@@ -6,7 +6,7 @@ use crate::rules::RuleId;
 
 const LANGS: [Lang; 2] = [Lang::Spanish, Lang::English];
 
-const TEXTS: [Text; 44] = [
+const TEXTS: [Text; 45] = [
     Text::WhyLabel,
     Text::FixLabel,
     Text::ExampleLabel,
@@ -34,6 +34,7 @@ const TEXTS: [Text; 44] = [
     Text::HelpFmtCheck,
     Text::HelpFixRule,
     Text::HelpDryRun,
+    Text::HelpUnsafeFixes,
     Text::HelpSince,
     Text::FixAllTitle,
     Text::HelpRule,

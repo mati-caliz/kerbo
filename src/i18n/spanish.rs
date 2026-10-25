@@ -48,6 +48,7 @@ impl Catalog for Spanish {
             }
             Text::HelpFixRule => "Sólo los arreglos de esta regla (se puede repetir)",
             Text::HelpDryRun => "Muestra el parche sin escribir los archivos",
+            Text::HelpUnsafeFixes => "Aplica también los arreglos que pueden cambiar lo que hace el código",
             Text::AboutFmt => "Formatea los archivos Go igual que gofmt",
             Text::HelpFmtCheck => {
                 "No escribe nada: lista los archivos que cambiarían y sale con 1 si hay alguno"

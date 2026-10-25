@@ -1,0 +1,242 @@
+import copy
+import functools
+import logging
+import os
+import pathlib
+import threading
+from functools import singledispatch, singledispatchmethod
+from threading import Lock
+
+logger = logging.getLogger(__name__)
+
+
+class Generator:
+    def __init__(self):
+        yield 1
+
+    def method(self):
+        yield 2
+
+
+class GeneratorFrom:
+    def __init__(self):
+        yield from range(3)
+
+
+def __init__():
+    yield 3
+
+
+class Nested:
+    def __init__(self):
+        def inner():
+            yield 4
+
+        self.inner = inner
+        self.values = [(yield) for _ in range(1)]
+
+
+counter = 0
+
+
+def outer():
+    value = 1
+
+    def inner():
+        global value
+        nonlocal value
+        value = 2
+
+    return inner
+
+
+def load_before_global():
+    print(counter)
+    global counter
+    counter = 1
+
+
+def delete_before_global():
+    del counter
+    global counter
+    counter = 4
+
+
+def except_before_global():
+    try:
+        pass
+    except ValueError:
+        pass
+    with open("file") as counter:
+        pass
+    global counter
+    counter = 5
+
+
+def global_first():
+    global counter
+    print(counter)
+
+
+global counter
+
+
+def continue_in_finally():
+    for _ in range(3):
+        try:
+            pass
+        finally:
+            continue
+
+
+def keywords(**kwargs):
+    return kwargs
+
+
+keywords(a=1, **{"a": 2})
+keywords(**{"a": 1, "a": 2})
+keywords(**{"a": 1}, **{"a": 2})
+keywords(a=1, **{"b": 2, "a": 3}, **{"c": 4})
+keywords(**{"a": 1}, b=2)
+keywords(**{1: 1, 1: 2})
+
+
+logging.info("%s %s", 1)
+logging.info("%s", 1, 2)
+logging.info("%s %s", 1, 2)
+logging.info("%(a)s", 1, 2)
+logging.info("%s", *values)
+logging.info("%s", 1, extra={})
+logging.info("%s %s", 1, extra={})
+logging.info("no placeholders", 1)
+logging.info("%s")
+logger.warning("%s %s", 1)
+logger.warning("%s", 1, 2)
+logging.getLogger().error("%s", 1, 2)
+log = logging
+log.debug("%s", 1, 2)
+logging.log(logging.INFO, "%s", 1)
+logging.info("%d%%", 1, 2)
+logging.info("%y", 1, 2)
+
+text = "hello"
+data = b"hello"
+text.strip("aa")
+text.lstrip("abca")
+text.rstrip("abc")
+"literal".strip("xx")
+b"bytes".rstrip(b"zz")
+data.strip(b"yy")
+data.strip("yy")
+text.strip("aa", 1)
+unknown.strip("aa")
+"literal".strip(chars="aa")
+
+os.getenv(1)
+os.getenv(b"key")
+os.getenv("key")
+os.getenv(key=1.5)
+os.getenv(None)
+os.getenv([1])
+os.getenv(name)
+os.getenv("key")
+
+
+class Dispatcher:
+    @singledispatch
+    def method(self, arg):
+        pass
+
+    @functools.singledispatch
+    @staticmethod
+    def static(arg):
+        pass
+
+    @singledispatchmethod
+    def right(self, arg):
+        pass
+
+
+@singledispatchmethod
+def function(arg):
+    pass
+
+
+@functools.singledispatchmethod
+def other_function(arg):
+    pass
+
+
+@singledispatch
+def fine(arg):
+    pass
+
+
+async def async_generator():
+    yield from range(3)
+
+
+async def nested_async():
+    def inner():
+        yield from range(3)
+
+    return inner
+
+
+def outer_sync():
+    async def inner():
+        yield from range(3)
+
+    return inner
+
+
+backspace = "ab"
+sub = "ab"
+esc = "ab"
+zero_width = "a​b"
+raw = r"ab"
+fstring = f"a{backspace}b"
+escaped = "a\x08b"
+multiple = "ab"
+in_bytes = b"ab"
+
+open("file", "rw")
+open("file", "rb")
+open("file", mode="rbt")
+open("file", "z")
+open("file", "rr")
+open("file", "rU")
+open("file", "U")
+open("file", "wU")
+open("file", "r+")
+open("file", "+")
+open("file", "")
+open("file", "xb")
+pathlib.Path("file").open("wa")
+pathlib.Path("file").open(mode="r")
+open("file", "r")
+
+copy.copy(os.environ)
+copy.copy(x=os.environ)
+copy.copy(os.environ, 1)
+copy.deepcopy(os.environ)
+copy.copy(environ)
+
+with threading.Lock():
+    pass
+with threading.RLock() as lock:
+    pass
+with Lock():
+    pass
+with threading.Condition(), threading.Semaphore():
+    pass
+with open("file"), threading.BoundedSemaphore():
+    pass
+with lock:
+    pass
+with threading.Event():
+    pass
+
+
+def first_iterable():
+    return [x for x in [(yield 1)]], [y for y in range(2) for z in [(yield 2)]]

@@ -6,10 +6,10 @@ use super::super::Visitor;
 use super::super::model::{Binding, BindingId, EXPLICIT_EXPORT, GLOBAL, NONLOCAL};
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
-use crate::lint::python::ast::{ALIASED_IMPORT, BLOCK, COMMENT, NAME_FIELD, fields, named, text};
+use crate::lint::python::ast::{ALIASED_IMPORT, NAME_FIELD, fields, text};
+use crate::lint::python::statement_removal::{delete_statement, isolation_group};
 use crate::rules::PythonRule;
 
-const PASS: &str = "pass";
 const SEPARATOR: &str = ", ";
 const LINE_FEED: u8 = b'\n';
 const ENTRY_TRAILER: &[u8] = b" \t,\r";
@@ -67,34 +67,14 @@ fn removal(statement: Node<'_>, unused: &[Node<'_>], source: &[u8]) -> Option<Fi
         .filter(|entry| !unused.iter().any(|removed| removed.id() == entry.id()))
         .collect();
     if kept.is_empty() {
-        return remove_statement(statement, source);
+        return Some(delete_statement(statement, source));
     }
-    if statement.start_position().row == statement.end_position().row {
-        return rewrite_line(&entries, &kept, source);
-    }
-    remove_lines(&entries, unused, source)
-}
-
-fn remove_statement(statement: Node<'_>, source: &[u8]) -> Option<Fix> {
-    let row = statement.start_position().row;
-    let shares_line = [statement.prev_sibling(), statement.next_sibling()]
-        .into_iter()
-        .flatten()
-        .filter(|sibling| sibling.kind() != COMMENT)
-        .any(|sibling| {
-            sibling.end_position().row == row || sibling.start_position().row == statement.end_position().row
-        });
-    if shares_line {
-        return None;
-    }
-    let alone_in_block = statement
-        .parent()
-        .is_some_and(|parent| parent.kind() == BLOCK && named(parent).len() == 1);
-    if alone_in_block {
-        Some(Fix::replace(statement, PASS, source))
+    let fix = if statement.start_position().row == statement.end_position().row {
+        rewrite_line(&entries, &kept, source)
     } else {
-        Some(Fix::remove(statement, source))
-    }
+        remove_lines(&entries, unused, source)
+    };
+    fix.map(|fix| fix.isolated(isolation_group(statement)))
 }
 
 fn rewrite_line(entries: &[Node<'_>], kept: &[Node<'_>], source: &[u8]) -> Option<Fix> {

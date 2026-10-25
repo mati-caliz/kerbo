@@ -52,6 +52,7 @@ mod slots;
 mod special_methods;
 mod splits;
 mod statement_checks;
+mod statement_removal;
 mod statements;
 mod string_characters;
 mod stub_bodies;

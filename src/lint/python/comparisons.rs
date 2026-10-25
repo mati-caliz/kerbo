@@ -94,10 +94,49 @@ fn is_equality(operator: Node<'_>, source: &[u8]) -> bool {
     matches!(text(operator, source), EQUAL | NOT_EQUAL)
 }
 
+// E711 y E712, inseguros como en ruff: `x == True` pasa a `x` y `x != True` a `not x`; si no, cada
+// `==` o `!=` señalado pasa a `is` o `is not`.
 fn identity_fix(comparison: Comparison<'_, '_>, flagged: &[(usize, Report)], source: &[u8]) -> Option<Fix> {
     if flagged.is_empty() {
         return None;
     }
+    let fix =
+        redundant_boolean(comparison, source).unwrap_or_else(|| operator_fix(comparison, flagged, source));
+    Some(fix.marked_unsafe())
+}
+
+fn redundant_boolean(comparison: Comparison<'_, '_>, source: &[u8]) -> Option<Fix> {
+    let ([left, right], [operator]) = (comparison.operands, comparison.operators) else {
+        return None;
+    };
+    let equal = text(*operator, source) == EQUAL;
+    let (literal, other, wrap) = if let Some(value) = boolean_literal(*left) {
+        let wrap = unparenthesized(*left).start_byte() != comparison.node.start_byte();
+        (value, *right, wrap)
+    } else {
+        let value = boolean_literal(*right)?;
+        let wrap = unparenthesized(*right).end_byte() != comparison.node.end_byte();
+        (value, *left, wrap)
+    };
+    let condition = text(other, source);
+    let result = if literal == equal {
+        condition.to_owned()
+    } else {
+        format!("not {condition}")
+    };
+    let result = if wrap { format!("({result})") } else { result };
+    Some(Fix::replace(comparison.node, &result, source))
+}
+
+fn boolean_literal(operand: Node<'_>) -> Option<bool> {
+    match unparenthesized(operand).kind() {
+        TRUE => Some(true),
+        FALSE => Some(false),
+        _ => None,
+    }
+}
+
+fn operator_fix(comparison: Comparison<'_, '_>, flagged: &[(usize, Report)], source: &[u8]) -> Fix {
     let mut indexes: Vec<usize> = flagged.iter().map(|(index, _)| *index).collect();
     indexes.dedup();
     let edits = indexes
@@ -112,7 +151,7 @@ fn identity_fix(comparison: Comparison<'_, '_>, flagged: &[(usize, Report)], sou
             spaced_edit(*operator, replacement, source)
         })
         .collect();
-    Some(Fix::from_edits(source, edits))
+    Fix::from_edits(source, edits)
 }
 
 fn spaced_edit(operator: Node<'_>, replacement: &str, source: &[u8]) -> TextEdit {

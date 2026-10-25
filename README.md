@@ -93,7 +93,9 @@ temporal en la misma carpeta que después se renombra, así nunca queda a medio 
 
 `--rule` (se puede repetir) limita los arreglos a esas reglas y las rutas, a esas carpetas o
 archivos. `--dry-run` (o `--diff`) no escribe nada y muestra el parche en diff unificado sin
-contexto (`git apply --unidiff-zero`, también con CRLF). `--since <referencia>` arregla sólo los
+contexto (`git apply --unidiff-zero`, también con CRLF). Como ruff, los arreglos que pueden cambiar lo
+que hace el código (borrar una variable sin usar cuyo valor tiene efectos, `x == True` que pasa a `x`)
+sólo se aplican con `--unsafe-fixes`; el "arreglar todo" del LSP tampoco los toma. `--since <referencia>` arregla sólo los
 problemas de las líneas que cambiaron desde esa referencia de git. Una vuelta de arreglos que deja
 errores de sintaxis nuevos no se acepta. Sale con `0` si todo quedó escrito, `1` si algún archivo
 no se escribió porque el arreglo dejaba algo nuevo y `2` si algo no se pudo leer o escribir.

@@ -1,0 +1,23 @@
+import json
+from other import name  # noqa: F401 este comentario no cuenta para el ancho de la línea
+x = 1
+
+
+def function():
+    import sys
+    import os
+
+    return os, sys
+
+
+try:
+    import json
+except ImportError:
+    json = None
+
+# isort: off
+# isort: on
+
+
+class Thing:
+    pass

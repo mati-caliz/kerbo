@@ -1,0 +1,130 @@
+import builtins
+import datetime
+import os as os
+from datetime import timezone
+from os import path as path
+
+
+def raising(flag):
+    if flag == 1:
+        raise Exception("falla")
+    if flag == 2:
+        raise BaseException
+    if flag == 3:
+        raise builtins.Exception("falla")
+    if flag == 4:
+        raise ValueError("falla")
+    if flag == 5:
+        raise RuntimeError("otra") from Exception("causa")
+    raise
+
+
+def silenced():
+    try:
+        pass
+    except:
+        pass
+    try:
+        pass
+    except Exception:
+        pass
+    try:
+        pass
+    except (ValueError, Exception):
+        pass
+    try:
+        pass
+    except ValueError:
+        pass
+    try:
+        pass
+    except Exception:
+        # comentario
+        pass
+    try:
+        pass
+    except Exception:
+        pass
+        pass
+
+
+def executing(code, exec_code):
+    exec(code)
+    builtins.exec(code)
+    exec_code(code)
+
+
+def keys(mapping, self):
+    if "a" in mapping.keys():
+        pass
+    if "a" not in mapping.keys():
+        pass
+    if ("a") in (mapping.keys()):
+        pass
+    if "a" in self.keys():
+        pass
+    if "a" in mapping.keys(1):
+        pass
+    if "a" in mapping.keys() in mapping:
+        pass
+    for key in mapping.keys():
+        pass
+    return [key for key in mapping.keys()]
+
+
+def utc():
+    first = datetime.timezone.utc
+    second = timezone.utc
+    return first, second, datetime.UTC
+
+
+def literals():
+    return [
+        str(),
+        str("texto"),
+        str("a" "b"),
+        str(f"{literals}"),
+        str(object="x"),
+        str(1),
+        bytes(b"x"),
+        bytes("x"),
+        int(),
+        int(1),
+        int(-1),
+        int(1.0),
+        float(1.0),
+        float(+1.5),
+        float(1),
+        bool(True),
+        bool(1),
+        complex(1j),
+        complex(real=1j),
+        int(1, 2),
+        int(x=1),
+    ]
+
+
+def formats(first, second, values):
+    return [
+        "{0} {1}".format(first, second),
+        "{1} {0}".format(first, second),
+        "{1} {0}".format(first),
+        "{1} {0}".format(*values),
+        "{0} {0}".format(first),
+        "{} {}".format(first, second),
+        "{0} {name}".format(first, name=second),
+        "{0:{1}}".format(first, second),
+        "{0}".format(first, second),
+        "{0.real} {1[0]}".format(first, second),
+    ]
+
+
+def unpacking(pair, rows):
+    first, second = pair
+    (third, fourth), fifth = pair, rows
+    _, sixth = pair
+    for key, value in rows:
+        print(key)
+    with open(pair) as (handle, other):
+        print(handle)
+    return first, third

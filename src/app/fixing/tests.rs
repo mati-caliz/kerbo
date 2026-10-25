@@ -32,6 +32,7 @@ fn request<'request>(tree: &TempTree, rules: &'request [RuleId], write: bool) ->
         config: None,
         write,
         since: None,
+        unsafe_fixes: false,
     }
 }
 
@@ -174,6 +175,8 @@ fn a_pass_that_breaks_the_syntax_is_not_accepted() {
                     replacement: String::new(),
                 }],
                 hunk: String::new(),
+                safe: true,
+                isolation: None,
             });
             diagnostic
         })

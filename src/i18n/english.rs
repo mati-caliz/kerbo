@@ -48,6 +48,7 @@ impl Catalog for English {
             }
             Text::HelpFixRule => "Only the fixes of this rule (can be repeated)",
             Text::HelpDryRun => "Shows the patch without writing the files",
+            Text::HelpUnsafeFixes => "Also applies the fixes that may change what the code does",
             Text::AboutFmt => "Formats the Go files exactly like gofmt",
             Text::HelpFmtCheck => {
                 "Writes nothing: lists the files that would change and exits with 1 if there are any"

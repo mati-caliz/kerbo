@@ -1,0 +1,432 @@
+import asyncio
+import os
+import sys
+import subprocess
+from io import open
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, ClassVar, NewType
+import trio
+import py
+from gettext import gettext as _, ngettext
+
+
+if TYPE_CHECKING:
+    pass
+
+if TYPE_CHECKING:
+    pass
+else:
+    pass
+
+if TYPE_CHECKING:
+    pass
+
+
+def remove_affixes(filename: str, text: str, other: str) -> str:
+    filename = filename[:-4] if filename.endswith(".txt") else filename
+    filename = filename[4:] if filename.startswith("pre_") else filename
+    filename = filename[:-4] if filename.startswith(".txt") else filename
+    filename = filename[len(other):] if filename.startswith(other) else filename
+    filename = filename[:-len(other)] if filename.endswith(other) else filename
+    filename = filename[:-3] if filename.endswith(".txt") else filename
+    filename = filename[4::2] if filename.startswith("pre_") else filename
+    filename = filename[4::1] if filename.startswith("pre_") else filename
+    filename = other[4:] if filename.startswith("pre_") else filename
+    if text.startswith("pre"):
+        text = text[3:]
+    if text.endswith("post"):
+        text = text[:-4]
+    if text.startswith("pre"):
+        text = text[3:]
+    else:
+        pass
+    if text.startswith("pre"):
+        other = text[3:]
+    if text.startswith(prefix := "pre"):
+        text = text[len(prefix):]
+    return filename + text
+
+
+def dict_lookups(key, default):
+    values = {}
+    if key in values:
+        found = values[key]
+    else:
+        found = default
+    if key not in values:
+        found = default
+    else:
+        found = values[key]
+    if key in values:
+        found = values[key]
+    else:
+        found = compute()
+    if key in values:
+        found = values[key]
+    else:
+        missing = default
+    if key in values:
+        found = values[other_key]
+    else:
+        found = default
+    if key in values:
+        found = values[key]
+    elif key:
+        found = default
+    if key in values:
+        found = values[key]
+    else:
+        found = None
+    if "a" in values:
+        found = values["a"]
+    else:
+        found = 0
+    if key in values:
+        found = values[key]
+    else:
+        found = default  # comentario
+    if key in values:
+        found = values[key]
+    else:
+        found = this_is_a_very_long_default_value_name_that_will_not_fit_in_a_line_for_sure
+    not_a_dict = []
+    if key in not_a_dict:
+        found = not_a_dict[key]
+    else:
+        found = default
+    return found
+
+
+def file_writes(lines, pairs):
+    with open("file", "w") as handle:
+        for line in lines:
+            handle.write(line)
+        for line in lines:
+            handle.write(line.encode())
+        for left, right in pairs:
+            handle.write(left + right)
+        for line in lines:
+            handle.write(line)
+        else:
+            pass
+        for line in lines:
+            handle.write(line, 1)
+        for line in lines:
+            handle.write(line=line)
+        for line in lines:
+            handle.write(line)
+            handle.flush()
+        for kept in lines:
+            handle.write(kept)
+        print(kept)
+    stream = open("file")
+    for line in lines:
+        stream.write(line)
+    not_a_file = object()
+    for line in lines:
+        not_a_file.write(line)
+    for line in stream.readlines():
+        pass
+    for line in open("x").readlines():
+        pass
+    for line in stream.readlines(10):
+        pass
+    for line in not_a_file.readlines():
+        pass
+    return [line for line in stream.readlines()]
+
+
+async def async_writes(lines):
+    with open("file", "w") as handle:
+        async for line in lines:
+            handle.write(line)
+
+
+def format_characters(value, number):
+    print("%z" % value)
+    print("{:z}".format(value))
+    print("{:,}".format(value))
+    print("{:_d}".format(value))
+    print("{:{}z}".format(value, number))
+    print("{:{}}".format(value, number))
+    print("{:y}{:z}".format(value, number))
+    print("%d" % "1")
+    print("%d" % 1)
+    print("%s %d" % ("a", "b"))
+    print("%s %d" % ("a", 1))
+    print("%(a)d" % {"a": "x"})
+    print("%(a)d" % {"a": 1})
+    print("%f" % [1])
+    print("%x" % 1.5)
+    print("%c" % "a")
+    print("%c" % "ab")
+    print("%d" % None)
+    print("%d %d" % (1,))
+    print("%s" % value)
+    print(b"%d" % b"x")
+
+
+def annotations_access(cls):
+    cls.__dict__.get("__annotations__")
+    cls.__dict__.get("__annotations__", {})
+    cls.__dict__["__annotations__"]
+    cls.__dict__.get("__annotations__", {}, 1)
+    cls.__dict__.get(key="__annotations__")
+    cls.__dict__.get("other")
+    cls.vars.get("__annotations__")
+    return cls
+
+
+__all__ = ["remove_affixes", "dict_lookups", "remove_affixes", "file_writes", "dict_lookups"]
+__all__ += ["format_characters", "format_characters"]
+__all__.extend(["annotations_access", "annotations_access"])
+__all__ = ("single",)
+
+
+def local_all():
+    __all__ = ["a", "a"]
+    return __all__
+
+
+def simple_list():
+    return [1]
+
+
+Immutable = NewType("Immutable", int)
+
+
+@dataclass
+class Settings:
+    first: list = simple_list()
+    second: int = int()
+    third: tuple = simple_list()
+    fourth: ClassVar[list] = simple_list()
+    fifth: list = field(default_factory=list)
+    sixth: Immutable = Immutable(1)
+    seventh = simple_list()
+    eighth: list = os.path.join("a")
+    ninth: list = Frozen()
+    tenth: list = Mutable()
+
+
+@dataclass(frozen=True)
+class Frozen:
+    value: int = 0
+
+
+@dataclass
+class Mutable:
+    value: int = 0
+
+
+class NotData:
+    first: list = simple_list()
+
+
+async def timeouts():
+    with asyncio.timeout(1):
+        print(1)
+    async with asyncio.timeout(1):
+        print(1)
+    async with asyncio.timeout(1):
+        await asyncio.sleep(1)
+    with trio.move_on_after(1):
+        print(1)
+    with trio.fail_after(1), open("x"):
+        print(1)
+    async with asyncio.timeout(1), open("x"):
+        print(1)
+    with trio.CancelScope():
+        yield 1
+    with asyncio.timeout_at(1):
+        async for item in items():
+            print(item)
+    with asyncio.timeout(1):
+        def inner():
+            return 1
+    os.waitpid(0, 0)
+    os.wait()
+    subprocess.run("x")
+
+
+def not_async():
+    os.waitpid(0, 0)
+
+
+def paths():
+    py.path.local("/foo")
+    return py.path.local
+
+
+def escapes():
+    first = "\.png"
+    second = "\n\."
+    third = r"\."
+    fourth = b"\d"
+    fifth = f"\d{first}\w"
+    sixth = "\
+"
+    seventh = "—ሴAA"
+    return first, second, third, fourth, fifth, sixth, seventh
+
+
+class Generic[_T]:
+    value: _T
+
+
+def generic_function[_T, _U_, __V__, W](value: _T) -> _T:
+    return value
+
+
+type Alias[_X] = list[_X]
+
+
+def version_checks():
+    if sys.version_info > (3, 8):
+        pass
+    if sys.version_info >= (3, 8):
+        pass
+    if sys.version_info < (3, 8):
+        pass
+    if sys.version_info <= (3, 8):
+        pass
+    if sys.version_info == (3, 8):
+        pass
+    if sys.version_info != (3, 8):
+        pass
+    if sys.version_info < (3, 10):
+        pass
+    if sys.version_info < (3, 11):
+        pass
+    if sys.version_info < (3, 12):
+        pass
+    if sys.version_info <= (3, 10):
+        pass
+    if sys.version_info <= (3, 11):
+        pass
+    if sys.version_info >= (3, 11):
+        pass
+    if sys.version_info > (3, 10):
+        pass
+    if sys.version_info < (3, 11, 0):
+        pass
+    if sys.version_info < (3, 11, 2):
+        pass
+    if sys.version_info[0] == 2:
+        pass
+    if sys.version_info[0] >= 3:
+        pass
+    if sys.version_info.major < 3:
+        pass
+    if sys.version_info[:2] < (3, 5):
+        pass
+    if sys.version_info < (2,):
+        pass
+    if sys.version_info < (3,):
+        pass
+    if sys.version_info < (3, 300):
+        pass
+    if sys.version_info < (3, x):
+        pass
+    if sys.version_info < (3, 9):
+        pass
+    elif sys.version_info < (3, 6):
+        pass
+    if True:
+        pass
+    elif sys.version_info < (3, 6):
+        pass
+    if sys.version_info[0] == 4:
+        pass
+    if sys.version_info[0] > 300:
+        pass
+
+
+def index_errors():
+    print([0, 1, 2][3])
+    print([0, 1, 2][2])
+    print((0, 1)[-3])
+    print((0, 1)[-2])
+    print([0, 1][99999999999999999999])
+    print("ab"[5])
+
+
+def counters(items):
+    count = 0
+    for item in items:
+        print(item)
+        count += 1
+    index = 0
+    for item in items:
+        index += 1
+    print(index)
+    other = 0
+    for item in items:
+        if item:
+            continue
+        other += 1
+    nested = 0
+    for item in items:
+        if item:
+            nested += 1
+    two = 0
+    for item in items:
+        two += 2
+    started = 1
+    for item in items:
+        started += 1
+    twice = 0
+    for item in items:
+        twice += 1
+        twice += 1
+    reset = 0
+    for item in items:
+        reset = 0
+        reset += 1
+    if items:
+        separate = 0
+    for item in items:
+        separate += 1
+
+
+def gettext_calls(name):
+    _("Hello, {}!".format(name))
+    _("Hello, %s!" % name)
+    ngettext("one {}".format(name), "many {}".format(name), 2)
+    _(f"Hello {name}")
+    return _("Hello")
+
+
+def await_outside():
+    await asyncio.sleep(1)
+
+
+class Exports:
+    __all__ = [1]
+
+
+__all__ = [Settings, 1, None]
+__all__ = ["a", "b"]
+
+
+def dict_expressions(values, key, default, settings):
+    first = values[key] if key in values else default
+    second = default if key not in values else values[key]
+    third = values[key] if key in values else compute()
+    fourth = settings.options["a"] if "a" in settings.options else settings.zero
+    fifth = values[key] if key in other else default
+    return first, second, third, fourth, fifth
+
+
+def counters_read_later(items, grid):
+    total = 0
+    for item in items:
+        total += 1
+    total += 5
+    column = 0
+    for item in items:
+        grid.place(column=column)
+        column += 1
+    grid.place(column=0)
+    grid.column = 1
+    return total

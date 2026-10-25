@@ -1,0 +1,221 @@
+print(ExceptionGroup, aiter, __file__, __name__, __doc__, __builtins__, __spec__, __path__, __dict__)
+print(PythonFinalizationError, reveal_type, __annotate__, __class__, __module__, __qualname__)
+
+
+class Cell:
+    print(__module__, __qualname__, __class__)
+    attr = 1
+    other = attr + 1
+    items = [attr for _ in range(3)]
+    first = [value for value in range(attr)]
+    lam = lambda: attr
+
+    def method(self, default=attr):
+        return __class__, __qualname__, attr
+
+    def nonlocal_cell(self):
+        nonlocal __class__
+        __class__ = Cell
+        del __class__
+
+
+def later():
+    return defined_after
+
+
+defined_after = 1
+print(not_yet)
+not_yet = 2
+
+
+def outer():
+    def inner():
+        return free
+
+    free = 1
+    return inner
+
+
+class WithGlobals:
+    global class_global
+
+    def method(self):
+        global method_global
+
+        def inner():
+            global inner_global
+
+
+print(class_global, method_global, inner_global)
+
+
+def setter():
+    global module_global, never_assigned
+    module_global = 1
+
+
+print(module_global, never_assigned)
+
+
+def enclosing():
+    value = 1
+
+    def inner():
+        nonlocal value
+        value = 2
+
+    return inner
+
+
+def orphan():
+    nonlocal missing
+    missing = 1
+
+
+try:
+    maybe_missing
+except NameError:
+    pass
+try:
+    maybe_missing_too
+except (NameError, ValueError):
+    pass
+deleted = 1
+del deleted
+print(deleted)
+if condition:
+    maybe_deleted = 1
+    del maybe_deleted
+print(maybe_deleted)
+handled = 1
+try:
+    pass
+except ValueError:
+    del handled
+print(handled)
+try:
+    pass
+except Exception:
+    pass
+print(error)
+
+
+def match_scopes(point):
+    match point:
+        case {"x": x_value, **rest}:
+            return x_value, rest
+        case [first_item, *others]:
+            return first_item, others
+        case Point(x=0) as matched:
+            return matched
+        case Color.RED:
+            return None
+
+
+[comprehension_name for comprehension_name in range(3)]
+print(comprehension_name)
+(lambda parameter: parameter + lambda_free)(1)
+
+
+@undefined_decorator
+def decorated(argument=undefined_default):
+    pass
+
+
+class Derived(UndefinedBase, metaclass=UndefinedMeta):
+    pass
+
+
+def walrus():
+    [assigned := 1 for _ in range(2)]
+    return assigned
+
+
+def comprehension_in_class():
+    class Inner:
+        hidden = 1
+        values = [hidden for _ in range(1)]
+
+    return Inner
+
+
+def uses_locals():
+    unused = 1
+    return locals()
+
+
+def generic_function[T](argument: T) -> T:
+    return argument
+
+
+class Generic[U]:
+    def method(self) -> U:
+        return self
+
+
+type Alias[W] = list[W]
+type Forward = LaterAlias
+LaterAlias = int
+
+
+def bounded[B: LaterBound](argument: B) -> B:
+    return argument
+
+
+class LaterBound:
+    pass
+
+
+def deletes_global():
+    del some_global
+
+
+def conditional_delete():
+    local_value = 1
+    if local_value:
+        del local_value
+    return local_value
+
+
+def except_delete():
+    caught = 1
+    try:
+        pass
+    except ValueError:
+        del caught
+    return caught
+
+
+x_global = 1
+
+
+def annotation_hides():
+    x_global: int
+    print(x_global)
+
+
+class AnnotationClass:
+    x_global: int
+    print(x_global)
+
+
+def type_comparisons(value, other):
+    print(type(value) == type(other), type(value) != int, value == int, value.dtype == int, type(value) is int)
+    print(f"{value!r:>10}", "{}", "plain", r"\d", "upper", f"a" "b" f"{value}", "x" "y")
+
+
+shadowed_module = 1
+
+
+def reads_before_assignment():
+    print(shadowed_module)
+    shadowed_module = 2
+
+
+
+
+class Shadowing:
+    class_shadowed = 1
+
+
+values = [comprehension_shadowed for comprehension_shadowed in range(3)]

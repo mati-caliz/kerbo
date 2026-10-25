@@ -1,0 +1,125 @@
+import asyncio
+import sys
+
+
+def anidados(a, b, c):
+    if a:
+        if b:
+            pass
+    if a:
+        if b:
+            if c:
+                pass
+    if a:
+        if b:
+            pass
+        else:
+            pass
+    if a:
+        pass
+    elif b:
+        if c:
+            pass
+    if a:
+        if b:
+            pass
+    if __name__ == "__main__":
+        if a:
+            pass
+    if True:
+        if a:
+            pass
+    if sys.version_info >= (3, 8):
+        if a:
+            pass
+    if a:
+        if b:
+            pass
+    elif c:
+        pass
+    else:
+        pass
+
+
+def contextos(x, y):
+    with abrir(x):
+        with abrir(y):
+            pass
+    with abrir(x):
+        with abrir(y):
+            with abrir(x):
+                pass
+    with abrir(x):
+        with abrir(y):
+            pass
+        cerrar()
+    with asyncio.timeout(1):
+        with abrir(x):
+            pass
+
+
+async def asincrono(x):
+    async with abrir(x):
+        with abrir(x):
+            pass
+    async with abrir(x):
+        async with abrir(x):
+            pass
+
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def blind_handlers():
+    try:
+        pass
+    except Exception:
+        pass
+    try:
+        pass
+    except (ValueError, BaseException):
+        pass
+    try:
+        pass
+    except Exception:
+        raise
+    try:
+        pass
+    except Exception as error:
+        raise RuntimeError("otra") from error
+    try:
+        pass
+    except Exception:
+        raise RuntimeError("otra") from None
+    try:
+        pass
+    except Exception:
+        logger.exception("falló")
+    try:
+        pass
+    except Exception:
+        logger.error("falló", exc_info=True)
+    try:
+        pass
+    except Exception:
+        logger.error("falló", exc_info=False)
+    try:
+        pass
+    except Exception:
+        logging.exception("falló")
+    try:
+        pass
+    except Exception:
+        if True:
+            raise
+    try:
+        pass
+    except Exception:
+        def inner():
+            raise
+    try:
+        pass
+    except ValueError:
+        pass

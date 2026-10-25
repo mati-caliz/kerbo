@@ -1,0 +1,92 @@
+import builtins
+import pdb
+import ipdb as debugger
+import IPython.terminal.embed
+import sys
+import unittest
+from pdb import set_trace
+from sys import breakpointhook
+
+import pytest
+
+value = 1
+items = [1, 2]
+
+
+def debugging():
+    pdb.set_trace()
+    debugger.set_trace()
+    breakpoint()
+    builtins.breakpoint()
+    set_trace()
+    sys.breakpointhook()
+    breakpointhook()
+    IPython.terminal.embed.InteractiveShellEmbed()
+
+
+class Tests(unittest.TestCase):
+    def test_raises(self):
+        with self.assertRaises(Exception):
+            pass
+        with self.assertRaises(ValueError):
+            pass
+        with self.assertRaises(Exception):
+            pass
+        self.assertRaises(Exception, int, "x")
+        self.assertRaises(Exception)
+        self.assertRaises(BaseException, func=int)
+        with pytest.raises(Exception):
+            pass
+        with pytest.raises(Exception, match="x"):
+            pass
+        with pytest.raises(Exception, "x"):
+            pass
+        with pytest.raises(expected_exception=Exception):
+            pass
+        pytest.raises(Exception, int, "x")
+
+
+def increments(x):
+    ++x
+    --x
+    -+x
+    +(+x)
+    - - x
+    return x
+
+
+def assignments():
+    a = 1
+    b = 2
+    a = a
+    a, b = a, b
+    a, b = b, a
+    (a, b) = (a, b)
+    a = b = a
+    [a] = [a]
+    a, *b = a, *b
+    return a, b
+
+
+class Holder:
+    value = value
+    items = items
+
+    def method(self):
+        value = value
+        return value
+
+
+def exceptions():
+    ValueError("bad")
+    Exception()
+    ExceptionGroup("x", [])
+    EnvironmentError()
+    (KeyError("k"))
+    print(ValueError())
+    raise ValueError()
+
+
+def shadowed():
+    ValueError = list
+    ValueError("x")

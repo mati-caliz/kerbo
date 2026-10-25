@@ -1,0 +1,17 @@
+from types import TracebackType
+from typing import TypeVar, Union
+
+_S = TypeVar("_S")
+
+class Shape:
+    def __enter__(self) -> Shape: ...
+    def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ...
+    def copy(self: _S) -> _S: ...
+
+field: type[int] | type[float] | str
+union: Union[type[int], type[float]]
+nested: type[int] | (type[str] | type[bytes])
+mixed: Union[type[int], int | type[str]]
+tuple_type: type[int, str] | type[str]
+def function(kind: type[int] | type[str]) -> type[int] | type[str]: ...
+alias = type[int] | type[str]

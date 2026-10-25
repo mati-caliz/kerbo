@@ -29,6 +29,7 @@ pub struct FixRequest<'request> {
     pub config: Option<&'request Path>,
     pub write: bool,
     pub since: Option<&'request str>,
+    pub unsafe_fixes: bool,
 }
 
 #[derive(Debug)]
@@ -51,6 +52,7 @@ struct Target<'target> {
     absolute: &'target Path,
     config: &'target Config,
     rules: &'target [RuleId],
+    unsafe_fixes: bool,
     allowed: Option<&'target HashSet<String>>,
 }
 
@@ -126,6 +128,7 @@ pub fn run(
         config: arguments.config.as_deref(),
         write: !arguments.dry_run,
         since: arguments.since.as_deref(),
+        unsafe_fixes: arguments.unsafe_fixes,
     };
     let outcome = fix_files(&request, directory)?;
     if arguments.dry_run {
@@ -164,7 +167,7 @@ pub fn fix_files(request: &FixRequest<'_>, directory: &Path) -> Result<FixOutcom
         let touched = changes
             .as_ref()
             .is_none_or(|changes| changes.touches(&diagnostic));
-        if touched && wanted_fix(&diagnostic, request.rules).is_some() {
+        if touched && wanted_fix(&diagnostic, request.rules, request.unsafe_fixes).is_some() {
             candidates
                 .entry(diagnostic.absolute_path)
                 .or_insert_with(|| (diagnostic.relative_path, HashSet::new()))
@@ -179,6 +182,7 @@ pub fn fix_files(request: &FixRequest<'_>, directory: &Path) -> Result<FixOutcom
                 absolute,
                 config: &config,
                 rules: request.rules,
+                unsafe_fixes: request.unsafe_fixes,
                 allowed: changes.as_ref().map(|_| touched),
             };
             fix_file(&target, relative, request.write)
@@ -210,7 +214,7 @@ fn fix_file(target: &Target<'_>, relative: &str, write: bool) -> Result<Option<F
     };
     let analyze = |text: &str| check_text(target.absolute, text.as_bytes(), target.config);
     let accepts = |diagnostic: &Diagnostic| {
-        wanted_fix(diagnostic, target.rules).is_some()
+        wanted_fix(diagnostic, target.rules, target.unsafe_fixes).is_some()
             && target
                 .allowed
                 .is_none_or(|allowed| allowed.contains(&diagnostic.fingerprint))
@@ -300,9 +304,13 @@ pub fn converge(fixer: &Fixer<'_>, original: &str, before: Vec<Diagnostic>) -> O
 pub fn wanted_fix<'diagnostic>(
     diagnostic: &'diagnostic Diagnostic,
     rules: &[RuleId],
+    unsafe_fixes: bool,
 ) -> Option<&'diagnostic Fix> {
     let wanted = rules.is_empty() || rules.contains(&diagnostic.rule);
-    diagnostic.fix.as_ref().filter(|_| wanted)
+    diagnostic
+        .fix
+        .as_ref()
+        .filter(|fix| wanted && (fix.safe || unsafe_fixes))
 }
 
 pub fn write_atomically(path: &Path, contents: &str) -> io::Result<()> {

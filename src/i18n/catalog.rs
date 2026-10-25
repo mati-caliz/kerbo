@@ -57,6 +57,7 @@ pub enum Text {
     HelpFmtCheck,
     HelpFixRule,
     HelpDryRun,
+    HelpUnsafeFixes,
     HelpSince,
     FixAllTitle,
     HelpRule,

@@ -1625,6 +1625,24 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     falta medirlo con ruff en Linux sobre un clon con permisos reales.
   - Ninguna de las 18 reglas de la última tanda trae arreglo (ruff lo tiene en EXE004, LOG002, LOG009,
     LOG014, G010, PT020, PT025 y PT026). TC007 con TC004 apagado tampoco se imita.
+- Arreglos de Python contra `ruff check --fix` (empezados, 2026-10-25). De las 412 reglas que tiene
+  kerbo, ruff arregla 216 (114 siempre, 102 a veces); kerbo arreglaba 10.
+  - Tanda 0, la base: cada arreglo es seguro o inseguro, como en ruff; `kerbo fix` (y `kerbo_fix` del
+    MCP) sólo aplica los inseguros con `--unsafe-fixes`, y el "arreglar todo" del LSP nunca. Los
+    arreglos también se pueden aislar por grupo (el `isolate` de ruff: dos sentencias borradas del
+    mismo bloque no van en la misma vuelta, que lo dejaría vacío). `statement_removal.rs` es el
+    `delete_stmt` de ruff: `pass` si la sentencia queda sola, sólo ella y su `;` si comparte la línea,
+    y si no las líneas enteras con su comentario.
+  - La paridad se mide con `tests/fix_parity.rs`: cada fixture tiene al lado lo que deja
+    `ruff check --fix` (`.fixed`) y con `--unsafe-fixes` (`.unsafe`), limitado con `--fixable` a las
+    reglas que kerbo arregla; kerbo aplica sus arreglos en vueltas como ruff y tiene que dejar el mismo
+    archivo, byte por byte. Con `KERBO_FIX_DUMP=<carpeta>` deja lo suyo para compararlo a mano.
+  - Los 10 que había quedaron idénticos a ruff en los 54 fixtures: F401 (borra la línea con su
+    comentario y se anima con `;`), F841 (ahora con los cuatro casos de ruff, inseguros: borrar la
+    asignación, dejar el valor si tiene efectos, `_x` al desempaquetar una tupla literal y sacar el
+    `as x` de un `with`; el del `except` sigue seguro), E711 y E712 (inseguros, y `x == True` pasa a
+    `x`), F541 (inseguro en posición de docstring), F632, E713, E714, E703 y F901.
+  - Pendientes: los 206 arreglos que faltan, en tandas por tema, sumando cada regla a `--fixable`.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

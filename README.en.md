@@ -94,7 +94,9 @@ half written.
 
 `--rule` (can be repeated) limits the fixes to those rules and the paths, to those folders or
 files. `--dry-run` (or `--diff`) writes nothing and shows the patch as a unified diff without
-context (`git apply --unidiff-zero`, also with CRLF). `--since <reference>` fixes only the problems
+context (`git apply --unidiff-zero`, also with CRLF). Like ruff, the fixes that may change what the
+code does (removing an unused variable whose value has side effects, `x == True` becoming `x`) are
+only applied with `--unsafe-fixes`; the LSP "fix all" skips them too. `--since <reference>` fixes only the problems
 on lines changed since that git reference. A round of fixes that leaves new syntax errors is not
 accepted. It exits with `0` if everything was written, `1` if some file was not written because the
 fix left something new and `2` if something could not be read or written.

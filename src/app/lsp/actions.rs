@@ -135,7 +135,7 @@ struct Document<'document> {
 // sobre el texto original, se manda una sola que reemplaza el documento entero por el arreglado.
 fn fix_all(document: &Document<'_>, diagnostics: Vec<Diagnostic>, lang: Lang) -> Option<Value> {
     let analyze = |text: &str| Some(diagnose(document.path, text));
-    let accepts = |diagnostic: &Diagnostic| diagnostic.fix.is_some();
+    let accepts = |diagnostic: &Diagnostic| diagnostic.fix.as_ref().is_some_and(|fix| fix.safe);
     let fixer = Fixer {
         language: Language::from_path(document.path),
         analyze: &analyze,

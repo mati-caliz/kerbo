@@ -30,6 +30,8 @@ pub struct TextEdit {
 pub struct Fix {
     pub edits: Vec<TextEdit>,
     pub hunk: String,
+    pub safe: bool,
+    pub isolation: Option<usize>,
 }
 
 impl TextPoint {
@@ -59,7 +61,25 @@ impl Fix {
         Self {
             hunk: hunk::unified(source, &edits).unwrap_or_default(),
             edits,
+            safe: true,
+            isolation: None,
         }
+    }
+
+    // Arreglos con el mismo grupo no se aplican en la misma vuelta, como el `isolate` de ruff: dos
+    // sentencias borradas del mismo bloque lo dejarían vacío.
+    #[must_use]
+    pub const fn isolated(mut self, group: Option<usize>) -> Self {
+        self.isolation = group;
+        self
+    }
+
+    // Un arreglo que puede cambiar lo que hace el código; `kerbo fix` sólo lo aplica con
+    // `--unsafe-fixes`, como ruff.
+    #[must_use]
+    pub const fn marked_unsafe(mut self) -> Self {
+        self.safe = false;
+        self
     }
 
     pub fn replace(node: Node<'_>, text: &str, source: &[u8]) -> Self {

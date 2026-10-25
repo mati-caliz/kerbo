@@ -1,0 +1,109 @@
+import io
+from decimal import Decimal
+from io import open as io_open
+
+rest = [1]
+options = {}
+
+
+def call(*args, **kwargs):
+    return args, kwargs
+
+
+call(a=1, *rest)
+call(*rest, a=1)
+call(**options)
+call(1, *rest, b=2, *rest)
+
+
+class Empty():
+    pass
+
+
+class Commented(  # comentario
+):
+    pass
+
+
+class Based(object):
+    pass
+
+
+class Plain:
+    pass
+
+
+io.open("f")
+io_open("f")
+open("f")
+
+Decimal(0.1)
+Decimal(-1.5)
+Decimal(+-(2.5))
+Decimal((3.5))
+Decimal(1e3)
+Decimal(1.5j)
+Decimal(1)
+Decimal("0.1")
+Decimal(value=0.1)
+
+
+def trailing():
+    print(1)
+    return
+
+
+def trailing_none():
+    print(1)
+    return None
+
+
+def only_return():
+    return
+
+
+def documented():
+    """Doc."""
+    return
+
+
+def documented_more():
+    """Doc."""
+    print(1)
+    return None
+
+
+def several(flag):
+    if flag:
+        return
+    print(1)
+    return
+
+
+def returns_value():
+    print(1)
+    return 1
+
+
+def annotated() -> int:
+    print(1)
+    return None
+
+
+def nested():
+    def inner():
+        return
+
+    print(1)
+    return
+
+
+def in_branch(flag):
+    print(1)
+    if flag:
+        return
+
+
+def fstring_doc():
+    f"""Doc."""
+    return

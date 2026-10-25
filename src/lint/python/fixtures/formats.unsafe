@@ -1,0 +1,73 @@
+a = b = 1
+"%s %s" % (a,)
+"%s" % (a, b)
+"%s %s" % a
+"%(x)s %(y)s" % {"x": 1, "z": 2}
+"%(x)s" % {"x": 1, **b}
+"%(x)s" % (1,)
+"%s %s" % {"x": 1}
+"%s %(x)s" % (1,)
+"%*d" % {"x": 1}
+"%y" % a
+"%b" % a
+"%" % a
+"%(x" % a
+"%5%" % ()
+"%.*f %d" % (1, 2, 3)
+"%s" % (*a,)
+"%s %%" % (a,)
+"%-#05.3ld" % (a,)
+("%s" "%s") % (a,)
+b"%s %s" % (a,)
+"%s %s" % (a,)
+"%a %r %c %i %u %o %x %X %e %E %f %F %g %G" % (1,)
+"{} {}".format(1)
+"{0} {1}".format(1, 2, 3)
+"{} {a}".format(1, 2, a=1, b=2)
+"{0} {}".format(1, 2)
+"{".format(1)
+"}".format(1)
+"{0!x}".format(1)
+"{:{}}".format(1)
+"{:{}}".format(1, 2)
+"{a.b} {c[0]}".format(a=1, c=2)
+"{0[}".format(1)
+"{}".format(*a)
+"{a}".format(**b)
+"{a}".format(1)
+"{} {}".format(1, *a)
+"{{}} {}".format(1)
+"{:>{width}}".format(1, width=2)
+"{0:{1}}".format(1)
+("{}" "{}").format(1)
+"{!r:}".format(1)
+"{0.}".format(1)
+"{0[0]x}".format(1)
+"{ }".format(1)
+"{-1}".format(1)
+"{00}".format(1)
+"%s %s" % [1]
+"%s %s" % 1
+"%s %s" % "x"
+"%s %s" % f(a)
+"%s %s" % {1}
+"%s %s" % (a)
+"%s %s" % -1
+"%s %s" % a.b
+"%s %s" % [x for x in a]
+"%s %s" % None
+"%s %s" % (1, 2) + (3,)
+"%s" % ()
+"%s %s" % b"x"
+"%s %s" % "x"
+"%s %s" % (lambda: 0)
+"%s %s" % a[0]
+"%(a)s" % [1]
+"%(a)s" % (x for x in a)
+"%(a)s %(a)s" % {"a": 1, "a": 2}
+"%(a)s" % {"a": 1, b: 2}
+"%(a)s" % dict(a=1)
+"%s" "%s" % (1,)
+"%s" % (1, 2), "%s"
+x = "%d items" % len(a)
+"%(a)s %%" % {"a": 1, "b": 2}

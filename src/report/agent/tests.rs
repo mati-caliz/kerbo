@@ -173,6 +173,8 @@ fn says_how_many_problems_kerbo_fix_solves_even_beyond_the_shown_ones() {
         item.fix = Some(crate::fix::Fix {
             edits: Vec::new(),
             hunk: "@@ -1 +0,0 @@\n-import x\n".to_owned(),
+            safe: true,
+            isolation: None,
         });
     }
     let fixable = diagnostics.len().div_ceil(2);

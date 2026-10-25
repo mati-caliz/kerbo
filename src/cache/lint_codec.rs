@@ -19,6 +19,7 @@ const JAVA: u64 = 11;
 const TAINT: u64 = 12;
 const NO_FIX: u64 = 0;
 const WITH_FIX: u64 = 1;
+const WITH_UNSAFE_FIX: u64 = 2;
 
 pub fn write_lint(writer: &mut Writer, finding: &LintFinding) {
     write_kind(writer, finding.kind);
@@ -42,9 +43,10 @@ pub fn write_fix(writer: &mut Writer, fix: Option<&Fix>) {
     match fix {
         None => writer.number(NO_FIX),
         Some(fix) => {
-            writer.number(WITH_FIX);
+            writer.number(if fix.safe { WITH_FIX } else { WITH_UNSAFE_FIX });
             writer.list(&fix.edits, write_edit);
             writer.text(&fix.hunk);
+            writer.size(fix.isolation.map_or(0, |group| group.saturating_add(1)));
         }
     }
 }
@@ -52,9 +54,11 @@ pub fn write_fix(writer: &mut Writer, fix: Option<&Fix>) {
 pub fn read_fix(reader: &mut Reader<'_>) -> Result<Option<Fix>, Corrupt> {
     match reader.number()? {
         NO_FIX => Ok(None),
-        WITH_FIX => Ok(Some(Fix {
+        code @ (WITH_FIX | WITH_UNSAFE_FIX) => Ok(Some(Fix {
             edits: reader.list(read_edit)?,
             hunk: reader.text()?,
+            safe: code == WITH_FIX,
+            isolation: reader.size()?.checked_sub(1),
         })),
         _ => Err(Corrupt),
     }

@@ -1,0 +1,75 @@
+import ctypes
+import dataclasses
+from typing import ClassVar, Final, Sequence
+
+import pydantic
+
+
+class Plain:
+    items = []
+    mapping = {}
+    flags = set()
+    numbers = (1, 2)
+    __slots__ = []
+    first = second = []
+    typed: list = []
+    sequence: Sequence[int] = []
+    shared: ClassVar[list] = []
+    constant: Final = []
+    bare: ClassVar = []
+    shared = []
+    nothing: list
+
+
+@dataclasses.dataclass
+class Data:
+    items: list = []
+    other = []
+
+
+class Model(pydantic.BaseModel):
+    items: list = []
+
+
+class Derived(Model):
+    items = []
+
+
+class Point(ctypes.Structure):
+    before = []
+    _fields_ = [("x", ctypes.c_int)]
+    after = []
+
+
+def factory():
+    class Local:
+        items = []
+
+    return Local
+
+
+__all__ = ["b", "a"]
+__all__ = ["CONSTANT", "Class", "function"]
+__all__ = ["function", "Class"]
+__all__ += ["z", "y"]
+__all__.extend(("item2", "item10"))
+__all__.extend(("item10", "item2"))
+__all__ = "b", "a"
+__all__ = ["a", "b", "c"]
+__all__ = ["a" "z", "b"]
+__all__ = ["A1", "A01"]
+__all__: list[str] = ["d", "c"]
+other = __all__ = ["b", "a"]
+
+
+def scoped():
+    __all__ = ["b", "a"]
+    return __all__
+
+
+class Slotted:
+    __slots__ = ("name", "breed")
+    __slots__ = {"b": "doc", "a": "doc"}
+    __slots__ = {"b", "a"}
+    __slots__ = ["Zeta", "alpha"]
+    __slots__ = ["a", "B"]

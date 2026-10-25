@@ -204,6 +204,8 @@ mod tests {
         diagnostics[0].fix = Some(Fix {
             edits: Vec::new(),
             hunk: UNUSED_IMPORT_HUNK.to_owned(),
+            safe: true,
+            isolation: None,
         });
         let parsed: serde_json::Value =
             serde_json::from_str(&rendered_of(&diagnostics, Format::AgentJson)).expect("es JSON válido");

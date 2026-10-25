@@ -1,3 +1,4 @@
+mod fix_parity;
 mod fixtures;
 
 use std::path::Path;
@@ -120,7 +121,7 @@ fn mechanical_fixes_rewrite_only_what_the_rule_points_at() {
     );
     assert_eq!(
         fixed("if x != True:\n    pass\n", PythonRule::E712),
-        "if x is not True:\n    pass\n"
+        "if not x:\n    pass\n"
     );
     assert_eq!(
         fixed("if not x in y:\n    pass\n", PythonRule::E713),
@@ -149,10 +150,10 @@ fn mechanical_fixes_rewrite_only_what_the_rule_points_at() {
 }
 
 #[test]
-fn imports_sharing_a_line_or_in_a_package_have_no_fix() {
+fn imports_sharing_a_line_lose_their_separator_and_in_a_package_have_no_fix() {
     let shared = lints("import os; x = 1\n");
     assert_eq!(rendered(&shared), ["1:1 I001", "1:10 E702", "1:8 F401"]);
-    assert!(shared.iter().all(|finding| finding.fix.is_none()));
+    assert_eq!(fixed("import os; x = 1\n", PythonRule::F401), "x = 1\n");
     let package = lints_at("pkg/__init__.py", "import os\n", &strict());
     assert_eq!(rendered(&package), ["1:8 F401"]);
     assert_eq!(package.first().and_then(|finding| finding.fix.clone()), None);
