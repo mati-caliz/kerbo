@@ -1696,7 +1696,12 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     `remove_argument`), RET501, PLR1711 (respeta un comentario al lado y deja `pass` si queda sola) y
     FURB157 (signo, ceros y separadores `_` como ruff). PLW1510 no va: el arreglo de ruff es sólo para
     mostrar y nunca se aplica.
-  - Pendientes: 93 arreglos que aparecen en el corpus; C417 (`map(lambda ...)`) queda para la tanda de
+  - Tanda 7: RUF100, idéntico a ruff en 62 fixtures (`noqa_fixes.py` junta los bordes). Cada
+    directiva `noqa` guarda ahora su rango, como en ruff (`# noqa` o hasta el último código); sin
+    códigos que sigan sirviendo se borra con el `delete_comment` de ruff (la línea entera si está
+    sola, desde el código o sólo la directiva si después viene otro comentario), y si no, se reescribe
+    con los que se usan (`# noqa: `, `# ruff: noqa: ` o `# flake8: noqa: `).
+  - Pendientes: 92 arreglos que aparecen en el corpus; C417 (`map(lambda ...)`) queda para la tanda de
     libcst más pesada.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.

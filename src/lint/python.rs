@@ -273,7 +273,12 @@ fn suppressed(
 ) -> Vec<Report> {
     let suppressions = noqa::Suppressions::new(root, source);
     reports.retain(|report| enabled(report.rule));
-    let unused = noqa::unused_directives(&suppressions, &reports, enabled, !root.has_error());
+    let check = noqa::Check {
+        enabled,
+        complete: !root.has_error(),
+        source,
+    };
+    let unused = noqa::unused_directives(&suppressions, &reports, &check);
     reports.retain(|report| !suppressions.silences(report));
     reports.extend(unused.into_iter().filter(|report| enabled(report.rule)));
     reports

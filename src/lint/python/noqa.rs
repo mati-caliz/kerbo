@@ -10,9 +10,10 @@ use super::ast::{COMMENT, STRING, text};
 use crate::rules::PythonRule;
 use crate::syntax::descendants;
 use ruff_codes::REDIRECTS;
-pub use unused::unused_directives;
+pub use unused::{Check, unused_directives};
 
 const NOQA: &str = "noqa";
+const FLAKE8: &str = "flake8";
 const FILE_PREFIXES: [&str; 2] = ["ruff:", "flake8:"];
 const CODE_SEPARATORS: [char; 2] = [',', ' '];
 const COMMENT_MARKER: char = '#';
@@ -49,6 +50,10 @@ fn redirected(code: &str) -> &str {
 struct Placed {
     directive: Directive,
     start: Point,
+    start_byte: usize,
+    end_byte: usize,
+    file: bool,
+    flake8: bool,
 }
 
 #[derive(Debug, Default)]
@@ -110,19 +115,36 @@ impl Suppressions {
     fn read_comment(&mut self, comment: Node<'_>, source: &[u8]) {
         let content = text(comment, source);
         let start = comment.start_position();
-        if let Some(directive) = file_directive(content) {
-            self.files.push(Placed { directive, start });
-        } else if let Some((offset, directive)) = line_directive(content) {
+        let comment_start = comment.start_byte();
+        if let Some((directive, end)) = file_directive(content) {
+            self.files.push(Placed {
+                directive,
+                start,
+                start_byte: comment_start,
+                end_byte: comment_start.saturating_add(end),
+                file: true,
+                flake8: content.contains(FLAKE8),
+            });
+        } else if let Some((offset, directive, end)) = line_directive(content) {
             let start = Point {
                 row: start.row,
                 column: start.column.saturating_add(offset),
             };
-            self.lines.insert(start.row, Placed { directive, start });
+            let placed = Placed {
+                directive,
+                start,
+                start_byte: comment_start.saturating_add(offset),
+                end_byte: comment_start.saturating_add(end),
+                file: false,
+                flake8: false,
+            };
+            self.lines.insert(start.row, placed);
         }
     }
 }
 
-fn file_directive(comment: &str) -> Option<Directive> {
+// La directiva de archivo y dónde termina adentro del comentario.
+fn file_directive(comment: &str) -> Option<(Directive, usize)> {
     let body = comment.trim_start_matches(COMMENT_MARKER).trim_start();
     let lowered = body.to_lowercase();
     let prefix = FILE_PREFIXES.iter().find(|prefix| lowered.starts_with(*prefix))?;
@@ -131,24 +153,31 @@ fn file_directive(comment: &str) -> Option<Directive> {
         .get(..NOQA.len())
         .filter(|word| word.eq_ignore_ascii_case(NOQA))
         .and_then(|_| rest.get(NOQA.len()..))?;
-    directive_after(after)
+    let (directive, consumed) = directive_after(after)?;
+    let end = comment.len().saturating_sub(after.len()).saturating_add(consumed);
+    Some((directive, end))
 }
 
-// La directiva y dónde empieza su `#` adentro del comentario.
-fn line_directive(comment: &str) -> Option<(usize, Directive)> {
+// La directiva, dónde empieza su `#` y dónde termina adentro del comentario.
+fn line_directive(comment: &str) -> Option<(usize, Directive, usize)> {
     comment.match_indices(COMMENT_MARKER).find_map(|(index, _)| {
         let rest = comment.get(index.saturating_add(1)..)?.trim_start();
         let word = rest.get(..NOQA.len())?;
-        word.eq_ignore_ascii_case(NOQA)
-            .then(|| rest.get(NOQA.len()..).and_then(directive_after))
-            .flatten()
-            .map(|directive| (index, directive))
+        let after = word
+            .eq_ignore_ascii_case(NOQA)
+            .then(|| rest.get(NOQA.len()..))
+            .flatten()?;
+        let (directive, consumed) = directive_after(after)?;
+        let end = comment.len().saturating_sub(after.len()).saturating_add(consumed);
+        Some((index, directive, end))
     })
 }
 
 // Lo que sigue a `noqa`, como el `lex_directive` de ruff: nada, `#` o espacios sin `:` es un `noqa`
 // general; `:` abre la lista de códigos; cualquier otra cosa (`noqa[E501]`) no es una directiva.
-fn directive_after(rest: &str) -> Option<Directive> {
+// También cuánto de `rest` ocupa la directiva: nada para un `noqa` general, hasta el último código si
+// tiene lista.
+fn directive_after(rest: &str) -> Option<(Directive, usize)> {
     let starts_valid = rest
         .chars()
         .next()
@@ -157,13 +186,15 @@ fn directive_after(rest: &str) -> Option<Directive> {
         return None;
     }
     let Some(listed) = rest.trim_start().strip_prefix(CODES_MARKER) else {
-        return Some(Directive::All);
+        return Some((Directive::All, 0));
     };
-    let codes: Vec<String> = listed_codes(listed)
-        .into_iter()
-        .map(|(_, code)| code.to_owned())
-        .collect();
-    (!codes.is_empty()).then_some(Directive::Codes(codes))
+    let found = listed_codes(listed);
+    let listed_start = rest.len().saturating_sub(listed.len());
+    let consumed = found
+        .last()
+        .map(|(position, code)| listed_start.saturating_add(*position).saturating_add(code.len()))?;
+    let codes: Vec<String> = found.into_iter().map(|(_, code)| code.to_owned()).collect();
+    Some((Directive::Codes(codes), consumed))
 }
 
 // Los códigos de la lista después de `noqa:`, con dónde empieza cada uno adentro de `listed`. La lista

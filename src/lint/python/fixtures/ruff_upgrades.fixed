@@ -158,7 +158,7 @@ itertools.starmap(pow, zip([1], [2], strict=True))
 itertools.starmap(pow, pairs)
 itertools.starmap(pow, zip())
 
-value = 1  # noqa: F401, T001
-other = 2  # noqa: TCH001
-third = 3  # noqa: E501
-fourth = 4  # noqa: RUF011
+value = 1
+other = 2
+third = 3
+fourth = 4
