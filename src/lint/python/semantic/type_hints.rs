@@ -166,7 +166,7 @@ impl<'tree> Hints<'_, '_, '_> {
         })
     }
 
-    fn is_bit_or(self, node: Node<'_>) -> bool {
+    pub fn is_bit_or(self, node: Node<'_>) -> bool {
         node.kind() == BINARY_OPERATOR
             && node
                 .child_by_field_name(OPERATOR_FIELD)

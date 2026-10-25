@@ -16,6 +16,7 @@ mod dunders;
 mod encodings;
 mod escapes;
 mod exception_flow;
+mod executable_bits;
 mod flow;
 mod formats;
 mod formatter_comments;
@@ -59,12 +60,14 @@ pub mod taint;
 mod try_checks;
 mod typing_names;
 
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::Path;
 
 use tree_sitter::{Node, Point};
 
 use super::{LintFinding, LintKind, finding_at};
 use crate::fix::Fix;
+use crate::language::Language;
 use crate::limits::{Limits, Preset};
 use crate::rules::{PythonRule, RuleId};
 use crate::syntax::descendants;
@@ -137,6 +140,17 @@ pub fn relaxed_by(preset: Preset) -> Vec<RuleId> {
         Preset::Minimal => &MINIMAL_OFF,
     };
     relaxed.iter().copied().map(RuleId::Python).collect()
+}
+
+// Lo que el resultado toma del archivo además del contenido: la ruta (paquetes, stubs y nombres de
+// módulo) y el permiso de ejecución (EXE001 y EXE002).
+pub fn analysis_context(language: Language, path: &Path) -> Option<u64> {
+    (language == Language::Python).then(|| {
+        let mut hasher = DefaultHasher::new();
+        path.hash(&mut hasher);
+        executable_bits::is_executable(path).hash(&mut hasher);
+        hasher.finish()
+    })
 }
 
 pub fn findings(root: Node<'_>, source: &[u8], limits: &Limits, path: Option<&Path>) -> Vec<LintFinding> {
@@ -242,6 +256,7 @@ fn more_syntax_reports(
     reports.extend(try_checks::reports(nodes, source));
     reports.extend(rewrites::reports(nodes, source));
     reports.extend(module_names::invalid_module_name(path));
+    reports.extend(executable_bits::reports(nodes, source, path));
     reports
 }
 

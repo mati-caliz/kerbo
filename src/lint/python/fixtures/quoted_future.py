@@ -25,3 +25,6 @@ value: "Node"
 broken: "Node[" = None
 fstring: f"Node" = None
 bytes_value: b"Node" = None
+
+
+future_union: "Foo" | None = None

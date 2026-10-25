@@ -17,8 +17,8 @@ const BIDIRECTIONAL: [char; 11] = [
     '\u{2069}', '\u{200F}', '\u{061C}',
 ];
 
-// Chequeos sobre el texto tal cual: W605 (escape inválido en un string), EXE005 (shebang que no está
-// al principio del archivo) y PLE2502 (caracteres de control bidireccionales).
+// Chequeos sobre el texto tal cual: W605 (escape inválido en un string), EXE004 y EXE005 (shebang que
+// no está al principio del archivo) y PLE2502 (caracteres de control bidireccionales).
 pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     let mut found = Vec::new();
     for node in nodes {
@@ -93,7 +93,8 @@ fn advanced(start: Point, before: &str) -> Point {
     }
 }
 
-// EXE005: `#!` en un comentario después de código; si antes sólo hay espacios es EXE004.
+// EXE005: `#!` en un comentario después de código. EXE004: si antes sólo hay espacios, que avisa al
+// principio del archivo.
 fn misplaced_shebang(comment: Node<'_>, source: &[u8]) -> Option<Report> {
     if !text(comment, source).starts_with(SHEBANG) {
         return None;
@@ -102,7 +103,10 @@ fn misplaced_shebang(comment: Node<'_>, source: &[u8]) -> Option<Report> {
     let only_whitespace = before
         .iter()
         .all(|byte| matches!(byte, b' ' | b'\t' | b'\x0c' | b'\r' | b'\n'));
-    (!only_whitespace).then(|| Report::at(PythonRule::EXE005, comment, ""))
+    if !only_whitespace {
+        return Some(Report::at(PythonRule::EXE005, comment, ""));
+    }
+    (!before.is_empty()).then(|| Report::at_point(PythonRule::EXE004, Point::default(), ""))
 }
 
 fn bidirectional_lines(source: &[u8]) -> Vec<Report> {

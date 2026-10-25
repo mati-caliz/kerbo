@@ -15,7 +15,7 @@ use super::short_circuit::short_circuit_reports;
 use super::targets::Store;
 use super::type_hints::{Hints, type_hint_reports};
 use super::type_names::is_type_name;
-use super::type_unions::redundant_type_union;
+use super::type_unions::{Deferral, redundant_type_union, runtime_string_union};
 use super::version_checks::{is_six_py3, version_subscript};
 use super::{Mode, Visitor};
 use crate::lint::python::Report;
@@ -42,6 +42,7 @@ const COMPREHENSIONS: [&str; 4] = [
 const LOCALS: &str = "locals";
 const EXEC: &str = "exec";
 const UTC_ALIAS: &str = "datetime.timezone.utc";
+const LOGGING_WARN: &str = "logging.WARN";
 const TEXT_ALIAS: &str = "Text";
 const REGEX_FLAG_ALIASES: [&str; 8] = ["re.A", "re.I", "re.L", "re.M", "re.S", "re.T", "re.U", "re.X"];
 const ARGUMENT_LIST: &str = "argument_list";
@@ -57,6 +58,7 @@ const NUMPY_DTYPE: &str = "numpy.dtype";
 
 pub trait Expressions<'tree> {
     fn expression(&mut self, node: Node<'tree>, mode: Mode);
+    fn union_reports(&mut self, node: Node<'tree>, mode: Mode);
     fn children(&mut self, node: Node<'tree>, mode: Mode);
     fn named_expression(&mut self, node: Node<'tree>, mode: Mode);
     fn string(&mut self, node: Node<'tree>, mode: Mode);
@@ -76,13 +78,7 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         }
         self.reports
             .extend(type_hint_reports(&self.model, self.source, node, mode));
-        let hints = Hints {
-            model: &self.model,
-            source: self.source,
-        };
-        let deferred = self.boundaries.future_annotations() || self.file.stub;
-        self.reports
-            .extend(redundant_type_union(hints, node, mode, deferred));
+        self.union_reports(node, mode);
         match node.kind() {
             IDENTIFIER => {
                 self.model.resolve_load(self.text(node), node.start_position());
@@ -148,6 +144,23 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
             kind if COMPREHENSIONS.contains(&kind) => self.comprehension(node),
             _ => self.children(node, mode),
         }
+    }
+
+    // PYI055 y TC010, que dependen de si la anotación se evalúa.
+    fn union_reports(&mut self, node: Node<'tree>, mode: Mode) {
+        let hints = Hints {
+            model: &self.model,
+            source: self.source,
+        };
+        let deferred = self.boundaries.future_annotations() || self.file.stub;
+        self.reports
+            .extend(redundant_type_union(hints, node, mode, deferred));
+        let deferral = Deferral {
+            always: self.file.stub || self.model.forward_reference,
+            future_annotations: self.boundaries.future_annotations(),
+        };
+        self.reports
+            .extend(runtime_string_union(hints, node, mode, deferral));
     }
 
     fn children(&mut self, node: Node<'tree>, mode: Mode) {
@@ -228,7 +241,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         self.typing_call(arguments, callee.as_deref());
     }
 
-    // UP006: `typing.List` y compañía donde alcanza con `list`; UP017: `datetime.timezone.utc`.
+    // UP006: `typing.List` y compañía donde alcanza con `list`; UP017: `datetime.timezone.utc`; LOG009:
+    // `logging.WARN`, el alias sin documentar de `logging.WARNING`.
     fn upgradable_reference(&mut self, node: Node<'tree>) {
         let Some(name) = qualified_name(&self.model, node, self.source) else {
             return;
@@ -243,6 +257,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
             self.reports.push(Report::at(PythonRule::UP019, node, ""));
         } else if is_six_py3(&name) {
             self.reports.push(Report::at(PythonRule::YTT202, node, ""));
+        } else if name == LOGGING_WARN {
+            self.reports.push(Report::at(PythonRule::LOG009, node, ""));
         }
     }
 

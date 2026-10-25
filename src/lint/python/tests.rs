@@ -309,3 +309,38 @@ import os
         assert_eq!(found(relative, source), Vec::<String>::new(), "{relative}");
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn shebangs_are_checked_against_the_executable_bit() {
+    use std::os::unix::fs::PermissionsExt;
+
+    const EXECUTABLE: u32 = 0o755;
+    const PLAIN: u32 = 0o644;
+    let tree = TempTree::new("python-executable-bits");
+    let cases = [
+        (
+            "script.py",
+            "#!/usr/bin/env python\nx = 1\n",
+            EXECUTABLE,
+            Vec::<&str>::new(),
+        ),
+        (
+            "plain.py",
+            "#!/usr/bin/env python\nx = 1\n",
+            PLAIN,
+            vec!["1:1 EXE001"],
+        ),
+        ("run.py", "x = 1\n", EXECUTABLE, vec!["1:1 EXE002"]),
+        ("module.py", "x = 1\n", PLAIN, Vec::new()),
+    ];
+    for (relative, source, mode, wanted) in cases {
+        tree.write(relative, source);
+        let path = tree.path().join(relative);
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode))
+            .expect("se cambian los permisos");
+        let mut lines = rendered(&lints_at(&path.to_string_lossy(), source, &strict()));
+        lines.retain(|line| line.ends_with("EXE001") || line.ends_with("EXE002"));
+        assert_eq!(lines, wanted, "{relative}");
+    }
+}

@@ -8,7 +8,7 @@ use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ASSIGNMENT, ATTRIBUTE, ATTRIBUTE_FIELD, CLASS, COMMENT, FUNCTION, FUNCTION_FIELD, IDENTIFIER,
     KEYWORD_ARGUMENT, LAMBDA, LEFT_FIELD, NAME_FIELD, OBJECT_FIELD, RIGHT_FIELD, SUBSCRIPT, SUBSCRIPT_FIELD,
-    TRUE, TUPLE, VALUE_FIELD, is_string, named, text, unparenthesized,
+    TUPLE, VALUE_FIELD, is_string, named, text, unparenthesized,
 };
 use crate::lint::python::escapes::text_value;
 use crate::lint::python::methods::method_kind;
@@ -33,18 +33,12 @@ const ALLOWED_SORT_KEYWORDS: [&str; 2] = ["key", "reverse"];
 const PREFIXED_BASES: [&str; 3] = ["2", "8", "16"];
 const STRIPS: [&str; 3] = ["strip", "lstrip", "rstrip"];
 const NAMED_TUPLE: &str = "NamedTuple";
-const ERROR: &str = "error";
-const EXC_INFO: &str = "exc_info";
-const LOGGING: &str = "logging";
-const LOG_PREFIX: &str = "log";
-const LOGGER_SUFFIX: &str = "logger";
-const EXCEPT_CLAUSES: [&str; 2] = ["except_clause", "except_group_clause"];
 const SCOPES: [&str; 3] = [FUNCTION, CLASS, LAMBDA];
 const MINUS: &str = "-";
 
 // Llamadas sueltas: FURB192 (`sorted(x)[0]`), RUF057 (`round` que no cambia nada), FURB166
 // (`int(s[2:], 16)`), B005 (`strip` con caracteres repetidos), FURB105 (`print("")`), UP014
-// (`NamedTuple` funcional), G201 (`logging.error(..., exc_info=True)`) y PLW0245 (`super.x()`).
+// (`NamedTuple` funcional) y PLW0245 (`super.x()`).
 pub fn misc_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Report> {
     let Some(function) = call.child_by_field_name(FUNCTION_FIELD) else {
         return Vec::new();
@@ -74,7 +68,6 @@ pub fn misc_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Ve
                 .map(|assignment| Report::at(PythonRule::UP014, assignment, "")),
         );
     }
-    reports.extend(logging_exc_info(hints, call, function, &given));
     reports.extend(super_without_call(model, source, call, function));
     reports
 }
@@ -252,44 +245,6 @@ fn is_identifier(value: &str) -> bool {
         .next()
         .is_some_and(|first| first.is_alphabetic() || first == '_')
         && letters.all(|letter| letter.is_alphanumeric() || letter == '_')
-}
-
-// G201: `logging.error(..., exc_info=True)` en un `except`, que es `logging.exception`. Avisa en el
-// método.
-fn logging_exc_info(
-    hints: Hints<'_, '_, '_>,
-    call: Node<'_>,
-    function: Node<'_>,
-    given: &Arguments<'_>,
-) -> Option<Report> {
-    let (model, source) = (hints.model, hints.source);
-    let method = function
-        .child_by_field_name(ATTRIBUTE_FIELD)
-        .filter(|method| function.kind() == ATTRIBUTE && text(*method, source) == ERROR)?;
-    let object = function.child_by_field_name(OBJECT_FIELD)?;
-    let exc_info =
-        keyword_value(given, EXC_INFO, source).is_some_and(|value| unparenthesized(value).kind() == TRUE);
-    let in_handler = std::iter::successors(call.parent(), Node::parent)
-        .take_while(|ancestor| !SCOPES.contains(&ancestor.kind()))
-        .any(|ancestor| EXCEPT_CLAUSES.contains(&ancestor.kind()));
-    (exc_info && in_handler && is_logger(model, source, object))
-        .then(|| Report::at(PythonRule::G201, method, ""))
-}
-
-// `is_logger_candidate` de ruff: el módulo `logging`, o un nombre del módulo que parece un logger.
-fn is_logger(model: &Model<'_>, source: &[u8], object: Node<'_>) -> bool {
-    if let Some(name) = qualified_name(model, object, source) {
-        return name == LOGGING;
-    }
-    let tail = if object.kind() == ATTRIBUTE {
-        object
-            .child_by_field_name(ATTRIBUTE_FIELD)
-            .map(|attribute| text(attribute, source))
-    } else {
-        (object.kind() == IDENTIFIER).then(|| text(object, source))
-    };
-    tail.map(str::to_ascii_lowercase)
-        .is_some_and(|tail| tail.starts_with(LOG_PREFIX) || tail.ends_with(LOGGER_SUFFIX))
 }
 
 // PLW0245: `super.metodo()` sin los paréntesis de `super()`, adentro de un método.

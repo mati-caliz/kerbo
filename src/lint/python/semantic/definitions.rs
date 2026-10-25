@@ -11,6 +11,7 @@ use super::self_types::{custom_type_variable_report, non_self_return_report};
 use super::builtin_calls::lru_cache_reports;
 use super::cached_methods::cached_instance_method;
 use super::model::{BindingKind, MODULE_SCOPE, ScopeKind, Site};
+use super::pytest_calls::pytest_decorator_reports;
 use super::qualified::is_builtin_named;
 use super::returns::{unnecessary_return_none, useless_return};
 use super::stub_signatures::signature_reports;
@@ -81,6 +82,8 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
                 let returns = unnecessary_return_none(&self.model, self.source, function, &decorators);
                 self.reports
                     .extend(lru_cache_reports(&self.model, self.source, &decorators));
+                self.reports
+                    .extend(pytest_decorator_reports(&self.model, self.source, &decorators));
                 self.reports.extend(cached_instance_method(
                     &self.model,
                     self.source,

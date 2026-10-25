@@ -115,6 +115,7 @@ pub const LINT_RULES: [RuleId; 6] = [
 
 pub use go::nolint_ranges as go_nolint_ranges;
 pub use java_style::relaxed_by as java_relaxed_by;
+pub use python::analysis_context as python_analysis_context;
 pub use python::relaxed_by as python_relaxed_by;
 
 pub fn find_lints(

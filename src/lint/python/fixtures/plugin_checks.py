@@ -1,0 +1,257 @@
+  #!/usr/bin/env python
+from __future__ import nested_scopes, braces, generator_stop
+from __future__ import barry_as_FLUFL, unknown_feature
+
+import logging
+import sys
+from logging import WARN, exception, getLogger, warn
+
+import flask
+from flask import current_app
+
+logger = logging.getLogger(__file__)
+other = getLogger(__cached__)
+named = logging.getLogger(name=__file__)
+fine = logging.getLogger(__name__)
+level = logging.WARN
+level2 = WARN
+logging.basicConfig(level=logging.WARNING)
+logging.warn("a")
+logger.warn("a")
+LOGGER = logging.getLogger("x")
+LOGGER.warn("a")
+Logger = LOGGER
+Logger.warn("a")
+my_logging = LOGGER
+my_logging.warn("x")
+current_app.logger.warn("x")
+flask.current_app.logger.warn("x")
+logging.getLogger().warn("x")
+logging.Logger("x").warn("x")
+warn("x")
+logger.fatal("x", exc_info=True)
+logging.info("x", extra={"name": 1, "other": 2, "msg": 3})
+logging.info("x", extra=dict(name=1, levelname=2, ok=3))
+logger.info("x", extra={"message": "m", **{"lineno": 1}})
+logging.warning("x", exc_info=True)
+logging.warning("x", exc_info=1)
+logging.warning("x", exc_info="yes")
+logging.warning("x", exc_info=0)
+logging.warning("x", exc_info=None)
+logging.warning("x", exc_info=sys.exc_info())
+logging.log(logging.INFO, "x", exc_info=True)
+logger.log(logging.INFO, "x", exc_info=True)
+exception("x", exc_info=True)
+something.warning("x", exc_info=True)
+
+
+def handler():
+    try:
+        pass
+    except ValueError:
+        logging.exception("x", exc_info=True)
+        logger.exception("x", exc_info=sys.exc_info())
+        logger.exception("x", exc_info=False)
+        logging.error("x", exc_info=False)
+        exception("x", exc_info=True)
+        logging.warning("x", exc_info=True)
+
+        def inner():
+            logging.exception("x", exc_info=True)
+            logging.warning("x", exc_info=True)
+
+    else:
+        logging.warning("x", exc_info=True)
+    finally:
+        logging.warning("x", exc_info=True)
+
+
+lambda: logging.warning("x", exc_info=True)
+
+
+from gettext import gettext, ngettext
+import gettext as gt
+from gettext import gettext as translate
+
+
+name = "x"
+_(f"Hello {name}")
+_("Hello %s" % name)
+_("Hello %s" % (name,))
+_("Hello" + name)
+gettext(f"Hello {name}")
+gettext("Hello %s" % name)
+ngettext(f"one {name}", "many", 2)
+ngettext("one %s" % name, f"many {name}", 2)
+gt.gettext(f"x {name}")
+gt.ngettext("x %s" % name, "y", 1)
+_(message=f"x {name}")
+_(f"plain")
+_(rf"plain {name}")
+_(b"x %s" % name)
+_(("x %s") % name)
+_(f"a" "b")
+other(f"x {name}")
+translate(f"x {name}")
+
+import pytest
+from pytest import mark, raises, yield_fixture
+from pytest.mark import usefixtures
+import pytest as pt
+
+from pytest import mark, raises, yield_fixture
+import pytest as pt
+
+
+def test_raises():
+    with pytest.raises():
+        pass
+    with raises():
+        pass
+    with pt.raises(match="x"):
+        pass
+    with pytest.raises(check=lambda e: True):
+        pass
+    with pytest.raises(expected_exception=ValueError):
+        pass
+    with pytest.raises(*args):
+        pass
+    pytest.raises()
+    pytest.raises(ValueError)
+
+
+@pytest.yield_fixture()
+def fixture_one():
+    yield 1
+
+
+@pytest.yield_fixture
+def fixture_two():
+    yield 1
+
+
+@yield_fixture(scope="module")
+def fixture_three():
+    yield 1
+
+
+@pytest.mark.usefixtures("a")
+@pytest.fixture()
+def fixture_four(a):
+    pass
+
+
+@pytest.fixture()
+@pytest.mark.usefixtures("a")
+@mark.usefixtures
+def fixture_five(a):
+    pass
+
+
+@pytest.mark.usefixtures("a")
+@pytest.yield_fixture
+def fixture_six(a):
+    yield 1
+
+
+@pytest.mark.usefixtures()
+def test_one():
+    pass
+
+
+@pytest.mark.usefixtures
+def test_two():
+    pass
+
+
+@pt.mark.usefixtures()
+@pytest.fixture
+def fixture_seven():
+    pass
+
+
+@pytest.mark.usefixtures()
+class TestClass:
+    @pytest.mark.usefixtures()
+    def test_method(self):
+        pass
+
+
+@pytest.mark.usefixtures(*[])
+def test_three():
+    pass
+
+
+@usefixtures()
+def test_four():
+    pass
+
+
+from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast
+import typing
+import typing as t
+
+if TYPE_CHECKING:
+    from foo import Foo, Bar, Baz, Qux
+    from collections.abc import Sequence
+    import pkg
+
+OptFoo: TypeAlias = Foo | None
+OptBar: typing.TypeAlias = list[Bar]
+OptBaz: t.TypeAlias = "Baz | None"
+Literal_: TypeAlias = typing.Literal["Foo"]
+Ann: TypeAlias = typing.Annotated[Foo, Bar]
+Seq: TypeAlias = Sequence[int]
+Mod: TypeAlias = pkg.Thing
+Plain = Foo | None
+Runtime: TypeAlias = int | None
+Call: TypeAlias = make(Foo)
+Tuple_: TypeAlias = tuple[Foo, Qux]
+
+x: "Foo" | None = None
+y: int | "Bar" = 1
+z: "A" | "B" | None
+w: list["A" | None]
+v: "A | None"
+u: b"A" | None
+
+
+def f(a: "A" | None, b: "B") -> "C" | None:
+    local: "A" | None = None
+    return local
+
+
+class K:
+    attr: "A" | None
+    other: ("A") | (None)
+
+
+if TYPE_CHECKING:
+    hidden: "A" | None
+
+
+def uses_qux():
+    return Qux
+
+
+z_cast = cast("A" | None, 1)
+T = TypeVar("T", bound="A" | None)
+AliasUnion: TypeAlias = "A" | None
+nested_union: "A" | (None | "B")
+union_in_union: typing.Union["A" | None, int]
+fstring_union: f"A" | None
+
+*a1, *b1 = (1, 2, 3)
+[*c1, *d1] = [1, 2]
+(*e1, f1), *g1 = [[1, 2], 3]
+for *h1, *i1 in []:
+    pass
+*j1, k1 = 1, 2
+(*e2, *f2), g2 = [[1, 2], 3]
+[x for *a2, *b2 in []]
+with open("f") as (*c2, *d2):
+    pass
+p2 = q2 = *r2, *s2 = 1, 2
+for (*t2, *u2), v2 in []:
+    pass
+(*w2, *y2) = 1, 2

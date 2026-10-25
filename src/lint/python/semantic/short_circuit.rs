@@ -27,6 +27,7 @@ const AND: &str = "and";
 const NONE_LITERAL: &str = "none";
 const INTEGER: &str = "integer";
 const FLOAT: &str = "float";
+const ELLIPSIS: &str = "ellipsis";
 const SIGNS: [&str; 2] = ["+", "-"];
 const CONTAINERS: [&str; 4] = ["list", "tuple", "set", "dictionary"];
 const SPLATS: [&str; 2] = ["list_splat", "dictionary_splat"];
@@ -161,6 +162,19 @@ fn truthiness(node: Node<'_>, context: Context<'_, '_, '_>) -> Option<bool> {
                 .then(|| !is_zero(text(operand, source)))
         }
         CALL => initializer_truthiness(node, context),
+        _ if is_string(node) => string_truthiness(node, source),
+        _ => None,
+    }
+}
+
+// La veracidad de un literal suelto, sin contenedores ni llamadas: el `is_literal_expr` de ruff seguido
+// de `Truthiness::from_expr`.
+pub fn literal_truthiness(node: Node<'_>, source: &[u8]) -> Option<bool> {
+    let node = unparenthesized(node);
+    match node.kind() {
+        TRUE | ELLIPSIS => Some(true),
+        FALSE | NONE_LITERAL => Some(false),
+        INTEGER | FLOAT => Some(!is_zero(text(node, source))),
         _ if is_string(node) => string_truthiness(node, source),
         _ => None,
     }

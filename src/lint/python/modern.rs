@@ -61,6 +61,7 @@ const MANDATORY_FUTURE_FEATURES: [&str; 8] = [
     "unicode_literals",
     "generator_stop",
 ];
+const OPTIONAL_FUTURE_FEATURES: [&str; 2] = ["annotations", "barry_as_FLUFL"];
 
 static CODING_COMMENT: LazyLock<Option<Regex>> =
     LazyLock::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*(?<name>[-_.a-zA-Z0-9]+)").ok());
@@ -84,7 +85,10 @@ pub fn reports(root: Node<'_>, nodes: &[Node<'_>], source: &[u8]) -> Vec<Report>
                 found.push(Report::at(PythonRule::UP025, *node, ""));
             }
             CALL => found.extend(deprecated_unittest_alias(*node, source)),
-            FUTURE_IMPORT => found.extend(unnecessary_future_import(*node, source)),
+            FUTURE_IMPORT => {
+                found.extend(unnecessary_future_import(*node, source));
+                found.extend(undefined_future_features(*node, source));
+            }
             EXPRESSION_STATEMENT => found.extend(useless_comparison(*node)),
             BLOCK | MODULE => found.extend(unnecessary_placeholders(*node, source)),
             _ => {}
@@ -96,8 +100,27 @@ pub fn reports(root: Node<'_>, nodes: &[Node<'_>], source: &[u8]) -> Vec<Report>
 // UP010: un `from __future__ import` de algo que ya es obligatorio en Python 3. Avisa una vez por
 // sentencia.
 fn unnecessary_future_import(statement: Node<'_>, source: &[u8]) -> Option<Report> {
+    let mandatory = future_features(statement)
+        .into_iter()
+        .any(|name| MANDATORY_FUTURE_FEATURES.contains(&text(name, source)));
+    mandatory.then(|| Report::at(PythonRule::UP010, statement, ""))
+}
+
+// F407: `from __future__ import braces`, una característica que Python no conoce. Avisa en cada una.
+fn undefined_future_features(statement: Node<'_>, source: &[u8]) -> Vec<Report> {
+    future_features(statement)
+        .into_iter()
+        .filter(|name| {
+            let feature = text(*name, source);
+            !MANDATORY_FUTURE_FEATURES.contains(&feature) && !OPTIONAL_FUTURE_FEATURES.contains(&feature)
+        })
+        .map(|name| Report::at(PythonRule::F407, name, text(name, source)))
+        .collect()
+}
+
+fn future_features(statement: Node<'_>) -> Vec<Node<'_>> {
     let mut cursor = statement.walk();
-    let mandatory = statement
+    statement
         .children_by_field_name(NAME_FIELD, &mut cursor)
         .filter_map(|name| {
             if name.kind() == ALIASED_IMPORT {
@@ -106,8 +129,7 @@ fn unnecessary_future_import(statement: Node<'_>, source: &[u8]) -> Option<Repor
                 Some(name)
             }
         })
-        .any(|name| MANDATORY_FUTURE_FEATURES.contains(&text(name, source)));
-    mandatory.then(|| Report::at(PythonRule::UP010, statement, ""))
+        .collect()
 }
 
 // UP009: un `# -*- coding: utf-8 -*-` en las dos primeras líneas, que en Python 3 sobra.

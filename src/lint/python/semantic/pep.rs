@@ -144,13 +144,13 @@ pub fn is_typing_only(node: Node<'_>, future_annotations: bool, source: &[u8]) -
     for ancestor in std::iter::successors(node.parent(), Node::parent) {
         match ancestor.kind() {
             IF if is_type_checking_body(ancestor, child, source) => return true,
-            TYPE_NODE => {
-                if let Some(typing) = ancestor
+            TYPE_NODE
+                if ancestor
                     .parent()
                     .and_then(|holder| annotation_context(holder, future_annotations))
-                {
-                    return typing;
-                }
+                    == Some(true) =>
+            {
+                return true;
             }
             _ => {}
         }

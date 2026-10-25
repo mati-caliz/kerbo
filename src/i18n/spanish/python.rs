@@ -6,6 +6,7 @@ mod idioms;
 mod library_rules;
 mod mixed_checks;
 mod modern;
+mod plugin_rules;
 mod pylint_errors;
 mod small_checks;
 mod stub_rules;
@@ -23,6 +24,7 @@ use idioms::IDIOM_TEXTS;
 use library_rules::LIBRARY_RULE_TEXTS;
 use mixed_checks::MIXED_CHECK_TEXTS;
 use modern::MODERN_TEXTS;
+use plugin_rules::PLUGIN_RULE_TEXTS;
 use pylint_errors::PYLINT_ERROR_TEXTS;
 use small_checks::SMALL_CHECK_TEXTS;
 use stub_rules::STUB_RULE_TEXTS;
@@ -43,6 +45,7 @@ pub fn python(rule: PythonRule) -> RuleText {
         .chain(MODERN_TEXTS.iter())
         .chain(IDIOM_TEXTS.iter())
         .chain(CHECK_TEXTS.iter())
+        .chain(PLUGIN_RULE_TEXTS.iter())
         .chain(LIBRARY_RULE_TEXTS.iter())
         .chain(UPGRADE_RULE_TEXTS.iter())
         .chain(STUB_RULE_TEXTS.iter())

@@ -1592,13 +1592,36 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Los archivos que no están en UTF-8 (ruff da E902 y no los analiza) se analizan igual: falta
     saltearlos o avisar como ruff. Se hacen en tandas de 15 a 25 reglas por
     tema, con un solo gate y una sola medición por tanda.
+  - Hechas las 18 reglas que quedaban del conjunto por defecto de ruff 0.17 y del clásico, medidas con
+    `fixtures/plugin_checks.py` (2026-10-25): EXE001 y EXE002 (shebang contra el permiso de
+    ejecución; como ruff, sólo en Unix y fuera de WSL), EXE004 (espacios antes del shebang), INT001 e
+    INT003 (f-string y `%` adentro de `gettext`; INT002 pasó al análisis semántico para reconocer
+    `import gettext as gt` como ruff), LOG002 (`getLogger(__file__)`), LOG009 (`logging.WARN`), LOG014
+    (`exc_info=True` fuera de un `except`), G010 (`warn`), G101 (`extra` que pisa un atributo de
+    `LogRecord`), G202 (`exc_info` de más en `exception`), PT010, PT020, PT025 y PT026 (pytest), TC010
+    (un string en una unión `X | Y` que se evalúa), F407 (característica de `__future__` que no
+    existe) y F622 (dos destinos con `*`). G201 se mudó con las otras de logging y ahora reconoce los
+    loggers con las mismas reglas que ruff (`logging.getLogger().x`, `current_app.logger`, `LOG`,
+    `from logging import error`). Corregido de paso `is_typing_only`: una anotación que se evalúa
+    adentro de `if TYPE_CHECKING:` contaba como de ejecución (afectaba TC004, PYI055 y TC010). Cero
+    diferencias en el corpus salvo EXE002 (ver pendientes).
+  - No hacen falta: FA100 y FA102 (ruff sólo las da con Python anterior a 3.10, y kerbo supone 3.11),
+    TC007 (ruff la calla con TC004 prendido, y la referencia del propio alias ya cuenta como uso en
+    ejecución, así que en el conjunto por defecto no sale nunca) y F621 (en ruff 0.17 es código
+    muerto: `starred_index` siempre es `None`).
+  - La caché de Python no tenía en cuenta la ruta del archivo: dos archivos con el mismo contenido en
+    lugares distintos compartían el resultado, aunque N999, PLW0406 y los stubs dependen de la ruta.
+    Ahora la clave suma la ruta y el permiso de ejecución, como Shell suma su dialecto.
 - Pendientes de Python contra ruff:
-  - Del conjunto clásico: E902 (no es una regla), F407 (`from __future__` de una característica que
-    no existe), F621 y F622 (expresiones con `*` de más): ninguna apareció en los diez repos.
-  - Del conjunto por defecto de ruff 0.17 (407 reglas) quedan 20, más las cuatro del conjunto
-    clásico de arriba, todas con cero avisos en el corpus, así que su paridad sólo se puede medir con
-    fixtures: B031, EXE001, EXE002, EXE004, FA100, FA102, INT001, INT003, LOG002, LOG009, LOG014, G010,
-    G101, G202, PT010, PT020, PT025, PT026, TC007 y TC010.
+  - Del conjunto clásico sólo queda E902, que no es una regla. Del conjunto por defecto de ruff 0.17
+    sólo queda B031 (reusar el generador de `itertools.groupby`): pide seguir los usos del grupo por
+    ramas y loops.
+  - EXE002 en el corpus: kerbo da 10.905 avisos que ruff no, porque el corpus se analiza montado
+    desde Windows en Docker, donde todo archivo aparece como ejecutable, y ruff corre en Windows, donde
+    la regla no existe. Ruff en ese mismo contenedor daría lo mismo (no es WSL), así que no se tocó;
+    falta medirlo con ruff en Linux sobre un clon con permisos reales.
+  - Ninguna de las 18 reglas de la última tanda trae arreglo (ruff lo tiene en EXE004, LOG002, LOG009,
+    LOG014, G010, PT020, PT025 y PT026). TC007 con TC004 apagado tampoco se imita.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

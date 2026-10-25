@@ -20,6 +20,10 @@ const CHEVRON: &str = "chevron";
 const CONDITION_FIELD: &str = "condition";
 const NOT_IMPLEMENTED: &str = "NotImplemented";
 const NOT_IMPLEMENTED_ERROR: &str = "NotImplementedError";
+const TARGET_SEQUENCES: [&str; 3] = ["pattern_list", "tuple_pattern", "list_pattern"];
+const AS_PATTERN_TARGET: &str = "as_pattern_target";
+const STARRED_TARGETS: [&str; 2] = ["list_splat_pattern", "list_splat"];
+const MAX_STARRED_TARGETS: usize = 1;
 
 pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     nodes
@@ -33,9 +37,27 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
             IF | ELIF => if_tuple(*node),
             PRINT => print_chevron(*node),
             RAISE => raise_not_implemented(*node, source),
+            kind if TARGET_SEQUENCES.contains(&kind) => multiple_starred(*node),
+            AS_PATTERN_TARGET => std::iter::once(*node)
+                .chain(named(*node).into_iter().map(unparenthesized))
+                .flat_map(multiple_starred)
+                .collect(),
             _ => Vec::new(),
         })
         .collect()
+}
+
+// F622: `*a, *b = x`, más de un `*` en la misma tupla o lista de destinos.
+fn multiple_starred(targets: Node<'_>) -> Vec<Report> {
+    let starred = named(targets)
+        .into_iter()
+        .filter(|target| STARRED_TARGETS.contains(&target.kind()))
+        .count();
+    if starred > MAX_STARRED_TARGETS {
+        vec![Report::at(PythonRule::F622, targets, "")]
+    } else {
+        Vec::new()
+    }
 }
 
 fn multiple_imports(statement: Node<'_>) -> Vec<Report> {

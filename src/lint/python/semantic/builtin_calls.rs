@@ -250,7 +250,7 @@ pub fn keyword_value<'tree>(
         .and_then(|argument| argument.child_by_field_name(VALUE_FIELD))
 }
 
-fn keyword_argument<'tree>(
+pub fn keyword_argument<'tree>(
     arguments: &Arguments<'tree>,
     keyword: &str,
     source: &[u8],

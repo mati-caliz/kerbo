@@ -2,9 +2,8 @@ use tree_sitter::Node;
 
 use super::Report;
 use super::ast::{
-    ARGUMENTS_FIELD, ASSIGNMENT, ATTRIBUTE, ATTRIBUTE_FIELD, AUGMENTED_ASSIGNMENT, BLOCK, BODY_FIELD, CALL,
-    CLASS, COMMENT, DECORATED, EXPRESSION_STATEMENT, FUNCTION, FUNCTION_FIELD, IDENTIFIER, KEYWORD_ARGUMENT,
-    LAMBDA, LEFT_FIELD, MODULE, OBJECT_FIELD, RIGHT_FIELD, TYPE_FIELD, named, text, unparenthesized,
+    ASSIGNMENT, AUGMENTED_ASSIGNMENT, BLOCK, BODY_FIELD, CLASS, COMMENT, DECORATED, EXPRESSION_STATEMENT,
+    FUNCTION, IDENTIFIER, LAMBDA, LEFT_FIELD, MODULE, RIGHT_FIELD, TYPE_FIELD, named, text, unparenthesized,
 };
 use super::known_types::{is_binding, is_name_reference, is_read_after};
 use crate::rules::PythonRule;
@@ -30,12 +29,8 @@ const INCREMENT: &str = "+=";
 const OPERATOR_FIELD: &str = "operator";
 const ONE: &str = "1";
 const ZERO: &str = "0";
-const FORMAT: &str = "format";
-const GETTEXT_FUNCTIONS: [&str; 3] = ["_", "gettext", "ngettext"];
-const QUALIFIED_GETTEXT: [&str; 2] = ["gettext.gettext", "gettext.ngettext"];
 
-// PLE1142 (`await` fuera de una función async), SIM113 (un contador a mano en vez de `enumerate`) e
-// INT002 (`_("...".format(x))`, que traduce el texto ya formateado).
+// PLE1142 (`await` fuera de una función async) y SIM113 (un contador a mano en vez de `enumerate`).
 pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     let mut found = Vec::new();
     for node in nodes {
@@ -51,7 +46,6 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
                 found.extend(await_outside_async(*node, *node));
             }
             FOR if !starts_with_async(*node, source) => found.extend(manual_counters(*node, source)),
-            CALL => found.extend(format_in_gettext(*node, source)),
             _ => {}
         }
     }
@@ -225,38 +219,4 @@ fn collect_declarations(node: Node<'_>, name: &str, source: &[u8], declared: &mu
             collect_declarations(child, name, source, declared);
         }
     }
-}
-
-// INT002: `.format` en el primer argumento de `gettext`; el plural de `ngettext` es de preview.
-fn format_in_gettext(call: Node<'_>, source: &[u8]) -> Option<Report> {
-    let function = call.child_by_field_name(FUNCTION_FIELD)?;
-    let name = text(function, source);
-    let is_gettext = match function.kind() {
-        IDENTIFIER => GETTEXT_FUNCTIONS.contains(&name),
-        ATTRIBUTE => QUALIFIED_GETTEXT.contains(&name),
-        _ => false,
-    };
-    if !is_gettext {
-        return None;
-    }
-    call.child_by_field_name(ARGUMENTS_FIELD)
-        .map(significant)
-        .unwrap_or_default()
-        .into_iter()
-        .find(|argument| argument.kind() != KEYWORD_ARGUMENT)
-        .filter(|first| is_format_call(*first, source))
-        .map(|first| Report::at(PythonRule::INT002, first, ""))
-}
-
-fn is_format_call(node: Node<'_>, source: &[u8]) -> bool {
-    node.kind() == CALL
-        && node
-            .child_by_field_name(FUNCTION_FIELD)
-            .filter(|function| function.kind() == ATTRIBUTE)
-            .and_then(|function| function.child_by_field_name(ATTRIBUTE_FIELD))
-            .is_some_and(|attribute| text(attribute, source) == FORMAT)
-        && node
-            .child_by_field_name(FUNCTION_FIELD)
-            .and_then(|function| function.child_by_field_name(OBJECT_FIELD))
-            .is_some()
 }
