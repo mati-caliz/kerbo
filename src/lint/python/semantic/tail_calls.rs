@@ -85,7 +85,7 @@ pub fn tail_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Ve
         && is_type_none_check(hints, &given)
         && let Some(checked) = given.positional.first()
     {
-        let fix = identity_check_fix(call, *checked, source);
+        let fix = identity_check_fix(call, *checked, false, source);
         reports.push(Report::at(PythonRule::FURB168, call, "").with_fix(Some(fix)));
     }
     if qualified == Some(MATH_LOG)

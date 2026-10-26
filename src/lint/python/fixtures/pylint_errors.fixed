@@ -190,15 +190,15 @@ def outer_sync():
     return inner
 
 
-backspace = "ab"
-sub = "ab"
-esc = "ab"
-zero_width = "a​b"
+backspace = "a\bb"
+sub = "a\x1ab"
+esc = "a\x1bb"
+zero_width = "a\u200bb"
 raw = r"ab"
-fstring = f"a{backspace}b"
+fstring = f"a\b{backspace}\x1bb"
 escaped = "a\x08b"
-multiple = "ab"
-in_bytes = b"ab"
+multiple = "\ba\bb\x1a"
+in_bytes = b"a\x1bb"
 
 open("file", "rw")
 open("file", "rb")

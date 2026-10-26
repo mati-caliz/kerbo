@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::builtin_calls::{Arguments, arguments, keyword_value};
 use super::cast_calls::is_assigned;
+use super::library_fixes::{library_fix, utc_suffix_fix};
 use super::model::{BindingKind, Model, Resolution};
 use super::mutability::{Resolver, without_subscript};
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
@@ -103,7 +104,9 @@ pub fn library_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
                 }
                 _ => None,
             }
-            .map(|argument| Report::at(PythonRule::FURB162, argument, "")),
+            .map(|argument| {
+                Report::at(PythonRule::FURB162, argument, "").with_fix(utc_suffix_fix(argument, source))
+            }),
         ),
         Some(name)
             if TYPE_VARIABLES.iter().any(|member| is_typing(name, member))
@@ -127,7 +130,8 @@ pub fn library_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
     } else {
         None
     };
-    reports.extend(rule.map(|rule| Report::at(rule, call, "")));
+    reports
+        .extend(rule.map(|rule| Report::at(rule, call, "").with_fix(library_fix(rule, model, call, source))));
     reports
 }
 

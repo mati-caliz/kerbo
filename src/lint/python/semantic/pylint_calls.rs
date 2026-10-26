@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 use super::builtin_calls::{Arguments, arguments, keyword_value};
+use super::call_rewrites::environ_copy_fix;
 use super::cast_calls::is_non_string_default;
 use super::handlers::is_logger_candidate;
 use super::model::Model;
@@ -87,7 +88,11 @@ pub fn pylint_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> 
                 && matches!(given.positional.as_slice(), [only]
                     if qualified_name(model, *only, source).as_deref() == Some(ENVIRON));
             if copies_environ {
-                reports.push(Report::at(PythonRule::PLW1507, call, ""));
+                let fix = given
+                    .positional
+                    .first()
+                    .map(|environ| environ_copy_fix(call, *environ, source));
+                reports.push(Report::at(PythonRule::PLW1507, call, "").with_fix(fix));
             }
         }
         _ => {}

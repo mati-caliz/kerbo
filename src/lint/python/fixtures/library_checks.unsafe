@@ -3,7 +3,6 @@ import contextvars
 import datetime
 import hashlib
 import os
-import pathlib
 import subprocess
 import typing
 import urllib.request
@@ -18,17 +17,17 @@ import trio
 
 
 async def trio_calls():
-    trio.sleep(1)
+    await trio.sleep(1)
     await trio.sleep(1)
     await (trio.sleep(1))
-    trio.lowlevel.checkpoint()
-    trio.open_file("x")
+    await trio.lowlevel.checkpoint()
+    await trio.open_file("x")
     trio.current_time()
-    await trio.sleep(86401)
+    await trio.sleep_forever()
     await trio.sleep(86400)
-    await trio.sleep(seconds=100000.5)
-    await anyio.sleep(delay=90000)
-    await anyio.sleep(1e10)
+    await trio.sleep_forever()
+    await anyio.sleep_forever()
+    await anyio.sleep_forever()
     await trio.sleep(1, 2)
 
 
@@ -63,9 +62,9 @@ def not_async():
 
 try:
     pass
-except (ValueError, ValueError):
+except ValueError:
     pass
-except (TypeError, KeyError, TypeError):
+except (TypeError, KeyError):
     pass
 except ValueError:
     pass
@@ -134,36 +133,36 @@ x.y and not x.y
 a and b and not a
 
 mapping = {"a": 1}
-zip(mapping.keys(), mapping.values())
-zip(mapping.keys(), mapping.values(), strict=True)
+mapping.items()
+mapping.items()
 zip(mapping.keys(), other.values())
 zip(other.keys(), other.values())
 
-type(a) == type(None)
-type(None) is type(a)
-type(a) != type(None)
-type(a) is not type(None)
+a is None
+a is None
+a is not None
+a is not None
 type(a) == type(b)
-type(None) == type(None)
+None is None
 
-Path().resolve()
-pathlib.Path(".").resolve()
-Path("").resolve()
+Path.cwd()
+Path.cwd()
+Path.cwd()
 Path("src").resolve()
 Path().resolve(strict=True)
 
-hashlib.sha256(b"x").digest().hex()
-hashlib.md5().digest().hex()
+hashlib.sha256(b"x").hexdigest()
+hashlib.md5().hexdigest()
 hashlib.new("md5").digest().hex()
 
-Path("file").with_suffix("txt")
+Path("file").with_suffix(".txt")
 Path("file").with_suffix(".")
 Path("file").with_suffix(".txt")
 Path("file").with_suffix("")
 target = Path("file")
-target.with_suffix("py")
+target.with_suffix(".py")
 unknown.with_suffix("py")
-Path("file").with_suffix(suffix="md")
+Path("file").with_suffix(suffix=".md")
 
 mocked.assert_called_once
 mocked.assert_awaited
@@ -178,7 +177,7 @@ P = ParamSpec("P", covariant=True, contravariant=True)
 U = typing.TypeVar("U", covariant=True, contravariant=False)
 TypeVar("V", covariant=True, contravariant=True)
 
-datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-datetime.datetime.fromisoformat(stamp.rstrip("Z") + "+00:00")
-datetime.datetime.fromisoformat(stamp[:-1] + "-0000")
+datetime.datetime.fromisoformat(stamp)
+datetime.datetime.fromisoformat(stamp)
+datetime.datetime.fromisoformat(stamp)
 datetime.datetime.fromisoformat(stamp.replace("Z", "+01:00"))

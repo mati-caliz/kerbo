@@ -13,6 +13,8 @@ use crate::lint::python::codegen;
 use crate::lint::python::fix_edits::{commented_unsafe, has_comment_within};
 
 const MATH: &str = "math";
+const IS: &str = "is";
+const IS_NOT: &str = "is not";
 const LOWLEVEL_SUFFIX: &str = ".lowlevel";
 const CHECKPOINT: &str = "checkpoint";
 const EMPTY_CALL: &str = "()";
@@ -74,9 +76,10 @@ pub fn bit_count_fix(call: Node<'_>, argument: Node<'_>, source: &[u8]) -> Fix {
 
 // FURB168, el `replace_with_identity_check` de ruff: `x is None`, entre paréntesis si la llamada está
 // adentro de otra expresión.
-pub fn identity_check_fix(call: Node<'_>, checked: Node<'_>, source: &[u8]) -> Fix {
+pub fn identity_check_fix(call: Node<'_>, checked: Node<'_>, negated: bool, source: &[u8]) -> Fix {
+    let operator = if negated { IS_NOT } else { IS };
     let comparison = format!(
-        "{} is None",
+        "{} {operator} None",
         codegen::unparse(checked, codegen::CMP.saturating_add(1), source)
     );
     let replacement = if is_inside_expression(call) {

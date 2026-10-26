@@ -63,9 +63,9 @@ def not_async():
 
 try:
     pass
-except (ValueError, ValueError):
+except ValueError:
     pass
-except (TypeError, KeyError, TypeError):
+except (TypeError, KeyError):
     pass
 except ValueError:
     pass
@@ -134,17 +134,17 @@ x.y and not x.y
 a and b and not a
 
 mapping = {"a": 1}
-zip(mapping.keys(), mapping.values())
-zip(mapping.keys(), mapping.values(), strict=True)
+mapping.items()
+mapping.items()
 zip(mapping.keys(), other.values())
 zip(other.keys(), other.values())
 
-type(a) == type(None)
-type(None) is type(a)
-type(a) != type(None)
-type(a) is not type(None)
+a is None
+a is None
+a is not None
+a is not None
 type(a) == type(b)
-type(None) == type(None)
+None is None
 
 Path().resolve()
 pathlib.Path(".").resolve()
@@ -152,8 +152,8 @@ Path("").resolve()
 Path("src").resolve()
 Path().resolve(strict=True)
 
-hashlib.sha256(b"x").digest().hex()
-hashlib.md5().digest().hex()
+hashlib.sha256(b"x").hexdigest()
+hashlib.md5().hexdigest()
 hashlib.new("md5").digest().hex()
 
 Path("file").with_suffix("txt")

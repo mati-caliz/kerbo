@@ -5,6 +5,7 @@ use super::effects::contains_effect;
 use super::if_blocks::single_comparison;
 use super::model::Model;
 use super::qualified::is_builtin_named;
+use super::tail_call_fixes::identity_check_fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ARGUMENT_FIELD, CALL, FUNCTION_FIELD, IDENTIFIER, LEFT_FIELD, NONE, NOT_OPERATOR, RIGHT_FIELD, text,
@@ -14,6 +15,8 @@ use crate::rules::PythonRule;
 
 const IDENTITY_OPERATORS: [&[&str]; 5] = [&["=="], &["!="], &["is"], &["is", "not"], &["is not"]];
 const TYPE_BUILTIN: &str = "type";
+const NOT_EQUAL: &str = "!=";
+const NOT_KEYWORD: &str = "not";
 const BOOLEAN_OPERATOR: &str = "boolean_operator";
 const AND: &str = "and";
 const OR: &str = "or";
@@ -30,7 +33,15 @@ pub fn type_none_comparison(model: &Model<'_>, source: &[u8], comparison: Node<'
         type_argument(model, source, parts.left)?,
         type_argument(model, source, parts.right)?,
     );
-    (left.kind() == NONE || right.kind() == NONE).then(|| Report::at(PythonRule::FURB169, comparison, ""))
+    (left.kind() == NONE || right.kind() == NONE).then(|| {
+        let other = if left.kind() == NONE { right } else { left };
+        let negated = parts
+            .operator
+            .iter()
+            .any(|operator| *operator == NOT_EQUAL || operator.contains(NOT_KEYWORD));
+        let fix = identity_check_fix(comparison, other, negated, source);
+        Report::at(PythonRule::FURB169, comparison, "").with_fix(Some(fix))
+    })
 }
 
 // El `x` de `type(x)` con el builtin.

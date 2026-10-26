@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::builtin_calls::{Arguments, arguments, keyword_value};
+use super::call_rewrites::{call_rewrite_fix, print_message_fix};
 use super::model::Model;
 use super::mutability::Resolver;
 use super::qualified::{is_builtin_named, qualified_name};
@@ -73,7 +74,9 @@ pub fn ruff_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Ve
     } else {
         None
     };
-    rule.map(|rule| Report::at(rule, call, "")).into_iter().collect()
+    rule.map(|rule| Report::at(rule, call, "").with_fix(call_rewrite_fix(rule, call, &given, source)))
+        .into_iter()
+        .collect()
 }
 
 fn is_mutable_fromkeys(resolver: &Resolver<'_, '_>, function: Node<'_>, given: &Arguments<'_>) -> bool {
@@ -181,5 +184,5 @@ pub fn assert_with_print(model: &Model<'_>, source: &[u8], statement: Node<'_>) 
         && message
             .child_by_field_name(FUNCTION_FIELD)
             .is_some_and(|function| is_builtin_named(model, function, source, PRINT)))
-    .then(|| Report::at(PythonRule::RUF030, message, ""))
+    .then(|| Report::at(PythonRule::RUF030, message, "").with_fix(print_message_fix(message, source)))
 }

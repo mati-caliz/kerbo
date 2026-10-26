@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import enum
 import math
@@ -55,10 +54,10 @@ if sys.version_info >= (3, 10) or sys.platform != "win32":
     i2: int
 
 def passes() -> None:
-    pass
+    ...
 
 def body() -> None:
-    print("x")
+    ...
 
 def ellipsis() -> None: ...
 
@@ -70,7 +69,7 @@ def two() -> None:
     return x
 
 class PassAlone:
-    pass
+    ...
 
 class PassAndMore:
     value: int

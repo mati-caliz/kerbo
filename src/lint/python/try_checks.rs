@@ -7,6 +7,9 @@ use super::ast::{
     ATTRIBUTE, ATTRIBUTE_FIELD, BLOCK, CALL, COMMENT, EXPRESSION_STATEMENT, FUNCTION_FIELD, IDENTIFIER,
     OBJECT_FIELD, TUPLE, named, text, unparenthesized,
 };
+use super::codegen;
+use super::fix_edits::{commented_unsafe, pad};
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const TRY: &str = "try_statement";
@@ -104,18 +107,37 @@ fn tuple_reports(
     }
     let mut in_tuple: HashSet<String> = HashSet::new();
     let mut repeated = false;
+    let mut unique: Vec<Node<'_>> = Vec::new();
     for (element, name) in elements
-        .into_iter()
+        .iter()
+        .copied()
         .filter_map(|element| dotted_name(element, source).map(|name| (element, name)))
     {
         if !in_tuple.insert(name.clone()) {
             repeated = true;
-        } else if !seen.insert(name) {
+            continue;
+        }
+        unique.push(element);
+        if !seen.insert(name) {
             reports.push(Report::at(PythonRule::B025, element, ""));
         }
     }
     if repeated {
-        reports.push(Report::at(PythonRule::B014, caught, ""));
+        let unnamed = elements
+            .iter()
+            .filter(|element| dotted_name(**element, source).is_none());
+        unique.extend(unnamed);
+        let replacement = if let [only] = unique.as_slice() {
+            pad(codegen::unparse(*only, 0, source), caught, source)
+        } else {
+            let listed: Vec<String> = unique
+                .iter()
+                .map(|element| codegen::unparse(*element, codegen::COMMA, source))
+                .collect();
+            format!("({})", listed.join(", "))
+        };
+        let fix = commented_unsafe(Fix::replace(caught, &replacement, source), caught, source);
+        reports.push(Report::at(PythonRule::B014, caught, "").with_fix(Some(fix)));
     }
     reports
 }
