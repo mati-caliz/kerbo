@@ -53,6 +53,7 @@ mod set_literals;
 mod simplify;
 mod slots;
 mod special_methods;
+mod split_fix;
 mod split_imports;
 mod splits;
 mod spread_fix;

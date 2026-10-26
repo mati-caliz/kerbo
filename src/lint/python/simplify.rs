@@ -1,3 +1,4 @@
+mod collapse_fix;
 mod needless_bool;
 
 use tree_sitter::Node;
@@ -11,6 +12,7 @@ use super::escapes::text_value;
 use super::known_types::{Known, is_known};
 use crate::fix::Fix;
 use crate::rules::PythonRule;
+use collapse_fix::collapse_fix;
 use needless_bool::needless_bool;
 
 const IF: &str = "if_statement";
@@ -106,7 +108,8 @@ fn collapsible_if(statement: Node<'_>, source: &[u8], system: &SystemNames) -> O
     ))?;
     let condition = statement.child_by_field_name(CONDITION_FIELD)?;
     let skipped = mentions_system(condition, source, system) || is_type_checking(condition, source);
-    (!skipped).then(|| Report::at(PythonRule::SIM102, candidate, ""))
+    (!skipped)
+        .then(|| Report::at(PythonRule::SIM102, candidate, "").with_fix(collapse_fix(candidate, source)))
 }
 
 // `nested_if_body`: el `if` o su último `elif`, si se puede juntar con lo que tiene adentro.

@@ -316,13 +316,9 @@ def version_checks():
         pass
     if sys.version_info < (3, x):
         pass
-    if sys.version_info < (3, 9):
+    if sys.version_info < (3, 9) or sys.version_info < (3, 6):
         pass
-    elif sys.version_info < (3, 6):
-        pass
-    if True:
-        pass
-    elif sys.version_info < (3, 6):
+    if True or sys.version_info < (3, 6):
         pass
     if sys.version_info[0] == 4:
         pass

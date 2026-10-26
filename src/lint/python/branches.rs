@@ -3,6 +3,8 @@ use tree_sitter::Node;
 use super::Report;
 use super::ast::{COMMENT, PARENTHESIZED, STRING, string_prefix, text};
 use super::escapes::text_value;
+use super::fix_edits::point_of;
+use crate::fix::{Fix, TextEdit};
 use crate::rules::PythonRule;
 
 const IF: &str = "if_statement";
@@ -12,6 +14,8 @@ const ALTERNATIVE_FIELD: &str = "alternative";
 const CONDITION_FIELD: &str = "condition";
 const ELSE: &str = "else_clause";
 const NEWLINE: u8 = b'\n';
+const COLON: &str = ":";
+const LOOSE: [&str; 3] = ["lambda", "named_expression", "conditional_expression"];
 
 // SIM114: dos ramas seguidas de un `if`/`elif` con el mismo cuerpo, que se pueden juntar con `or`.
 pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
@@ -20,6 +24,53 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
         .filter(|node| node.kind() == IF)
         .flat_map(|statement| same_arms(*statement, source))
         .collect()
+}
+
+// El `merge_branches` de ruff: la condición de la segunda rama se suma con `or` a la de la primera
+// (entre paréntesis si es una lambda, un `:=` o un `if`) y se borran las líneas de la segunda.
+fn merge_branches_fix(current: Node<'_>, following: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let current_test = current.child_by_field_name(CONDITION_FIELD)?;
+    let following_test = following.child_by_field_name(CONDITION_FIELD)?;
+    let colon = (0..current.child_count())
+        .filter_map(|index| current.child(index))
+        .find(|child| child.kind() == COLON && child.start_byte() >= current_test.end_byte())?;
+    let current_end = current.child_by_field_name(CONSEQUENCE_FIELD)?.end_byte();
+    let following_end = following.child_by_field_name(CONSEQUENCE_FIELD)?.end_byte();
+    let wrap = |test: Node<'_>| {
+        let written = text(test, source);
+        if LOOSE.contains(&test.kind()) {
+            format!("({written})")
+        } else {
+            written.to_owned()
+        }
+    };
+    let mut edits = vec![TextEdit {
+        start: point_of(source, full_line_end(source, current_end)),
+        end: point_of(source, full_line_end(source, following_end)),
+        replacement: String::new(),
+    }];
+    if LOOSE.contains(&current_test.kind()) {
+        edits.push(TextEdit {
+            start: point_of(source, current_test.start_byte()),
+            end: point_of(source, current_test.end_byte()),
+            replacement: wrap(current_test),
+        });
+    }
+    edits.push(TextEdit {
+        start: point_of(source, colon.start_byte()),
+        end: point_of(source, colon.start_byte()),
+        replacement: format!(" or {}", wrap(following_test)),
+    });
+    Some(Fix::from_edits(source, edits))
+}
+
+fn full_line_end(source: &[u8], offset: usize) -> usize {
+    source
+        .get(offset..)
+        .and_then(|after| after.iter().position(|byte| *byte == NEWLINE))
+        .map_or(source.len(), |position| {
+            offset.saturating_add(position).saturating_add(1)
+        })
 }
 
 fn same_arms(statement: Node<'_>, source: &[u8]) -> Vec<Report> {
@@ -34,9 +85,10 @@ fn same_arms(statement: Node<'_>, source: &[u8]) -> Vec<Report> {
     branches
         .windows(2)
         .filter_map(|pair| match pair {
-            [current, following] if same_body(*current, *following, source) => {
-                Some(Report::at(PythonRule::SIM114, *current, ""))
-            }
+            [current, following] if same_body(*current, *following, source) => Some(
+                Report::at(PythonRule::SIM114, *current, "")
+                    .with_fix(merge_branches_fix(*current, *following, source)),
+            ),
             _ => None,
         })
         .collect()

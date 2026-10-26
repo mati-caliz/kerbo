@@ -7,7 +7,17 @@ from typing import NewType
 UserId = NewType("UserId", int)
 
 
-def mutable(a=[], b={}, c=set(), d=collections.deque(), e=list[int](), f=(), g=None):
+def mutable(a=None, b=None, c=None, d=None, e=None, f=(), g=None):
+    if e is None:
+        e = list[int]()
+    if d is None:
+        d = collections.deque()
+    if c is None:
+        c = set()
+    if b is None:
+        b = {}
+    if a is None:
+        a = []
     return a, b, c, d, e, f, g
 
 
@@ -19,11 +29,15 @@ def calls(a=len("x"), b=datetime.datetime.now(), c=datetime.timedelta(1), d=User
     return a, b, c, d, e
 
 
-def nested(a=[len(x) for x in "ab"]):
+def nested(a=None):
+    if a is None:
+        a = [len(x) for x in "ab"]
     return a
 
 
-def handler(a=len("x"), b=[]):
+def handler(a=len("x"), b=None):
+    if b is None:
+        b = []
     return (a, b)
 
 

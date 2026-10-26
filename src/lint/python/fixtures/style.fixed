@@ -90,9 +90,7 @@ else: pass
 class Stub: ...
 assert (x, 1)
 assert ()
-if (x, 1):
-    pass
-elif (1,):
+if (x, 1) or (1,):
     pass
 raise NotImplementedError
 raise NotImplementedError("x")

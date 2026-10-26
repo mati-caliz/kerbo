@@ -20,6 +20,7 @@ mod dataclass_checks;
 mod dataclass_defaults;
 mod decimals;
 mod decorators;
+mod default_fixes;
 mod defaults;
 mod definitions;
 mod effects;

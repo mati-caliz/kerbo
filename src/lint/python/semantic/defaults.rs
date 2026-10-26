@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::default_fixes::mutable_default_fix;
 use super::mutability::Resolver;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
@@ -30,7 +31,8 @@ pub fn default_reports(
             continue;
         }
         if checks_mutable && resolver.is_mutable_expression(default) {
-            reports.push(Report::at(PythonRule::B006, unparenthesized(default), ""));
+            let fix = mutable_default_fix(*parameter, default, resolver.source);
+            reports.push(Report::at(PythonRule::B006, unparenthesized(default), "").with_fix(fix));
         }
         reports.extend(
             calls_outside_lambdas(default)

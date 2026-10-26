@@ -74,24 +74,24 @@ def platform():
     return True
 
 
-"a b c".split()
-"a,b,c".split(",")
-"a b c".rsplit()
-"a b c".split(None)
-"a b c".split(maxsplit=1)
-"a b c".split(" ", 1)
-"a b c".split(" ", -1)
-"a b c".split(" ", 0x10)
-"a b c".split(" ", 1_000)
+["a", "b", "c"]
+["a", "b", "c"]
+["a", "b", "c"]
+["a", "b", "c"]
+["a", "b c"]
+["a", "b c"]
+["a", "b", "c"]
+["a", "b", "c"]
+["a", "b", "c"]
 "a b c".split(" ", 99999999999)
 "a b c".split(" ", x)
 "a b c".split(sep)
-"a b c".split(*args)
-"a b c".split(**kwargs)
-("a" "b").split()
+["a", "b", "c"]
+["a", "b", "c"]
+["ab"]
 b"a b".split()
 f"{x} b".split()
-"a b c".split(sep=",", maxsplit=-2)
+["a b c"]
 "a b c".split(maxsplit=+1)
 "a b c".splitlines()
 

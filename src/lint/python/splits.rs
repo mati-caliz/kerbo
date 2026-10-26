@@ -6,9 +6,11 @@ use super::ast::{
     NONE, OBJECT_FIELD, STRING, VALUE_FIELD, is_string, named, string_prefix, text, unparenthesized,
 };
 use super::escapes::text_value;
+use super::split_fix::{StaticSplit, split_list_fix};
 use crate::rules::PythonRule;
 
-const SPLIT_METHODS: [&str; 2] = ["split", "rsplit"];
+const RSPLIT: &str = "rsplit";
+const SPLIT_METHODS: [&str; 2] = ["split", RSPLIT];
 const SEPARATOR_KEYWORD: &str = "sep";
 const MAXSPLIT_KEYWORD: &str = "maxsplit";
 const SEPARATOR_POSITION: usize = 0;
@@ -39,10 +41,11 @@ fn split_static_string(call: Node<'_>, source: &[u8]) -> Option<Report> {
     let function = call
         .child_by_field_name(FUNCTION_FIELD)
         .filter(|function| function.kind() == ATTRIBUTE)?;
-    function
+    let method = function
         .child_by_field_name(ATTRIBUTE_FIELD)
-        .filter(|attribute| SPLIT_METHODS.contains(&text(*attribute, source)))?;
-    function
+        .map(|attribute| text(attribute, source))
+        .filter(|method| SPLIT_METHODS.contains(method))?;
+    let object = function
         .child_by_field_name(OBJECT_FIELD)
         .map(unparenthesized)
         .filter(|object| is_plain_string(*object, source))?;
@@ -60,7 +63,18 @@ fn split_static_string(call: Node<'_>, source: &[u8]) -> Option<Report> {
     let separator = argument_value(&arguments, SEPARATOR_KEYWORD, SEPARATOR_POSITION, source);
     let static_separator =
         separator.is_none_or(|value| value.kind() == NONE || is_plain_string(value, source));
-    static_separator.then(|| Report::at(PythonRule::SIM905, call, ""))
+    static_separator.then(|| {
+        let reverse = method == RSPLIT;
+        let split = StaticSplit {
+            call,
+            object,
+            separator,
+            maxsplit,
+            reverse,
+        };
+        let fix = split_list_fix(&split, source);
+        Report::at(PythonRule::SIM905, call, "").with_fix(fix)
+    })
 }
 
 fn is_plain_string(node: Node<'_>, source: &[u8]) -> bool {
