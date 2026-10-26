@@ -6,6 +6,7 @@ use super::ast::{
     LAMBDA, LEFT_FIELD, NAME_FIELD, RIGHT_FIELD, TUPLE, TYPE_FIELD, WILDCARD_IMPORT, children, fields, named,
     text, unparenthesized,
 };
+use super::split_imports::split_imports_fix;
 use crate::fix::Fix;
 use crate::rules::PythonRule;
 
@@ -29,7 +30,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     nodes
         .iter()
         .flat_map(|node| match node.kind() {
-            IMPORT => multiple_imports(*node),
+            IMPORT => multiple_imports(*node, source),
             IMPORT_FROM => star_import(*node, source),
             TRY => handlers(*node),
             EXPRESSION_STATEMENT => lambda_assignment(*node),
@@ -60,9 +61,9 @@ fn multiple_starred(targets: Node<'_>) -> Vec<Report> {
     }
 }
 
-fn multiple_imports(statement: Node<'_>) -> Vec<Report> {
+fn multiple_imports(statement: Node<'_>, source: &[u8]) -> Vec<Report> {
     if fields(statement, NAME_FIELD).len() > 1 {
-        vec![Report::at(PythonRule::E401, statement, "")]
+        vec![Report::at(PythonRule::E401, statement, "").with_fix(split_imports_fix(statement, source))]
     } else {
         Vec::new()
     }

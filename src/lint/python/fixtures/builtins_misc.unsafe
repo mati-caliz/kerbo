@@ -2,6 +2,7 @@ import datetime
 import functools
 import os
 import subprocess
+import sys
 
 items = [1, 2]
 
@@ -42,8 +43,8 @@ dict([("a", 1)], b=2)
 datetime.datetime.utcnow()
 datetime.datetime.utcnow().astimezone()
 
-exit(1)
-quit()
+sys.exit(1)
+sys.exit()
 exit
 
 subprocess.run(["ls"], universal_newlines=True)
@@ -68,14 +69,14 @@ other = os.environ = {}
 environment = os
 environment.environ = {}
 
-for value in {1, 2, 3}:
+for value in (1, 2, 3):
     pass
-for value in {1}:
+for value in (1,):
     pass
 for value in {items[0], 2}:
     pass
-squares = [value for value in {"a", "b"}]
-for value in ({1, 2}):
+squares = [value for value in ("a", "b")]
+for value in ((1, 2)):
     pass
 
 

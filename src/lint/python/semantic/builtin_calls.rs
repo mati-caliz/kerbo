@@ -4,6 +4,7 @@ use super::call_fixes::type_of_primitive_fix;
 use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
+use super::reference_fixes::sys_exit_fix;
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
@@ -87,7 +88,8 @@ pub fn builtin_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
         .iter()
         .any(|alias| is_builtin_named(model, function, source, alias))
     {
-        reports.push(Report::at(PythonRule::PLR1722, function, ""));
+        let fix = sys_exit_fix(model, function, &arguments, source);
+        reports.push(Report::at(PythonRule::PLR1722, function, "").with_fix(fix));
     }
     if qualified.as_deref() == Some(SUBPROCESS_RUN)
         && let Some(keyword) = keyword_argument(&arguments, UNIVERSAL_NEWLINES, source)

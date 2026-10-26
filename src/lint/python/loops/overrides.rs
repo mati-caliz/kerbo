@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::names::{NameRole, name_role};
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     COMMENT, IDENTIFIER, LAMBDA, LEFT_FIELD, RIGHT_FIELD, named, string_prefix, text, unparenthesized,
@@ -42,8 +43,23 @@ pub fn iteration_over_set(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
         .filter_map(|node| node.child_by_field_name(RIGHT_FIELD))
         .map(unparenthesized)
         .filter(|iterable| iterable.kind() == SET && is_literal_set(*iterable, source))
-        .map(|set| Report::at(PythonRule::PLC0208, set, ""))
+        .map(|set| Report::at(PythonRule::PLC0208, set, "").with_fix(Some(tuple_fix(set, source))))
         .collect()
+}
+
+// Como ruff: el texto de adentro de las llaves entre paréntesis, o `(x,)` con un solo elemento.
+fn tuple_fix(set: Node<'_>, source: &[u8]) -> Fix {
+    let elements = named(set);
+    let tuple = if let [element] = elements.as_slice() {
+        format!("({},)", text(*element, source))
+    } else {
+        let written = text(set, source);
+        let inner = written
+            .get(1..written.len().saturating_sub(1))
+            .unwrap_or_default();
+        format!("({inner})")
+    };
+    Fix::replace(set, &tuple, source)
 }
 
 fn is_literal_set(set: Node<'_>, source: &[u8]) -> bool {

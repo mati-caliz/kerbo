@@ -6,8 +6,12 @@ use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const STRING_CONTENT: &str = "string_content";
+const INTERPOLATION: &str = "interpolation";
+const FORMAT_SPECIFIER: &str = "format_specifier";
 const BACKSLASH: u8 = b'\\';
 const RAW: [char; 2] = ['r', 'R'];
+const UNICODE: [char; 2] = ['u', 'U'];
+const RAW_PREFIX: &str = "r";
 const VALID_ESCAPES: [char; 24] = [
     '\n', '\r', '\\', '\'', '"', 'a', 'b', 'f', 'n', 'r', 't', 'v', '0', '1', '2', '3', '4', '5', '6', '7',
     'x', 'N', 'u', 'U',
@@ -34,21 +38,101 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
 }
 
 // W605: `"\."`, un escape que Python no conoce. Como ruff, `\\` consume la barra siguiente y cada tramo
-// literal de un f-string se mira por separado.
+// literal de un f-string se mira por separado. El arreglo de ruff depende de toda la parte: si tiene
+// algún escape válido duplica la barra de cada inválido; si no, la vuelve raw (`u` pasa a `r`).
 fn invalid_escapes(string: Node<'_>, source: &[u8]) -> Vec<Report> {
-    if string_prefix(string, source).contains(RAW) {
+    let prefix = string_prefix(string, source);
+    if prefix.contains(RAW) {
         return Vec::new();
     }
-    named(string)
+    let mut contains_valid_escape = false;
+    let mut invalid: Vec<InvalidEscape> = Vec::new();
+    for (start, literal) in literal_pieces(string, source) {
+        contains_valid_escape |= scan_escapes(start, literal, &mut invalid);
+    }
+    invalid
         .into_iter()
-        .filter(|part| part.kind() == STRING_CONTENT)
-        .flat_map(|content| invalid_escapes_in(content, source))
+        .map(|escape| {
+            let fix = if contains_valid_escape {
+                Fix::insert_at(escape.after_backslash, "\\", source)
+            } else {
+                raw_prefix_fix(string, prefix, source)
+            };
+            Report::at_point(PythonRule::W605, escape.start, &escape.character.to_string())
+                .with_fix(Some(fix))
+        })
         .collect()
 }
 
-fn invalid_escapes_in(content: Node<'_>, source: &[u8]) -> Vec<Report> {
-    let literal = text(content, source);
-    let mut found = Vec::new();
+struct InvalidEscape {
+    start: Point,
+    after_backslash: Point,
+    character: char,
+}
+
+fn raw_prefix_fix(string: Node<'_>, prefix: &str, source: &[u8]) -> Fix {
+    let start = string.start_position();
+    if prefix.contains(UNICODE) {
+        let after_prefix = Point {
+            row: start.row,
+            column: start.column.saturating_add(1),
+        };
+        return Fix::replace_range(start, after_prefix, RAW_PREFIX, source);
+    }
+    let glued_to_name = string
+        .start_byte()
+        .checked_sub(1)
+        .and_then(|before| source.get(before))
+        .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_');
+    let inserted = if glued_to_name {
+        format!(" {RAW_PREFIX}")
+    } else {
+        RAW_PREFIX.to_owned()
+    };
+    Fix::insert_at(start, &inserted, source)
+}
+
+// Los tramos literales del string: su contenido y, en un f-string, el texto del formato de cada
+// interpolación (`{x:\>10}`) sin las interpolaciones que tenga adentro.
+fn literal_pieces<'source>(string: Node<'_>, source: &'source [u8]) -> Vec<(Point, &'source str)> {
+    let mut pieces = Vec::new();
+    for part in named(string) {
+        if part.kind() == STRING_CONTENT {
+            pieces.push((part.start_position(), text(part, source)));
+        } else if part.kind() == INTERPOLATION {
+            for specifier in named(part)
+                .into_iter()
+                .filter(|child| child.kind() == FORMAT_SPECIFIER)
+            {
+                pieces.extend(specifier_pieces(specifier, source));
+            }
+        }
+    }
+    pieces
+}
+
+fn specifier_pieces<'source>(specifier: Node<'_>, source: &'source [u8]) -> Vec<(Point, &'source str)> {
+    let whole = text(specifier, source);
+    let mut pieces = Vec::new();
+    let mut cursor = 0;
+    let nested_ranges = named(specifier).into_iter().map(|nested| {
+        let start = nested.start_byte().saturating_sub(specifier.start_byte());
+        let end = nested.end_byte().saturating_sub(specifier.start_byte());
+        (start, end)
+    });
+    for (start, end) in nested_ranges.chain(std::iter::once((whole.len(), whole.len()))) {
+        if let Some(piece) = whole.get(cursor..start).filter(|piece| !piece.is_empty()) {
+            let before = whole.get(..cursor).unwrap_or_default();
+            pieces.push((advanced(specifier.start_position(), before), piece));
+        }
+        cursor = end;
+    }
+    pieces
+}
+
+// Junta los escapes inválidos del tramo y dice si vio alguno válido.
+fn scan_escapes(piece_start: Point, literal: &str, invalid: &mut Vec<InvalidEscape>) -> bool {
+    let mut contains_valid_escape = false;
     let mut previous: Option<usize> = None;
     for (index, byte) in literal.bytes().enumerate() {
         if byte != BACKSLASH {
@@ -66,16 +150,21 @@ fn invalid_escapes_in(content: Node<'_>, source: &[u8]) -> Vec<Report> {
             continue;
         };
         if VALID_ESCAPES.contains(&next) {
+            contains_valid_escape = true;
             continue;
         }
         let before = literal.get(..index).unwrap_or_default();
-        found.push(Report::at_point(
-            PythonRule::W605,
-            advanced(content.start_position(), before),
-            &next.to_string(),
-        ));
+        let start = advanced(piece_start, before);
+        invalid.push(InvalidEscape {
+            start,
+            after_backslash: Point {
+                row: start.row,
+                column: start.column.saturating_add(1),
+            },
+            character: next,
+        });
     }
-    found
+    contains_valid_escape
 }
 
 fn advanced(start: Point, before: &str) -> Point {

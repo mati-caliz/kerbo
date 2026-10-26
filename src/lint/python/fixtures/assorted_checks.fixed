@@ -260,11 +260,11 @@ def paths():
 
 
 def escapes():
-    first = "\.png"
-    second = "\n\."
+    first = r"\.png"
+    second = "\n\\."
     third = r"\."
-    fourth = b"\d"
-    fifth = f"\d{first}\w"
+    fourth = rb"\d"
+    fifth = rf"\d{first}\w"
     sixth = "\
 "
     seventh = "—ሴAA"

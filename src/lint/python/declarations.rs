@@ -109,24 +109,28 @@ fn empty_class_parentheses(class: Node<'_>, source: &[u8]) -> Option<Report> {
         })
 }
 
-// PLR0402: `import a.b as b`, que se escribe `from a import b`.
+// PLR0402: `import a.b as b`, que se escribe `from a import b`. Ruff sólo lo arregla si es el único
+// nombre de la sentencia.
 fn manual_from_imports(statement: Node<'_>, source: &[u8]) -> Vec<Report> {
-    named(statement)
-        .into_iter()
+    let aliases = named(statement);
+    let single = aliases.len() == 1;
+    aliases
+        .iter()
         .filter(|alias| alias.kind() == ALIASED_IMPORT)
-        .filter(|alias| {
+        .filter_map(|alias| {
             let module = alias
                 .child_by_field_name(NAME_FIELD)
-                .map(|name| text(name, source));
+                .map(|name| text(name, source))?;
             let local = alias
                 .child_by_field_name(ALIAS_FIELD)
-                .map(|name| text(name, source));
-            module
-                .and_then(|module| module.rsplit_once(MODULE_SEPARATOR))
-                .zip(local)
-                .is_some_and(|((_, last), local)| last == local)
+                .map(|name| text(name, source))?;
+            let (parent, last) = module.rsplit_once(MODULE_SEPARATOR)?;
+            (last == local).then(|| {
+                let fix =
+                    single.then(|| Fix::replace(statement, &format!("from {parent} import {local}"), source));
+                Report::at(PythonRule::PLR0402, *alias, "").with_fix(fix)
+            })
         })
-        .map(|alias| Report::at(PythonRule::PLR0402, alias, ""))
         .collect()
 }
 

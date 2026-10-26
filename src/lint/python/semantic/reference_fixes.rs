@@ -1,9 +1,11 @@
 use tree_sitter::Node;
 
+use super::builtin_calls::{Arguments, keyword_argument};
 use super::call_fixes::builtin_fix;
 use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
 use super::model::Model;
 use crate::fix::{Fix, TextEdit, TextPoint};
+use crate::lint::python::ast::{VALUE_FIELD, text};
 use crate::lint::python::fix_edits::commented_unsafe;
 
 const MEMBER_SEPARATOR: char = '.';
@@ -31,6 +33,10 @@ const REGEX_FLAGS: [(&str, &str); 8] = [
     ("X", "VERBOSE"),
 ];
 const LOGGING: &str = "logging";
+const DICTIONARY_SPLAT: &str = "dictionary_splat";
+const SYS: &str = "sys";
+const EXIT: &str = "exit";
+const EXIT_CODE: &str = "code";
 const WARNING: &str = "WARNING";
 
 // UP006: `typing.List` pasa a `list`, y `typing.Deque` a `deque` de `collections`.
@@ -68,6 +74,44 @@ pub fn regex_flag_fix(model: &Model<'_>, node: Node<'_>, qualified: &str, source
 // LOG009: `logging.WARN` pasa a `logging.WARNING`.
 pub fn warn_constant_fix(model: &Model<'_>, node: Node<'_>, source: &[u8]) -> Option<Fix> {
     imported_fix(model, node, import_module(LOGGING, WARNING), source)
+}
+
+// PLR1722: `exit(1)` pasa a `sys.exit(1)`, y `code=1` a `1`. Siempre inseguro, como en ruff; sin
+// arreglo con más de un argumento o con `**`.
+pub fn sys_exit_fix(
+    model: &Model<'_>,
+    function: Node<'_>,
+    arguments: &Arguments<'_>,
+    source: &[u8],
+) -> Option<Fix> {
+    let count = arguments
+        .positional
+        .len()
+        .saturating_add(arguments.keywords.len());
+    let spread = arguments
+        .keywords
+        .iter()
+        .any(|keyword| keyword.kind() == DICTIONARY_SPLAT);
+    if count > 1 || spread {
+        return None;
+    }
+    let (name, import) = get_or_import_member(model, source, function, import_module(SYS, EXIT))?;
+    let mut edits = vec![TextEdit {
+        start: TextPoint::from_point(function.start_position()),
+        end: TextPoint::from_point(function.end_position()),
+        replacement: name,
+    }];
+    if let Some(keyword) = keyword_argument(arguments, EXIT_CODE, source)
+        && let Some(value) = keyword.child_by_field_name(VALUE_FIELD)
+    {
+        edits.push(TextEdit {
+            start: TextPoint::from_point(keyword.start_position()),
+            end: TextPoint::from_point(keyword.end_position()),
+            replacement: text(value, source).to_owned(),
+        });
+    }
+    edits.push(import);
+    Some(Fix::from_edits(source, edits).marked_unsafe())
 }
 
 const fn import_from<'request>(module: &'request str, member: &'request str) -> ImportRequest<'request> {

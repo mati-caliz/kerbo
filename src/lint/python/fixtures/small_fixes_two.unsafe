@@ -1,0 +1,45 @@
+"""Bordes de E401, W605, PLC0208, PLR0402 y PLR1722."""
+import json as j
+from os import path
+from xml.etree import ElementTree
+
+
+def nested():
+    import io
+    import sys as system
+    return io, system
+
+
+x = 1; import csv; import re
+import sys
+
+
+def escapes():
+    first = r"\d"
+    second = "\\d\n"
+    third = rb"\s" b"\n\\s"
+    fourth = rf"\d{first:\>10}"
+    return first, second, third, fourth
+
+
+def returned():
+    return r"\d"
+
+
+for value in (1,):
+    pass
+for value in (1, 2,):
+    pass
+for value in ( "a" , "b" ):
+    pass
+
+
+def leave(flag):
+    if flag:
+        sys.exit(2)
+    elif flag is None:
+        quit(1, 2)
+    sys.exit()
+
+
+print(path, j, ElementTree, csv, re, x)
