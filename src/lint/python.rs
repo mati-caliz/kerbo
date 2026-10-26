@@ -245,7 +245,7 @@ fn more_syntax_reports(
     reports.extend(loops::loop_variable_overrides(nodes, source));
     reports.extend(loops::iteration_over_set(nodes, source));
     reports.extend(deprecated::reports(nodes, source));
-    reports.extend(concatenation::reports(nodes));
+    reports.extend(concatenation::reports(nodes, source));
     reports.extend(branches::reports(nodes, source));
     reports.extend(loops::reports(nodes, source));
     reports.extend(dunders::reports(nodes, source));

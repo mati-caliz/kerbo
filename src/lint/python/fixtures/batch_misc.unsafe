@@ -90,16 +90,16 @@ def redefinitions(item, path, error, handle, _ignored):
 
 def conversions(value, items):
     first = 1
-    second = int(len(items))
-    third = int(round(value))
+    second = len(items)
+    third = round(value)
     fourth = int(round(value, 2))
-    fifth = int(math.floor(value))
-    sixth = int(math.ceil(value))
-    seventh = int(int(value))
+    fifth = math.floor(value)
+    sixth = math.ceil(value)
+    seventh = int(value)
     eighth = int(value)
-    ninth = int(round(value, None))
-    tenth = int(math.trunc(value))
-    eleventh = int(ord("a"))
+    ninth = round(value, None)
+    tenth = math.trunc(value)
+    eleventh = ord("a")
     return first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth, eleventh
 
 
@@ -122,7 +122,7 @@ def implicit(
 
 
 def arithmetic(value):
-    return int((1 << 31) - 1), int(-2**31), int(2**34 / 2), int(value - 1)
+    return ((1 << 31) - 1), (-2**31), int(2**34 / 2), int(value - 1)
 
 
 def outer_parameter(index, values):

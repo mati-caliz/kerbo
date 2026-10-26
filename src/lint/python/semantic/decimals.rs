@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::calls::call_arguments;
+use super::comprehension_fixes::preferred_quote;
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
 use crate::fix::Fix;
@@ -14,6 +15,7 @@ use crate::lint::python::fix_edits::commented_unsafe;
 use crate::rules::PythonRule;
 
 const DECIMAL: &str = "decimal.Decimal";
+const MINUS: &str = "-";
 const FLOAT: &str = "float";
 const VALUE_KEYWORD: &str = "value";
 const LIST_SPLAT: &str = "list_splat";
@@ -128,7 +130,31 @@ pub fn decimal_from_float_literal(model: &Model<'_>, source: &[u8], call: Node<'
         .map(unparenthesized)?;
     let function = call.child_by_field_name(FUNCTION_FIELD)?;
     let is_decimal = qualified_name(model, function, source).as_deref() == Some(DECIMAL);
-    (is_decimal && is_float_literal(first, source)).then(|| Report::at(PythonRule::RUF032, first, ""))
+    (is_decimal && is_float_literal(first, source))
+        .then(|| Report::at(PythonRule::RUF032, first, "").with_fix(Some(float_to_string_fix(first, source))))
+}
+
+// El arreglo de RUF032: el float entre comillas, con un `-` si quedan signos negativos impares;
+// inseguro, como en ruff.
+fn float_to_string_fix(argument: Node<'_>, source: &[u8]) -> Fix {
+    let mut negative = false;
+    let mut value = unparenthesized(argument);
+    while value.kind() == UNARY {
+        if value
+            .child_by_field_name(OPERATOR_FIELD)
+            .is_some_and(|operator| text(operator, source) == MINUS)
+        {
+            negative = !negative;
+        }
+        let Some(operand) = value.child_by_field_name(ARGUMENT_FIELD) else {
+            break;
+        };
+        value = unparenthesized(operand);
+    }
+    let quote = preferred_quote(argument, source);
+    let sign = if negative { MINUS } else { "" };
+    let replacement = format!("{quote}{sign}{}{quote}", text(value, source));
+    Fix::replace(argument, &replacement, source).marked_unsafe()
 }
 
 // Un float escrito, con signos `+`/`-` adelante; un complejo (`1.5j`) no cuenta.

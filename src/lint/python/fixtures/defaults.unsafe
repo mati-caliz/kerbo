@@ -87,13 +87,13 @@ def attributes(target, name):
 
 def first_elements(values):
     return [
-        list(values)[0],
-        tuple(values)[0],
+        next(iter(values)),
+        next(iter(values)),
         list(values)[1],
-        [value for value in values][0],
-        [*values][0],
-        list(values).pop(0),
-        list(values)[0],
+        next(iter(values)),
+        next(iter(values)),
+        next(iter(values)),
+        next(iter(values)),
         min(values),
-        list(values, )[0],
+        next(iter(values)),
     ]

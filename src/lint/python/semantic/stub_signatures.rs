@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::Mode;
+use super::call_fixes::builtin_fix;
 use super::decorators::is_abstract;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::type_hints::{Hints, subscript_parts, unwrapped};
@@ -14,6 +15,7 @@ use crate::lint::python::methods::{MethodKind, method_kind};
 use crate::rules::PythonRule;
 use crate::syntax::{SnippetLanguage, parse_snippet};
 
+const OBJECT: &str = "object";
 const PARAMETERS_FIELD: &str = "parameters";
 const RETURN_TYPE_FIELD: &str = "return_type";
 const TYPE_FIELD: &str = "type";
@@ -248,7 +250,10 @@ fn any_equality_annotation(
         return None;
     };
     let annotation = other.child_by_field_name(TYPE_FIELD)?;
-    typing_named(hints, annotation, ANY).then(|| Report::at(PythonRule::PYI032, annotation, ""))
+    typing_named(hints, annotation, ANY).then(|| {
+        let fix = builtin_fix(hints.model, annotation, OBJECT, hints.source);
+        Report::at(PythonRule::PYI032, annotation, "").with_fix(fix)
+    })
 }
 
 // PYI063: el primer parámetro (después de `self` o `cls`) escrito `__x`, el sólo posicional de PEP

@@ -3,7 +3,7 @@ use tree_sitter::Node;
 use super::effects::contains_effect;
 use super::model::Model;
 use super::qualified::is_builtin_named;
-use crate::fix::Fix;
+use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     COMMENT, LEFT_FIELD, RIGHT_FIELD, SUBSCRIPT, VALUE_FIELD, named, text, unparenthesized,
@@ -13,6 +13,9 @@ use crate::lint::python::fix_edits::commented_unsafe;
 use crate::rules::PythonRule;
 
 const BOOLEAN_OPERATOR: &str = "boolean_operator";
+const PARENTHESIZED_EXPRESSION: &str = "parenthesized_expression";
+const OPEN_PARENTHESIS: &str = "(";
+const CLOSE_PARENTHESIS: &str = ")";
 const COMPARISON: &str = "comparison_operator";
 const OPERATOR_FIELD: &str = "operator";
 const OPERATORS_FIELD: &str = "operators";
@@ -40,7 +43,10 @@ pub fn boolean_chain_reports(model: &Model<'_>, source: &[u8], operation: Node<'
         if let [left, right] = pair
             && is_chainable(source, *left, *right)
         {
-            reports.push(Report::at(PythonRule::PLR1716, *left, ""));
+            reports.push(
+                Report::at(PythonRule::PLR1716, *left, "")
+                    .with_fix(chained_comparison_fix(*left, *right, source)),
+            );
         }
     }
     reports
@@ -113,6 +119,54 @@ fn is_unnecessary_key_check(model: &Model<'_>, source: &[u8], left: Node<'_>, ri
     indexes
         && !contains_effect(*dictionary, source, &is_builtin)
         && !contains_effect(*key, source, &is_builtin)
+}
+
+// El arreglo de PLR1716: borra desde el lado derecho de la primera comparación hasta el izquierdo de
+// la segunda, dejando el primero, y equilibra los paréntesis que envolvían a cada una.
+fn chained_comparison_fix(left: Node<'_>, right: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let left_comparison = unparenthesized(left);
+    let right_comparison = unparenthesized(right);
+    let middle = *comparison_operands(left_comparison).last()?;
+    let next = *comparison_operands(right_comparison).first()?;
+    let mut edits = vec![TextEdit {
+        start: TextPoint::from_point(middle.start_position()),
+        end: TextPoint::from_point(next.end_position()),
+        replacement: text(middle, source).to_owned(),
+    }];
+    let (left_depth, right_depth) = (parenthesis_depth(left), parenthesis_depth(right));
+    if left_depth < right_depth {
+        edits.push(TextEdit {
+            start: TextPoint::from_point(left_comparison.start_position()),
+            end: TextPoint::from_point(left_comparison.start_position()),
+            replacement: OPEN_PARENTHESIS.repeat(right_depth.saturating_sub(left_depth)),
+        });
+    } else if left_depth > right_depth {
+        edits.push(TextEdit {
+            start: TextPoint::from_point(right_comparison.end_position()),
+            end: TextPoint::from_point(right_comparison.end_position()),
+            replacement: CLOSE_PARENTHESIS.repeat(left_depth.saturating_sub(right_depth)),
+        });
+    }
+    Some(Fix::from_edits(source, edits))
+}
+
+fn comparison_operands(comparison: Node<'_>) -> Vec<Node<'_>> {
+    named(comparison)
+        .into_iter()
+        .filter(|operand| operand.kind() != COMMENT)
+        .collect()
+}
+
+fn parenthesis_depth(mut node: Node<'_>) -> usize {
+    let mut depth = 0_usize;
+    while node.kind() == PARENTHESIZED_EXPRESSION {
+        depth = depth.saturating_add(1);
+        match named(node).into_iter().find(|inner| inner.kind() != COMMENT) {
+            Some(inner) => node = inner,
+            None => break,
+        }
+    }
+    depth
 }
 
 fn is_chainable(source: &[u8], left: Node<'_>, right: Node<'_>) -> bool {

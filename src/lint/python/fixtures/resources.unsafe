@@ -77,15 +77,15 @@ def validate(value, items):
 
 
 CONCATENATED = [
-    "a" "b",
+    ("a" "b"),
     "c",
     ("d" "e"),
-    f"{CONCATENATED}" "g",
+    (f"{CONCATENATED}" "g"),
 ]
-PAIR = "a" "b", "c"
-GROUP = {"a" "b", "c"}
-TUPLE = ("a" "b", "c")
-INDEXED = {}["a" "b", "c"]
+PAIR = ("a" "b"), "c"
+GROUP = {("a" "b"), "c"}
+TUPLE = (("a" "b"), "c")
+INDEXED = {}[("a" "b"), "c"]
 CALLED = print("a" "b", "c")
 
 

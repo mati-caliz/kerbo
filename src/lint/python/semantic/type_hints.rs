@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use super::Mode;
 use super::model::Model;
 use super::qualified::{is_typing, qualified_name};
+use super::type_hint_fixes::{final_literal_fix, generic_last_fix, literal_dedup_fix};
 use super::union_duplicates::duplicate_union_fix;
 use crate::fix::Fix;
 use crate::lint::python::Report;
@@ -104,7 +105,13 @@ pub fn type_hint_reports(model: &Model<'_>, source: &[u8], node: Node<'_>, mode:
                 .filter(|member| member.kind() == NONE_LITERAL)
                 .map(|member| Report::at(PythonRule::PYI061, *member, "")),
         );
-        reports.extend(duplicates(&members, source, PythonRule::PYI062));
+        let repeated = duplicates(&members, source, PythonRule::PYI062);
+        let fix = if repeated.is_empty() {
+            None
+        } else {
+            literal_dedup_fix(node, &members, source)
+        };
+        reports.extend(repeated.into_iter().map(|report| report.with_fix(fix.clone())));
     }
     reports.extend(hints.never_in_union(node));
     reports.extend(hints.redundant_final_literal(node));
@@ -338,7 +345,8 @@ impl<'tree> Hints<'_, '_, '_> {
                     .child_by_field_name(TYPE_FIELD)
                     .is_some_and(|typed| typed.id() == annotation.id())
         })?;
-        Some(Report::at(PythonRule::PYI064, assignment, ""))
+        let fix = final_literal_fix(node, *value, assignment, self.source);
+        Some(Report::at(PythonRule::PYI064, assignment, "").with_fix(fix))
     }
 
     // PYI059: `Generic[...]` entre las bases de una clase, pero no última. Avisa en los paréntesis.
@@ -361,6 +369,11 @@ impl<'tree> Hints<'_, '_, '_> {
         let generic = bases
             .iter()
             .position(|base| self.is_typing_subscript(*base, GENERIC))?;
-        (generic.saturating_add(1) != bases.len()).then(|| Report::at(PythonRule::PYI059, node, ""))
+        let fix = bases
+            .get(generic)
+            .zip(bases.last())
+            .map(|(generic, last)| generic_last_fix(node, *generic, *last, self.source));
+        (generic.saturating_add(1) != bases.len())
+            .then(|| Report::at(PythonRule::PYI059, node, "").with_fix(fix))
     }
 }

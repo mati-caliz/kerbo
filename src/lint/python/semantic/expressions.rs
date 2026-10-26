@@ -6,6 +6,7 @@ use super::calls::{call_reports, is_first_element_subscript};
 use super::comparisons::comparison_reports;
 use super::comprehension_fixes::{collection_call_fix, literal_set_fix};
 use super::conversions::conversion_reports;
+use super::first_element::first_element_fix;
 use super::if_blocks::dict_get_expression;
 use super::isinstance_calls::{BOOLEAN_OPERATOR, duplicate_isinstance_reports};
 use super::literals::{is_native_literal_call, native_literal_fix};
@@ -95,7 +96,11 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
             }
             SUBSCRIPT => {
                 if is_first_element_subscript(&self.model, self.source, node) {
-                    self.reports.push(Report::at(PythonRule::RUF015, node, ""));
+                    let fix = node
+                        .child_by_field_name(VALUE_FIELD)
+                        .and_then(|value| first_element_fix(&self.model, self.source, node, value));
+                    self.reports
+                        .push(Report::at(PythonRule::RUF015, node, "").with_fix(fix));
                 }
                 self.reports
                     .extend(version_subscript(&self.model, self.source, node));

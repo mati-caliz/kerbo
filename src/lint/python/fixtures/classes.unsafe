@@ -55,7 +55,7 @@ __all__.extend(("item2", "item10"))
 __all__.extend(("item10", "item2"))
 __all__ = "b", "a"
 __all__ = ["a", "b", "c"]
-__all__ = ["a" "z", "b"]
+__all__ = [("a" "z"), "b"]
 __all__ = ["A1", "A01"]
 __all__: list[str] = ["d", "c"]
 other = __all__ = ["b", "a"]

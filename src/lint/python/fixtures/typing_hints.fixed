@@ -35,8 +35,8 @@ none_literal: Literal[None]
 mixed_literal: Literal[1, None]
 optional_literal: Literal[None] | None
 union_literal: Literal[None] | int
-duplicate_literal: Literal[1, 2, 1, "a", "a"]
-nested_literal: Literal[1, Literal[1]]
+duplicate_literal: Literal[1, 2, "a"]
+nested_literal: Literal[1]
 literal_union: Literal[1] | Literal[2]
 literal_union_three: Literal["a"] | Literal["b"] | int
 duplicate_union: int | str
@@ -44,7 +44,7 @@ duplicate_typing_union: int | str
 nested_duplicate: int | str
 type_union: type[int] | type[str]
 builtin_type_union: builtins.type[int] | builtins.type[str]
-final_literal: Final[Literal[1]] = 1
+final_literal: Final = 1
 final_plain: Final = 1
 bytes_value: ByteString
 abc_bytes: collections.abc.ByteString
@@ -71,10 +71,10 @@ def dunder_name(__x__: int) -> None:
 
 
 class Equal:
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return True
 
-    def __ne__(self, other: typing.Any) -> bool:
+    def __ne__(self, other: object) -> bool:
         return False
 
     def __lt__(self, other: Any) -> bool:

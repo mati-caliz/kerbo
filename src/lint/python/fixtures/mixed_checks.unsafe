@@ -75,12 +75,12 @@ def numbers(values, a, b, c, text):
         max(values),
         max(values),
         sorted(values)[1],
-        a < b and b < c,
+        a < b < c,
         a < b and c < b,
-        a > b and b > c,
+        a > b > c,
         a < b and b > c,
-        round(1),
-        round(1, 0),
+        1,
+        1,
         round(1, -1),
         round(a),
         round(1.5),
@@ -95,11 +95,11 @@ def numbers(values, a, b, c, text):
 
 
 def printing():
-    print("")
+    print()
     print("", "")
-    print("a", sep="")
+    print("a")
     print("a", "b", sep="")
-    print(sep="")
+    print()
     (named := 42)
     print(named)
 

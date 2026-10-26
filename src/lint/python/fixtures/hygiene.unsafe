@@ -78,7 +78,7 @@ def literals():
     return [
         "",
         "texto",
-        "a" "b",
+        ("a" "b"),
         str(f"{literals}"),
         "x",
         str(1),

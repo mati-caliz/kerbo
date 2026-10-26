@@ -1,4 +1,5 @@
 import enum
+import itertools
 import os
 from typing import TypeVar
 
@@ -92,7 +93,7 @@ def environment():
 
 
 def pairs(items):
-    return zip(items, items[1:]), zip(items, items[2:]), zip(items[1:], items), list(zip(items, items[1:]))
+    return itertools.pairwise(items), zip(items, items[2:]), zip(items[1:], items), list(itertools.pairwise(items))
 
 
 def errors():

@@ -5,6 +5,7 @@ use super::call_fixes::builtin_available;
 use super::model::Model;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::type_hints::Hints;
+use super::unwrap_fixes::unnecessary_round_fix;
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
@@ -12,7 +13,9 @@ use crate::lint::python::ast::{
     KEYWORD_ARGUMENT, LAMBDA, LEFT_FIELD, NAME_FIELD, OBJECT_FIELD, RIGHT_FIELD, SUBSCRIPT, SUBSCRIPT_FIELD,
     TRUE, TUPLE, VALUE_FIELD, is_string, named, text, unparenthesized,
 };
+use crate::lint::python::codegen;
 use crate::lint::python::escapes::text_value;
+use crate::lint::python::fix_edits::has_comment_within;
 use crate::lint::python::methods::method_kind;
 use crate::rules::PythonRule;
 
@@ -60,13 +63,20 @@ pub fn misc_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Ve
         reports.extend(sorted_min_max(model, source, call, &given));
     }
     if builtin(ROUND) && is_unnecessary_round(&given, source) {
-        reports.push(Report::at(PythonRule::RUF057, call, ""));
+        let fix = given
+            .positional
+            .first()
+            .map(|number| unnecessary_round_fix(call, *number, source));
+        reports.push(Report::at(PythonRule::RUF057, call, "").with_fix(fix));
     }
     if builtin(INT) && is_prefix_stripped_int(&given, source) {
         reports.push(Report::at(PythonRule::FURB166, call, "").with_fix(prefixed_base_fix(&given, source)));
     }
     if builtin(PRINT) && is_unnecessary_print_argument(&given, source) {
-        reports.push(Report::at(PythonRule::FURB105, call, ""));
+        reports.push(
+            Report::at(PythonRule::FURB105, call, "")
+                .with_fix(Some(print_fix(call, function, &given, source))),
+        );
     }
     if is_repeated_strip(function, &given, source) {
         reports.push(Report::at(PythonRule::B005, call, ""));
@@ -232,6 +242,45 @@ fn is_unnecessary_print_argument(given: &Arguments<'_>, source: &[u8]) -> bool {
     let empty_only = matches!(given.positional.as_slice(), [only] if is_string(*only)
         && text_value(*only, source).is_some_and(|value| value.is_empty()));
     has_sep || empty_only
+}
+
+// El `EmptyStringFix` de ruff con el separador fuera: la llamada vuelta a escribir sin los strings
+// vacíos ni el `sep`; inseguro con comentarios o con un `sep` que no es un string ni `None`.
+fn print_fix(call: Node<'_>, function: Node<'_>, given: &Arguments<'_>, source: &[u8]) -> Fix {
+    let mut unsafe_separator = false;
+    let mut parts: Vec<String> = given
+        .positional
+        .iter()
+        .filter(|argument| !is_empty_string(**argument, source))
+        .map(|argument| codegen::unparse(*argument, codegen::COMMA, source))
+        .collect();
+    for keyword in &given.keywords {
+        let name = keyword
+            .child_by_field_name(NAME_FIELD)
+            .map(|name| text(name, source));
+        if name == Some(SEP) {
+            let value = keyword.child_by_field_name(VALUE_FIELD).map(unparenthesized);
+            unsafe_separator |= !value.is_some_and(|value| is_string(value) || value.kind() == NONE_LITERAL);
+            continue;
+        }
+        parts.push(codegen::unparse(*keyword, codegen::COMMA, source));
+    }
+    let replacement = format!(
+        "{}({})",
+        codegen::unparse(function, codegen::MAX, source),
+        parts.join(", ")
+    );
+    let fix = Fix::replace(call, &replacement, source);
+    if unsafe_separator || has_comment_within(call, call.start_byte(), call.end_byte()) {
+        fix.marked_unsafe()
+    } else {
+        fix
+    }
+}
+
+fn is_empty_string(argument: Node<'_>, source: &[u8]) -> bool {
+    let argument = unparenthesized(argument);
+    is_string(argument) && text_value(argument, source).is_some_and(|value| value.is_empty())
 }
 
 // B005: `strip(".txt")`, que saca caracteres sueltos y no el sufijo.

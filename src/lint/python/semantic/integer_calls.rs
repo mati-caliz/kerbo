@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use super::builtin_calls::{Arguments, arguments, keyword_value};
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
+use super::unwrap_fixes::cast_to_int_fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     CALL, FUNCTION_FIELD, LEFT_FIELD, LIST, RIGHT_FIELD, named, text, unparenthesized,
@@ -56,7 +57,8 @@ pub fn integer_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
         && let [value] = given.positional.as_slice()
         && is_integer(model, source, unparenthesized(*value))
     {
-        reports.push(Report::at(PythonRule::RUF046, call, ""));
+        let fix = cast_to_int_fix(model, call, *value, source);
+        reports.push(Report::at(PythonRule::RUF046, call, "").with_fix(Some(fix)));
     }
     reports
 }

@@ -4,9 +4,11 @@ use super::builtin_calls::{Arguments, arguments, keyword_value};
 use super::comprehension_fixes::{
     dict_comprehension_fix, double_cast_fix, list_call_fix, list_comprehension_set_fix, literal_dict_fix,
 };
+use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
 use super::model::Model;
 use super::qualified::{is_typing, qualified_name};
 use super::type_hints::Hints;
+use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ASSIGNMENT, CALL, COMMENT, FUNCTION_FIELD, IDENTIFIER, KEYWORD_ARGUMENT, NAME_FIELD, RIGHT_FIELD,
@@ -46,6 +48,8 @@ const NAME_KEYWORD: &str = "name";
 const COVARIANT_SUFFIX: &str = "_co";
 const CONTRAVARIANT_SUFFIX: &str = "_contra";
 const SORTED: &str = "sorted";
+const ITERTOOLS: &str = "itertools";
+const PAIRWISE: &str = "pairwise";
 
 // Llamadas que repiten o envuelven de más: C414 (`list(tuple(x))`), C403 (`set([...])` con una
 // comprensión), C404 (`dict([(k, v) for ...])`), C411 (`list([...])`), C418 (`dict({...})`), y además
@@ -61,7 +65,8 @@ pub fn cast_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Ve
     if let Some(outer) = builtin.as_deref() {
         reports.extend(collection_wrapper(Hints { model, source }, call, outer, &given));
         if outer == ZIP && is_successive_pair(&given, source) {
-            reports.push(Report::at(PythonRule::RUF007, call, ""));
+            let fix = pairwise_fix(model, call, &given, source);
+            reports.push(Report::at(PythonRule::RUF007, call, "").with_fix(fix));
         }
     }
     let qualified = qualified_name(model, function, source);
@@ -183,6 +188,23 @@ fn same_keywords(outer: &Arguments<'_>, inner: &Arguments<'_>, source: &[u8]) ->
 // `ResolvedPythonType` de ruff: algo que se sabe que no es texto ni `None`.
 pub fn is_non_string_default(default: Node<'_>, source: &[u8]) -> bool {
     NON_STRING_DEFAULTS.contains(&default.kind()) || (is_string(default) && is_bytes(default, source))
+}
+
+// El arreglo de RUF007: `itertools.pairwise(x)` con el import que haga falta; inseguro, como en ruff.
+fn pairwise_fix(model: &Model<'_>, call: Node<'_>, given: &Arguments<'_>, source: &[u8]) -> Option<Fix> {
+    let (name, _) = slice_start(unparenthesized(*given.positional.first()?), source)?;
+    let request = ImportRequest {
+        module: ITERTOOLS,
+        member: PAIRWISE,
+        style: ImportStyle::Import,
+    };
+    let (binding, import) = get_or_import_member(model, source, call, request)?;
+    let reference = TextEdit {
+        start: TextPoint::from_point(call.start_position()),
+        end: TextPoint::from_point(call.end_position()),
+        replacement: format!("{binding}({name})"),
+    };
+    Some(Fix::from_edits(source, vec![reference, import]).marked_unsafe())
 }
 
 // RUF007: `zip(x, x[1:])`, donde los dos lados recorren el mismo nombre corrido en uno.

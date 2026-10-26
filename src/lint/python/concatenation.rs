@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::Report;
 use super::ast::{CONCATENATED_STRING, LIST, SET, SUBSCRIPT, TUPLE};
+use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::rules::PythonRule;
 
 const EXPRESSION_LIST: &str = "expression_list";
@@ -10,12 +11,29 @@ const MINIMUM_SUBSCRIPT_TUPLE: usize = 2;
 
 // ISC004: `["a" "b", "c"]`, una concatenación implícita sin paréntesis dentro de una lista, tupla o
 // conjunto, que suele ser una coma olvidada.
-pub fn reports(nodes: &[Node<'_>]) -> Vec<Report> {
+pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     nodes
         .iter()
         .flat_map(|node| collection_elements(*node))
         .filter(|element| element.kind() == CONCATENATED_STRING)
-        .map(|element| Report::at(PythonRule::ISC004, element, ""))
+        .map(|element| {
+            let fix = Fix::from_edits(
+                source,
+                vec![
+                    TextEdit {
+                        start: TextPoint::from_point(element.start_position()),
+                        end: TextPoint::from_point(element.start_position()),
+                        replacement: String::from("("),
+                    },
+                    TextEdit {
+                        start: TextPoint::from_point(element.end_position()),
+                        end: TextPoint::from_point(element.end_position()),
+                        replacement: String::from(")"),
+                    },
+                ],
+            );
+            Report::at(PythonRule::ISC004, element, "").with_fix(Some(fix.marked_unsafe()))
+        })
         .collect()
 }
 

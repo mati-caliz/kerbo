@@ -8,6 +8,7 @@ use super::cast_calls::cast_call_reports;
 use super::collection_calls::collection_call_reports;
 use super::decimals::{decimal_from_float_literal, verbose_decimal_constructor};
 use super::file_loops::readlines_in_for;
+use super::first_element::first_element_fix;
 use super::format_calls::format_call_report;
 use super::gettext_calls::gettext_call_reports;
 use super::idioms::idiom_reports;
@@ -72,7 +73,7 @@ pub fn call_arguments(call: Node<'_>) -> CallArguments<'_> {
 // UP008.
 pub fn call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Vec<Report> {
     let mut reports: Vec<Report> = call_rule(model, source, call)
-        .map(|(rule, at)| Report::at(rule, at, "").with_fix(call_rule_fix(source, call, rule)))
+        .map(|(rule, at)| Report::at(rule, at, "").with_fix(call_rule_fix(model, source, call, rule)))
         .into_iter()
         .collect();
     reports
@@ -126,13 +127,17 @@ fn is_parenthesized(call: Node<'_>) -> bool {
     call.parent().is_some_and(|parent| parent.kind() == PARENTHESIZED)
 }
 
-// Los arreglos de PIE808, B009 y B010; RUF015 todavía no tiene.
-fn call_rule_fix(source: &[u8], call: Node<'_>, rule: PythonRule) -> Option<Fix> {
+// Los arreglos de PIE808, B009, B010 y RUF015.
+fn call_rule_fix(model: &Model<'_>, source: &[u8], call: Node<'_>, rule: PythonRule) -> Option<Fix> {
     let arguments = call_arguments(call);
     match (rule, arguments.positional.as_slice()) {
         (PythonRule::PIE808, [start, _]) => range_start_fix(call, *start, source),
         (PythonRule::B009, [object, name]) => getattr_fix(call, *object, unparenthesized(*name), source),
         (PythonRule::B010, [_, _, _]) if !is_parenthesized(call) => setattr_fix(call, source),
+        (PythonRule::RUF015, _) => call
+            .child_by_field_name(FUNCTION_FIELD)
+            .and_then(|function| function.child_by_field_name(OBJECT_FIELD))
+            .and_then(|object| first_element_fix(model, source, call, object)),
         _ => None,
     }
 }
