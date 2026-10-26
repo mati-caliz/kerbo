@@ -61,9 +61,9 @@ class Comparable:
 
 def joins(first, second, items):
     return [
-        " ".join([first, second]),
-        "".join(("a", "b")),
-        ", ".join([first, "x", 1, True, second.name, second.load()]),
+        f"{first} {second}",
+        "ab",
+        f"{first}, x, {1}, {True}, {second.name}, {second.load()}",
         " ".join([first, second.load(1)]),
         " ".join(items),
         " ".join([*items]),

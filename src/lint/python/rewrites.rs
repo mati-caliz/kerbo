@@ -6,8 +6,10 @@ use super::ast::{
     IDENTIFIER, KEYWORD_ARGUMENT, LIST, NAME_FIELD, OBJECT_FIELD, STRING, TRUE, TUPLE, VALUE_FIELD, is_bytes,
     is_f_string, is_identifier, named, string_prefix, text, unparenthesized,
 };
+use super::codegen;
 use super::escapes::text_value;
-use super::fix_edits::{Parentheses, commented_unsafe, remove_argument};
+use super::fix_edits::{Parentheses, commented_unsafe, pad, remove_argument};
+use super::semantic::preferred_quote;
 use crate::fix::Fix;
 use crate::rules::PythonRule;
 
@@ -28,7 +30,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     let mut reports = Vec::new();
     for call in nodes.iter().filter(|node| node.kind() == CALL) {
         if is_static_join(*call, source) {
-            reports.push(Report::at(PythonRule::FLY002, *call, ""));
+            reports.push(Report::at(PythonRule::FLY002, *call, "").with_fix(static_join_fix(*call, source)));
         }
         let duplicates = duplicate_keywords(*call, source);
         reports.extend(
@@ -65,6 +67,73 @@ fn plain_string(node: Node<'_>, source: &[u8]) -> Option<String> {
             .iter()
             .all(|part| !is_f_string(*part, source) && !is_bytes(*part, source));
     if plain { text_value(node, source) } else { None }
+}
+
+// El arreglo de FLY002: un string si todo son strings, o una f-string con cada elemento entre llaves
+// y el separador en el medio; inseguro, como en ruff. Sin arreglo cuando habría que escapar algo más
+// que las llaves.
+fn static_join_fix(call: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let function = call.child_by_field_name(FUNCTION_FIELD)?;
+    let joiner_node = function.child_by_field_name(OBJECT_FIELD)?;
+    let joiner = plain_string(joiner_node, source)?;
+    let sequence = unparenthesized(*arguments(call).first()?);
+    let elements: Vec<Node<'_>> = named(sequence)
+        .into_iter()
+        .filter(|element| element.kind() != COMMENT)
+        .collect();
+    let strings: Option<Vec<String>> = elements
+        .iter()
+        .map(|element| plain_string(*element, source))
+        .collect();
+    let contents = if let Some(strings) = strings {
+        let first = unparenthesized(*elements.first()?);
+        let first = if first.kind() == CONCATENATED_STRING {
+            *named(first).first()?
+        } else {
+            first
+        };
+        let prefix = string_prefix(first, source);
+        let quote = text(first, source).get(prefix.len()..)?.chars().next()?;
+        let merged = strings.join(&joiner);
+        if needs_escaping(&merged, quote) || prefix.contains(RAW_PREFIX) {
+            return None;
+        }
+        format!("{prefix}{quote}{merged}{quote}")
+    } else {
+        let mut parts = Vec::new();
+        for (index, element) in elements.iter().enumerate() {
+            if index > 0 {
+                parts.push(escaped_braces(&joiner));
+            }
+            parts.push(plain_string(*element, source).map_or_else(
+                || format!("{{{}}}", codegen::unparse(*element, 0, source)),
+                |literal| escaped_braces(&literal),
+            ));
+        }
+        let body: String = parts.concat();
+        let quote = preferred_quote(call, source);
+        let has_single = body.contains('\'') || joiner.contains('\'');
+        let has_double = body.contains('"') || joiner.contains('"');
+        let quote = match (quote, has_single, has_double) {
+            (_, true, true) => return None,
+            ('\'', true, false) => '"',
+            ('"', false, true) => '\'',
+            (quote, _, _) => quote,
+        };
+        if needs_escaping(&body, quote) {
+            return None;
+        }
+        format!("f{quote}{body}{quote}")
+    };
+    Some(Fix::replace(call, &pad(contents, call, source), source).marked_unsafe())
+}
+
+fn needs_escaping(content: &str, quote: char) -> bool {
+    content.contains(['\\', '\n', '\r', quote])
+}
+
+fn escaped_braces(literal: &str) -> String {
+    literal.replace('{', "{{").replace('}', "}}")
 }
 
 fn is_static_join(call: Node<'_>, source: &[u8]) -> bool {

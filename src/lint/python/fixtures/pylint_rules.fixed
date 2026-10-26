@@ -59,8 +59,7 @@ class Nested:
 
 for item in items:
     print(item)
-else:
-    print("fin")
+print("fin")
 
 for item in items:
     if item:
@@ -77,14 +76,12 @@ else:
 for item in items:
     for inner in items:
         break
-else:
-    print("fin")
+print("fin")
 
 for item in items:
     for inner in items:
         pass
-    else:
-        break
+    break
 else:
     print("fin")
 
@@ -106,8 +103,7 @@ else:
 for item in items:
     def helper():
         pass
-else:
-    print("fin")
+print("fin")
 
 
 def none_only(flag):

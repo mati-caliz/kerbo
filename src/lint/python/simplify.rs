@@ -68,7 +68,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     let mut found: Vec<Report> = nodes
         .iter()
         .filter(|node| node.kind() == IF)
-        .filter_map(|statement| needless_bool(*statement, &is_excluded))
+        .filter_map(|statement| needless_bool(*statement, &is_excluded, source))
         .collect();
     found.extend(nodes.iter().filter_map(|node| match node.kind() {
         IF => collapsible_if(*node, source, &system),

@@ -96,10 +96,7 @@ def file_writes(lines, pairs):
         handle.writelines(lines)
         handle.writelines(line.encode() for line in lines)
         handle.writelines(left + right for left, right in pairs)
-        for line in lines:
-            handle.write(line)
-        else:
-            pass
+        handle.writelines(lines)
         for line in lines:
             handle.write(line, 1)
         for line in lines:

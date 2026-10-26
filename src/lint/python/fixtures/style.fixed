@@ -104,8 +104,7 @@ yield 1
 await x
 for item in []:
     pass
-else:
-    break
+break
 while True:
     def inner():
         break

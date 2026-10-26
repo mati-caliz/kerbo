@@ -6,25 +6,17 @@ from typing import TYPE_CHECKING
 
 
 def positive(x):
-    if x > 0:
-        return True
-    return False
+    return x > 0
 
 
 def inverted(x):
-    if x > 0:
-        return False
-    else:
-        return True
+    return not x > 0
 
 
 def chained(x):
     if x > 0:
         return 1
-    elif x < 0:
-        return True
-    else:
-        return False
+    return x < 0
 
 
 def same(x):
@@ -41,10 +33,7 @@ def commented(x):
 
 
 def parenthesized(x):
-    if x:
-        return (True)
-    else:
-        return (False)
+    return bool(x)
 
 
 def with_more(x):

@@ -12,13 +12,13 @@ def compute():
 
 "{}".format(name)
 "{} {}".format(name, items)
-"{0} {1}".format(name, items)
-"{1} {0}".format(name, items)
+"{} {}".format(name, items)
+"{} {}".format(items, name)
 "{a} {b}".format(a=name, b=items)
 "{a}".format(a=name, )
 "{.real}".format(1)
 "{[0]}".format(items)
-"{0[a]}".format(values)
+"{[a]}".format(values)
 "{!r:>10}".format(name)
 "{:{width}}".format(name, width=3)
 "{}".format(*items)
@@ -66,7 +66,7 @@ gettext("{}".format(name))
 lazy("{}".format(name))
 print(gettext("{} {}".format(name, items)))
 "{} {}".format(name, items).upper()
-x = "{0}".format(name) + "{1}".format(name, items)
+x = "{}".format(name) + "{1}".format(name, items)
 
 
 def translated():

@@ -209,7 +209,7 @@ fn syntax_reports(root: Node<'_>, nodes: &[Node<'_>], source: &[u8], path: Optio
     reports.extend(simplify::reports(nodes, source));
     reports.extend(splits::reports(nodes, source));
     reports.extend(slots::reports(nodes, source));
-    reports.extend(loop_else::reports(nodes));
+    reports.extend(loop_else::reports(nodes, source));
     reports.extend(parentheses::reports(root, source));
     reports.extend(declarations::reports(nodes, source));
     reports.extend(raises::reports(nodes, source));

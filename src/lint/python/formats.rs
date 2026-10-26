@@ -1,5 +1,6 @@
 mod argument_types;
 mod braces;
+mod explicit_positions;
 mod fstring;
 pub mod percent;
 mod printf;
@@ -17,6 +18,7 @@ use super::escapes::text_value;
 use crate::rules::PythonRule;
 use argument_types::mismatched_types;
 use braces::BraceSummary;
+use explicit_positions::explicit_positions_fix;
 pub use fstring::is_convertible_format_call;
 use percent::{PercentError, PercentSummary};
 use unused_arguments::{unused_arguments_fix, unused_keys_fix};
@@ -27,6 +29,7 @@ const MODULO: &str = "%";
 const FORMAT: &str = "format";
 const DICTIONARY: &str = "dictionary";
 const CALL_ARGUMENTS: &str = "argument_list";
+const CONCATENATED_STRING_KIND: &str = "concatenated_string";
 const DICTIONARY_COMPREHENSION: &str = "dictionary_comprehension";
 const PAIR: &str = "pair";
 const KEY_FIELD: &str = "key";
@@ -245,7 +248,9 @@ fn brace_format(call: Node<'_>, source: &[u8]) -> Vec<Report> {
         .into_iter()
         .map(|(rule, subject)| {
             let removed = removable_arguments(rule, &summary, &arguments, source);
-            let fix = if removed.is_empty() {
+            let fix = if rule == PythonRule::UP030 {
+                explicit_positions_fix(call, &summary.indices, source)
+            } else if removed.is_empty() {
                 None
             } else {
                 unused_arguments_fix(call, &removed, source)
