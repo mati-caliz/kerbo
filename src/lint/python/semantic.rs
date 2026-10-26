@@ -83,6 +83,7 @@ use tree_sitter::{Node, Point};
 
 use super::{FileKind, Report};
 pub use checks::is_dummy;
+pub use effects::contains_effect;
 use model::{BranchId, Model, ScopeId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

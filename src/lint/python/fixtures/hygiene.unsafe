@@ -110,7 +110,7 @@ def formats(first, second, values):
         "{} {}".format(first, second),
         "{0} {name}".format(first, name=second),
         "{0:{1}}".format(first, second),
-        "{0}".format(first, second),
+        "{0}".format(first, ),
         "{0.real} {1[0]}".format(first, second),
     ]
 

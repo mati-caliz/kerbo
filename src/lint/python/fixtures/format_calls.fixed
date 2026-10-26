@@ -15,7 +15,7 @@ def compute():
 "{0} {1}".format(name, items)
 "{1} {0}".format(name, items)
 "{a} {b}".format(a=name, b=items)
-"{a}".format(a=name, b=items)
+"{a}".format(a=name, )
 "{.real}".format(1)
 "{[0]}".format(items)
 "{0[a]}".format(values)
@@ -29,12 +29,12 @@ def compute():
     name
 )
 "{}".format(name,
-            items)
+            )
 "{}".format()
-"".format(name)
-"sin campos".format(name)
+""
+"sin campos"
 "{} {}".format(name)
-"{x}".format(y=name)
+"{x}".format()
 "{0} {0}".format(compute())
 "{0} {0}".format(name)
 "{a} {a}".format(a=list())

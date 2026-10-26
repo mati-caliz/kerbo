@@ -46,5 +46,4 @@ dict_vacio = "%(a)s" % {}
 solo_splat = "%(a)s" % {**base}
 varias_lineas = "%(a)s %(b)s" % {"a": 1,
     "b": 2}
-varias_lineas_sin_inicio = "%(a)s" % {"a": 1, "b":
-    2}
+varias_lineas_sin_inicio = "%(a)s" % {"a": 1, }

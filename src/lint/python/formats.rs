@@ -4,6 +4,7 @@ mod fstring;
 pub mod percent;
 mod printf;
 mod template;
+mod unused_arguments;
 
 use tree_sitter::Node;
 
@@ -18,12 +19,14 @@ use argument_types::mismatched_types;
 use braces::BraceSummary;
 pub use fstring::is_convertible_format_call;
 use percent::{PercentError, PercentSummary};
+use unused_arguments::{unused_arguments_fix, unused_keys_fix};
 
 const BINARY: &str = "binary_operator";
 const OPERATOR_FIELD: &str = "operator";
 const MODULO: &str = "%";
 const FORMAT: &str = "format";
 const DICTIONARY: &str = "dictionary";
+const CALL_ARGUMENTS: &str = "argument_list";
 const DICTIONARY_COMPREHENSION: &str = "dictionary_comprehension";
 const PAIR: &str = "pair";
 const KEY_FIELD: &str = "key";
@@ -89,7 +92,11 @@ fn percent_format(operation: Node<'_>, source: &[u8]) -> Vec<Report> {
         Err(PercentError::Invalid) => vec![Report::at(PythonRule::F501, operation, "")],
         Ok(summary) => percent_rules(&summary, right, source)
             .into_iter()
-            .map(|(rule, subject)| Report::at(rule, operation, &subject))
+            .map(|(rule, subject)| {
+                let fix = (rule == PythonRule::F504)
+                    .then(|| unused_keys_fix(right, &unused_pairs(&summary, right, source), source));
+                Report::at(rule, operation, &subject).with_fix(fix)
+            })
             .chain(
                 mismatched_types(&format, right, source)
                     .then(|| Report::at(PythonRule::PLE1307, operation, "")),
@@ -152,11 +159,10 @@ fn named_arguments(
         .map(|key| (key.kind() == STRING).then(|| text_value(key, source)).flatten())
         .collect();
     let mut found = Vec::new();
-    let unused: Vec<&str> = keys
-        .iter()
-        .flatten()
-        .filter(|key| !summary.keywords.contains(*key))
-        .map(String::as_str)
+    let unused: Vec<String> = unused_pairs(summary, dictionary, source)
+        .into_iter()
+        .filter_map(|pair| pair.child_by_field_name(KEY_FIELD))
+        .filter_map(|key| text_value(key, source))
         .collect();
     if !unused.is_empty() {
         found.push((PythonRule::F504, unused.join(SEPARATOR)));
@@ -173,6 +179,19 @@ fn named_arguments(
         }
     }
     found
+}
+
+// Los pares con una clave string que el formato no nombra.
+fn unused_pairs<'tree>(summary: &PercentSummary, dictionary: Node<'tree>, source: &[u8]) -> Vec<Node<'tree>> {
+    named(dictionary)
+        .into_iter()
+        .filter(|pair| {
+            pair.child_by_field_name(KEY_FIELD)
+                .filter(|key| key.kind() == STRING)
+                .and_then(|key| text_value(key, source))
+                .is_some_and(|key| !summary.keywords.contains(&key))
+        })
+        .collect()
 }
 
 fn substitutions(right: Node<'_>) -> Option<usize> {
@@ -224,15 +243,77 @@ fn brace_format(call: Node<'_>, source: &[u8]) -> Vec<Report> {
     });
     brace_rules(&summary, &arguments, source)
         .into_iter()
-        .map(|(rule, subject)| Report::at(rule, call, &subject))
+        .map(|(rule, subject)| {
+            let removed = removable_arguments(rule, &summary, &arguments, source);
+            let fix = if removed.is_empty() {
+                None
+            } else {
+                unused_arguments_fix(call, &removed, source)
+            };
+            Report::at(rule, call, &subject).with_fix(fix)
+        })
         .chain(invalid_types)
         .collect()
 }
 
-fn brace_rules(summary: &BraceSummary, arguments: &[Node<'_>], source: &[u8]) -> Vec<(PythonRule, String)> {
-    let (keywords, positional): (Vec<Node<'_>>, Vec<Node<'_>>) = arguments
+// Lo que sacan los arreglos de F522 y F523. Los posicionales, sólo si son los últimos: sacar uno del
+// medio pediría renumerar el formato.
+fn removable_arguments<'tree>(
+    rule: PythonRule,
+    summary: &BraceSummary,
+    arguments: &[Node<'tree>],
+    source: &[u8],
+) -> Vec<Node<'tree>> {
+    let (keywords, positional) = split_arguments(arguments);
+    if rule == PythonRule::F522 {
+        return keywords
+            .into_iter()
+            .filter(|keyword| {
+                keyword
+                    .child_by_field_name(NAME_FIELD)
+                    .is_some_and(|name| !summary.keywords.iter().any(|used| used == text(name, source)))
+            })
+            .collect();
+    }
+    if rule != PythonRule::F523 {
+        return Vec::new();
+    }
+    let unused = unused_positions(summary, &positional);
+    let contiguous_from_end = unused
         .iter()
-        .partition(|argument| matches!(argument.kind(), KEYWORD_ARGUMENT | DICTIONARY_SPLAT));
+        .rev()
+        .zip((0..positional.len()).rev())
+        .all(|(index, expected)| *index == expected);
+    if !contiguous_from_end {
+        return Vec::new();
+    }
+    unused
+        .into_iter()
+        .filter_map(|index| positional.get(index).copied())
+        .collect()
+}
+
+fn split_arguments<'tree>(arguments: &[Node<'tree>]) -> (Vec<Node<'tree>>, Vec<Node<'tree>>) {
+    arguments
+        .iter()
+        .partition(|argument| matches!(argument.kind(), KEYWORD_ARGUMENT | DICTIONARY_SPLAT))
+}
+
+fn unused_positions(summary: &BraceSummary, positional: &[Node<'_>]) -> Vec<usize> {
+    positional
+        .iter()
+        .enumerate()
+        .filter(|(index, argument)| {
+            argument.kind() != LIST_SPLAT
+                && !summary.autos.contains(index)
+                && !summary.indices.contains(index)
+        })
+        .map(|(index, _)| index)
+        .collect()
+}
+
+fn brace_rules(summary: &BraceSummary, arguments: &[Node<'_>], source: &[u8]) -> Vec<(PythonRule, String)> {
+    let (keywords, positional) = split_arguments(arguments);
     let names: Vec<&str> = keywords
         .iter()
         .filter_map(|keyword| keyword.child_by_field_name(NAME_FIELD))
@@ -249,15 +330,9 @@ fn brace_rules(summary: &BraceSummary, arguments: &[Node<'_>], source: &[u8]) ->
     if !spread_keywords && !unused_names.is_empty() {
         found.push((PythonRule::F522, unused_names.join(SEPARATOR)));
     }
-    let unused_positions: Vec<String> = positional
+    let unused_positions: Vec<String> = unused_positions(summary, &positional)
         .iter()
-        .enumerate()
-        .filter(|(index, argument)| {
-            argument.kind() != LIST_SPLAT
-                && !summary.autos.contains(index)
-                && !summary.indices.contains(index)
-        })
-        .map(|(index, _)| index.to_string())
+        .map(ToString::to_string)
         .collect();
     if !unused_positions.is_empty() {
         found.push((PythonRule::F523, unused_positions.join(SEPARATOR)));

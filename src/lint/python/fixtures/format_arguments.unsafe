@@ -1,0 +1,37 @@
+"""Argumentos de más en `%` y `.format`: comas, espacios y efectos."""
+
+
+def compute():
+    return 1
+
+
+"%(a)s" % {"a": 1,  }
+"%(a)s" % {"a": 1,  }
+"%(a)s" % { "a": 1 }
+"%(a)s" % {"a": 1, }
+"%(a)s" % {"a": compute(), }
+"%(a)s" % {"a": 1, 2: 3, }
+"{a}".format(a=1, )
+"{a}".format(a=1, )
+"{a}".format( a=1)
+"{a}".format(a=1)
+"{a}".format(a=1, )
+"{a}".format(a=compute(), )
+"{0}".format(1, )
+"{0}".format(1, )
+"{0}".format(1, )
+"{0}".format(1,  # comentario
+             )
+"hola"
+"hola" "chau"
+"{{}}".format()
+"{0}".format(1, )
+"{a}".format(a=2)
+"{0}{2}".format(1, 2, 3)
+"{0}".format(
+    1,
+    )
+"%(a)s" % {
+    "a": 1,
+    
+}
