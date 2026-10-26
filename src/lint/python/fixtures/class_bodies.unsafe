@@ -38,10 +38,14 @@ class Comparisons:
         return not self != other
 
 
-factory = list
-mapping = dict
-filled = lambda: [1]
-taking = lambda x: []
+def factory():
+    return []
+def mapping():
+    return {}
+def filled():
+    return [1]
+def taking(x):
+    return []
 grouped = defaultdict(list)
 
 

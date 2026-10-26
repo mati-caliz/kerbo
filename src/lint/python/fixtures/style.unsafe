@@ -37,23 +37,28 @@ try:
 except :  # comment
     if a:
         raise
-f = lambda: 0
+def f():
+    return 0
 f.x = lambda: 0
-g: object = lambda: 0
+def g():
+    return 0
 h, k = lambda: 0, 1
 o = p = lambda: 0
-r = (lambda: 0)
+def r():
+    return (0)
 
 
 class K:
-    m = lambda self: 0
+    def m(self):
+        return 0
     n: object = lambda: 0
     def method(self): pass
     def stub(self): ...
 
 
 def d():
-    n = lambda: 0
+    def n():
+        return 0
     return n
 
 

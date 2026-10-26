@@ -21,7 +21,8 @@ class Node(Generic[T]):
         class Inside:
             field: "Node[T]"
 
-        lambda_value = lambda: cast("Node[T]", other)
+        def lambda_value():
+            return cast("Node[T]", other)
         print(local, nested, pair, broken, escaped, inner, Inside, lambda_value)
         return None
 

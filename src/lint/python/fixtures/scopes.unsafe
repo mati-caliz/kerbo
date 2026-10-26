@@ -8,7 +8,8 @@ class Cell:
     other = attr + 1
     items = [attr for _ in range(3)]
     first = [value for value in range(attr)]
-    lam = lambda: attr
+    def lam():
+        return attr
 
     def method(self, default=attr):
         return __class__, __qualname__, attr

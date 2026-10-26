@@ -1750,11 +1750,22 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     o más (`X | None` y nunca `Optional`); FLY002 no arregla cuando habría que escapar algo más que
     las llaves; PLW0120 desindenta línea por línea (un string de varias líneas en el `else` se
     rompería; ruff usa libcst).
+  - Tanda 12 (33 arreglos, idénticos a ruff en todos los fixtures): E731 (la lambda pasa a `def`
+    con el cuerpo tal como está), PLE2510, PLE2512, PLE2513, PLE2515, PYI009, PYI010, PYI012,
+    PYI013, PYI015, PYI044, FURB162, FURB169, FURB177, FURB181, SIM911, SIM220, SIM221, PTH210,
+    PLW1507, RUF024, RUF026, RUF030, RUF058, RUF101, B014, ASYNC105, ASYNC116, PLE1519, PLE1520,
+    UP001, UP023 y UP026. Dos ajustes más del orden de ruff: los avisos de una sentencia van detrás
+    de los de sus expresiones (ruff analiza la sentencia al final), y F401, F841 y RUF059 (los de los
+    alcances diferidos) van detrás de todos los del árbol.
+  - Pendientes de esa tanda: E731 no arregla con una anotación `Callable` (ruff la pasa a la firma);
+    RUF030 sólo arregla `print("texto")` (ruff arma una f-string con varios argumentos); UP026 sólo
+    arregla `import mock` con un nombre en la sentencia. Quedan para la próxima B006, C417, SIM905,
+    SIM114, UP049, PYI025, RUF033, UP014, F601 y F602.
   - Lo que falta de arreglos (medido el 2026-10-26 con `../kerbo-parity/scripts/pending_by_frequency.txt`):
-    21 reglas que aparecen en el corpus (unos 19.000 arreglos, 16.000 de ellos UP031 y UP032) y 38
-    que no aparecen. Las próximas: E731, SIM905, SIM114, B006, PYI025, F601, F602, SIM117, SIM102,
-    RUF022/RUF023, PYI034/PYI019, TC004, RUF028, UP036 y C417; al final UP031/UP032 (pasar `%` y
-    `.format` a f-string).
+    20 reglas que aparecen en el corpus (unos 18.000 arreglos, 16.000 de ellos UP031 y UP032) y 6
+    que no aparecen. Las próximas: B006, C417, SIM905, SIM114, UP049, PYI025, RUF033, UP014, F601,
+    F602, SIM117, SIM102, RUF022/RUF023, PYI034/PYI019, TC004, RUF028 y UP036; al final UP031/UP032
+    (pasar `%` y `.format` a f-string).
     C417 (`map(lambda ...)`) queda para la tanda de libcst más pesada.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.

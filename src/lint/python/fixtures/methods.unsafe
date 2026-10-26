@@ -41,7 +41,8 @@ def outside(self):
 
 value = (lambda: 1)()
 other = (lambda x: x)(2)
-named = lambda: 1
+def named():
+    return 1
 called = named()
 
 datetime.datetime.today()

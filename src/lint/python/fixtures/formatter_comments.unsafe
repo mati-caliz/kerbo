@@ -90,6 +90,7 @@ match value:
     ]:
         pass
 
-result = lambda x: (  # fmt: skip
+def result(x):
+    return (  # fmt: skip
     x
 )

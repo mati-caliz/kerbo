@@ -187,7 +187,8 @@ def nested_generator(flag):
 
 
 def lambda_yield(flag):
-    lambda: (yield)
+    def callback():
+        return (yield)
     if flag:
-        return None
-    return None
+        return
+    return

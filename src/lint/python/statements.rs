@@ -6,6 +6,7 @@ use super::ast::{
     LAMBDA, LEFT_FIELD, NAME_FIELD, RIGHT_FIELD, TUPLE, TYPE_FIELD, WILDCARD_IMPORT, children, fields, named,
     text, unparenthesized,
 };
+use super::lambda_fix::lambda_to_def_fix;
 use super::split_imports::split_imports_fix;
 use crate::fix::Fix;
 use crate::rules::PythonRule;
@@ -33,7 +34,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
             IMPORT => multiple_imports(*node, source),
             IMPORT_FROM => star_import(*node, source),
             TRY => handlers(*node),
-            EXPRESSION_STATEMENT => lambda_assignment(*node),
+            EXPRESSION_STATEMENT => lambda_assignment(*node, source),
             ASSERT => assert_tuple(*node),
             IF | ELIF => if_tuple(*node),
             PRINT => print_chevron(*node),
@@ -121,7 +122,7 @@ fn reraises(handler: Node<'_>) -> bool {
         .any(|statement| statement.kind() == RAISE && named(statement).is_empty())
 }
 
-fn lambda_assignment(statement: Node<'_>) -> Vec<Report> {
+fn lambda_assignment(statement: Node<'_>, source: &[u8]) -> Vec<Report> {
     let Some(assignment) = named(statement)
         .into_iter()
         .find(|child| child.kind() == ASSIGNMENT)
@@ -137,7 +138,8 @@ fn lambda_assignment(statement: Node<'_>) -> Vec<Report> {
     let annotated = assignment.child_by_field_name(TYPE_FIELD).is_some();
     let is_lambda = target.kind() == IDENTIFIER && unparenthesized(value).kind() == LAMBDA;
     if is_lambda && !(annotated && in_class_body(statement)) {
-        vec![Report::at(PythonRule::E731, assignment, "")]
+        let fix = lambda_to_def_fix(statement, assignment, source);
+        vec![Report::at(PythonRule::E731, assignment, "").with_fix(fix)]
     } else {
         Vec::new()
     }

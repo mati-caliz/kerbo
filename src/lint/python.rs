@@ -27,6 +27,7 @@ mod import_self;
 mod imports;
 mod index_types;
 mod known_types;
+mod lambda_fix;
 mod literal_checks;
 mod loop_else;
 mod loop_lookups;

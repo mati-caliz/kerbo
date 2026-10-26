@@ -23,7 +23,8 @@ def nested(a=[len(x) for x in "ab"]):
     return a
 
 
-handler = lambda a=len("x"), b=[]: (a, b)
+def handler(a=len("x"), b=[]):
+    return (a, b)
 
 
 class Base:
