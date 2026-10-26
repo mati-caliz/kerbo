@@ -46,7 +46,7 @@ exit(1)
 quit()
 exit
 
-subprocess.run(["ls"], universal_newlines=True)
+subprocess.run(["ls"], text=True)
 subprocess.run(["ls"], text=True)
 subprocess.Popen(["ls"], preexec_fn=os.setsid)
 subprocess.Popen(["ls"], preexec_fn=None)

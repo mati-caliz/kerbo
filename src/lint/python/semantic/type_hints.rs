@@ -3,12 +3,15 @@ use tree_sitter::Node;
 use super::Mode;
 use super::model::Model;
 use super::qualified::{is_typing, qualified_name};
+use super::union_duplicates::duplicate_union_fix;
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ASSIGNMENT, ATTRIBUTE, COMMENT, KEYWORD_ARGUMENT, LEFT_FIELD, PARENTHESIZED, RIGHT_FIELD, SUBSCRIPT,
     SUBSCRIPT_FIELD, TUPLE, VALUE_FIELD, fields, named, text, unparenthesized,
 };
 use crate::lint::python::branches::equivalent;
+use crate::lint::python::fix_edits::commented_unsafe;
 use crate::rules::PythonRule;
 
 const TYPE_NODE: &str = "type";
@@ -23,6 +26,7 @@ const OPERATOR_FIELD: &str = "operator";
 const TYPE_FIELD: &str = "type";
 const BIT_OR: &str = "|";
 const NONE_LITERAL: &str = "none";
+const NONE_WORD: &str = "None";
 const UNION: &str = "Union";
 const LITERAL: &str = "Literal";
 const NEVER_TYPES: [&str; 2] = ["Never", "NoReturn"];
@@ -63,7 +67,13 @@ pub fn type_hint_reports(model: &Model<'_>, source: &[u8], node: Node<'_>, mode:
     if hints.is_union(node, mode) && !hints.is_nested(node, mode, Hints::is_union) {
         let mut members = Vec::new();
         hints.union_members(node, mode, &mut members);
-        reports.extend(duplicates(&members, source, PythonRule::PYI016));
+        let repeated = duplicates(&members, source, PythonRule::PYI016);
+        let fix = if repeated.is_empty() {
+            None
+        } else {
+            duplicate_union_fix(hints, node, &members)
+        };
+        reports.extend(repeated.into_iter().map(|report| report.with_fix(fix.clone())));
         if members
             .iter()
             .filter(|member| hints.is_typing_subscript(**member, LITERAL))
@@ -254,8 +264,55 @@ impl<'tree> Hints<'_, '_, '_> {
                 qualified_name(self.model, *operand, self.source)
                     .is_some_and(|name| NEVER_TYPES.iter().any(|never| is_typing(&name, never)))
             })
-            .map(|operand| Report::at(PythonRule::RUF020, operand, ""))
+            .map(|operand| {
+                Report::at(PythonRule::RUF020, operand, "").with_fix(self.never_union_fix(node, operand))
+            })
             .collect()
+    }
+
+    // El arreglo de RUF020 para `Never | T`: queda el otro lado, tal como está escrito. Ruff no lo
+    // arregla si quedaría `None | None`, y el de `Union[...]` todavía no está.
+    fn never_union_fix(self, union: Node<'_>, never: Node<'_>) -> Option<Fix> {
+        if union.kind() != UNION_TYPE && !self.is_bit_or(union) {
+            return None;
+        }
+        let sides: Vec<Node<'_>> = named(union)
+            .into_iter()
+            .filter(|part| part.kind() != COMMENT)
+            .collect();
+        let [left, right] = sides.as_slice() else {
+            return None;
+        };
+        let other = if unwrapped(*left).id() == never.id() {
+            *right
+        } else {
+            *left
+        };
+        if self.has_bare_none(union) {
+            return None;
+        }
+        let fix = Fix::replace(union, text(unwrapped(other), self.source), self.source);
+        Some(commented_unsafe(fix, union, self.source))
+    }
+
+    fn has_bare_none(self, union: Node<'_>) -> bool {
+        let root = std::iter::successors(Some(union), |node| {
+            node.parent()
+                .filter(|parent| parent.kind() == UNION_TYPE || self.is_bit_or(*parent))
+        })
+        .last()
+        .unwrap_or(union);
+        let mut pending = vec![root];
+        while let Some(node) = pending.pop() {
+            if node.kind() == UNION_TYPE || self.is_bit_or(node) {
+                pending.extend(named(node));
+            } else if unwrapped(node).kind() == NONE_LITERAL
+                || text(unwrapped(node), self.source) == NONE_WORD
+            {
+                return true;
+            }
+        }
+        false
     }
 
     // PYI064: `x: Final[Literal[1]] = ...`, donde alcanza con `Final`. Avisa en la asignación.

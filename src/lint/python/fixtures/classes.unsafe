@@ -17,7 +17,6 @@ class Plain:
     shared: ClassVar[list] = []
     constant: Final = []
     bare: ClassVar = []
-    shared = []
     nothing: list
 
 
@@ -69,7 +68,3 @@ def scoped():
 
 class Slotted:
     __slots__ = ("name", "breed")
-    __slots__ = {"b": "doc", "a": "doc"}
-    __slots__ = {"b", "a"}
-    __slots__ = ["Zeta", "alpha"]
-    __slots__ = ["a", "B"]

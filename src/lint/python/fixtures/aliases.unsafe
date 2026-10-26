@@ -31,17 +31,17 @@ def errors():
         pass
     try:
         pass
-    except OSError as error:
-        raise error
+    except OSError:
+        raise
     raise OSError
     raise OSError("x")
     raise TimeoutError from None
     raise (OSError)
 
 
-OSError("x")
-OSError()
-TimeoutError()
+raise OSError("x")
+raise OSError()
+raise TimeoutError()
 
 str
 bytes
@@ -55,13 +55,13 @@ type(f"{type}")
 str
 type(x)
 
-subprocess.run(["ls"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-run(["ls"], stdout=PIPE, stderr=PIPE)
+subprocess.run(["ls"], capture_output=True)
+run(["ls"], capture_output=True)
 subprocess.run(["ls"], stdout=subprocess.PIPE)
 subprocess.run(["ls"], stdout=PIPE, stderr=subprocess.STDOUT)
 subprocess.run(["ls"], stdout=PIPE, stderr=PIPE, capture_output=False)
 
-hasattr(len, "__call__")
+callable(len)
 len.__call__
 getattr(len, "__call__", None)
 hasattr(len, "__call__", 1)

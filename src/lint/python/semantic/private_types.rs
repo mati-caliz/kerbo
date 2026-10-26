@@ -6,8 +6,9 @@ use super::qualified::{is_typing, qualified_name_from};
 use super::type_hints::{subscript_parts, unwrapped};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
-    ASSIGNMENT, CALL, CLASS, FUNCTION_FIELD, LEFT_FIELD, RIGHT_FIELD, named, text,
+    ASSIGNMENT, CALL, CLASS, EXPRESSION_STATEMENT, FUNCTION_FIELD, LEFT_FIELD, RIGHT_FIELD, named, text,
 };
+use crate::lint::python::statement_removal::delete_statement_only;
 use crate::rules::PythonRule;
 
 const PRIVATE_PREFIX: char = '_';
@@ -59,7 +60,14 @@ pub fn unused_private_types(visitor: &Visitor<'_>, latest: &[(&str, BindingId)])
             let unused_typed_dict = checked && typed_dict_definition;
             let text = text(name, visitor.source);
             if unused_type_variable {
-                Some(Report::at(PythonRule::PYI018, name, ""))
+                let fix = std::iter::successors(name.parent(), Node::parent)
+                    .find(|ancestor| ancestor.kind() == EXPRESSION_STATEMENT)
+                    .map(|statement| {
+                        delete_statement_only(statement, visitor.source)
+                            .isolated(None)
+                            .marked_unsafe()
+                    });
+                Some(Report::at(PythonRule::PYI018, name, "").with_fix(fix))
             } else if unused_alias {
                 Some(Report::at(PythonRule::PYI047, name, text))
             } else if unused_typed_dict {

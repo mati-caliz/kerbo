@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::Report;
 use super::ast::{ALIAS_FIELD, BLOCK, COMMENT, IDENTIFIER, VALUE_FIELD, named, text, unparenthesized};
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const EXCEPT_CLAUSES: [&str; 2] = ["except_clause", "except_group_clause"];
@@ -10,6 +11,7 @@ const RAISE: &str = "raise_statement";
 const TRY: &str = "try_statement";
 const FINALLY: &str = "finally_clause";
 const CAUSE_FIELD: &str = "cause";
+const RAISE_KEYWORD: &str = "raise";
 
 // TRY201: `except E as error: raise error`, que se escribe `raise` a secas para no tocar el
 // traceback. Avisa en el nombre.
@@ -32,9 +34,12 @@ fn verbose_raises(handler: Node<'_>, source: &[u8]) -> Vec<Report> {
     raises
         .into_iter()
         .filter(|raise| raise.child_by_field_name(CAUSE_FIELD).is_none())
-        .filter_map(raised_value)
-        .filter(|value| value.kind() == IDENTIFIER && text(*value, source) == name)
-        .map(|value| Report::at(PythonRule::TRY201, value, ""))
+        .filter_map(|raise| raised_value(raise).map(|value| (raise, value)))
+        .filter(|(_, value)| value.kind() == IDENTIFIER && text(*value, source) == name)
+        .map(|(raise, value)| {
+            let fix = Fix::replace(raise, RAISE_KEYWORD, source).marked_unsafe();
+            Report::at(PythonRule::TRY201, value, "").with_fix(Some(fix))
+        })
         .collect()
 }
 

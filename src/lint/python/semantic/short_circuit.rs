@@ -4,15 +4,19 @@ use super::builtin_calls::arguments;
 use super::effects::contains_effect;
 use super::model::Model;
 use super::qualified::is_builtin_named;
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
-    CALL, COMMENT, FALSE, FUNCTION_FIELD, LEFT_FIELD, PARENTHESIZED, RIGHT_FIELD, TRUE, is_bytes, is_string,
-    named, string_prefix, text, unparenthesized,
+    CALL, COMMENT, FALSE, FUNCTION_FIELD, LEFT_FIELD, PARENTHESIZED, RIGHT_FIELD, TRUE, TUPLE, is_bytes,
+    is_string, named, string_prefix, text, unparenthesized,
 };
+use crate::lint::python::codegen;
 use crate::lint::python::escapes::text_value;
 use crate::rules::PythonRule;
 
 const BOOLEAN_OPERATOR: &str = "boolean_operator";
+const TRUE_LITERAL: &str = "True";
+const FALSE_LITERAL: &str = "False";
 const NOT_OPERATOR: &str = "not_operator";
 const UNARY_OPERATOR: &str = "unary_operator";
 const CONDITIONAL: &str = "conditional_expression";
@@ -73,12 +77,39 @@ pub fn short_circuit_reports(model: &Model<'_>, source: &[u8], operation: Node<'
             location = next.start_position();
             continue;
         }
-        if value_truth == Some(short_circuits) || truthiness(*next, context) == Some(short_circuits) {
-            return Some(Report::at_point(rule, location, ""));
+        let deciding = if value_truth == Some(short_circuits) {
+            Some(*value)
+        } else if truthiness(*next, context) == Some(short_circuits) {
+            Some(*next)
+        } else {
+            None
+        };
+        if let Some(deciding) = deciding {
+            let replacement =
+                short_circuit_replacement(deciding, boolean_test.then_some(short_circuits), source);
+            let fix =
+                Fix::replace_range(location, operation.end_position(), &replacement, source).marked_unsafe();
+            return Some(Report::at_point(rule, location, "").with_fix(Some(fix)));
         }
         return None;
     }
     None
+}
+
+// El `get_short_circuit_edit` de ruff: en una condición, la constante; si no, el operando que decide,
+// entre paréntesis si es una tupla.
+fn short_circuit_replacement(deciding: Node<'_>, constant: Option<bool>, source: &[u8]) -> String {
+    let rewritten = match constant {
+        Some(true) => String::from(TRUE_LITERAL),
+        Some(false) => String::from(FALSE_LITERAL),
+        None => codegen::unparse(deciding, 0, source),
+    };
+    let inner = unparenthesized(deciding);
+    if inner.kind() == TUPLE && !named(inner).is_empty() {
+        format!("({rewritten})")
+    } else {
+        rewritten
+    }
 }
 
 fn operator<'source>(node: Node<'_>, source: &'source [u8]) -> Option<&'source str> {

@@ -98,7 +98,7 @@ fn is_integer(model: &Model<'_>, source: &[u8], value: Node<'_>) -> bool {
 
 // `ResolvedPythonType` de ruff para los enteros: un entero escrito, o una operación entre enteros
 // que no sea `/`.
-fn is_integer_literal(value: Node<'_>, source: &[u8]) -> bool {
+pub fn is_integer_literal(value: Node<'_>, source: &[u8]) -> bool {
     let operand_is_integer = |field: &str| {
         value
             .child_by_field_name(field)

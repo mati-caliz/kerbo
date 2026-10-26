@@ -10,7 +10,7 @@ def mutable(a=[], b={}, c=set(), d=collections.deque(), e=list[int](), f=(), g=N
     return a, b, c, d, e, f, g
 
 
-def annotated(a: Sequence[int] = [], b: int | None = int(), c: int | str = len("x"), d: int | None = len("x")):
+def annotated(a: Sequence[int] = [], b: int | None = 0, c: int | str = len("x"), d: int | None = len("x")):
     return a, b, c, d
 
 

@@ -7,6 +7,7 @@ use super::ast::{
     TYPE_FIELD, named, text, unparenthesized,
 };
 use super::semantic::is_dummy;
+use super::statement_removal::delete_statement_only;
 use crate::fix::Fix;
 use crate::rules::PythonRule;
 
@@ -205,7 +206,8 @@ fn duplicate_class_fields(class: Node<'_>, source: &[u8]) -> Vec<Report> {
             continue;
         }
         if seen.contains(&name) {
-            found.push(Report::at(PythonRule::PIE794, statement, ""));
+            let fix = delete_statement_only(statement, source).marked_unsafe();
+            found.push(Report::at(PythonRule::PIE794, statement, "").with_fix(Some(fix)));
         } else {
             seen.push(name);
         }

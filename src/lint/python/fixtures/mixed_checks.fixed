@@ -63,10 +63,9 @@ def dictionaries(items: dict, unknown, values):
     for value in values:
         if value:
             result.append(value)
-    if "key" in mapping and mapping["key"]:
+    if mapping.get("key"):
         pass
-    if "key" in mapping:
-        del mapping["key"]
+    mapping.pop("key", None)
     return {"static": value for value in values}, {value: value for value in values}
 
 
@@ -108,7 +107,7 @@ def printing():
 def handlers():
     try:
         pass
-    except (ValueError,):
+    except ValueError:
         pass
     try:
         pass

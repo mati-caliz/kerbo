@@ -7,8 +7,10 @@ use super::ast::{
 };
 use super::branches::equivalent;
 use super::codegen;
+use super::fix_edits::pad;
 use super::loop_variable_reads::is_read_in_scope;
-use crate::fix::Fix;
+use super::spread_fix::unnecessary_spread_fix;
+use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::rules::PythonRule;
 
 const BOOL: &str = "bool";
@@ -48,6 +50,8 @@ const LITERAL_KINDS: [&str; 7] = [
 const FORMATTED_PREFIXES: [char; 4] = ['f', 'F', 't', 'T'];
 const PAIR_TARGETS: [&str; 3] = ["pattern_list", "tuple_pattern", TUPLE];
 const ITEMS: &str = "items";
+const KEYS: &str = "keys";
+const VALUES: &str = "values";
 const ORDERINGS: [&str; 4] = ["<", "<=", ">", ">="];
 const ASSIGNMENT: &str = "assignment";
 const EXPRESSION_STATEMENT: &str = "expression_statement";
@@ -61,7 +65,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
             kind if EXCEPT_CLAUSES.contains(&kind) => found.extend(non_exception_classes(*node)),
             RAISE => found.extend(raised_literal(*node, source)),
             ASSERT => found.extend(asserted_string(*node)),
-            DICTIONARY => found.extend(unnecessary_spreads(*node)),
+            DICTIONARY => found.extend(unnecessary_spreads(*node, source)),
             NOT_OPERATOR => found.extend(double_negation(*node, source)),
             CONDITIONAL => found.extend(conditional_reports(*node, source)),
             FOR => found.extend(incorrect_dict_iterator(*node, source)),
@@ -121,13 +125,19 @@ fn asserted_string(statement: Node<'_>) -> Option<Report> {
 }
 
 // PIE800: `{**base, **{"a": 1}}`, donde el diccionario de adentro se puede escribir directo.
-fn unnecessary_spreads(dictionary: Node<'_>) -> Vec<Report> {
+fn unnecessary_spreads(dictionary: Node<'_>, source: &[u8]) -> Vec<Report> {
     significant(dictionary)
         .into_iter()
         .filter(|item| item.kind() == DICTIONARY_SPLAT)
-        .filter_map(|splat| significant(splat).first().map(|inner| unparenthesized(*inner)))
-        .filter(|inner| inner.kind() == DICTIONARY)
-        .map(|inner| Report::at(PythonRule::PIE800, inner, ""))
+        .filter_map(|splat| {
+            significant(splat)
+                .first()
+                .map(|inner| (splat, unparenthesized(*inner)))
+        })
+        .filter(|(_, inner)| inner.kind() == DICTIONARY)
+        .map(|(splat, inner)| {
+            Report::at(PythonRule::PIE800, inner, "").with_fix(unnecessary_spread_fix(splat, inner, source))
+        })
         .collect()
 }
 
@@ -185,7 +195,10 @@ fn conditional_reports(conditional: Node<'_>, source: &[u8]) -> Vec<Report> {
     let (body, orelse) = (unparenthesized(*body), unparenthesized(*orelse));
     let mut found = Vec::new();
     if body.kind() == FALSE && orelse.kind() == TRUE {
-        found.push(Report::at(PythonRule::SIM211, conditional, ""));
+        let test = parts.get(1).map_or(conditional, |test| *test);
+        let negated = format!("not {}", codegen::unparse(test, codegen::NOT, source));
+        let fix = Fix::replace(conditional, &negated, source).marked_unsafe();
+        found.push(Report::at(PythonRule::SIM211, conditional, "").with_fix(Some(fix)));
     }
     if equivalent(body, orelse, source) {
         found.push(Report::at(PythonRule::RUF034, conditional, ""));
@@ -220,7 +233,23 @@ fn incorrect_dict_iterator(statement: Node<'_>, source: &[u8]) -> Option<Report>
     }
     let key_used = is_any_read(*key, source);
     let value_used = is_any_read(*value, source);
-    (key_used != value_used).then(|| Report::at(PythonRule::PERF102, iterable, ""))
+    (key_used != value_used).then(|| {
+        let (subset, kept) = if key_used { (KEYS, *key) } else { (VALUES, *value) };
+        let fix = function.child_by_field_name(ATTRIBUTE_FIELD).map(|attribute| {
+            let replacement = TextEdit {
+                start: TextPoint::from_point(attribute.start_position()),
+                end: TextPoint::from_point(attribute.end_position()),
+                replacement: subset.to_owned(),
+            };
+            let target_edit = TextEdit {
+                start: TextPoint::from_point(target.start_position()),
+                end: TextPoint::from_point(target.end_position()),
+                replacement: pad(text(kept, source).to_owned(), target, source),
+            };
+            Fix::from_edits(source, vec![target_edit, replacement]).marked_unsafe()
+        });
+        Report::at(PythonRule::PERF102, iterable, "").with_fix(fix)
+    })
 }
 
 // `is_unused` de ruff para una tupla: se usa si alguno de sus nombres se usa.

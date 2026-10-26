@@ -2,12 +2,14 @@ use tree_sitter::Node;
 
 use super::model::{BindingKind, Model, Resolution};
 use super::qualified::{is_typing, qualified_name};
+use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, ASSIGNMENT, ATTRIBUTE, ATTRIBUTE_FIELD, BODY_FIELD, CALL, COMMENT, EXPRESSION_STATEMENT,
     FUNCTION_FIELD, IDENTIFIER, KEYWORD_ARGUMENT, LEFT_FIELD, OBJECT_FIELD, PARENTHESIZED, RIGHT_FIELD,
     TYPE_FIELD, VALUE_FIELD, named, text, unparenthesized,
 };
+use crate::lint::python::fix_edits::{commented_unsafe, point_of};
 use crate::lint::python::known_types::is_read_after;
 use crate::rules::PythonRule;
 
@@ -140,7 +142,25 @@ pub fn readlines_in_for(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Opt
     } else {
         is_io_initializer(model, source, object)
     };
-    is_file.then(|| Report::at(PythonRule::FURB129, call, ""))
+    is_file.then(|| {
+        let receiver_end = function
+            .child_by_field_name(OBJECT_FIELD)
+            .map_or_else(|| call.start_byte(), |receiver| receiver.end_byte());
+        let glued = source
+            .get(call.end_byte())
+            .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_');
+        let replacement = if glued { " " } else { "" };
+        let fix = Fix::from_edits(
+            source,
+            vec![TextEdit {
+                start: point_of(source, receiver_end),
+                end: TextPoint::from_point(call.end_position()),
+                replacement: replacement.to_owned(),
+            }],
+        );
+        let fix = commented_unsafe(fix, iterable, source);
+        Report::at(PythonRule::FURB129, call, "").with_fix(Some(fix))
+    })
 }
 
 // `typing::is_io_base` de ruff sobre el binding al que resuelve el nombre.

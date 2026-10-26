@@ -4,7 +4,7 @@ use super::call_fixes::type_of_primitive_fix;
 use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
-use super::reference_fixes::sys_exit_fix;
+use super::reference_fixes::{callable_fix, capture_output_fix, sys_exit_fix, text_keyword_fix};
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
@@ -71,7 +71,8 @@ pub fn builtin_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
         && is_pipe(STDOUT)
         && is_pipe(STDERR)
     {
-        reports.push(Report::at(PythonRule::UP022, call, ""));
+        let fix = capture_output_fix(call, &arguments, source);
+        reports.push(Report::at(PythonRule::UP022, call, "").with_fix(fix));
     }
     let qualified = qualified_name(model, function, source);
     let naive_datetime = match qualified.as_deref() {
@@ -95,7 +96,8 @@ pub fn builtin_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
         && let Some(keyword) = keyword_argument(&arguments, UNIVERSAL_NEWLINES, source)
         && let Some(name) = keyword.child_by_field_name(NAME_FIELD)
     {
-        reports.push(Report::at(PythonRule::UP021, name, ""));
+        let fix = text_keyword_fix(call, keyword, &arguments, source);
+        reports.push(Report::at(PythonRule::UP021, name, "").with_fix(fix));
     }
     if qualified.as_deref() == Some(SUBPROCESS_POPEN)
         && let Some(keyword) = keyword_argument(&arguments, PREEXEC_FN, source)
@@ -106,7 +108,15 @@ pub fn builtin_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
         reports.push(Report::at(PythonRule::PLW1509, keyword, ""));
     }
     if is_unreliable_callable_check(model, source, function, &arguments) {
-        reports.push(Report::at(PythonRule::B004, call, ""));
+        let fix = is_builtin_named(model, function, source, HASATTR)
+            .then(|| {
+                arguments
+                    .positional
+                    .first()
+                    .and_then(|object| callable_fix(model, call, *object, source))
+            })
+            .flatten();
+        reports.push(Report::at(PythonRule::B004, call, "").with_fix(fix));
     }
     reports
 }

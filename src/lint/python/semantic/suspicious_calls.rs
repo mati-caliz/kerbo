@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::model::Model;
 use super::qualified::qualified_name;
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, COMMENT, EXPRESSION_STATEMENT, FUNCTION_FIELD,
@@ -91,6 +92,7 @@ const BUILTIN_EXCEPTIONS: [&str; 65] = [
     "UserWarning",
     "EncodingWarning",
 ];
+const RAISE_PREFIX: &str = "raise ";
 const EXCEPTION_GROUPS: [&str; 2] = ["BaseExceptionGroup", "ExceptionGroup"];
 
 struct Arguments<'tree> {
@@ -136,7 +138,8 @@ pub fn suspicious_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>)
     if let Some(statement) = statement
         && qualified.as_deref().is_some_and(is_builtin_exception)
     {
-        reports.push(Report::at(PythonRule::PLW0133, statement, ""));
+        let fix = Fix::insert_before(statement, RAISE_PREFIX, source).marked_unsafe();
+        reports.push(Report::at(PythonRule::PLW0133, statement, "").with_fix(Some(fix)));
     }
     reports
 }

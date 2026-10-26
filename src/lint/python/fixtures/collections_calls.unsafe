@@ -6,21 +6,21 @@ items = [3, 1, 2]
 def handlers():
     try:
         pass
-    except ValueError as error:
-        raise error
+    except ValueError:
+        raise
     try:
         pass
     except ValueError as error:
         raise error from None
     try:
         pass
-    except ValueError as error:
-        raise (error)
+    except ValueError:
+        raise
     try:
         pass
-    except ValueError as error:
+    except ValueError:
         if items:
-            raise error
+            raise
     try:
         pass
     except ValueError as error:
@@ -35,7 +35,7 @@ def handlers():
     except ValueError as error:
 
         def inner():
-            raise error
+            raise
 
         raise ValueError from error
     try:
@@ -44,8 +44,8 @@ def handlers():
         raise
     try:
         pass
-    except* ValueError as group:
-        raise group
+    except* ValueError:
+        raise
 
 
 b"abc"

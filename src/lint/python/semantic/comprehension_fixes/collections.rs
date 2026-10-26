@@ -87,7 +87,7 @@ pub fn collection_call_fix(call: Node<'_>, collection: &str, source: &[u8]) -> O
 
 // La comilla de ruff: adentro de un f-string, la otra; si no, la del primer string del archivo que no
 // es triple, o la doble.
-fn preferred_quote(node: Node<'_>, source: &[u8]) -> char {
+pub fn preferred_quote(node: Node<'_>, source: &[u8]) -> char {
     if let Some(string) =
         std::iter::successors(node.parent(), Node::parent).find(|ancestor| ancestor.kind() == STRING)
     {

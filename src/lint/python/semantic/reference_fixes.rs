@@ -1,12 +1,12 @@
 use tree_sitter::Node;
 
 use super::builtin_calls::{Arguments, keyword_argument};
-use super::call_fixes::builtin_fix;
+use super::call_fixes::{builtin_available, builtin_fix};
 use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
 use super::model::Model;
 use crate::fix::{Fix, TextEdit, TextPoint};
-use crate::lint::python::ast::{VALUE_FIELD, text};
-use crate::lint::python::fix_edits::commented_unsafe;
+use crate::lint::python::ast::{ARGUMENTS_FIELD, NAME_FIELD, VALUE_FIELD, text};
+use crate::lint::python::fix_edits::{Parentheses, commented_unsafe, remove_argument};
 
 const MEMBER_SEPARATOR: char = '.';
 const COLLECTIONS: &str = "collections";
@@ -35,6 +35,13 @@ const REGEX_FLAGS: [(&str, &str); 8] = [
 const LOGGING: &str = "logging";
 const DICTIONARY_SPLAT: &str = "dictionary_splat";
 const SYS: &str = "sys";
+const STDOUT: &str = "stdout";
+const STDERR: &str = "stderr";
+const CAPTURE_OUTPUT: &str = "capture_output";
+const CAPTURE_OUTPUT_TRUE: &str = "capture_output=True";
+const TEXT: &str = "text";
+const CALLABLE: &str = "callable";
+const BUILTINS: &str = "builtins";
 const EXIT: &str = "exit";
 const EXIT_CODE: &str = "code";
 const WARNING: &str = "WARNING";
@@ -111,6 +118,69 @@ pub fn sys_exit_fix(
         });
     }
     edits.push(import);
+    Some(Fix::from_edits(source, edits).marked_unsafe())
+}
+
+// UP022: `stdout=PIPE, stderr=PIPE` pasa a `capture_output=True` en el primero y se borra el otro;
+// inseguro, y sin arreglo si ya hay un `capture_output`.
+pub fn capture_output_fix(call: Node<'_>, arguments: &Arguments<'_>, source: &[u8]) -> Option<Fix> {
+    if keyword_argument(arguments, CAPTURE_OUTPUT, source).is_some() {
+        return None;
+    }
+    let stdout = keyword_argument(arguments, STDOUT, source)?;
+    let stderr = keyword_argument(arguments, STDERR, source)?;
+    let (first, second) = if stdout.start_byte() < stderr.start_byte() {
+        (stdout, stderr)
+    } else {
+        (stderr, stdout)
+    };
+    let list = call.child_by_field_name(ARGUMENTS_FIELD)?;
+    let mut edits = vec![TextEdit {
+        start: TextPoint::from_point(first.start_position()),
+        end: TextPoint::from_point(first.end_position()),
+        replacement: CAPTURE_OUTPUT_TRUE.to_owned(),
+    }];
+    edits.extend(remove_argument(second, list, Parentheses::Preserve, source).edits);
+    Some(Fix::from_edits(source, edits).marked_unsafe())
+}
+
+// UP021: `universal_newlines=` pasa a `text=`, o se borra si ya hay un `text`.
+pub fn text_keyword_fix(
+    call: Node<'_>,
+    keyword: Node<'_>,
+    arguments: &Arguments<'_>,
+    source: &[u8],
+) -> Option<Fix> {
+    if keyword_argument(arguments, TEXT, source).is_some() {
+        let list = call.child_by_field_name(ARGUMENTS_FIELD)?;
+        return Some(remove_argument(keyword, list, Parentheses::Preserve, source));
+    }
+    Some(Fix::replace(
+        keyword.child_by_field_name(NAME_FIELD)?,
+        TEXT,
+        source,
+    ))
+}
+
+// B004: `hasattr(x, "__call__")` pasa a `callable(x)` (o `builtins.callable` si está tapado);
+// inseguro, como en ruff.
+pub fn callable_fix(model: &Model<'_>, call: Node<'_>, object: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let mut edits = Vec::new();
+    let binding = if builtin_available(model, CALLABLE) {
+        CALLABLE.to_owned()
+    } else {
+        let (name, import) = get_or_import_member(model, source, call, import_module(BUILTINS, CALLABLE))?;
+        edits.push(import);
+        name
+    };
+    edits.insert(
+        0,
+        TextEdit {
+            start: TextPoint::from_point(call.start_position()),
+            end: TextPoint::from_point(call.end_position()),
+            replacement: format!("{binding}({})", text(object, source)),
+        },
+    );
     Some(Fix::from_edits(source, edits).marked_unsafe())
 }
 

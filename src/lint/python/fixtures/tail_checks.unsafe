@@ -5,13 +5,13 @@ import math
 import sys
 import time
 from builtins import str as text_type
-from typing import Never, TypeVar
+from typing import TypeVar
 
 import trio
 
 T = TypeVar("U")
 V = TypeVar("V")
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 named_logger = logging.getLogger(__name__)
 values = {}
 values["key"]: int
@@ -29,8 +29,7 @@ class Plain(metaclass=abc):
 def generator(items, pairs):
     for item in items:
         yield item
-    for left, right in pairs:
-        yield left, right
+    yield from pairs
     for item in items:
         yield item
         print(item)
@@ -42,10 +41,10 @@ def generator(items, pairs):
 
 def starts(message, other_message):
     return (
-        message.startswith("a") or message.startswith("b"),
-        message.endswith("a") or message.endswith("b") or other_message.endswith("c"),
+        message.startswith(("a", "b")),
+        message.endswith(("a", "b")) or other_message.endswith("c"),
         message.startswith("a") and message.startswith("b"),
-        message.startswith(("a", "b")) or message.startswith("c"),
+        message.startswith(("a", "b", "c")),
         message.startswith("a") or other_message.startswith("b"),
     )
 
@@ -76,10 +75,10 @@ def asserts(items):
 
 
 def lookups(mapping, items):
-    for key, value in mapping.items():
-        print(mapping[key])
+    for value in mapping.values():
+        print(value)
     for index, item in enumerate(items):
-        print(items[index])
+        print(item)
     for index, item in enumerate(items):
         items[index] = item
 
@@ -106,12 +105,11 @@ def stopping_call():
 
 def sets(item):
     numbers = {1, 2}
-    if item in numbers:
-        numbers.remove(item)
+    numbers.discard(item)
     return numbers
 
 
-def never() -> Never | int:
+def never() -> int:
     return 1
 
 
@@ -125,7 +123,7 @@ def handlers():
 
 
 def bits(number, obj):
-    return bin(number).count("1"), isinstance(obj, type(None)), isinstance(obj, (int, type(None)))
+    return (number).bit_count(), (obj is None), isinstance(obj, (int, type(None)))
 
 
 def outer():
@@ -136,7 +134,7 @@ def outer():
 
 
 def logs(number):
-    return math.log(number, math.e), math.log(number, 2), math.log(number, 10), math.log(number, 3)
+    return math.log(number), math.log2(number), math.log10(number), math.log(number, 3)
 
 
 def timestamps():
@@ -178,8 +176,7 @@ async def async_generator(items):
 
 
 def tuple_generator(pairs):
-    for first, second in pairs:
-        yield first, second
+    yield from pairs
 
 
 class Annotated:
@@ -194,10 +191,9 @@ def targets(frame, other):
     for index, _ in enumerate(frame):
         print(frame[index])
     gamma = {1, 2}
-    if other in gamma:
-        gamma.remove(other)
+    gamma.discard(other)
     gamma = gamma - {3}
-    return result, Never | other
+    return result, other
 
 
 def holder():

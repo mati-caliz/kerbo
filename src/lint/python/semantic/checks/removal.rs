@@ -60,7 +60,8 @@ fn entry_of(node: Node<'_>) -> Node<'_> {
         .unwrap_or(node)
 }
 
-fn removal(statement: Node<'_>, unused: &[Node<'_>], source: &[u8]) -> Option<Fix> {
+// El `remove_unused_imports` de ruff: saca esos nombres del import, o la sentencia entera.
+pub fn removal(statement: Node<'_>, unused: &[Node<'_>], source: &[u8]) -> Option<Fix> {
     let entries = fields(statement, NAME_FIELD);
     let kept: Vec<Node<'_>> = entries
         .iter()

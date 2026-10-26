@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::Visitor;
+use super::checks::import_removal;
 use super::model::{BindingKind, EXPLICIT_EXPORT, Site};
 use crate::fix::Fix;
 use crate::lint::python::Report;
@@ -170,25 +171,24 @@ impl<'tree> Imports<'tree> for Visitor<'tree> {
     // los nombres sin alias que no pisan otro binding del mismo alcance.
     fn unnecessary_builtin_imports(&mut self, statement: Node<'tree>, module: &str) {
         let scope = self.model.scope;
-        let unnecessary: Vec<&str> = fields(statement, NAME_FIELD)
+        let unnecessary: Vec<Node<'tree>> = fields(statement, NAME_FIELD)
             .into_iter()
             .filter(|name| name.kind() == DOTTED_NAME)
-            .map(|name| self.text(name))
-            .filter(|member| is_builtin_import(module, member))
-            .filter(|member| {
+            .filter(|name| is_builtin_import(module, self.text(*name)))
+            .filter(|name| {
                 self.model
                     .scope_of(scope)
                     .names
-                    .get(*member)
+                    .get(self.text(*name))
                     .is_some_and(|id| self.model.shadowed_in_scope(scope, *id).is_none())
             })
             .collect();
         if !unnecessary.is_empty() {
-            self.reports.push(Report::at(
-                PythonRule::UP029,
-                statement,
-                &unnecessary.join(MEMBER_SEPARATOR),
-            ));
+            let members: Vec<&str> = unnecessary.iter().map(|name| self.text(*name)).collect();
+            let fix = import_removal(statement, &unnecessary, self.source).map(Fix::marked_unsafe);
+            self.reports.push(
+                Report::at(PythonRule::UP029, statement, &members.join(MEMBER_SEPARATOR)).with_fix(fix),
+            );
         }
     }
 

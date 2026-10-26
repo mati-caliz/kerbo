@@ -5,8 +5,11 @@ use super::ast::{
     ASSIGNMENT, ATTRIBUTE, CLASS, COMMENT, FALSE, FUNCTION, IDENTIFIER, LAMBDA, LEFT_FIELD, MODULE,
     RIGHT_FIELD, SUBSCRIPT, TRUE, TUPLE, VALUE_FIELD, is_string, named, string_prefix, text, unparenthesized,
 };
+use super::codegen;
 use super::escapes::text_value;
+use super::fix_edits::{commented_unsafe, pad};
 use super::known_types::is_binding;
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const BODY_FIELD: &str = "body";
@@ -53,7 +56,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
             MODULE | FUNCTION | CLASS => found.extend(docstring(*node, source)),
             GLOBAL => found.extend(unassigned_globals(*node, source)),
             NAMED_EXPRESSION => found.extend(named_without_context(*node)),
-            EXCEPT => found.extend(redundant_tuple(*node)),
+            EXCEPT => found.extend(redundant_tuple(*node, source)),
             kind if JUMPS.contains(&kind) => found.extend(jump_in_finally(*node)),
             DICTIONARY_COMPREHENSION => found.extend(static_key(*node, source)),
             ASSIGNMENT => found.extend(invalid_all(*node, source)),
@@ -178,7 +181,7 @@ fn named_without_context(expression: Node<'_>) -> Option<Report> {
 }
 
 // B013: `except (ValueError,):`, una tupla de un solo elemento.
-fn redundant_tuple(handler: Node<'_>) -> Option<Report> {
+fn redundant_tuple(handler: Node<'_>, source: &[u8]) -> Option<Report> {
     let value = handler.child_by_field_name(VALUE_FIELD)?;
     let caught = if value.kind() == AS_PATTERN {
         *significant(value).first()?
@@ -189,7 +192,11 @@ fn redundant_tuple(handler: Node<'_>) -> Option<Report> {
     let [only] = parts_2.as_slice() else {
         return None;
     };
-    (caught.kind() == TUPLE && only.kind() != LIST_SPLAT).then(|| Report::at(PythonRule::B013, caught, ""))
+    (caught.kind() == TUPLE && only.kind() != LIST_SPLAT).then(|| {
+        let replacement = pad(codegen::unparse(*only, 0, source), caught, source);
+        let fix = commented_unsafe(Fix::replace(caught, &replacement, source), caught, source);
+        Report::at(PythonRule::B013, caught, "").with_fix(Some(fix))
+    })
 }
 
 // B012: `return`, `break` o `continue` adentro de un `finally`, que se traga la excepción.

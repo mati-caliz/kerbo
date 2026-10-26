@@ -310,6 +310,7 @@ pub fn literal_dict_fix(call: Node<'_>, argument: Node<'_>, source: &[u8]) -> Fi
 
 mod calls;
 mod collections;
+pub use collections::preferred_quote;
 
 pub use calls::{
     comprehension_argument_fix, comprehension_in_call_fix, dict_comprehension_fix, list_call_fix,

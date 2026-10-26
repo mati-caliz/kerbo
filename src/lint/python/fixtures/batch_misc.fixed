@@ -89,7 +89,7 @@ def redefinitions(item, path, error, handle, _ignored):
 
 
 def conversions(value, items):
-    first = int(1)
+    first = 1
     second = int(len(items))
     third = int(round(value))
     fourth = int(round(value, 2))

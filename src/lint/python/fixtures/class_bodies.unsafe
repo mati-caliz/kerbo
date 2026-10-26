@@ -18,9 +18,7 @@ def negations(x, y):
 class Fields:
     name = 1
     other = 2
-    name = 3
     count: int
-    count: int = 0
     total = 1
     total = total + 1
     a = b = 1

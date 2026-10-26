@@ -3,6 +3,9 @@ use tree_sitter::Node;
 use super::builtin_calls::{Arguments, arguments, keyword_value};
 use super::model::Model;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
+use super::tail_call_fixes::{
+    MATH_LOG_FUNCTION, bit_count_fix, get_logger_fix, identity_check_fix, log_base_fix,
+};
 use super::type_hints::Hints;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
@@ -29,7 +32,8 @@ const TYPE: &str = "type";
 const NONE_LITERAL: &str = "none";
 const MATH_LOG: &str = "math.log";
 const MATH_E: &str = "math.e";
-const REDUNDANT_BASES: [&str; 4] = ["2", "10", "2.0", "10.0"];
+const REDUNDANT_BASES: [(&str, &str); 4] =
+    [("2", "log2"), ("10", "log10"), ("2.0", "log2"), ("10.0", "log10")];
 const UTCFROMTIMESTAMP: &str = "datetime.datetime.utcfromtimestamp";
 const EXCEPTION: &str = "exception";
 const LOGGING: &str = "logging";
@@ -68,17 +72,27 @@ pub fn tail_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Ve
         reports.push(Report::at(PythonRule::PLC0132, call, ""));
     }
     if qualified == Some(LOGGER_CLASS) {
-        reports.push(Report::at(PythonRule::LOG001, function, ""));
+        let fix = get_logger_fix(model, function, source);
+        reports.push(Report::at(PythonRule::LOG001, function, "").with_fix(fix));
     }
     reports.extend(unnecessary_map(hints, call, function, &given));
-    if is_bit_count(hints, function, &given) {
-        reports.push(Report::at(PythonRule::FURB161, call, ""));
+    if let Some(counted) = bit_count_argument(hints, function, &given) {
+        reports.push(
+            Report::at(PythonRule::FURB161, call, "").with_fix(Some(bit_count_fix(call, counted, source))),
+        );
     }
-    if is_builtin_named(model, function, source, ISINSTANCE) && is_type_none_check(hints, &given) {
-        reports.push(Report::at(PythonRule::FURB168, call, ""));
+    if is_builtin_named(model, function, source, ISINSTANCE)
+        && is_type_none_check(hints, &given)
+        && let Some(checked) = given.positional.first()
+    {
+        let fix = identity_check_fix(call, *checked, source);
+        reports.push(Report::at(PythonRule::FURB168, call, "").with_fix(Some(fix)));
     }
-    if qualified == Some(MATH_LOG) && is_redundant_log_base(hints, &given) {
-        reports.push(Report::at(PythonRule::FURB163, call, ""));
+    if qualified == Some(MATH_LOG)
+        && let Some(replacement) = redundant_log_base(hints, &given)
+    {
+        let fix = log_base_fix(model, call, replacement, source);
+        reports.push(Report::at(PythonRule::FURB163, call, "").with_fix(fix));
     }
     if qualified == Some(PY_PATH) {
         reports.push(Report::at(PythonRule::PTH124, function, ""));
@@ -177,25 +191,29 @@ fn map_lambda_body(call: Node<'_>) -> Option<Node<'_>> {
         .filter(|_| simple)
 }
 
-// FURB161: `bin(x).count("1")`, que es `x.bit_count()`.
-fn is_bit_count(hints: Hints<'_, '_, '_>, function: Node<'_>, given: &Arguments<'_>) -> bool {
+// FURB161: `bin(x).count("1")`, que es `x.bit_count()`; devuelve el `x`.
+fn bit_count_argument<'tree>(
+    hints: Hints<'_, '_, '_>,
+    function: Node<'tree>,
+    given: &Arguments<'_>,
+) -> Option<Node<'tree>> {
     let counts_ones = function.kind() == ATTRIBUTE
         && function
             .child_by_field_name(ATTRIBUTE_FIELD)
             .is_some_and(|attribute| text(attribute, hints.source) == COUNT)
         && matches!(given.positional.as_slice(), [only] if is_string(*only)
             && text_value(*only, hints.source).as_deref() == Some(ONE));
-    counts_ones
-        && function
-            .child_by_field_name(OBJECT_FIELD)
-            .map(unparenthesized)
-            .is_some_and(|object| {
-                object.kind() == CALL
-                    && object
-                        .child_by_field_name(FUNCTION_FIELD)
-                        .is_some_and(|inner| is_builtin_named(hints.model, inner, hints.source, BIN))
-                    && arguments(object).positional.len() == 1
-            })
+    let object = function
+        .child_by_field_name(OBJECT_FIELD)
+        .map(unparenthesized)
+        .filter(|object| counts_ones && object.kind() == CALL)?;
+    let is_bin = object
+        .child_by_field_name(FUNCTION_FIELD)
+        .is_some_and(|inner| is_builtin_named(hints.model, inner, hints.source, BIN));
+    match arguments(object).positional.as_slice() {
+        [only] if is_bin => Some(*only),
+        _ => None,
+    }
 }
 
 // FURB168: `isinstance(x, type(None))`, que es `x is None`.
@@ -212,13 +230,19 @@ fn is_type_none_check(hints: Hints<'_, '_, '_>, given: &Arguments<'_>) -> bool {
 }
 
 // FURB163: `math.log(x, 2)`, `math.log(x, 10)` o `math.log(x, math.e)`, que tienen su propia función.
-fn is_redundant_log_base(hints: Hints<'_, '_, '_>, given: &Arguments<'_>) -> bool {
+// Devuelve la función de `math` que corresponde a la base.
+fn redundant_log_base(hints: Hints<'_, '_, '_>, given: &Arguments<'_>) -> Option<&'static str> {
     let [_, base] = given.positional.as_slice() else {
-        return false;
+        return None;
     };
     let base = unparenthesized(*base);
-    REDUNDANT_BASES.contains(&text(base, hints.source))
-        || qualified_name(hints.model, base, hints.source).as_deref() == Some(MATH_E)
+    if qualified_name(hints.model, base, hints.source).as_deref() == Some(MATH_E) {
+        return Some(MATH_LOG_FUNCTION);
+    }
+    REDUNDANT_BASES
+        .iter()
+        .find(|(written, _)| *written == text(base, hints.source))
+        .map(|(_, function)| *function)
 }
 
 // TRY401: la excepción del `except ... as e` pasada otra vez a `logger.exception`, que ya la registra.

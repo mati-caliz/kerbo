@@ -1,14 +1,16 @@
 use tree_sitter::Node;
 
 use super::builtin_calls::{Arguments, arguments, keyword_value};
+use super::call_fixes::builtin_available;
 use super::model::Model;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::type_hints::Hints;
+use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
-    ASSIGNMENT, ATTRIBUTE, ATTRIBUTE_FIELD, CLASS, COMMENT, FUNCTION, FUNCTION_FIELD, IDENTIFIER,
+    ASSIGNMENT, ATTRIBUTE, ATTRIBUTE_FIELD, CLASS, COMMENT, FALSE, FUNCTION, FUNCTION_FIELD, IDENTIFIER,
     KEYWORD_ARGUMENT, LAMBDA, LEFT_FIELD, NAME_FIELD, OBJECT_FIELD, RIGHT_FIELD, SUBSCRIPT, SUBSCRIPT_FIELD,
-    TUPLE, VALUE_FIELD, is_string, named, text, unparenthesized,
+    TRUE, TUPLE, VALUE_FIELD, is_string, named, text, unparenthesized,
 };
 use crate::lint::python::escapes::text_value;
 use crate::lint::python::methods::method_kind;
@@ -29,7 +31,14 @@ const PRINT: &str = "print";
 const SUPER: &str = "super";
 const SEP: &str = "sep";
 const NDIGITS: &str = "ndigits";
-const ALLOWED_SORT_KEYWORDS: [&str; 2] = ["key", "reverse"];
+const KEY: &str = "key";
+const REVERSE: &str = "reverse";
+const ALLOWED_SORT_KEYWORDS: [&str; 2] = [KEY, REVERSE];
+const FIRST_INDEX: &str = "0";
+const AUTOMATIC_BASE: &str = "0";
+const LAST_INDEX: &str = "-1";
+const MIN: &str = "min";
+const MAX: &str = "max";
 const PREFIXED_BASES: [&str; 3] = ["2", "8", "16"];
 const STRIPS: [&str; 3] = ["strip", "lstrip", "rstrip"];
 const NAMED_TUPLE: &str = "NamedTuple";
@@ -48,13 +57,13 @@ pub fn misc_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Ve
     let builtin = |name: &str| is_builtin_named(model, function, source, name);
     let mut reports = Vec::new();
     if builtin(SORTED) {
-        reports.extend(sorted_min_max(source, call, &given));
+        reports.extend(sorted_min_max(model, source, call, &given));
     }
     if builtin(ROUND) && is_unnecessary_round(&given, source) {
         reports.push(Report::at(PythonRule::RUF057, call, ""));
     }
     if builtin(INT) && is_prefix_stripped_int(&given, source) {
-        reports.push(Report::at(PythonRule::FURB166, call, ""));
+        reports.push(Report::at(PythonRule::FURB166, call, "").with_fix(prefixed_base_fix(&given, source)));
     }
     if builtin(PRINT) && is_unnecessary_print_argument(&given, source) {
         reports.push(Report::at(PythonRule::FURB105, call, ""));
@@ -90,7 +99,7 @@ fn is_integer(node: Node<'_>, source: &[u8], allow_negative: bool) -> bool {
 }
 
 // FURB192: `sorted(x)[0]` o `sorted(x)[-1]`, que son `min` y `max`. Avisa en el subíndice.
-fn sorted_min_max(source: &[u8], call: Node<'_>, given: &Arguments<'_>) -> Option<Report> {
+fn sorted_min_max(model: &Model<'_>, source: &[u8], call: Node<'_>, given: &Arguments<'_>) -> Option<Report> {
     let mut value = call;
     while let Some(parent) = value.parent().filter(|parent| parent.kind() == PARENTHESIZED) {
         value = parent;
@@ -118,8 +127,47 @@ fn sorted_min_max(source: &[u8], call: Node<'_>, given: &Arguments<'_>) -> Optio
         return None;
     };
     let written = text(*index, source).replace(' ', "");
-    (keywords_allowed && matches!(written.as_str(), "0" | "-1"))
-        .then(|| Report::at(PythonRule::FURB192, subscript, ""))
+    let is_first = written == FIRST_INDEX;
+    (keywords_allowed && (is_first || written == LAST_INDEX)).then(|| {
+        let fix = min_max_function(given, is_first, source)
+            .filter(|function| builtin_available(model, function))
+            .map(|function| min_max_fix(subscript, given, function, source));
+        Report::at(PythonRule::FURB192, subscript, "").with_fix(fix)
+    })
+}
+
+// `min(x)` o `max(x)` según el índice y `reverse`, con el `key` si lo hay; inseguro, como en ruff, y
+// sólo si el builtin no está tapado.
+fn min_max_fix(subscript: Node<'_>, given: &Arguments<'_>, function: &str, source: &[u8]) -> Fix {
+    let listed = given
+        .positional
+        .first()
+        .map_or("", |listed| text(*listed, source));
+    let replacement = keyword_named(given, KEY, source).map_or_else(
+        || format!("{function}({listed})"),
+        |key| format!("{function}({listed}, {})", text(key, source)),
+    );
+    Fix::replace(subscript, &replacement, source).marked_unsafe()
+}
+
+fn min_max_function(given: &Arguments<'_>, is_first: bool, source: &[u8]) -> Option<&'static str> {
+    let reversed = match keyword_named(given, REVERSE, source)
+        .and_then(|keyword| keyword.child_by_field_name(VALUE_FIELD))
+    {
+        None => false,
+        Some(value) if value.kind() == TRUE => true,
+        Some(value) if value.kind() == FALSE => false,
+        Some(_) => return None,
+    };
+    Some(if is_first == reversed { MAX } else { MIN })
+}
+
+fn keyword_named<'tree>(given: &Arguments<'tree>, wanted: &str, source: &[u8]) -> Option<Node<'tree>> {
+    given.keywords.iter().copied().find(|keyword| {
+        keyword
+            .child_by_field_name(NAME_FIELD)
+            .is_some_and(|name| text(name, source) == wanted)
+    })
 }
 
 // RUF057: `round` de un entero sin decimales negativos, que devuelve lo mismo.
@@ -132,6 +180,25 @@ fn is_unnecessary_round(given: &Arguments<'_>, source: &[u8]) -> bool {
         unparenthesized(digits).kind() == NONE_LITERAL || is_integer(digits, source, false)
     });
     given.positional.len() <= 2 && is_integer(number, source, true) && digits_ok
+}
+
+// El arreglo de FURB166: el string sin el subíndice y la base en `0`; inseguro, como en ruff.
+fn prefixed_base_fix(given: &Arguments<'_>, source: &[u8]) -> Option<Fix> {
+    let [value, base] = given.positional.as_slice() else {
+        return None;
+    };
+    let sliced = unparenthesized(*value);
+    let string = sliced.child_by_field_name(VALUE_FIELD)?;
+    let rewrite = |node: Node<'_>, replacement: &str| TextEdit {
+        start: TextPoint::from_point(node.start_position()),
+        end: TextPoint::from_point(node.end_position()),
+        replacement: replacement.to_owned(),
+    };
+    let edits = vec![
+        rewrite(sliced, text(string, source)),
+        rewrite(*base, AUTOMATIC_BASE),
+    ];
+    Some(Fix::from_edits(source, edits).marked_unsafe())
 }
 
 // FURB166: `int(s[2:], 16)` (o base 2 u 8), que es `int(s, 0)`.

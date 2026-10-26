@@ -3,10 +3,12 @@ use tree_sitter::Node;
 use super::Report;
 use super::ast::{
     ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, CALL, COMMENT, CONCATENATED_STRING, FALSE, FUNCTION_FIELD,
-    IDENTIFIER, LIST, OBJECT_FIELD, STRING, TRUE, TUPLE, is_bytes, is_f_string, is_identifier, named,
-    string_prefix, text, unparenthesized,
+    IDENTIFIER, KEYWORD_ARGUMENT, LIST, NAME_FIELD, OBJECT_FIELD, STRING, TRUE, TUPLE, VALUE_FIELD, is_bytes,
+    is_f_string, is_identifier, named, string_prefix, text, unparenthesized,
 };
 use super::escapes::text_value;
+use super::fix_edits::{Parentheses, commented_unsafe, remove_argument};
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const JOIN: &str = "join";
@@ -28,11 +30,15 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
         if is_static_join(*call, source) {
             reports.push(Report::at(PythonRule::FLY002, *call, ""));
         }
+        let duplicates = duplicate_keywords(*call, source);
         reports.extend(
             arguments(*call)
                 .into_iter()
                 .filter(|argument| is_unnecessary_dict_kwargs(*argument, source))
-                .map(|argument| Report::at(PythonRule::PIE804, argument, "")),
+                .map(|argument| {
+                    let fix = dict_kwargs_fix(*call, argument, &duplicates, source);
+                    Report::at(PythonRule::PIE804, argument, "").with_fix(fix)
+                }),
         );
     }
     reports
@@ -161,6 +167,86 @@ fn is_simple_callee(callee: Node<'_>) -> bool {
             .is_some_and(is_simple_callee),
         _ => false,
     }
+}
+
+// El arreglo de PIE804: `**{**x}` pasa a `**x`, `**{}` se borra y `**{"a": 1}` pasa a `a=1` si ningún
+// nombre se repite en la llamada (inseguro si el diccionario tiene comentarios).
+fn dict_kwargs_fix(call: Node<'_>, splat: Node<'_>, duplicates: &[String], source: &[u8]) -> Option<Fix> {
+    let dictionary = named(splat).first().map(|value| unparenthesized(*value))?;
+    let items: Vec<Node<'_>> = named(dictionary)
+        .into_iter()
+        .filter(|item| item.kind() != COMMENT)
+        .collect();
+    if let [only] = items.as_slice()
+        && only.kind() == DICTIONARY_SPLAT
+    {
+        let value = named(*only).first().map_or("", |value| text(*value, source));
+        return Some(Fix::replace(splat, &format!("**{value}"), source));
+    }
+    if items.is_empty() {
+        let arguments = call.child_by_field_name(ARGUMENTS_FIELD)?;
+        return Some(remove_argument(splat, arguments, Parentheses::Preserve, source));
+    }
+    let keywords: Vec<(String, &str)> = items
+        .iter()
+        .filter_map(|pair| {
+            let key = pair
+                .child_by_field_name(KEY_FIELD)
+                .and_then(|key| plain_string(key, source))?;
+            let value = pair.child_by_field_name(VALUE_FIELD)?;
+            Some((key, text(value, source)))
+        })
+        .collect();
+    if keywords.iter().any(|(key, _)| duplicates.contains(key)) {
+        return None;
+    }
+    let replacement = keywords
+        .iter()
+        .map(|(key, value)| format!("{key}={value}"))
+        .collect::<Vec<String>>()
+        .join(", ");
+    Some(commented_unsafe(
+        Fix::replace(splat, &replacement, source),
+        dictionary,
+        source,
+    ))
+}
+
+// Los nombres que aparecen más de una vez entre los argumentos con nombre y las claves de los `**{...}`.
+fn duplicate_keywords(call: Node<'_>, source: &[u8]) -> Vec<String> {
+    let mut seen: Vec<String> = Vec::new();
+    let mut duplicates = Vec::new();
+    for argument in arguments(call) {
+        let names: Vec<String> = if argument.kind() == KEYWORD_ARGUMENT {
+            argument
+                .child_by_field_name(NAME_FIELD)
+                .map(|name| text(name, source).to_owned())
+                .into_iter()
+                .collect()
+        } else if argument.kind() == DICTIONARY_SPLAT {
+            named(argument)
+                .first()
+                .map(|value| unparenthesized(*value))
+                .filter(|value| value.kind() == DICTIONARY)
+                .map(named)
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|pair| pair.child_by_field_name(KEY_FIELD))
+                .filter_map(|key| plain_string(key, source))
+                .filter(|key| is_identifier(key))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        for name in names {
+            if seen.contains(&name) {
+                duplicates.push(name);
+            } else {
+                seen.push(name);
+            }
+        }
+    }
+    duplicates
 }
 
 fn is_unnecessary_dict_kwargs(argument: Node<'_>, source: &[u8]) -> bool {

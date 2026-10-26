@@ -1,5 +1,4 @@
 import asyncio
-import builtins
 import os
 import subprocess
 import sys
@@ -13,14 +12,9 @@ import trio
 
 if TYPE_CHECKING:
     pass
-
-if TYPE_CHECKING:
-    pass
 else:
     pass
 
-if TYPE_CHECKING:
-    pass
 
 
 def remove_affixes(filename: str, text: str, other: str) -> str:
@@ -99,7 +93,7 @@ def dict_lookups(key, default):
 
 
 def file_writes(lines, pairs):
-    with builtins.open("file", "w") as handle:
+    with open("file", "w") as handle:
         for line in lines:
             handle.write(line)
         for line in lines:
@@ -120,25 +114,25 @@ def file_writes(lines, pairs):
         for kept in lines:
             handle.write(kept)
         print(kept)
-    stream = builtins.open("file")
+    stream = open("file")
     for line in lines:
         stream.write(line)
     not_a_file = object()
     for line in lines:
         not_a_file.write(line)
-    for line in stream.readlines():
+    for line in stream:
         pass
-    for line in builtins.open("x").readlines():
+    for line in open("x"):
         pass
     for line in stream.readlines(10):
         pass
     for line in not_a_file.readlines():
         pass
-    return [line for line in stream.readlines()]
+    return [line for line in stream]
 
 
 async def async_writes(lines):
-    with builtins.open("file", "w") as handle:
+    with open("file", "w") as handle:
         async for line in lines:
             handle.write(line)
 
@@ -199,7 +193,7 @@ Immutable = NewType("Immutable", int)
 @dataclass
 class Settings:
     first: list = simple_list()
-    second: int = int()
+    second: int = 0
     third: tuple = simple_list()
     fourth: ClassVar[list] = simple_list()
     fifth: list = field(default_factory=list)
@@ -233,9 +227,9 @@ async def timeouts():
         await asyncio.sleep(1)
     with trio.move_on_after(1):
         print(1)
-    with trio.fail_after(1), builtins.open("x"):
+    with trio.fail_after(1), open("x"):
         print(1)
-    async with asyncio.timeout(1), builtins.open("x"):
+    async with asyncio.timeout(1), open("x"):
         print(1)
     with trio.CancelScope():
         yield 1

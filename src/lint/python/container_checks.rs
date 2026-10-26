@@ -8,6 +8,7 @@ use super::ast::{
 };
 use super::branches::equivalent;
 use super::escapes::text_value;
+use super::statement_removal::delete_statement;
 use crate::rules::PythonRule;
 
 const IF: &str = "if_statement";
@@ -323,7 +324,9 @@ fn empty_type_checking(statement: Node<'_>, source: &[u8]) -> Option<Report> {
     }
     let body = significant(statement.child_by_field_name(CONSEQUENCE_FIELD)?);
     match body.as_slice() {
-        [only] if only.kind() == PASS => Some(Report::at(PythonRule::TC005, *only, "")),
+        [only] if only.kind() == PASS => {
+            Some(Report::at(PythonRule::TC005, *only, "").with_fix(Some(delete_statement(statement, source))))
+        }
         _ => None,
     }
 }

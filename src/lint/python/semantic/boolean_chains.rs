@@ -3,11 +3,13 @@ use tree_sitter::Node;
 use super::effects::contains_effect;
 use super::model::Model;
 use super::qualified::is_builtin_named;
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     COMMENT, LEFT_FIELD, RIGHT_FIELD, SUBSCRIPT, VALUE_FIELD, named, text, unparenthesized,
 };
 use crate::lint::python::branches::equivalent;
+use crate::lint::python::fix_edits::commented_unsafe;
 use crate::rules::PythonRule;
 
 const BOOLEAN_OPERATOR: &str = "boolean_operator";
@@ -31,7 +33,8 @@ pub fn boolean_chain_reports(model: &Model<'_>, source: &[u8], operation: Node<'
     if let [left, right] = operands.as_slice()
         && is_unnecessary_key_check(model, source, *left, *right)
     {
-        reports.push(Report::at(PythonRule::RUF019, operation, ""));
+        let fix = key_check_fix(operation, *right, source);
+        reports.push(Report::at(PythonRule::RUF019, operation, "").with_fix(fix));
     }
     for pair in operands.windows(2) {
         if let [left, right] = pair
@@ -79,6 +82,19 @@ fn comparison_parts<'tree>(
         .map(|operator| text(operator, source))
         .collect();
     Some((operands, operators))
+}
+
+// El arreglo de RUF019: `d.get(k)` con el diccionario y la clave del subíndice, tal como están
+// escritos; inseguro si hay comentarios.
+fn key_check_fix(operation: Node<'_>, subscript: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let dictionary = subscript.child_by_field_name(VALUE_FIELD)?;
+    let key = named(subscript).into_iter().nth(1)?;
+    let replacement = format!("{}.get({})", text(dictionary, source), text(key, source));
+    Some(commented_unsafe(
+        Fix::replace(operation, &replacement, source),
+        operation,
+        source,
+    ))
 }
 
 fn is_unnecessary_key_check(model: &Model<'_>, source: &[u8], left: Node<'_>, right: Node<'_>) -> bool {

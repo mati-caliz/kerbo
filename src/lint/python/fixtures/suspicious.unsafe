@@ -78,11 +78,11 @@ class Holder:
 
 
 def exceptions():
-    ValueError("bad")
-    Exception()
-    ExceptionGroup("x", [])
-    OSError()
-    (KeyError("k"))
+    raise ValueError("bad")
+    raise Exception()
+    raise ExceptionGroup("x", [])
+    raise OSError()
+    raise (KeyError("k"))
     print(ValueError())
     raise ValueError()
 

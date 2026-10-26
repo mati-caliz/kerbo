@@ -1719,8 +1719,24 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Pendientes de esa tanda: los efectos de F504/F522/F523 toman cualquier nombre como builtin (ruff
     mira si está tapado); E401 detrás de algo que no es `;` (`if x: import a, b`) no se arregla, y
     ruff lo arregla, ve el error de sintaxis y revierte el archivo.
+  - Tanda 10 (37 arreglos, idénticos a ruff en todos los fixtures): UP018 (el literal o el valor cero,
+    con los paréntesis de la precedencia de ruff), RUF010 (`{x!s}`, reescribiendo la parte del
+    f-string como libcst), PIE804, PIE800 (sobre tokens, como ruff), PERF102, PIE810 y SIM101 (las
+    llamadas juntas), TRY201, PLW0133, SIM210, SIM211, SIM222, SIM223, B004, UP021, UP022, B013,
+    LOG001, FURB129, FURB132, FURB161, FURB163, FURB166, FURB168, FURB192, PLR1733 y PLR1736 (con los
+    no-op de ruff sobre las variables del loop), RUF019, RUF051, RUF020 (`Never | T`), UP028, UP029,
+    PIE794, PYI016, PYI018, PT014 y TC005. `scripts/parity/fix-dump.sh` muestra todas las diferencias
+    con ruff de una vez y deja en `target/fix-dump/*.passes` qué arreglo se aplicó en cada vuelta.
+    `loop_lookups` pasó antes que `literal_checks` en el orden de los avisos: ruff genera PLR1733
+    antes que PERF102 y el empate entre los dos se decide por ese orden.
+  - Pendientes de esa tanda: F601 y F602 no tienen arreglo (no hay casos en los fixtures para
+    medirlo); RUF020 en `Union[...]` y PYI016 con un `Optional` adentro no se arreglan; SIM210 no
+    mira si `bool` está tapado; UP028 no mira `global`/`nonlocal`; FURB192 avisa aunque `reverse` no
+    sea un literal (ruff no); SIM222/SIM223 cortan en el primer par sin decidir y ruff sigue mirando;
+    RUF010 no le pone paréntesis a un generador sin paréntesis; RUF019 no distingue los efectos
+    "quizás" de ruff (los trata como seguros).
   - Lo que falta de arreglos (medido el 2026-10-26 con `../kerbo-parity/scripts/pending_by_frequency.txt`):
-    98 reglas que aparecen en el corpus (unos 24.000 arreglos, 16.000 de ellos UP031 y UP032) y 38
+    61 reglas que aparecen en el corpus (unos 23.000 arreglos, 16.000 de ellos UP031 y UP032) y 38
     que no aparecen. Las próximas por tema: F811, F601, F602, E731 y PLW0120; después UP031/UP032
     (pasar `%` y `.format` a f-string), ISC004, UP035, SIM117, UP030, RUF015, RUF022/RUF023.
     C417 (`map(lambda ...)`) queda para la tanda de libcst más pesada.

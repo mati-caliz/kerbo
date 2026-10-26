@@ -2,10 +2,14 @@ use tree_sitter::Node;
 
 use super::Report;
 use super::ast::{
-    ALIAS_FIELD, BLOCK, CLASS, COMMENT, DECORATED, FALSE, FUNCTION, IDENTIFIER, NAME_FIELD, TRUE,
+    ALIAS_FIELD, BLOCK, CLASS, COMMENT, COMPARISON, DECORATED, FALSE, FUNCTION, IDENTIFIER, NAME_FIELD, TRUE,
     VALUE_FIELD, named, text, unparenthesized,
 };
+use super::codegen;
+use crate::fix::Fix;
 use crate::rules::PythonRule;
+
+const BOOL: &str = "bool";
 
 const TRY: &str = "try_statement";
 const RAISE: &str = "raise_statement";
@@ -23,7 +27,7 @@ pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
         .flat_map(|node| match node.kind() {
             TRY => useless_try_except(*node, source),
             RAISE => misplaced_bare_raise(*node, source).into_iter().collect(),
-            CONDITIONAL => true_false_ternary(*node).into_iter().collect(),
+            CONDITIONAL => true_false_ternary(*node, source).into_iter().collect(),
             _ => Vec::new(),
         })
         .collect()
@@ -124,14 +128,21 @@ fn is_in_exit_method(raise: Node<'_>, source: &[u8]) -> bool {
 
 // SIM210: `True if condición else False`, que es `bool(condición)` (o la condición, si ya es una
 // comparación).
-fn true_false_ternary(expression: Node<'_>) -> Option<Report> {
+fn true_false_ternary(expression: Node<'_>, source: &[u8]) -> Option<Report> {
     let parts: Vec<Node<'_>> = named(expression)
         .into_iter()
         .filter(|child| child.kind() != COMMENT)
         .collect();
-    let [body, _, alternative] = parts.as_slice() else {
+    let [body, test, alternative] = parts.as_slice() else {
         return None;
     };
-    (unparenthesized(*body).kind() == TRUE && unparenthesized(*alternative).kind() == FALSE)
-        .then(|| Report::at(PythonRule::SIM210, expression, ""))
+    (unparenthesized(*body).kind() == TRUE && unparenthesized(*alternative).kind() == FALSE).then(|| {
+        let replacement = if unparenthesized(*test).kind() == COMPARISON {
+            text(*test, source).to_owned()
+        } else {
+            format!("{BOOL}({})", codegen::unparse(*test, codegen::COMMA, source))
+        };
+        let fix = Fix::replace(expression, &replacement, source).marked_unsafe();
+        Report::at(PythonRule::SIM210, expression, "").with_fix(Some(fix))
+    })
 }

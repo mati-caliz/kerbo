@@ -75,9 +75,9 @@ def joins(first, second, items):
 
 
 def keywords(function, options):
-    function(**{"a": 1, "b": 2})
-    function(**{})
-    function(**{**options})
+    function(a=1, b=2)
+    function()
+    function(**options)
     function(**{"not valid": 1})
     function(**{"class": 1})
     function(**options)
@@ -85,11 +85,11 @@ def keywords(function, options):
 
 def conversions(value, values):
     return [
-        f"{str(value)} {repr(value)} {ascii(value)}",
+        f"{value!s} {value!r} {value!a}",
         f"{str(value)!r}",
-        f"{str(object=value)}",
+        f"{value!s}",
         f"{repr(object=value)}",
         f"{str(value)=}",
-        f"{str(*values)} {repr(value)}",
+        f"{str(*values)} {value!r}",
         f"{str(value, 'utf-8')}",
     ]

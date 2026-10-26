@@ -65,6 +65,7 @@ mod stub_conditions;
 mod stub_signatures;
 mod supers;
 mod suspicious_calls;
+mod tail_call_fixes;
 mod tail_calls;
 mod targets;
 mod timeouts;
@@ -72,6 +73,7 @@ mod type_hints;
 mod type_names;
 mod type_unions;
 mod typecheck;
+mod union_duplicates;
 mod version_checks;
 
 use crate::lint::python::semantic::annotations::Annotations;

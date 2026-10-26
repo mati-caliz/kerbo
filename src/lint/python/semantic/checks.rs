@@ -1,6 +1,7 @@
 mod assert_bindings;
 mod redefinitions;
 mod removal;
+pub use removal::removal as import_removal;
 mod type_checking_imports;
 mod unused_variables;
 

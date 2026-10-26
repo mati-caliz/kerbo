@@ -11,11 +11,13 @@ const MAX_FIX_PASSES: usize = 10;
 const PACKAGE_INIT: &str = "/__init__";
 const PACKAGE_INIT_STEM: &str = "_init";
 const DUMP_VARIABLE: &str = "KERBO_FIX_DUMP";
+const PASS_SEPARATOR: &str = "\n";
 
 // Lo que hace `ruff check --fix`: aplica los arreglos que no se pisan, vuelve a analizar y repite.
-fn fixed_like_ruff(path: &str, source: &str, unsafe_fixes: bool) -> String {
+fn fixed_like_ruff(path: &str, source: &str, unsafe_fixes: bool) -> (String, String) {
     let mut text = source.to_owned();
-    for _ in 0..MAX_FIX_PASSES {
+    let mut passes: Vec<String> = Vec::new();
+    for pass in 0..MAX_FIX_PASSES {
         let found = lints_at(path, &text, &strict());
         let chosen = compatible(
             found
@@ -26,12 +28,23 @@ fn fixed_like_ruff(path: &str, source: &str, unsafe_fixes: bool) -> String {
         if chosen.is_empty() {
             break;
         }
+        passes.extend(
+            found
+                .iter()
+                .filter(|finding| {
+                    finding
+                        .fix
+                        .as_ref()
+                        .is_some_and(|fix| chosen.iter().any(|picked| std::ptr::eq(*picked, fix)))
+                })
+                .map(|finding| format!("{pass} {}:{} {:?}", finding.line, finding.column, finding.kind)),
+        );
         let Some(next) = apply(&edits_of(&chosen), &text) else {
             break;
         };
         text = next;
     }
-    text
+    (text, passes.join(PASS_SEPARATOR))
 }
 
 // La salida de ruff al lado del fixture; si no está, ruff no cambió nada.
@@ -74,8 +87,9 @@ fn fixes_exactly_what_ruff_fixes_with_its_default_rules() {
             [(SAFE_SUFFIX, false), (UNSAFE_SUFFIX, true)]
                 .into_iter()
                 .filter_map(move |(suffix, unsafe_fixes)| {
-                    let fixed = fixed_like_ruff(path, source, unsafe_fixes);
+                    let (fixed, passes) = fixed_like_ruff(path, source, unsafe_fixes);
                     dump(path, suffix, &fixed);
+                    dump(path, &format!("{suffix}.passes"), &passes);
                     first_difference(&fixed, &golden(path, suffix, source))
                         .map(|difference| format!("{path} ({suffix}): {difference}"))
                 })

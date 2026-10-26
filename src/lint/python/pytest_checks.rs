@@ -6,7 +6,11 @@ use super::ast::{
     unparenthesized,
 };
 use super::branches::equivalent;
+use super::fix_edits::{delete_between, has_comment_within};
+use crate::fix::Fix;
 use crate::rules::PythonRule;
+
+const COMMA: &str = ",";
 
 const BODY_FIELD: &str = "body";
 const ARGUMENTS_FIELD: &str = "arguments";
@@ -124,9 +128,33 @@ fn duplicate_parametrize_cases(definition: Node<'_>, source: &[u8]) -> Vec<Repor
                 .take(index)
                 .any(|earlier| equivalent(*earlier, *case, source))
             {
-                found.push(Report::at(PythonRule::PT014, *case, ""));
+                let fix = index
+                    .checked_sub(1)
+                    .and_then(|previous| cases.get(previous))
+                    .and_then(|previous| duplicate_case_fix(values, *previous, *case, source));
+                found.push(Report::at(PythonRule::PT014, *case, "").with_fix(fix));
             }
         }
     }
     found
+}
+
+// El arreglo de PT014: desde la coma que sigue al caso anterior hasta la que sigue al repetido (o el
+// cierre de la lista); inseguro, y sin arreglo si hay un comentario en el medio.
+fn duplicate_case_fix(values: Node<'_>, previous: Node<'_>, case: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let closing = values
+        .child(values.child_count().saturating_sub(1))
+        .map_or_else(|| values.end_byte(), |closing| closing.start_byte());
+    let comma_after = |element: Node<'_>| {
+        element
+            .next_sibling()
+            .filter(|sibling| sibling.kind() == COMMA)
+            .map_or(closing, |comma| comma.start_byte())
+    };
+    let start = comma_after(previous);
+    let end = comma_after(case);
+    if has_comment_within(values, start, end) {
+        return None;
+    }
+    Some(delete_between(start, end, source).marked_unsafe())
 }

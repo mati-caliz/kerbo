@@ -8,7 +8,7 @@ use super::comprehension_fixes::{collection_call_fix, literal_set_fix};
 use super::conversions::conversion_reports;
 use super::if_blocks::dict_get_expression;
 use super::isinstance_calls::{BOOLEAN_OPERATOR, duplicate_isinstance_reports};
-use super::literals::is_native_literal_call;
+use super::literals::{is_native_literal_call, native_literal_fix};
 use super::model::{BindingKind, Model, ScopeKind};
 use super::pep::is_pep585_generic;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
@@ -241,7 +241,9 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
         if let Some(function) = function
             && is_native_literal_call(&self.model, self.source, function, arguments)
         {
-            self.reports.push(Report::at(PythonRule::UP018, call, ""));
+            let fix = native_literal_fix(call, &self.model, self.source);
+            self.reports
+                .push(Report::at(PythonRule::UP018, call, "").with_fix(fix));
         }
         if COMPREHENSIONS.contains(&arguments.kind()) {
             self.comprehension(arguments);

@@ -96,8 +96,8 @@ def keywords(**kwargs):
 keywords(a=1, **{"a": 2})
 keywords(**{"a": 1, "a": 2})
 keywords(**{"a": 1}, **{"a": 2})
-keywords(a=1, **{"b": 2, "a": 3}, **{"c": 4})
-keywords(**{"a": 1}, b=2)
+keywords(a=1, **{"b": 2, "a": 3}, c=4)
+keywords(a=1, b=2)
 keywords(**{1: 1, 1: 2})
 
 

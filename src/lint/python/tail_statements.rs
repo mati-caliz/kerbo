@@ -7,7 +7,9 @@ use super::ast::{
     named, text, unparenthesized,
 };
 use super::branches::equivalent;
+use super::codegen;
 use super::known_types::{Known, is_binding, is_known};
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const IF: &str = "if_statement";
@@ -115,6 +117,23 @@ fn ternary_min_max(conditional: Node<'_>, source: &[u8]) -> Option<Report> {
 
 // FURB132: `if x in s: s.remove(x)` sobre un conjunto, que es `s.discard(x)`.
 fn check_and_remove(statement: Node<'_>, source: &[u8]) -> Option<Report> {
+    let report = removed_from_set(statement, source)?;
+    let condition = unparenthesized(statement.child_by_field_name(CONDITION_FIELD)?);
+    let operands = significant(condition);
+    let [element, set] = operands.as_slice() else {
+        return None;
+    };
+    let replacement = format!(
+        "{}.discard({})",
+        text(*set, source),
+        codegen::unparse(*element, codegen::COMMA, source)
+    );
+    Some(report.with_fix(Some(
+        Fix::replace(statement, &replacement, source).marked_unsafe(),
+    )))
+}
+
+fn removed_from_set(statement: Node<'_>, source: &[u8]) -> Option<Report> {
     if statement.child_by_field_name(ALTERNATIVE_FIELD).is_some() {
         return None;
     }

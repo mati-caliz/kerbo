@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import sys
 import typing as typing_alias
-from typing import TYPE_CHECKING, Literal, TypeAlias, overload
+from typing import Literal, TypeAlias, overload
 
 import one
 import package.module.leaf
@@ -19,8 +19,6 @@ from grouped import (
 )
 from star import *
 
-if TYPE_CHECKING:
-    pass
 try:
     import json
 except ImportError:

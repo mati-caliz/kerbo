@@ -40,9 +40,9 @@ def dictionaries(mapping):
         print(value)
     for key, value in mapping.items():
         print(key)
-    for key, _ in mapping.items():
+    for key in mapping:
         print(key)
-    for _, value in mapping.items():
+    for value in mapping.values():
         print(value)
     for key, value in mapping.items():
         print(key, value)
@@ -73,13 +73,13 @@ def casts(items):
 def booleans(x, y):
     return (
         x or True,
-        x or True or y,
+        x or True,
         x and False,
-        y and False and x,
+        y and False,
         bool(x),
         bool(y),
-        False if x else True,
-        True if x else False,
+        not x,
+        bool(x),
         x or [1],
         x or "",
         "value" if x else "value",
@@ -115,7 +115,7 @@ def asserts(value):
 
 
 def spreads(base):
-    return {**base, **{"a": 1}}, {**base, **{}}, {**{"b": 2}}
+    return {**base, "a": 1}, {**base, }, {"b": 2}
 
 
 class Methods:
@@ -203,7 +203,7 @@ class Implicit:
 
 
 def more(cache, environment, values):
-    for key, (send, close) in cache.items():
+    for key in cache:
         print(key)
     try:
         pass
@@ -218,7 +218,7 @@ def more(cache, environment, values):
 
 
 def nested_scope(mapping):
-    for path, args in mapping.items():
+    for args in mapping.values():
         print(args)
 
     def inner(path):

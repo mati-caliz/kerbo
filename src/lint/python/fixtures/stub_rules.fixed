@@ -89,7 +89,7 @@ __all__: list[str]
 __all__ = ["T"]
 
 default_int: int = 1
-default_call: int = int()
+default_call: int = 0
 default_str = "text"
 default_list = [1, 2]
 default_big: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]

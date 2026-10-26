@@ -115,7 +115,7 @@ def asserts(value):
 
 
 def spreads(base):
-    return {**base, **{"a": 1}}, {**base, **{}}, {**{"b": 2}}
+    return {**base, "a": 1}, {**base, }, {"b": 2}
 
 
 class Methods:

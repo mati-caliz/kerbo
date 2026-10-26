@@ -6,7 +6,9 @@ use super::ast::{
     TUPLE, VALUE_FIELD, named, text, unparenthesized,
 };
 use super::branches::equivalent;
+use super::fix_edits::commented_unsafe;
 use super::known_types::{Known, is_known};
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const BODY_FIELD: &str = "body";
@@ -163,7 +165,11 @@ fn key_in_dict_del(statement: Node<'_>, source: &[u8]) -> Option<Report> {
             .child_by_field_name(VALUE_FIELD)
             .is_some_and(|value| equivalent(value, *dictionary, source))
         && matches!(significant(*target).as_slice(), [_, index] if equivalent(*index, *key, source));
-    deletes.then(|| Report::at(PythonRule::RUF051, *delete, ""))
+    deletes.then(|| {
+        let replacement = format!("{}.pop({}, None)", text(*dictionary, source), text(*key, source));
+        let fix = commented_unsafe(Fix::replace(statement, &replacement, source), statement, source);
+        Report::at(PythonRule::RUF051, *delete, "").with_fix(Some(fix))
+    })
 }
 // PERF402: `for x in items: result.append(x)`, que es `result = list(items)`. Avisa en la llamada.
 fn manual_list_copy(statement: Node<'_>, source: &[u8]) -> Option<Report> {

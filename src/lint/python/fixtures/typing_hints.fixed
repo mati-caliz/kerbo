@@ -16,7 +16,6 @@ from typing import (
     TypeAlias,
     TypeVar,
     TypeVarTuple,
-    Union,
 )
 
 _T = TypeVar("_T")
@@ -40,9 +39,9 @@ duplicate_literal: Literal[1, 2, 1, "a", "a"]
 nested_literal: Literal[1, Literal[1]]
 literal_union: Literal[1] | Literal[2]
 literal_union_three: Literal["a"] | Literal["b"] | int
-duplicate_union: int | str | int
-duplicate_typing_union: int | str | int
-nested_duplicate: int | int | str
+duplicate_union: int | str
+duplicate_typing_union: int | str
+nested_duplicate: int | str
 type_union: type[int] | type[str]
 builtin_type_union: builtins.type[int] | builtins.type[str]
 final_literal: Final[Literal[1]] = 1
@@ -164,7 +163,7 @@ class Color(enum.Enum):
     RED = 1
 
 
-runtime_union = print(Union[int, int])
+runtime_union = print(int)
 camelAlias: TypeAlias = int
 final_member: Final[Literal[Color.RED]] = Color.RED
 final_negative: Final[Literal[-1]] = -1

@@ -7,6 +7,7 @@ use super::ast::{
 };
 use super::known_types::{Known, is_binding, is_known};
 use super::loop_variable_reads::is_load;
+use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::rules::PythonRule;
 
 const FOR: &str = "for_statement";
@@ -33,6 +34,7 @@ const TARGET_CONTAINERS: [&str; 5] = [
     "parenthesized_expression",
 ];
 const BLOCK: &str = "block";
+const EXPRESSION_LIST: &str = "expression_list";
 const DUMMY_PREFIX: char = '_';
 
 // Chequeos sobre loops for: UP028, PLR1733, PLR1736 y PERF101.
@@ -94,7 +96,18 @@ fn yield_in_for_loop(statement: Node<'_>, source: &[u8]) -> Option<Report> {
             pending.extend(named(node));
         }
     }
-    (!is_from).then(|| Report::at(PythonRule::UP028, statement, ""))
+    (!is_from).then(|| {
+        let fix = statement.child_by_field_name(RIGHT_FIELD).map(|iterable| {
+            let written = text(iterable, source);
+            let replacement = if iterable.kind() == EXPRESSION_LIST {
+                format!("yield from ({written})")
+            } else {
+                format!("yield from {written}")
+            };
+            Fix::replace(statement, &replacement, source).marked_unsafe()
+        });
+        Report::at(PythonRule::UP028, statement, "").with_fix(fix)
+    })
 }
 // `is_same_expr` de ruff: el mismo nombre, o tuplas con los mismos nombres en el mismo orden.
 fn same_names<'source>(
@@ -173,11 +186,29 @@ fn unnecessary_index_lookups(statement: Node<'_>, source: &[u8]) -> Vec<Report> 
             && matches!(significant(node).as_slice(), [_, key] if key.kind() == IDENTIFIER && text(*key, source) == text(*index, source))
             && is_load_subscript(node);
         if looks_up {
-            found.push(Report::at(rule, node, ""));
+            let fix = lookup_fix(node, *index, *value, source);
+            found.push(Report::at(rule, node, "").with_fix(Some(fix)));
         }
     }
     found
 }
+// Como ruff: el subíndice pasa a la variable del loop, con un no-op sobre las dos variables para que
+// otro arreglo que las cambie no vaya en la misma vuelta.
+fn lookup_fix(subscript: Node<'_>, index: Node<'_>, value: Node<'_>, source: &[u8]) -> Fix {
+    let rewrite = |node: Node<'_>, replacement: &str| TextEdit {
+        start: TextPoint::from_point(node.start_position()),
+        end: TextPoint::from_point(node.end_position()),
+        replacement: replacement.to_owned(),
+    };
+    let name = text(value, source);
+    let edits = vec![
+        rewrite(subscript, name),
+        rewrite(index, text(index, source)),
+        rewrite(value, name),
+    ];
+    Fix::from_edits(source, edits)
+}
+
 fn indexed_sequence<'tree>(iterable: Node<'tree>, source: &[u8]) -> Option<(PythonRule, Node<'tree>)> {
     if iterable.kind() != CALL {
         return None;
