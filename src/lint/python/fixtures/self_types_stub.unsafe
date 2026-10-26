@@ -1,3 +1,4 @@
+import typing
 from types import TracebackType
 from typing import TypeVar
 
@@ -8,10 +9,10 @@ class Shape:
     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ...
     def copy(self: _S) -> _S: ...
 
-field: type[int] | type[float] | str
-union: type[int] | type[float]
-nested: type[int] | (type[str] | type[bytes])
-mixed: type[int] | (int | type[str])
+field: type[int | float] | str
+union: type[int | float]
+nested: type[int | str | bytes]
+mixed: type[int | str] | int
 tuple_type: type[int, str] | type[str]
-def function(kind: type[int] | type[str]) -> type[int] | type[str]: ...
-alias = type[int] | type[str]
+def function(kind: type[int | str]) -> type[int | str]: ...
+alias: typing.TypeAlias = type[int] | type[str]

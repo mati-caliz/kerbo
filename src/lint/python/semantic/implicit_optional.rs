@@ -5,11 +5,13 @@ use super::annotations::Annotations;
 use super::annotations::embedded::{Placement, wrap};
 use super::model::Model;
 use super::qualified::{is_typing, qualified_name};
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     CONCATENATED_STRING, PARENTHESIZED, STRING, SUBSCRIPT, SUBSCRIPT_FIELD, TUPLE, TYPE_FIELD, VALUE_FIELD,
     fields, is_bytes, is_f_string, named, text, unparenthesized,
 };
+use crate::lint::python::codegen;
 use crate::lint::python::escapes::text_value;
 use crate::lint::python::imports::stdlib::STANDARD_LIBRARY;
 use crate::rules::PythonRule;
@@ -73,7 +75,10 @@ fn offending_annotation(visitor: &Visitor<'_>, annotation: Node<'_>) -> Option<R
         source: visitor.source,
     };
     if !matches!(annotation.kind(), STRING | CONCATENATED_STRING) {
-        return explicit(annotation, context).map(|node| Report::at(PythonRule::RUF013, node, ""));
+        return explicit(annotation, context).map(|node| {
+            let fix = Fix::replace(node, &with_none(node, visitor.source), visitor.source).marked_unsafe();
+            Report::at(PythonRule::RUF013, node, "").with_fix(Some(fix))
+        });
     }
     let parts = if annotation.kind() == STRING {
         vec![annotation]
@@ -103,12 +108,20 @@ fn offending_annotation(visitor: &Visitor<'_>, annotation: Node<'_>) -> Option<R
         ..context
     };
     explicit(expression, snippet).map(|node| {
-        Report::at_point(
-            PythonRule::RUF013,
-            placement.wrapped().map(node.start_position()),
-            "",
-        )
+        let wrapped_placement = placement.wrapped();
+        let start = wrapped_placement.map(node.start_position());
+        let fix = placement.simple.then(|| {
+            let end = wrapped_placement.map(node.end_position());
+            Fix::replace_range(start, end, &with_none(node, wrapped.as_bytes()), visitor.source)
+                .marked_unsafe()
+        });
+        Report::at_point(PythonRule::RUF013, start, "").with_fix(fix)
     })
+}
+
+// El arreglo de RUF013 con Python 3.10 o más: `T | None`; siempre inseguro, como en ruff.
+fn with_none(node: Node<'_>, source: &[u8]) -> String {
+    format!("{} | None", codegen::unparse(node, codegen::BIT_OR, source))
 }
 
 fn parsed_expression(root: Node<'_>) -> Option<Node<'_>> {

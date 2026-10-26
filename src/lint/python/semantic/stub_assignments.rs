@@ -1,9 +1,11 @@
 use tree_sitter::Node;
 
 use super::dataclass_checks::is_enumeration;
+use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
 use super::model::{MODULE_SCOPE, Model};
 use super::mutability::{Resolver, without_subscript};
 use super::qualified::{is_typing, qualified_name_from};
+use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ASSIGNMENT, ATTRIBUTE, CALL, CLASS, COMMENT, FUNCTION, FUNCTION_FIELD, IDENTIFIER, LEFT_FIELD, MODULE,
@@ -58,6 +60,7 @@ const TYPE_VARIABLE_LIKE: [&str; 4] = ["TypeVar", "TypeVarTuple", "NewType", "Pa
 const MODULE_SPECIAL: &str = "__all__";
 const CLASS_SPECIALS: [&str; 2] = ["__match_args__", "__slots__"];
 const TYPE_ALIAS: &str = "TypeAlias";
+const TYPING: &str = "typing";
 const FINAL: &str = "Final";
 const ANY: &str = "Any";
 const PRIVATE_PREFIX: char = '_';
@@ -132,7 +135,22 @@ impl<'model> Context<'model, '_> {
             }
         }
         if self.is_annotatable_type_alias(value) {
-            reports.push(Report::at(PythonRule::PYI026, target, self.text(target)));
+            let request = ImportRequest {
+                module: TYPING,
+                member: TYPE_ALIAS,
+                style: ImportStyle::ImportFrom,
+            };
+            let fix = get_or_import_member(self.resolver.model, self.resolver.source, target, request).map(
+                |(binding, import)| {
+                    let annotated = TextEdit {
+                        start: TextPoint::from_point(target.start_position()),
+                        end: TextPoint::from_point(target.end_position()),
+                        replacement: format!("{}: {binding}", self.text(target)),
+                    };
+                    Fix::from_edits(self.resolver.source, vec![annotated, import])
+                },
+            );
+            reports.push(Report::at(PythonRule::PYI026, target, self.text(target)).with_fix(fix));
         }
         reports
     }

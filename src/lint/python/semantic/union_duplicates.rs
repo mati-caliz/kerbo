@@ -1,7 +1,8 @@
 use tree_sitter::Node;
 
+use super::Mode;
 use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
-use super::qualified::{is_typing, qualified_name};
+use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::type_hints::{Hints, unwrapped};
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::ast::{VALUE_FIELD, text};
@@ -10,6 +11,9 @@ use crate::lint::python::codegen;
 use crate::lint::python::fix_edits::commented_unsafe;
 
 const TYPING: &str = "typing";
+const INT: &str = "int";
+const FLOAT: &str = "float";
+const COMPLEX: &str = "complex";
 const UNION: &str = "Union";
 const OPTIONAL: &str = "Optional";
 const UNION_TYPE: &str = "union_type";
@@ -40,8 +44,42 @@ pub fn duplicate_union_fix(hints: Hints<'_, '_, '_>, union: Node<'_>, members: &
     if unique.iter().all(|member| is_none(*member, source)) {
         return None;
     }
+    rewritten_union_fix(hints, union, members, &unique)
+}
+
+// PYI041: `int | float` pasa a `float` y `float | complex` a `complex`, con el resto de la unión.
+pub fn numeric_union_fix(hints: Hints<'_, '_, '_>, union: Node<'_>) -> Option<Fix> {
+    let mut members = Vec::new();
+    hints.union_members(union, Mode::TypeDefinition, &mut members);
+    let has = |builtin: &str| {
+        members
+            .iter()
+            .any(|member| is_builtin_named(hints.model, *member, hints.source, builtin))
+    };
+    let redundant: &[&str] = if has(COMPLEX) { &[INT, FLOAT] } else { &[INT] };
+    let kept: Vec<Node<'_>> = members
+        .iter()
+        .copied()
+        .filter(|member| {
+            !redundant
+                .iter()
+                .any(|builtin| is_builtin_named(hints.model, *member, hints.source, builtin))
+        })
+        .collect();
+    rewritten_union_fix(hints, union, &members, &kept)
+}
+
+// La unión vuelta a escribir con esos miembros: uno solo queda solo; si los miembros venían de un `|`,
+// con `|`, y si no con `Union[...]`.
+fn rewritten_union_fix(
+    hints: Hints<'_, '_, '_>,
+    union: Node<'_>,
+    members: &[Node<'_>],
+    unique: &[Node<'_>],
+) -> Option<Fix> {
+    let source = hints.source;
     let mut edits = Vec::new();
-    let replacement = if let [only] = unique.as_slice() {
+    let replacement = if let [only] = unique {
         codegen::unparse(*only, 0, source)
     } else if members.iter().any(|member| comes_from_bit_or(hints, *member)) {
         let mut printed = unique

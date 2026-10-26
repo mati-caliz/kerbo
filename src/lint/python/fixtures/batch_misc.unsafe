@@ -105,19 +105,19 @@ def conversions(value, items):
 
 
 def implicit(
-    a: int = None,
+    a: int | None = None,
     b: int | None = None,
     c: int | None = None,
     d: Any = None,
     e: object = None,
-    f: int = None,
-    g: int | str = None,
+    f: int | None = None,
+    g: int | str | None = None,
     h: int | None = None,
-    i: list[int] = None,
+    i: list[int] | None = None,
     j: None = None,
     k: int = 1,
     *,
-    m: str = None,
+    m: str | None = None,
 ):
     pass
 
@@ -134,5 +134,5 @@ def outer_parameter(index, values):
     return scan
 
 
-def third_party(value: numpy.ndarray[int] = None, other: dict[str, int] = None):
+def third_party(value: numpy.ndarray[int] = None, other: dict[str, int] | None = None):
     pass

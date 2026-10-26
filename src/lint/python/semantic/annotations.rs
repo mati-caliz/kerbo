@@ -108,7 +108,12 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
             self.reports.push(Report::at(rule, subscript, "").with_fix(fix));
         }
         if is_pep646_unpack(&name, subscript, slices) {
-            self.reports.push(Report::at(PythonRule::UP044, subscript, ""));
+            let fix = slices.first().map(|slice| {
+                Fix::replace(subscript, &format!("*{}", text(*slice, self.source)), self.source)
+                    .marked_unsafe()
+            });
+            self.reports
+                .push(Report::at(PythonRule::UP044, subscript, "").with_fix(fix));
         }
     }
 

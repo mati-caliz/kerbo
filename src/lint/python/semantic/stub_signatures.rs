@@ -6,6 +6,7 @@ use super::decorators::is_abstract;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::type_hint_fixes::iterator_fix;
 use super::type_hints::{Hints, subscript_parts, unwrapped};
+use super::union_duplicates::numeric_union_fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ATTRIBUTE, ATTRIBUTE_FIELD, BODY_FIELD, CALL, COMMENT, FUNCTION_FIELD, IDENTIFIER, NAME_FIELD, is_string,
@@ -91,7 +92,9 @@ pub fn signature_reports(
             reports.push(Report::at(PythonRule::PYI050, annotation, ""));
         }
         if !is_dispatch_registration(decorators, source) && is_redundant_numeric_union(hints, annotation) {
-            reports.push(Report::at(PythonRule::PYI041, annotation, ""));
+            reports.push(
+                Report::at(PythonRule::PYI041, annotation, "").with_fix(numeric_union_fix(hints, annotation)),
+            );
         }
     }
     let kind = method_kind(function, source);

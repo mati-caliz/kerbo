@@ -49,7 +49,7 @@ def first(value: _Used) -> _Used:
     return value
 
 
-def numbers(a: int | float, b: float | complex, c: int | float | str, d: int | bool) -> int | float:
+def numbers(a: float, b: complex, c: float | str, d: int | bool) -> int | float:
     return 1
 
 

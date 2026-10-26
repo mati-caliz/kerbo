@@ -98,10 +98,10 @@ default_sys = sys.stdin
 default_final: Final = default_int
 default_expr = 1 + 2
 default_name = default_int
-default_none = None
-default_union = int | None
-default_subscript = list[int]
-default_any = Any
+default_none: TypeAlias = None
+default_union: TypeAlias = int | None
+default_subscript: TypeAlias = list[int]
+default_any: TypeAlias = Any
 alias: TypeAlias = int | str
 a, b = 1, 2
 c = d = 3
@@ -113,8 +113,8 @@ class Members(enum.Enum):
 
 class Regular:
     attribute = 1
-    other = None
-    alias = list[int]
+    other: TypeAlias = None
+    alias: TypeAlias = list[int]
 
 _PrivateT: TypeAlias = int
 _Private2T: TypeAlias = int

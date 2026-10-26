@@ -156,14 +156,18 @@ pub fn reports(root: Node<'_>, source: &[u8], file: FileKind) -> Vec<Report> {
     visitor.block(root);
     visitor.run_deferred();
     visitor.visit_exports();
-    let mut reports = classes::mutable_class_defaults(&visitor.model, source, &visitor.classes);
+    let mut reports = std::mem::take(&mut visitor.reports);
+    reports.extend(classes::mutable_class_defaults(
+        &visitor.model,
+        source,
+        &visitor.classes,
+    ));
     reports.extend(checks::reports(&visitor));
     reports.extend(self_types::deferred_type_variables(
         &visitor.model,
         source,
         &visitor.methods,
     ));
-    reports.append(&mut visitor.reports);
     reports
 }
 

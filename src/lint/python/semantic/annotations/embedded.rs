@@ -10,7 +10,7 @@ use tree_sitter::{Node, Point};
 
 use super::super::qualified::{is_typing, qualified_name};
 use super::super::type_hints::Hints;
-use super::super::type_unions::has_redundant_type_members;
+use super::super::type_unions::{has_redundant_type_members, merged_type_union};
 use super::super::{Mode, Visitor};
 use super::{ANNOTATED, LITERAL};
 use crate::lint::python::ast::{
@@ -100,11 +100,18 @@ impl EmbeddedAnnotations for Visitor<'_> {
             source: context.source,
         };
         if !context.literal && has_redundant_type_members(hints, node, Mode::TypeDefinition) {
-            self.reports.push(Report::at_point(
-                PythonRule::PYI055,
-                context.placement.map(node.start_position()),
-                "",
-            ));
+            let start = context.placement.map(node.start_position());
+            let fix = context
+                .placement
+                .simple
+                .then(|| merged_type_union(hints, node, Mode::TypeDefinition))
+                .flatten()
+                .map(|replacement| {
+                    let end = context.placement.map(node.end_position());
+                    Fix::replace_range(start, end, &replacement, self.source)
+                });
+            self.reports
+                .push(Report::at_point(PythonRule::PYI055, start, "").with_fix(fix));
         }
         match node.kind() {
             IDENTIFIER => {
@@ -188,11 +195,22 @@ impl EmbeddedAnnotations for Visitor<'_> {
             .as_deref()
             .is_some_and(|name| is_pep646_unpack(name, node, &slices))
         {
-            self.reports.push(Report::at_point(
-                PythonRule::UP044,
-                context.placement.map(node.start_position()),
-                "",
-            ));
+            let start = context.placement.map(node.start_position());
+            let fix = context
+                .placement
+                .simple
+                .then(|| {
+                    slices
+                        .first()
+                        .map(|slice| format!("*{}", text(*slice, context.source)))
+                })
+                .flatten()
+                .map(|replacement| {
+                    let end = context.placement.map(node.end_position());
+                    Fix::replace_range(start, end, &replacement, self.source).marked_unsafe()
+                });
+            self.reports
+                .push(Report::at_point(PythonRule::UP044, start, "").with_fix(fix));
         }
         let is_literal = context.literal || name.as_deref().is_some_and(|name| is_typing(name, LITERAL));
         let is_annotated = name.as_deref().is_some_and(|name| is_typing(name, ANNOTATED));

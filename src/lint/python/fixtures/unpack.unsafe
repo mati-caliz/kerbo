@@ -1,0 +1,46 @@
+from typing import Generic, TypedDict, TypeVarTuple, Unpack
+
+Shape = TypeVarTuple("Shape")
+
+
+class Movie(TypedDict):
+    name: str
+
+
+class Array(Generic[*Shape]):
+    pass
+
+
+class Pair(Generic[int, *Shape]):
+    pass
+
+
+def variadic(*args: *Shape) -> tuple[*Shape]:
+    return args
+
+
+def qualified(*args: *tuple[int, ...]) -> None:
+    pass
+
+
+def extension(*args: *Shape) -> None:
+    pass
+
+
+def keywords(**kwargs: Unpack[Movie]) -> None:
+    pass
+
+
+def plain(value: Unpack[Shape]) -> None:
+    pass
+
+
+def union(*args: Unpack[int | str]) -> None:
+    pass
+
+
+Alias = tuple[int, *Shape]
+Bare = Unpack[Shape]
+Nested = dict[str, tuple[*Shape]]
+Parenthesized = tuple[(int, *Shape)]
+quoted: "tuple[*Shape]" = ()

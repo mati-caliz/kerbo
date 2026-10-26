@@ -1,0 +1,11 @@
+from typing import TypeAlias
+
+Recursive: TypeAlias = list[Recursive]
+Plain: TypeAlias = list[Plain]
+value: Later
+
+def function(argument: Later) -> Later: ...
+
+class Later: ...
+
+missing: Undefined
