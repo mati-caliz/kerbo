@@ -4,9 +4,10 @@ import enum
 import itertools
 import sys
 from collections import defaultdict
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from itertools import starmap
-from typing import ClassVar, Generator, Generic, TypeAlias, TypeVar
+from typing import ClassVar, Generic, TypeAlias, TypeVar
 
 import mock
 import mock.mock

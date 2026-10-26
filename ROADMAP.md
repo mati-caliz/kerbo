@@ -1735,10 +1735,26 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     sea un literal (ruff no); SIM222/SIM223 cortan en el primer par sin decidir y ruff sigue mirando;
     RUF010 no le pone paréntesis a un generador sin paréntesis; RUF019 no distingue los efectos
     "quizás" de ruff (los trata como seguros).
+  - Tanda 11 (40 arreglos, idénticos a ruff en todos los fixtures): RUF046, RUF057 (con el
+    `unwrapped_call_argument` de ruff), FURB105, ISC004, RUF015, PYI064, PYI062, PYI059, RUF032,
+    RUF007, PLR1716, PYI032, FURB136, PYI029, PYI020, UP050, PERF101, PLR1730, PYI036, ASYNC115,
+    PYI058, RUF068, SIM401, FURB188, RUF017, FURB122, RUF041, PYI061, PYI030, PYI026, PYI041, PYI055 y
+    UP044 (también adentro de una anotación entre comillas), RUF013, SIM103, FLY002, UP030 (con la
+    misma regex de ruff y sus rarezas), PLW0120, UP035 (el `ImportReplacer` de ruff) y F811. Dos
+    cambios de orden para desempatar como ruff: los avisos del recorrido semántico van antes que los
+    de los alcances diferidos (F401 y compañía), y los arreglos de F811 se aplican antes que todos.
+  - Pendientes de esa tanda: E731, SIM905, SIM114, B006 y PYI025 quedan para la próxima (piden
+    reescribir sentencias enteras o renombrar en todo el archivo). FURB136, PLR1730, SIM103 y
+    FURB192 no miran si `min`, `max` o `bool` están tapados; RUF046 y RUF057 tratan como inseguro
+    todo `round` de algo que no está escrito (ruff mira el tipo); PYI061 y RUF013 asumen Python 3.10
+    o más (`X | None` y nunca `Optional`); FLY002 no arregla cuando habría que escapar algo más que
+    las llaves; PLW0120 desindenta línea por línea (un string de varias líneas en el `else` se
+    rompería; ruff usa libcst).
   - Lo que falta de arreglos (medido el 2026-10-26 con `../kerbo-parity/scripts/pending_by_frequency.txt`):
-    61 reglas que aparecen en el corpus (unos 23.000 arreglos, 16.000 de ellos UP031 y UP032) y 38
-    que no aparecen. Las próximas por tema: F811, F601, F602, E731 y PLW0120; después UP031/UP032
-    (pasar `%` y `.format` a f-string), ISC004, UP035, SIM117, UP030, RUF015, RUF022/RUF023.
+    21 reglas que aparecen en el corpus (unos 19.000 arreglos, 16.000 de ellos UP031 y UP032) y 38
+    que no aparecen. Las próximas: E731, SIM905, SIM114, B006, PYI025, F601, F602, SIM117, SIM102,
+    RUF022/RUF023, PYI034/PYI019, TC004, RUF028, UP036 y C417; al final UP031/UP032 (pasar `%` y
+    `.format` a f-string).
     C417 (`map(lambda ...)`) queda para la tanda de libcst más pesada.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.

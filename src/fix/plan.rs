@@ -1,12 +1,12 @@
 use super::{Fix, TextEdit, TextPoint};
 
 // El `apply_fixes` de ruff: los arreglos por dónde empiezan (a igualdad, por su puesto en la lista de
-// avisos de ruff y después en el orden en que llegan), y en secuencia: uno se descarta si empieza antes del final del
+// avisos de ruff y después en el orden en que llegan; el puesto 0 va antes que todo, como F811 en ruff), y en secuencia: uno se descarta si empieza antes del final del
 // último aplicado (tocarse también cuenta), si ya se aplicó otro de su grupo de aislamiento, o si todas
 // sus ediciones ya se aplicaron con otro.
 pub fn compatible<'fix>(fixes: impl IntoIterator<Item = &'fix Fix>) -> Vec<&'fix Fix> {
     let mut ordered: Vec<&Fix> = fixes.into_iter().filter(|fix| !fix.edits.is_empty()).collect();
-    ordered.sort_by_key(|fix| (min_start(fix), fix.rank));
+    ordered.sort_by_key(|fix| (fix.rank != 0, min_start(fix), fix.rank));
     let mut chosen: Vec<&Fix> = Vec::new();
     let mut applied: Vec<&TextEdit> = Vec::new();
     let mut last_end: Option<TextPoint> = None;

@@ -1,6 +1,7 @@
 import ctypes
 import dataclasses
-from typing import ClassVar, Final, Sequence
+from collections.abc import Sequence
+from typing import ClassVar, Final
 
 import pydantic
 
