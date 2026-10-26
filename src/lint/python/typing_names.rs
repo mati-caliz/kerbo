@@ -8,18 +8,15 @@ const IMPORT_FROM: &str = "import_from_statement";
 const TYPE_ALIAS_STATEMENT: &str = "type_alias_statement";
 const ALIASED_IMPORT: &str = "aliased_import";
 const MODULE_NAME_FIELD: &str = "module_name";
-const ALIAS_FIELD: &str = "alias";
 const GENERIC_TYPE: &str = "generic_type";
 const COLLECTIONS_ABC: &str = "collections.abc";
-const SET: &str = "Set";
-const ABSTRACT_SET: &str = "AbstractSet";
 const BYTE_STRING: &str = "ByteString";
 const BYTE_STRING_MODULES: [&str; 3] = ["typing", "typing_extensions", COLLECTIONS_ABC];
 const PRIVATE_PREFIX: char = '_';
 const TYPE_SUFFIX: char = 'T';
 
-// PYI042 y PYI043 (el nombre de un `type`; el `TypeAlias` lo mira el modelo semántico), PYI025 (`from collections.abc import Set` sin llamarlo
-// `AbstractSet`) y PYI057 (importar `ByteString`).
+// PYI042 y PYI043 (el nombre de un `type`; el `TypeAlias` lo mira el modelo semántico) y PYI057
+// (importar `ByteString`).
 pub fn reports(nodes: &[Node<'_>], source: &[u8]) -> Vec<Report> {
     let mut found = Vec::new();
     for node in nodes {
@@ -93,22 +90,12 @@ fn import_reports(statement: Node<'_>, source: &[u8]) -> Vec<Report> {
     statement
         .children_by_field_name(NAME_FIELD, &mut cursor)
         .filter_map(|imported| {
-            let (name, alias) = if imported.kind() == ALIASED_IMPORT {
-                (
-                    imported.child_by_field_name(NAME_FIELD)?,
-                    imported
-                        .child_by_field_name(ALIAS_FIELD)
-                        .map(|alias| text(alias, source)),
-                )
+            let name = if imported.kind() == ALIASED_IMPORT {
+                imported.child_by_field_name(NAME_FIELD)?
             } else {
-                (imported, None)
+                imported
             };
             let member = text(name, source);
-            if member == SET && module == COLLECTIONS_ABC {
-                let bound = alias.unwrap_or(member);
-                return (bound != ABSTRACT_SET && !bound.starts_with(PRIVATE_PREFIX))
-                    .then(|| Report::at(PythonRule::PYI025, imported, ""));
-            }
             (member == BYTE_STRING && BYTE_STRING_MODULES.contains(&module))
                 .then(|| Report::at(PythonRule::PYI057, name, ""))
         })

@@ -4,6 +4,7 @@ use tree_sitter::Node;
 
 use super::Report;
 use super::ast::{COMMENT, DECORATED, NAME_FIELD, named, text};
+use super::fix_edits::delete_comment;
 use crate::rules::PythonRule;
 use shape::{Item, is_first_in_alternate_body, is_statement, items, statements};
 
@@ -187,8 +188,12 @@ impl<'tree> Walker<'tree, '_> {
     fn capture(&mut self, comment: Suppression<'tree>, placement: &Placement<'tree>) {
         self.next = self.next.saturating_add(1);
         if self.is_ignored(comment, placement) {
-            self.reports
-                .push(Report::at(PythonRule::RUF028, comment.node, ""));
+            self.reports.push(
+                Report::at(PythonRule::RUF028, comment.node, "").with_fix(Some(
+                    delete_comment(comment.node.start_byte(), comment.node.end_byte(), self.source)
+                        .marked_unsafe(),
+                )),
+            );
         }
     }
 

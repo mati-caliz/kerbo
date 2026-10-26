@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::builtin_calls::{Arguments, arguments, keyword_value};
+use super::map_fix::{Comprehension, map_comprehension_fix};
 use super::model::Model;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::tail_call_fixes::{
@@ -155,7 +156,10 @@ fn unnecessary_map(
             .filter(|outer| outer.kind() == CALL)
             .and_then(|outer| outer.child_by_field_name(FUNCTION_FIELD))
             .is_some_and(|outer| WRAPPERS.iter().any(|name| is_builtin(outer, name)));
-        return (!wrapped && map_lambda_body(call).is_some()).then(|| Report::at(PythonRule::C417, call, ""));
+        return (!wrapped && map_lambda_body(call).is_some()).then(|| {
+            let fix = map_comprehension_fix(hints.source, call, call, Comprehension::Generator);
+            Report::at(PythonRule::C417, call, "").with_fix(fix)
+        });
     }
     let wrapper = WRAPPERS.iter().find(|name| is_builtin(function, name))?;
     let [inner] = given.positional.as_slice() else {
@@ -174,7 +178,15 @@ fn unnecessary_map(
                 .filter(|element| element.kind() != COMMENT)
                 .count()
                 == 2);
-    fits.then(|| Report::at(PythonRule::C417, call, ""))
+    let comprehension = match *wrapper {
+        LIST_LITERAL => Comprehension::List,
+        DICT => Comprehension::Dict,
+        _ => Comprehension::Set,
+    };
+    fits.then(|| {
+        let fix = map_comprehension_fix(hints.source, call, inner, comprehension);
+        Report::at(PythonRule::C417, call, "").with_fix(fix)
+    })
 }
 
 fn map_lambda_body(call: Node<'_>) -> Option<Node<'_>> {

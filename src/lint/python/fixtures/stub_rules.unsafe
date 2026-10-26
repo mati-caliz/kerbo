@@ -11,16 +11,8 @@ P = ParamSpec("P")
 Ts = TypeVarTuple("Ts")
 U = typing.TypeVar("U")
 
-if sys.version_info >= (3, 9):
-    pass
-if sys.version_info < (3, 9):
-    x: int
-else:
-    x: str
-if sys.version_info < (3, 9):
-    y: int
-if sys.version_info > (3, 9):
-    z: int
+x: str
+z: int
 if sys.version_info == (3, 9, 1):
     w: int
 if sys.version_info[:1] == (3, 9):
@@ -33,8 +25,7 @@ if sys.version_info[1] >= 9:
     s: int
 if sys.version_info >= (3, 9.0):
     r: int
-if sys.version_info == 3:
-    q: int
+q: int
 if sys.platform == "linux":
     p: int
 if sys.platform == "linus":

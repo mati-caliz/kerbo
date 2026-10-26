@@ -245,11 +245,11 @@ def escapes():
     return first, second, third, fourth, fifth, sixth, seventh
 
 
-class Generic[_T]:
-    value: _T
+class Generic[T]:
+    value: T
 
 
-def generic_function[_T, _U_, __V__, W](value: _T) -> _T:
+def generic_function[T, _U_, __V__, W](value: T) -> T:
     return value
 
 
@@ -257,53 +257,19 @@ type Alias[_X] = list[_X]
 
 
 def version_checks():
-    if sys.version_info > (3, 8):
-        pass
-    if sys.version_info >= (3, 8):
-        pass
-    if sys.version_info < (3, 8):
-        pass
-    if sys.version_info <= (3, 8):
-        pass
     if sys.version_info == (3, 8):
         pass
     if sys.version_info != (3, 8):
         pass
-    if sys.version_info < (3, 10):
-        pass
-    if sys.version_info < (3, 11):
-        pass
     if sys.version_info < (3, 12):
-        pass
-    if sys.version_info <= (3, 10):
         pass
     if sys.version_info <= (3, 11):
         pass
-    if sys.version_info >= (3, 11):
-        pass
-    if sys.version_info > (3, 10):
-        pass
-    if sys.version_info < (3, 11, 0):
-        pass
     if sys.version_info < (3, 11, 2):
-        pass
-    if sys.version_info[0] == 2:
-        pass
-    if sys.version_info[0] >= 3:
-        pass
-    if sys.version_info.major < 3:
-        pass
-    if sys.version_info[:2] < (3, 5):
-        pass
-    if sys.version_info < (2,):
-        pass
-    if sys.version_info < (3,):
         pass
     if sys.version_info < (3, 300):
         pass
     if sys.version_info < (3, x):
-        pass
-    if sys.version_info < (3, 9) or sys.version_info < (3, 6):
         pass
     if True:
         pass

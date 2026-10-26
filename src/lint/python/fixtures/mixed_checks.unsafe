@@ -9,8 +9,11 @@ import pytest
 __all__ = "Name"
 
 counter = 0
-Point = NamedTuple("Point", [("x", int), ("y", int)])
-Keyword = NamedTuple("Keyword", x=int)
+class Point(NamedTuple):
+    x: int
+    y: int
+class Keyword(NamedTuple):
+    x: int
 Dynamic = NamedTuple("Dynamic", fields)
 Nested = Literal["a", "b"]
 Flat = Literal["a", "b"]
@@ -151,7 +154,8 @@ math.floor(1)
 
 __all__ = math.__all__ + ["extra"]
 __all__ = names + ["extra"]
-Empty = NamedTuple("Empty", [])
+class Empty(NamedTuple):
+    pass
 Tupled = NamedTuple("Tupled", (("x", int),))
 
 

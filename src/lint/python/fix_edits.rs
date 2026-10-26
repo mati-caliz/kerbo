@@ -6,6 +6,9 @@ use crate::fix::{Fix, TextEdit, TextPoint};
 const COMMA: &str = ",";
 const EMPTY_ARGUMENTS: &str = "()";
 const LINE_FEED: u8 = b'\n';
+const CARRIAGE_RETURN: u8 = b'\r';
+const HASH: u8 = b'#';
+const WHITESPACE: &[u8] = b" \t\x0c";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Parentheses {
@@ -166,4 +169,60 @@ pub fn point_of(source: &[u8], offset: usize) -> TextPoint {
     let column = lines.next_back().map_or(0, <[u8]>::len);
     let row = lines.count();
     TextPoint::from_point(Point { row, column })
+}
+
+// El `delete_comment` de ruff: la línea entera si es sólo el comentario; hasta el final de la línea
+// si no sigue nada; sólo la directiva si después viene otro comentario.
+pub fn delete_comment(start: usize, end: usize, source: &[u8]) -> Fix {
+    let line_start = source
+        .get(..start)
+        .and_then(|before| before.iter().rposition(|byte| *byte == LINE_FEED))
+        .map_or(0, |newline| newline.saturating_add(1));
+    let full_line_end = source
+        .get(end..)
+        .and_then(|rest| rest.iter().position(|byte| *byte == LINE_FEED))
+        .map_or(source.len(), |newline| {
+            end.saturating_add(newline).saturating_add(1)
+        });
+    let line_end = if source.get(full_line_end.saturating_sub(1)) == Some(&LINE_FEED) {
+        let without_feed = full_line_end.saturating_sub(1);
+        if source.get(without_feed.saturating_sub(1)) == Some(&CARRIAGE_RETURN) {
+            without_feed.saturating_sub(1)
+        } else {
+            without_feed
+        }
+    } else {
+        full_line_end
+    };
+    let before = source.get(line_start..start).unwrap_or_default();
+    let leading = before.len().saturating_sub(trimmed_end(before).len());
+    let after = source.get(end..line_end).unwrap_or_default();
+    let trailing = after.len().saturating_sub(trimmed_start(after).len());
+    let (from, to) =
+        if start.saturating_sub(leading) == line_start && end.saturating_add(trailing) == line_end {
+            (line_start, full_line_end)
+        } else if end.saturating_add(trailing) == line_end {
+            (start.saturating_sub(leading), line_end)
+        } else if source.get(end.saturating_add(trailing)) == Some(&HASH) {
+            (start, end.saturating_add(trailing))
+        } else {
+            (start.saturating_sub(leading), line_end)
+        };
+    delete_between(from, to, source)
+}
+
+fn trimmed_end(bytes: &[u8]) -> &[u8] {
+    let kept = bytes
+        .iter()
+        .rposition(|byte| !WHITESPACE.contains(byte))
+        .map_or(0, |index| index.saturating_add(1));
+    bytes.get(..kept).unwrap_or_default()
+}
+
+fn trimmed_start(bytes: &[u8]) -> &[u8] {
+    let skipped = bytes
+        .iter()
+        .position(|byte| !WHITESPACE.contains(byte))
+        .unwrap_or(bytes.len());
+    bytes.get(skipped..).unwrap_or_default()
 }

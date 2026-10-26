@@ -84,7 +84,7 @@ for name in (name for name in items):
 for key, other in {key: 1 for key in items}.items():
     pass
 
-for element in map(lambda element: element, items):
+for element in (element for element in items):
     pass
 
 for item in sorted(items, key=lambda item: item):

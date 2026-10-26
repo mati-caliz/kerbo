@@ -3,23 +3,17 @@ def decorator(function):
 
 
 @decorator
-# fmt: off
 def example():
     if True:
-        # fmt: skip
         expression = [
-            # fmt: off
             1,
             2,
         ]
-        # yapf: disable
     # fmt: on
-    # yapf: enable
     return expression
 
 
 @decorator
-# fmt: on
 class Decorated:
     # fmt: off
     value = 1
@@ -29,11 +23,8 @@ class Decorated:
 # fmt: off
 TABLE = {
     "a": 1,
-    # fmt: off
     "b": 2,
-    # fmt:on
     "c": call(
-        # fmt: skip
         1, 2,
     ),
 }
@@ -41,18 +32,17 @@ TABLE = {
 
 value = 1  # fmt: skip
 other = 2  # fmt: off
-third = 3  # fmt: on
+third = 3
 fourth = [1, 2]  # fmt: skip
-fifth = call(1,  # fmt: skip
+fifth = call(1,
              2)
 sixth = (
-    1  # fmt: skip
+    1
 )
 
 
 def parameters(
-    first,  # fmt: skip
-    # fmt: off
+    first,
     second,
 ):
     pass  # fmt: skip
@@ -70,7 +60,6 @@ class Body:
 
 if value:
     pass
-# fmt: off
 else:
     pass
 
@@ -85,7 +74,6 @@ match value:
     case 1:
         pass
     case [
-        # fmt: skip
         2
     ]:
         pass

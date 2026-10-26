@@ -4,7 +4,7 @@ use super::ruff_codes::{DEFAULT_CODES, RUFF_CODES};
 use super::{Directive, Placed, Suppressions, redirected};
 use crate::fix::{Fix, TextEdit};
 use crate::lint::python::Report;
-use crate::lint::python::fix_edits::{delete_between, point_of};
+use crate::lint::python::fix_edits::{delete_comment, point_of};
 use crate::rules::PythonRule;
 
 const SELF_CODE: &str = "RUF100";
@@ -16,10 +16,6 @@ const CODE_SEPARATOR: &str = ", ";
 const LINE_PREFIX: &str = "# noqa: ";
 const RUFF_FILE_PREFIX: &str = "# ruff: noqa: ";
 const FLAKE8_FILE_PREFIX: &str = "# flake8: noqa: ";
-const LINE_FEED: u8 = b'\n';
-const CARRIAGE_RETURN: u8 = b'\r';
-const HASH: u8 = b'#';
-const WHITESPACE: &[u8] = b" \t\x0c";
 
 #[derive(Debug, Default)]
 struct Unused<'code> {
@@ -128,62 +124,6 @@ pub struct Check<'enabled, 'source> {
     pub enabled: &'enabled dyn Fn(PythonRule) -> bool,
     pub complete: bool,
     pub source: &'source [u8],
-}
-
-// El `delete_comment` de ruff: la línea entera si es sólo el comentario; hasta el final de la línea
-// si no sigue nada; sólo la directiva si después viene otro comentario.
-fn delete_comment(start: usize, end: usize, source: &[u8]) -> Fix {
-    let line_start = source
-        .get(..start)
-        .and_then(|before| before.iter().rposition(|byte| *byte == LINE_FEED))
-        .map_or(0, |newline| newline.saturating_add(1));
-    let full_line_end = source
-        .get(end..)
-        .and_then(|rest| rest.iter().position(|byte| *byte == LINE_FEED))
-        .map_or(source.len(), |newline| {
-            end.saturating_add(newline).saturating_add(1)
-        });
-    let line_end = if source.get(full_line_end.saturating_sub(1)) == Some(&LINE_FEED) {
-        let without_feed = full_line_end.saturating_sub(1);
-        if source.get(without_feed.saturating_sub(1)) == Some(&CARRIAGE_RETURN) {
-            without_feed.saturating_sub(1)
-        } else {
-            without_feed
-        }
-    } else {
-        full_line_end
-    };
-    let before = source.get(line_start..start).unwrap_or_default();
-    let leading = before.len().saturating_sub(trimmed_end(before).len());
-    let after = source.get(end..line_end).unwrap_or_default();
-    let trailing = after.len().saturating_sub(trimmed_start(after).len());
-    let (from, to) =
-        if start.saturating_sub(leading) == line_start && end.saturating_add(trailing) == line_end {
-            (line_start, full_line_end)
-        } else if end.saturating_add(trailing) == line_end {
-            (start.saturating_sub(leading), line_end)
-        } else if source.get(end.saturating_add(trailing)) == Some(&HASH) {
-            (start, end.saturating_add(trailing))
-        } else {
-            (start.saturating_sub(leading), line_end)
-        };
-    delete_between(from, to, source)
-}
-
-fn trimmed_end(bytes: &[u8]) -> &[u8] {
-    let kept = bytes
-        .iter()
-        .rposition(|byte| !WHITESPACE.contains(byte))
-        .map_or(0, |index| index.saturating_add(1));
-    bytes.get(..kept).unwrap_or_default()
-}
-
-fn trimmed_start(bytes: &[u8]) -> &[u8] {
-    let skipped = bytes
-        .iter()
-        .position(|byte| !WHITESPACE.contains(byte))
-        .unwrap_or(bytes.len());
-    bytes.get(skipped..).unwrap_or_default()
 }
 
 fn classified<'code>(

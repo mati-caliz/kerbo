@@ -52,10 +52,10 @@ def starts(message, other_message):
 
 def maps(items):
     return (
-        map(lambda x: x + 1, items),
-        list(map(lambda x: x * 2, items)),
-        set(map(lambda x: x, items)),
-        dict(map(lambda pair: (pair, pair), items)),
+        (x + 1 for x in items),
+        [x * 2 for x in items],
+        {x for x in items},
+        {pair: pair for pair in items},
         map(str, items),
         map(lambda x, y: x + y, items, items),
     )

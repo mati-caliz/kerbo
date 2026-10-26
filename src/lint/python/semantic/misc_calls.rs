@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use super::builtin_calls::{Arguments, arguments, keyword_value};
 use super::call_fixes::builtin_available;
 use super::model::Model;
+use super::named_tuple_fix::named_tuple_class_fix;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::type_hints::Hints;
 use super::unwrap_fixes::unnecessary_round_fix;
@@ -32,6 +33,7 @@ const ROUND: &str = "round";
 const INT: &str = "int";
 const PRINT: &str = "print";
 const SUPER: &str = "super";
+const SUPER_CALL: &str = "super()";
 const SEP: &str = "sep";
 const NDIGITS: &str = "ndigits";
 const KEY: &str = "key";
@@ -82,10 +84,10 @@ pub fn misc_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Ve
         reports.push(Report::at(PythonRule::B005, call, ""));
     }
     if is_functional_named_tuple(hints, call, function, &given) {
-        reports.extend(
-            call.parent()
-                .map(|assignment| Report::at(PythonRule::UP014, assignment, "")),
-        );
+        reports.extend(call.parent().map(|assignment| {
+            let fix = named_tuple_class_fix(source, assignment, call);
+            Report::at(PythonRule::UP014, assignment, "").with_fix(fix)
+        }));
     }
     reports.extend(super_without_call(model, source, call, function));
     reports
@@ -372,12 +374,15 @@ fn super_without_call(
 ) -> Option<Report> {
     let object = function
         .child_by_field_name(OBJECT_FIELD)
-        .filter(|object| function.kind() == ATTRIBUTE && object.kind() == IDENTIFIER)?;
+        .filter(|_| function.kind() == ATTRIBUTE)
+        .map(unparenthesized)
+        .filter(|object| object.kind() == IDENTIFIER)?;
     if !is_builtin_named(model, object, source, SUPER) {
         return None;
     }
     let method = std::iter::successors(call.parent(), Node::parent)
         .find(|ancestor| SCOPES.contains(&ancestor.kind()))?;
-    (method.kind() == FUNCTION && method_kind(method, source).is_some())
-        .then(|| Report::at(PythonRule::PLW0245, object, ""))
+    (method.kind() == FUNCTION && method_kind(method, source).is_some()).then(|| {
+        Report::at(PythonRule::PLW0245, object, "").with_fix(Some(Fix::replace(object, SUPER_CALL, source)))
+    })
 }

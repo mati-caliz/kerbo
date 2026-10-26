@@ -2,16 +2,15 @@ use tree_sitter::Node;
 
 use super::effects::contains_effect;
 use super::model::Model;
+use super::outdated_versions::outdated_version_blocks;
 use super::qualified::{is_builtin_named, qualified_name};
 use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ASSIGNMENT, COMMENT, COMPARISON, EXPRESSION_STATEMENT, IDENTIFIER, LEFT_FIELD, OPERATORS_FIELD,
-    RIGHT_FIELD, SUBSCRIPT, SUBSCRIPT_FIELD, TUPLE, TYPE_FIELD, VALUE_FIELD, fields, named, text,
-    unparenthesized,
+    RIGHT_FIELD, SUBSCRIPT, SUBSCRIPT_FIELD, TYPE_FIELD, VALUE_FIELD, fields, named, text, unparenthesized,
 };
 use crate::lint::python::branches::equivalent;
-use crate::lint::python::container_checks::integer_value;
 use crate::lint::python::fix_edits::has_comment_within;
 use crate::lint::python::known_types::{Known, is_known};
 use crate::rules::PythonRule;
@@ -19,7 +18,6 @@ use crate::rules::PythonRule;
 const ELIF: &str = "elif_clause";
 const ELSE: &str = "else_clause";
 const BOOLEAN_OPERATOR: &str = "boolean_operator";
-const INTEGER: &str = "integer";
 const CONDITION_FIELD: &str = "condition";
 const CONSEQUENCE_FIELD: &str = "consequence";
 const ALTERNATIVE_FIELD: &str = "alternative";
@@ -27,16 +25,9 @@ const BODY_FIELD: &str = "body";
 const VERSION_INFO: &str = "sys.version_info";
 const VERSION_MAJOR: &str = "sys.version_info.major";
 const LESS: &str = "<";
-const LESS_EQUAL: &str = "<=";
-const GREATER: &str = ">";
 const GREATER_EQUAL: &str = ">=";
-const EQUAL: &str = "==";
-const NOT_EQUAL: &str = "!=";
 const IN: &str = "in";
 const NOT_IN: [&str; 2] = ["not", "in"];
-const TARGET_MAJOR: u8 = 3;
-const TARGET_MINOR: u8 = 11;
-const PYTHON_TWO: u8 = 2;
 const MAX_LINE_LENGTH: usize = 88;
 const GET_CALL: &str = ".get(";
 const ARGUMENT_SEPARATOR: &str = ", ";
@@ -59,7 +50,7 @@ pub fn if_reports(model: &Model<'_>, source: &[u8], statement: Node<'_>) -> Vec<
     for test in &tests {
         reports.extend(bad_version_comparisons(model, source, *test));
     }
-    reports.extend(outdated_version_blocks(model, source, &tests));
+    reports.extend(outdated_version_blocks(model, source, statement, &tests));
     reports.extend(dict_get_block(model, source, statement));
     reports
 }
@@ -119,7 +110,7 @@ fn bad_version_comparisons(model: &Model<'_>, source: &[u8], test: Node<'_>) -> 
         .collect()
 }
 
-fn is_version_info(model: &Model<'_>, source: &[u8], left: Node<'_>) -> bool {
+pub fn is_version_info(model: &Model<'_>, source: &[u8], left: Node<'_>) -> bool {
     let left = unparenthesized(left);
     let base = if left.kind() == SUBSCRIPT {
         left.child_by_field_name(VALUE_FIELD).unwrap_or(left)
@@ -128,114 +119,6 @@ fn is_version_info(model: &Model<'_>, source: &[u8], left: Node<'_>) -> bool {
     };
     qualified_name(model, base, source).as_deref() == Some(VERSION_INFO)
         || qualified_name(model, left, source).as_deref() == Some(VERSION_MAJOR)
-}
-
-enum Outcome {
-    Outdated,
-    Invalid,
-    Current,
-    Abort,
-}
-
-// UP036 para cada rama del `if`, con la versión mínima por defecto de ruff 0.17 (3.11). Como ruff,
-// una tupla que no es toda de enteros o un entero que no es 2 ni 3 cortan el resto de las ramas.
-fn outdated_version_blocks(model: &Model<'_>, source: &[u8], tests: &[Node<'_>]) -> Vec<Report> {
-    let mut reports = Vec::new();
-    for test in tests {
-        let Some(comparison) = single_comparison(*test, source) else {
-            continue;
-        };
-        if !is_version_info(model, source, comparison.left) {
-            continue;
-        }
-        let right = unparenthesized(comparison.right);
-        let outcome = match right.kind() {
-            TUPLE => tuple_outcome(&comparison, right, source),
-            INTEGER => integer_outcome(&comparison, right, source),
-            _ => Outcome::Current,
-        };
-        match outcome {
-            Outcome::Outdated => reports.push(Report::at(PythonRule::UP036, unparenthesized(*test), "")),
-            Outcome::Invalid => reports.push(Report::at(PythonRule::UP036, comparison.right, "")),
-            Outcome::Current => {}
-            Outcome::Abort => break,
-        }
-    }
-    reports
-}
-
-fn small(value: i128) -> Option<u8> {
-    u8::try_from(value).ok()
-}
-
-fn tuple_outcome(comparison: &Comparison<'_>, tuple: Node<'_>, source: &[u8]) -> Outcome {
-    let ordering = [LESS, LESS_EQUAL, GREATER, GREATER_EQUAL]
-        .into_iter()
-        .find(|operator| operator_is(comparison, operator));
-    let Some(ordering) = ordering else {
-        return Outcome::Current;
-    };
-    let elements: Vec<Node<'_>> = named(tuple)
-        .into_iter()
-        .filter(|element| element.kind() != COMMENT)
-        .collect();
-    let mut version = Vec::new();
-    for element in elements {
-        let Some(number) = (element.kind() == INTEGER)
-            .then(|| integer_value(element, source))
-            .flatten()
-        else {
-            return Outcome::Abort;
-        };
-        version.push(number);
-    }
-    let or_equal = ordering == LESS_EQUAL || ordering == GREATER;
-    match always_less_than(&version, or_equal) {
-        Some(true) => Outcome::Outdated,
-        Some(false) => Outcome::Current,
-        None => Outcome::Invalid,
-    }
-}
-
-// `version_always_less_than` de ruff: `None` es una versión inválida.
-fn always_less_than(version: &[i128], or_equal: bool) -> Option<bool> {
-    let Some(major) = version.first() else {
-        return Some(false);
-    };
-    let major = small(*major)?;
-    if major != TARGET_MAJOR {
-        return Some(major < TARGET_MAJOR);
-    }
-    let Some(minor) = version.get(1) else {
-        return Some(true);
-    };
-    let minor = small(*minor)?;
-    let micro = match version.get(2) {
-        Some(micro) => Some(small(*micro)?),
-        None => None,
-    };
-    Some(if or_equal {
-        minor < TARGET_MINOR
-    } else if let Some(micro) = micro {
-        minor < TARGET_MINOR || (minor == TARGET_MINOR && micro == 0)
-    } else {
-        minor <= TARGET_MINOR
-    })
-}
-
-// Un entero sólo vale como versión mayor: 2 o 3 con un operador de orden o de igualdad.
-fn integer_outcome(comparison: &Comparison<'_>, integer: Node<'_>, source: &[u8]) -> Outcome {
-    let Some(major) = integer_value(integer, source).and_then(small) else {
-        return Outcome::Invalid;
-    };
-    let known = [EQUAL, NOT_EQUAL, LESS, LESS_EQUAL, GREATER, GREATER_EQUAL]
-        .into_iter()
-        .any(|operator| operator_is(comparison, operator));
-    if known && (major == PYTHON_TWO || major == TARGET_MAJOR) {
-        Outcome::Outdated
-    } else {
-        Outcome::Abort
-    }
 }
 
 fn single_statement(body: Option<Node<'_>>) -> Option<Node<'_>> {

@@ -5,10 +5,7 @@ from typing import TypeAlias, TypedDict, TypeVar
 
 T = TypeVar("T")
 
-if sys.version_info < (3, 9):
-    x = 1
-else:
-    x = 2
+x = 2
 
 if sys.platform == "linus":
     pass

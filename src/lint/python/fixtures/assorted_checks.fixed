@@ -258,11 +258,11 @@ def escapes():
     return first, second, third, fourth, fifth, sixth, seventh
 
 
-class Generic[_T]:
-    value: _T
+class Generic[T]:
+    value: T
 
 
-def generic_function[_T, _U_, __V__, W](value: _T) -> _T:
+def generic_function[T, _U_, __V__, W](value: T) -> T:
     return value
 
 

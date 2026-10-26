@@ -7,6 +7,7 @@ use super::classes::{
 };
 use super::mutability::{Resolver, without_subscript};
 use super::parameters::{Signature, has_default};
+use super::post_init_fix::{PostInit, initvar_fix};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     BODY_FIELD, CALL, DECORATED, FUNCTION, FUNCTION_FIELD, NAME_FIELD, VALUE_FIELD, named, text,
@@ -49,7 +50,7 @@ pub fn dataclass_reports(resolver: &Resolver<'_, '_>, seen: &SeenModules, class:
                 .map(|node| Report::at(PythonRule::RUF049, node, "")),
         );
     }
-    reports.extend(post_init_defaults(resolver.source, class));
+    reports.extend(post_init_defaults(resolver, class));
     reports
 }
 
@@ -67,7 +68,8 @@ fn mutable_defaults(resolver: &Resolver<'_, '_>, seen: &SeenModules, class: Node
         .collect()
 }
 
-fn post_init_defaults(source: &[u8], class: Node<'_>) -> Vec<Report> {
+fn post_init_defaults(resolver: &Resolver<'_, '_>, class: Node<'_>) -> Vec<Report> {
+    let source = resolver.source;
     class
         .child_by_field_name(BODY_FIELD)
         .map(named)
@@ -88,16 +90,29 @@ fn post_init_defaults(source: &[u8], class: Node<'_>) -> Vec<Report> {
                     .child_by_field_name(NAME_FIELD)
                     .is_some_and(|name| text(name, source) == POST_INIT)
         })
-        .flat_map(|function| {
-            let signature = Signature::of(function);
-            signature
-                .positional
-                .into_iter()
-                .chain(signature.keyword_only)
-                .filter(|parameter| has_default(*parameter))
-                .filter_map(|parameter| parameter.child_by_field_name(VALUE_FIELD))
-                .map(|default| Report::at(PythonRule::RUF033, default, ""))
-                .collect::<Vec<_>>()
+        .flat_map(|function| post_init_reports(resolver, &PostInit { class, function }))
+        .collect()
+}
+
+// Como ruff, los arreglos paran en el primer parámetro que no se puede arreglar: uno sin default
+// detrás de otro con default sería un error de sintaxis.
+fn post_init_reports(resolver: &Resolver<'_, '_>, post_init: &PostInit<'_>) -> Vec<Report> {
+    let signature = Signature::of(post_init.function);
+    let mut stopped_fixes = false;
+    signature
+        .positional
+        .into_iter()
+        .chain(signature.keyword_only)
+        .filter(|parameter| has_default(*parameter))
+        .filter_map(|parameter| {
+            let default = parameter.child_by_field_name(VALUE_FIELD)?;
+            let fix = if stopped_fixes {
+                None
+            } else {
+                initvar_fix(resolver.model, resolver.source, post_init, parameter)
+            };
+            stopped_fixes |= fix.is_none();
+            Some(Report::at(PythonRule::RUF033, default, "").with_fix(fix))
         })
         .collect()
 }

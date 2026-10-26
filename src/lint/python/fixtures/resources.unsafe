@@ -124,7 +124,7 @@ def closures(values):
 
         functions.append(inner)
         print((lambda: value)())
-        print(list(map(lambda item: item + value, values)))
+        print([item + value for item in values])
         print(sorted(values, key=lambda item: item - value))
         total = value * 2
         functions.append(lambda: total)

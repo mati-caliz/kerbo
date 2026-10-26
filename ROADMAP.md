@@ -1769,11 +1769,25 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     comentarios de cada elemento); SIM102 y SIM117 desindentan línea por línea (un string de varias
     líneas adentro quedaría corrido) y miden 88 columnas fijas; SIM117 no junta la forma con
     paréntesis. Siguen pendientes C417, PYI025, UP014, UP049, RUF033, F601, F602 y PLW0245.
+  - Tanda 14 (10 arreglos, idénticos a ruff en todos los fixtures; `small_fixes_three.py` junta los
+    bordes de PLW0245, F601 y F602): PLW0245 (también `(super).x()`), F601 y F602 (sólo cuando el
+    valor también se repite, desde el final del elemento anterior), RUF028 (con el `delete_comment`
+    de RUF100, que pasó a `fix_edits.rs`), RUF033 (el parámetro pasa a un campo `InitVar` arriba de
+    `__post_init__`, con el importer), UP014 (la clase impresa con el generador y la sangría del
+    archivo), C417 (generador o comprensión con el cuerpo de la lambda tal cual), UP036 (las cuatro
+    formas de ruff: borrar el `if`, el `elif` que pasa a `if`, el cuerpo que sube un nivel con el
+    `dedent_to` de ruff y el `elif` que pasa a `else`), PYI025 y UP049 (un renombrador sobre los
+    bindings del modelo, como el `Renamer` de ruff). PYI025 ahora sale de los bindings, al final del
+    análisis semántico, como en los alcances diferidos de ruff.
+  - Pendientes de esa tanda: el renombrador no sigue los `global`/`nonlocal` ni renombra adentro de
+    `__all__` o de anotaciones entre comillas (en esos casos no arregla); UP036 y el cuerpo que sube
+    un nivel no arreglan si hay un string de varias líneas o sangría mezclada (ruff usa libcst);
+    UP014 no mira los nombres dunder ni los `*` de los campos al detectar; RUF033 asume `\n` como
+    fin de línea.
   - Lo que falta de arreglos (medido el 2026-10-26 con `../kerbo-parity/scripts/pending_by_frequency.txt`):
-    13 reglas que aparecen en el corpus (unos 16.700 arreglos, 16.000 de ellos UP031 y UP032) y 6
-    que no aparecen. Las próximas: C417, PYI025, UP014, UP049, RUF033, F601, F602, PLW0245,
-    PYI034/PYI019, TC004, RUF028 y UP036; al final UP031/UP032 (pasar `%` y `.format` a f-string).
-    C417 (`map(lambda ...)`) queda para la tanda de libcst más pesada.
+    en el corpus quedan UP031 y UP032 (unos 16.000, pasar `%` y `.format` a f-string), TC004 (sacar
+    imports del `if TYPE_CHECKING`, que se cruza con I001) y PYI034/PYI019 (análisis de `Self`);
+    PLW1510 no va (el arreglo de ruff es sólo para mostrar).
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

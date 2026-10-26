@@ -44,13 +44,17 @@ mod library_calls;
 mod library_fixes;
 mod literals;
 mod logging_calls;
+mod map_fix;
 mod misc_calls;
 mod model;
 mod mutability;
+mod named_tuple_fix;
+mod outdated_versions;
 mod parameters;
 mod patterns;
 mod pep;
 mod pep604_fixes;
+mod post_init_fix;
 mod private_types;
 mod pylint_calls;
 mod pylint_definitions;
@@ -58,6 +62,7 @@ mod pytest_calls;
 mod qualified;
 mod redundant_tests;
 mod reference_fixes;
+mod renames;
 mod resources;
 mod returns;
 mod ruff_calls;
@@ -80,6 +85,7 @@ mod type_unions;
 mod typecheck;
 mod union_duplicates;
 mod unwrap_fixes;
+mod version_block_fix;
 mod version_checks;
 
 use crate::lint::python::semantic::annotations::Annotations;
@@ -172,6 +178,14 @@ pub fn reports(root: Node<'_>, source: &[u8], file: FileKind) -> Vec<Report> {
         source,
         &visitor.methods,
     ));
+    let exports: Vec<String> = visitor.exports.iter().map(|(name, _)| name.clone()).collect();
+    reports.extend(renames::unaliased_set_imports(
+        &visitor.model,
+        source,
+        visitor.file.stub,
+        &exports,
+    ));
+    renames::attach_private_type_parameter_fixes(&visitor.model, source, &mut reports);
     reports
 }
 
