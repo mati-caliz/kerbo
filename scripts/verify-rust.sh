@@ -15,7 +15,9 @@ readonly CARGO_DENY_SHA256="9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac61
 readonly LLVM_COV_URL="https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.9.1/cargo-llvm-cov-x86_64-unknown-linux-musl.tar.gz"
 readonly LLVM_COV_SHA256="3fca950394a3c49457657c158b1619cec8dfd2647ae5b48746734c0ab969a522"
 readonly MEMORY_LIMIT="1500m"
-readonly BUILD_JOBS=2
+# Un solo job: con dos, el clippy de un crate grande compilado de cero (pasó con kerbo al subir
+# cc el 2026-10-26) junta dos clippy-driver de ~750 MB y el tope del contenedor lo mata.
+readonly BUILD_JOBS=1
 readonly CACHE_VOLUME="rust-quality-cache"
 readonly VERIFY_CGROUP="builds.slice"
 readonly MAX_FILE_LINES=400
