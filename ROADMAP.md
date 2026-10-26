@@ -1710,8 +1710,20 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Pendientes de esa tanda: entre los avisos del árbol, el puesto sigue el orden en que los genera
     kerbo y no el de ruff (que corre antes las reglas de tokens y saca F401 alcance por alcance); sólo
     importa si dos arreglos así empiezan en el mismo lugar.
-  - Pendientes: 92 arreglos que aparecen en el corpus; C417 (`map(lambda ...)`) queda para la tanda de
-    libcst más pesada.
+  - Tanda 9 (8 arreglos, idénticos a ruff en todos los fixtures; `format_arguments.py` y
+    `small_fixes_two.py` juntan los bordes): F504, F522 y F523 (el `retain` de libcst: cada elemento
+    se lleva su coma y el espacio hasta el siguiente; F523 sólo saca posicionales del final), E401,
+    W605 (barra doble o raw según los escapes válidos de la parte; ahora también avisa en el formato
+    de una interpolación de f-string, como ruff), PLC0208, PLR0402 y PLR1722 (`sys.exit` con el
+    importer).
+  - Pendientes de esa tanda: los efectos de F504/F522/F523 toman cualquier nombre como builtin (ruff
+    mira si está tapado); E401 detrás de algo que no es `;` (`if x: import a, b`) no se arregla, y
+    ruff lo arregla, ve el error de sintaxis y revierte el archivo.
+  - Lo que falta de arreglos (medido el 2026-10-26 con `../kerbo-parity/scripts/pending_by_frequency.txt`):
+    98 reglas que aparecen en el corpus (unos 24.000 arreglos, 16.000 de ellos UP031 y UP032) y 38
+    que no aparecen. Las próximas por tema: F811, F601, F602, E731 y PLW0120; después UP031/UP032
+    (pasar `%` y `.format` a f-string), ISC004, UP035, SIM117, UP030, RUF015, RUF022/RUF023.
+    C417 (`map(lambda ...)`) queda para la tanda de libcst más pesada.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece
@@ -1720,8 +1732,6 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - I001: el aviso que falta en `pydantic-core/python/pydantic_core/_pydantic_core/__init__.pyi`
     (ruff lo da y kerbo no; sospecha: cómo se clasifica `pydantic_core` desde un paquete que sólo
     tiene `__init__.pyi`).
-  - Arreglos que ruff tiene y kerbo todavía no: E401 (partir el import), F811 (borrar la definición
-    pisada), F504/F522/F523 (sacar los argumentos de más) y E731 (pasar la lambda a `def`).
   - El arnés de esta paridad (ruff en JSON contra kerbo en JSON con la conversión de columnas)
     quedó fuera del repo, como los anteriores.
 - TypeScript y JavaScript contra ESLint (empezada, 2026-10-21): 20 reglas de `@eslint/js`
