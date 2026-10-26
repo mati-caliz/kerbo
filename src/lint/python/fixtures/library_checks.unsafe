@@ -124,13 +124,13 @@ def finally_without():
 
 
 a = b = 1
-a and not a
-not a and a
+False
+False
 a and not b
-a or not a
+True
 f() and not f()
 x.y and not x.y
-a and b and not a
+False
 
 mapping = {"a": 1}
 mapping.items()

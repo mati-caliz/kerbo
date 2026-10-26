@@ -8,6 +8,7 @@ use tree_sitter::{Node, Point};
 
 use super::Report;
 use super::ast::{COMMENT, STRING, text};
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 use crate::syntax::descendants;
 pub use fix_order::rank_fixes_like_ruff;
@@ -237,7 +238,12 @@ pub fn redirected_codes(root: Node<'_>, source: &[u8]) -> Vec<Report> {
                     row: start.row,
                     column: start.column.saturating_add(offset).saturating_add(position),
                 };
-                reports.push(Report::at_point(PythonRule::RUF101, at, code));
+                let end = Point {
+                    row: at.row,
+                    column: at.column.saturating_add(code.len()),
+                };
+                let fix = Fix::replace_range(at, end, redirected(code), source);
+                reports.push(Report::at_point(PythonRule::RUF101, at, code).with_fix(Some(fix)));
             }
         }
     }

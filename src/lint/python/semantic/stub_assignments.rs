@@ -61,6 +61,7 @@ const MODULE_SPECIAL: &str = "__all__";
 const CLASS_SPECIALS: [&str; 2] = ["__match_args__", "__slots__"];
 const TYPE_ALIAS: &str = "TypeAlias";
 const TYPING: &str = "typing";
+const ELLIPSIS_TEXT: &str = "...";
 const FINAL: &str = "Final";
 const ANY: &str = "Any";
 const PRIVATE_PREFIX: char = '_';
@@ -129,7 +130,8 @@ impl<'model> Context<'model, '_> {
         let ignored = self.is_special(target) || self.is_call_to(value, &TYPE_VARIABLE_LIKE);
         if !ignored && !self.is_valid_without_annotation(value) {
             if !self.is_valid_with_annotation(value, true) {
-                reports.push(Report::at(PythonRule::PYI015, value, ""));
+                let fix = Fix::replace(value, ELLIPSIS_TEXT, self.resolver.source);
+                reports.push(Report::at(PythonRule::PYI015, value, "").with_fix(Some(fix)));
             } else if !self.in_enum() {
                 reports.push(Report::at(PythonRule::PYI052, value, self.text(target)));
             }
@@ -184,7 +186,13 @@ impl<'model> Context<'model, '_> {
         if skipped {
             Vec::new()
         } else {
-            vec![Report::at(PythonRule::PYI015, value, "")]
+            vec![
+                Report::at(PythonRule::PYI015, value, "").with_fix(Some(Fix::replace(
+                    value,
+                    ELLIPSIS_TEXT,
+                    self.resolver.source,
+                ))),
+            ]
         }
     }
 

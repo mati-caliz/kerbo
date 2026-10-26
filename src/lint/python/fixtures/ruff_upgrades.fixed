@@ -7,9 +7,8 @@ from collections import defaultdict
 from collections.abc import Generator
 from dataclasses import dataclass, field
 from typing import ClassVar, Generic, TypeAlias, TypeVar
+from unittest import mock
 
-import mock
-import mock.mock
 import six
 
 T = TypeVar("T")
@@ -29,19 +28,18 @@ six.PY3
 if six.PY3:
     pass
 
-mock.mock.patch
+mock.patch
 mock.patch
 
 
 class Meta:
-    __metaclass__ = type
+    pass
 
 
 class OtherMeta:
     __metaclass__ = object
 
 
-__metaclass__ = type
 
 Alias: TypeAlias = int
 

@@ -6,6 +6,7 @@ use super::if_blocks::single_comparison;
 use super::model::Model;
 use super::qualified::is_builtin_named;
 use super::tail_call_fixes::identity_check_fix;
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ARGUMENT_FIELD, CALL, FUNCTION_FIELD, IDENTIFIER, LEFT_FIELD, NONE, NOT_OPERATOR, RIGHT_FIELD, text,
@@ -15,6 +16,8 @@ use crate::rules::PythonRule;
 
 const IDENTITY_OPERATORS: [&[&str]; 5] = [&["=="], &["!="], &["is"], &["is", "not"], &["is not"]];
 const TYPE_BUILTIN: &str = "type";
+const TRUE_LITERAL: &str = "True";
+const FALSE_LITERAL: &str = "False";
 const NOT_EQUAL: &str = "!=";
 const NOT_KEYWORD: &str = "not";
 const BOOLEAN_OPERATOR: &str = "boolean_operator";
@@ -93,6 +96,12 @@ pub fn negated_operands(model: &Model<'_>, source: &[u8], operation: Node<'_>) -
     if negated.is_empty() || contains_effect(operation, source, &is_builtin) {
         return Vec::new();
     }
+    let constant = if rule == PythonRule::SIM220 {
+        FALSE_LITERAL
+    } else {
+        TRUE_LITERAL
+    };
+    let fix = Fix::replace(operation, constant, source).marked_unsafe();
     let mut reports = Vec::new();
     for inner in &negated {
         for other in &plain {
@@ -100,7 +109,7 @@ pub fn negated_operands(model: &Model<'_>, source: &[u8], operation: Node<'_>) -
                 && other.kind() == IDENTIFIER
                 && text(*inner, source) == text(*other, source)
             {
-                reports.push(Report::at(rule, operation, ""));
+                reports.push(Report::at(rule, operation, "").with_fix(Some(fix.clone())));
             }
         }
     }

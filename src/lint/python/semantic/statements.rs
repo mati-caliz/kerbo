@@ -77,12 +77,9 @@ impl<'tree> Statements<'tree> for Visitor<'tree> {
 
     fn statement(&mut self, statement: Node<'tree>) {
         self.track_boundaries(statement);
-        self.reports.extend(compound_reports(
-            &self.model,
-            self.source,
-            statement,
-            self.file.stub,
-        ));
+        // Ruff analiza la sentencia después de recorrerla: sus avisos van detrás de los de sus
+        // expresiones, y eso decide los empates entre arreglos.
+        let analysis = compound_reports(&self.model, self.source, statement, self.file.stub);
         match statement.kind() {
             EXPRESSION_STATEMENT => self.expression_statement(statement),
             IMPORT => self.import(statement),
@@ -107,6 +104,7 @@ impl<'tree> Statements<'tree> for Visitor<'tree> {
             }
             _ => self.loads(statement),
         }
+        self.reports.extend(analysis);
     }
 
     fn loads(&mut self, node: Node<'tree>) {
