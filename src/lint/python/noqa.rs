@@ -1,3 +1,4 @@
+mod fix_order;
 mod ruff_codes;
 mod unused;
 
@@ -9,6 +10,7 @@ use super::Report;
 use super::ast::{COMMENT, STRING, text};
 use crate::rules::PythonRule;
 use crate::syntax::descendants;
+pub use fix_order::rank_fixes_like_ruff;
 use ruff_codes::REDIRECTS;
 pub use unused::{Check, unused_directives};
 

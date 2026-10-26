@@ -279,8 +279,14 @@ fn suppressed(
         source,
     };
     let unused = noqa::unused_directives(&suppressions, &reports, &check);
-    reports.retain(|report| !suppressions.silences(report));
+    let silenced: Vec<bool> = reports
+        .iter()
+        .map(|report| suppressions.silences(report))
+        .collect();
     reports.extend(unused.into_iter().filter(|report| enabled(report.rule)));
+    noqa::rank_fixes_like_ruff(&mut reports, &silenced);
+    let mut silenced_flags = silenced.into_iter();
+    reports.retain(|_| !silenced_flags.next().unwrap_or(false));
     reports
 }
 

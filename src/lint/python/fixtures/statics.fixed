@@ -1,9 +1,8 @@
+import decimal
 import sys
 from decimal import Decimal
 from decimal import Decimal as D
 from typing import TYPE_CHECKING
-
-import decimal
 
 
 def positive(x):

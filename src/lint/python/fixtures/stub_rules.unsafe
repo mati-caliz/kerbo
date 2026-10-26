@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import enum
 import math
 import sys
 import typing
-from __future__ import annotations
 from collections.abc import AsyncIterable, Iterable, Iterator
 from typing import Any, Final, ParamSpec, TypeAlias, TypedDict, TypeVar, TypeVarTuple
 

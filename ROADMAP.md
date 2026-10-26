@@ -1701,6 +1701,15 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     códigos que sigan sirviendo se borra con el `delete_comment` de ruff (la línea entera si está
     sola, desde el código o sólo la directiva si después viene otro comentario), y si no, se reescribe
     con los que se usan (`# noqa: `, `# ruff: noqa: ` o `# flake8: noqa: `).
+  - Tanda 8: I001, idéntico a ruff en todos los fixtures. Reescribe el bloque ordenado con la sangría del
+    bloque, y el orden en que se aplican los arreglos quedó calcado del `apply_fixes` de ruff: por
+    dónde empiezan, y a igualdad por el puesto del aviso en la lista de ruff (los del árbol, después
+    los I001 y al final los RUF100; los silenciados por `noqa` salen con `swap_remove`, así que los
+    últimos avisos pasan a ocupar su lugar y eso decide si gana I001 o F401 sobre el mismo import).
+    F401 y UP010 con nombres que quedan reescriben la sentencia entera, como libcst en ruff.
+  - Pendientes de esa tanda: entre los avisos del árbol, el puesto sigue el orden en que los genera
+    kerbo y no el de ruff (que corre antes las reglas de tokens y saca F401 alcance por alcance); sólo
+    importa si dos arreglos así empiezan en el mismo lugar.
   - Pendientes: 92 arreglos que aparecen en el corpus; C417 (`map(lambda ...)`) queda para la tanda de
     libcst más pesada.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
@@ -1711,9 +1720,8 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - I001: el aviso que falta en `pydantic-core/python/pydantic_core/_pydantic_core/__init__.pyi`
     (ruff lo da y kerbo no; sospecha: cómo se clasifica `pydantic_core` desde un paquete que sólo
     tiene `__init__.pyi`).
-  - Arreglos que ruff tiene y kerbo todavía no: I001 (reescribir el bloque ordenado), E401 (partir
-    el import), F811 (borrar la definición pisada), F504/F522/F523 (sacar los argumentos de más) y
-    E731 (pasar la lambda a `def`).
+  - Arreglos que ruff tiene y kerbo todavía no: E401 (partir el import), F811 (borrar la definición
+    pisada), F504/F522/F523 (sacar los argumentos de más) y E731 (pasar la lambda a `def`).
   - El arnés de esta paridad (ruff en JSON contra kerbo en JSON con la conversión de columnas)
     quedó fuera del repo, como los anteriores.
 - TypeScript y JavaScript contra ESLint (empezada, 2026-10-21): 20 reglas de `@eslint/js`

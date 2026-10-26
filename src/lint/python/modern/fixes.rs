@@ -5,7 +5,7 @@ use crate::fix::Fix;
 use crate::lint::python::ast::{
     COMMENT, CONCATENATED_STRING, EXPRESSION_STATEMENT, STRING, named, string_prefix, text,
 };
-use crate::lint::python::fix_edits::safe_unless_commented;
+use crate::lint::python::fix_edits::{rewrite_names, safe_unless_commented};
 use crate::lint::python::statement_removal::{delete_statement, delete_statement_only, isolation_group};
 
 // UP009 borra la línea entera del comentario.
@@ -57,16 +57,15 @@ pub fn future_import_fix(statement: Node<'_>, source: &[u8]) -> Fix {
         })
         .map(|entry| text(*entry, source))
         .collect();
-    let fix = match (kept.is_empty(), entries.first(), entries.last()) {
-        (false, Some(first), Some(last)) => Fix::replace_range(
-            first.start_position(),
-            last.end_position(),
-            &kept.join(", "),
-            source,
-        )
-        .isolated(isolation_group(statement)),
-        _ => delete_statement(statement, source),
+    let rewritten = if kept.is_empty() {
+        None
+    } else {
+        rewrite_names(statement, &entries, &kept.join(", "), source)
     };
+    let fix = rewritten.map_or_else(
+        || delete_statement(statement, source),
+        |fix| fix.isolated(isolation_group(statement)),
+    );
     safe_unless_commented(fix, statement)
 }
 

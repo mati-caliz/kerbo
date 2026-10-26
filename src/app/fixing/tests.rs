@@ -177,6 +177,7 @@ fn a_pass_that_breaks_the_syntax_is_not_accepted() {
                 hunk: String::new(),
                 safe: true,
                 isolation: None,
+                rank: 0,
             });
             diagnostic
         })

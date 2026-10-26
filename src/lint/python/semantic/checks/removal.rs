@@ -7,6 +7,7 @@ use super::super::model::{Binding, BindingId, EXPLICIT_EXPORT, GLOBAL, NONLOCAL}
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{ALIASED_IMPORT, NAME_FIELD, fields, text};
+use crate::lint::python::fix_edits::rewrite_names;
 use crate::lint::python::statement_removal::{delete_statement, isolation_group};
 use crate::rules::PythonRule;
 
@@ -70,23 +71,16 @@ fn removal(statement: Node<'_>, unused: &[Node<'_>], source: &[u8]) -> Option<Fi
         return Some(delete_statement(statement, source));
     }
     let fix = if statement.start_position().row == statement.end_position().row {
-        rewrite_line(&entries, &kept, source)
+        rewrite_line(statement, &entries, &kept, source)
     } else {
         remove_lines(&entries, unused, source)
     };
     fix.map(|fix| fix.isolated(isolation_group(statement)))
 }
 
-fn rewrite_line(entries: &[Node<'_>], kept: &[Node<'_>], source: &[u8]) -> Option<Fix> {
-    let first = entries.first()?;
-    let last = entries.last()?;
+fn rewrite_line(statement: Node<'_>, entries: &[Node<'_>], kept: &[Node<'_>], source: &[u8]) -> Option<Fix> {
     let kept_text: Vec<&str> = kept.iter().map(|entry| text(*entry, source)).collect();
-    let edit = TextEdit {
-        start: TextPoint::from_point(first.start_position()),
-        end: TextPoint::from_point(last.end_position()),
-        replacement: kept_text.join(SEPARATOR),
-    };
-    Some(Fix::from_edits(source, vec![edit]))
+    rewrite_names(statement, entries, &kept_text.join(SEPARATOR), source)
 }
 
 fn remove_lines(entries: &[Node<'_>], unused: &[Node<'_>], source: &[u8]) -> Option<Fix> {

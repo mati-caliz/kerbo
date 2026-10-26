@@ -1,7 +1,6 @@
 from __future__ import annotations as _annotations
 
 
-
 def forward(a: Later, b: list[AlsoLater]) -> Later:
     c: Missing = 1
     return c

@@ -1,11 +1,13 @@
 import json
+
 from other import name  # noqa: F401 este comentario no cuenta para el ancho de la línea
+
 x = 1
 
 
 def function():
-    import sys
     import os
+    import sys
 
     return os, sys
 

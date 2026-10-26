@@ -87,6 +87,7 @@ fn edit(line: usize, start: usize, end: usize, replacement: &str) -> Fix {
         hunk: String::new(),
         safe: true,
         isolation: None,
+        rank: 0,
     }
 }
 

@@ -14,6 +14,8 @@ use tree_sitter::Node;
 
 use super::Report;
 use super::ast::COMMENT;
+use super::fix_edits::point_of;
+use crate::fix::{Fix, TextEdit};
 use crate::rules::PythonRule;
 use blocks::{Builder, ImportGroup, Trailer};
 use directives::Directives;
@@ -96,7 +98,34 @@ fn unsorted(
         block_end
     };
     let actual = text_source.slice(line_start, actual_end);
-    (!matches_ignoring_indentation(actual, &expected)).then(|| Report::at(PythonRule::I001, first, ""))
+    if matches_ignoring_indentation(actual, &expected) {
+        return None;
+    }
+    let fix = Fix::from_edits(
+        file.source,
+        vec![TextEdit {
+            start: point_of(file.source, line_start),
+            end: point_of(file.source, actual_end),
+            replacement: indented(&expected, indentation),
+        }],
+    );
+    Some(Report::at(PythonRule::I001, first, "").with_fix(Some(fix)))
+}
+
+// El `textwrap::indent` de ruff: la sangría del bloque en cada línea que no está en blanco.
+fn indented(text: &str, indentation: &str) -> String {
+    if indentation.is_empty() {
+        return text.to_owned();
+    }
+    text.split_inclusive('\n')
+        .map(|line| {
+            if line.trim().is_empty() {
+                line.to_owned()
+            } else {
+                format!("{indentation}{line}")
+            }
+        })
+        .collect()
 }
 
 // `format_import_block`: las secciones en orden, separadas por una línea en blanco.

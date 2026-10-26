@@ -175,6 +175,7 @@ fn says_how_many_problems_kerbo_fix_solves_even_beyond_the_shown_ones() {
             hunk: "@@ -1 +0,0 @@\n-import x\n".to_owned(),
             safe: true,
             isolation: None,
+            rank: 0,
         });
     }
     let fixable = diagnostics.len().div_ceil(2);

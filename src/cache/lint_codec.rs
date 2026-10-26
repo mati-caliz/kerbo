@@ -47,6 +47,7 @@ pub fn write_fix(writer: &mut Writer, fix: Option<&Fix>) {
             writer.list(&fix.edits, write_edit);
             writer.text(&fix.hunk);
             writer.size(fix.isolation.map_or(0, |group| group.saturating_add(1)));
+            writer.size(fix.rank);
         }
     }
 }
@@ -59,6 +60,7 @@ pub fn read_fix(reader: &mut Reader<'_>) -> Result<Option<Fix>, Corrupt> {
             hunk: reader.text()?,
             safe: code == WITH_FIX,
             isolation: reader.size()?.checked_sub(1),
+            rank: reader.size()?,
         })),
         _ => Err(Corrupt),
     }

@@ -7,8 +7,8 @@ import re as regex
 from collections import (
     OrderedDict,
     abc,
-deque,
-defaultdict,
+    defaultdict,
+    deque,
 )
 from typing import TYPE_CHECKING
 

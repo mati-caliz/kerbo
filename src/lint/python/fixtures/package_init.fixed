@@ -1,0 +1,9 @@
+import os
+import sys as sys
+
+from . import sub
+from .sub import thing
+from .x import y as y
+
+print(__path__)
+__all__ = ["missing_in_init"]

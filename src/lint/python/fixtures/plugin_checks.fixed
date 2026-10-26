@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-from __future__ import braces
-from __future__ import barry_as_FLUFL, unknown_feature
+from __future__ import barry_as_FLUFL, braces, unknown_feature
 
 import logging
 import sys
@@ -69,10 +68,9 @@ def handler():
 lambda: logging.warning("x", exc_info=True)
 
 
-from gettext import gettext, ngettext
 import gettext as gt
+from gettext import gettext, ngettext
 from gettext import gettext as translate
-
 
 name = "x"
 _(f"Hello {name}")
@@ -95,12 +93,9 @@ other(f"x {name}")
 translate(f"x {name}")
 
 import pytest
+import pytest as pt
 from pytest import raises, yield_fixture
 from pytest.mark import usefixtures
-import pytest as pt
-
-from pytest import raises, yield_fixture
-import pytest as pt
 
 
 def test_raises():
@@ -182,14 +177,15 @@ def test_four():
     pass
 
 
-from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast
 import typing
 import typing as t
+from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast
 
 if TYPE_CHECKING:
-    from foo import Foo, Bar, Baz, Qux
     from collections.abc import Sequence
+
     import pkg
+    from foo import Bar, Baz, Foo, Qux
 
 OptFoo: TypeAlias = Foo | None
 OptBar: typing.TypeAlias = list[Bar]

@@ -1,7 +1,7 @@
 """Módulo de prueba."""
 import typing
-from typing import TYPE_CHECKING, Protocol
 from abc import abstractmethod
+from typing import TYPE_CHECKING, Protocol
 
 saludo = "hola"
 bytes_saludo = b"hola"

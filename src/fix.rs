@@ -32,6 +32,7 @@ pub struct Fix {
     pub hunk: String,
     pub safe: bool,
     pub isolation: Option<usize>,
+    pub rank: usize,
 }
 
 impl TextPoint {
@@ -63,6 +64,7 @@ impl Fix {
             edits,
             safe: true,
             isolation: None,
+            rank: 0,
         }
     }
 

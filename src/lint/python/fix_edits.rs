@@ -144,6 +144,22 @@ pub fn pad(mut content: String, node: Node<'_>, source: &[u8]) -> String {
     content
 }
 
+// Como `remove_imports` de ruff, que reescribe la sentencia entera con libcst: el arreglo cubre toda
+// la sentencia aunque cambie sólo la lista de nombres, y así desempata con otros igual que en ruff.
+pub fn rewrite_names(statement: Node<'_>, entries: &[Node<'_>], names: &str, source: &[u8]) -> Option<Fix> {
+    let first = entries.first()?;
+    let last = entries.last()?;
+    let slice = |start: usize, end: usize| {
+        String::from_utf8_lossy(source.get(start..end).unwrap_or_default()).into_owned()
+    };
+    let replacement = format!(
+        "{}{names}{}",
+        slice(statement.start_byte(), first.start_byte()),
+        slice(last.end_byte(), statement.end_byte())
+    );
+    Some(Fix::replace(statement, &replacement, source))
+}
+
 pub fn point_of(source: &[u8], offset: usize) -> TextPoint {
     let before = source.get(..offset).unwrap_or(source);
     let mut lines = before.split(|byte| *byte == LINE_FEED);

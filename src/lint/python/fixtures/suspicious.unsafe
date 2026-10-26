@@ -1,12 +1,12 @@
 import builtins
 import pdb
-import ipdb as debugger
-import IPython.terminal.embed
 import sys
 import unittest
 from pdb import set_trace
 from sys import breakpointhook
 
+import ipdb as debugger
+import IPython.terminal.embed
 import pytest
 
 value = 1

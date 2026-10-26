@@ -1,5 +1,13 @@
-from typing import Annotated, Literal, NamedTuple, TypeAlias, TypedDict, TypeVar, cast
 import typing
+from typing import (
+    Annotated,
+    Literal,
+    NamedTuple,
+    TypeAlias,
+    TypedDict,
+    TypeVar,
+    cast,
+)
 
 
 def strings(a: "Missing1", b: "list[Missing2]", c: "Missing3 | None") -> "Missing4":

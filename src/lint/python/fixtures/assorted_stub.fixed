@@ -1,5 +1,5 @@
-from typing import Literal
 import sys
+from typing import Literal
 
 def function() -> int: ...
 def other(value: list[int]) -> Literal["a"]: ...
