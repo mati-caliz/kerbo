@@ -43,13 +43,10 @@ def anidados(a, b, c):
 
 
 def contextos(x, y):
-    with abrir(x) as a:
-        with abrir(y) as b:
-            pass
-    with abrir(x):
-        with abrir(y):
-            with abrir(x):
-                pass
+    with abrir(x) as a, abrir(y) as b:
+        pass
+    with abrir(x), abrir(y), abrir(x):
+        pass
     with abrir(x):
         with abrir(y):
             pass
@@ -63,9 +60,8 @@ async def asincrono(x):
     async with abrir(x):
         with abrir(x):
             pass
-    async with abrir(x):
-        async with abrir(x):
-            pass
+    async with abrir(x), abrir(x):
+        pass
 
 
 import logging

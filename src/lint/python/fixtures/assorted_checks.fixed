@@ -165,7 +165,7 @@ def annotations_access(cls):
     return cls
 
 
-__all__ = ["remove_affixes", "dict_lookups", "file_writes"]
+__all__ = ["dict_lookups", "file_writes", "remove_affixes"]
 __all__ += ["format_characters"]
 __all__.extend(["annotations_access"])
 __all__ = ("single",)

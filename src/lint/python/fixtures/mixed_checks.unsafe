@@ -183,14 +183,12 @@ async def asynchronous(values):
 
 
 def test_nested_warns(optional: dict | None):
-    with pytest.warns(UserWarning):
-        with pytest.raises(ValueError):
-            print("one")
-    with pytest.warns(UserWarning):
-        with pytest.raises(ValueError):
+    with pytest.warns(UserWarning), pytest.raises(ValueError):
+        print("one")
+    with pytest.warns(UserWarning), pytest.raises(ValueError):
 
-            class Inside:
-                pass
+        class Inside:
+            pass
 
     for key in optional:
         print(optional[key])

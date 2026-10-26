@@ -10,8 +10,10 @@ use super::ast::{
 };
 use super::escapes::text_value;
 use super::natural::{isort_compare, natural_compare};
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
+const LINE_FEED: char = '\n';
 const ALL: &str = "__all__";
 const SLOTS: &str = "__slots__";
 const EXTEND: &str = "extend";
@@ -96,7 +98,8 @@ fn unsorted_all(value: Node<'_>, source: &[u8]) -> Option<Report> {
     if !matches!(value.kind(), LIST | TUPLE | EXPRESSION_LIST) {
         return None;
     }
-    is_unsorted(&elements(value), source, isort_compare).then(|| Report::at(PythonRule::RUF022, value, ""))
+    is_unsorted(&elements(value), source, isort_compare)
+        .then(|| Report::at(PythonRule::RUF022, value, "").with_fix(sorted_fix(value, isort_compare, source)))
 }
 
 fn unsorted_slots(value: Node<'_>, source: &[u8]) -> Option<Report> {
@@ -115,7 +118,39 @@ fn unsorted_slots(value: Node<'_>, source: &[u8]) -> Option<Report> {
         }
         _ => return None,
     };
-    is_unsorted(&items, source, natural_compare).then(|| Report::at(PythonRule::RUF023, value, ""))
+    let fix = sorted_fix(value, natural_compare, source);
+    is_unsorted(&items, source, natural_compare)
+        .then(|| Report::at(PythonRule::RUF023, value, "").with_fix(fix))
+}
+
+// El `sort_single_line_elements_sequence` de ruff: los elementos ordenados, separados por `, ` y sin
+// la coma final, entre los mismos corchetes. Con varias líneas ruff conserva los comentarios y eso
+// todavía no está.
+fn sorted_fix(collection: Node<'_>, compare: fn(&str, &str) -> Ordering, source: &[u8]) -> Option<Fix> {
+    if text(collection, source).contains(LINE_FEED) {
+        return None;
+    }
+    let mut keyed: Vec<(String, &str)> = elements(collection)
+        .into_iter()
+        .map(|element| {
+            let key = if element.kind() == PAIR {
+                element.child_by_field_name(KEY_FIELD)?
+            } else {
+                element
+            };
+            string_literal(key, source).map(|value| (value, text(element, source)))
+        })
+        .collect::<Option<Vec<(String, &str)>>>()?;
+    keyed.sort_by(|(first, _), (second, _)| compare(first, second));
+    let (opening, closing) = match collection.kind() {
+        LIST => ("[", "]"),
+        TUPLE => ("(", ")"),
+        SET | DICTIONARY => ("{", "}"),
+        _ => ("", ""),
+    };
+    let listed: Vec<&str> = keyed.iter().map(|(_, written)| *written).collect();
+    let replacement = format!("{opening}{}{closing}", listed.join(", "));
+    Some(Fix::replace(collection, &replacement, source))
 }
 
 fn elements(collection: Node<'_>) -> Vec<Node<'_>> {

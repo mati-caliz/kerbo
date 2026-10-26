@@ -12,7 +12,7 @@ use super::escapes::text_value;
 use super::known_types::{Known, is_known};
 use crate::fix::Fix;
 use crate::rules::PythonRule;
-use collapse_fix::collapse_fix;
+use collapse_fix::{collapse_fix, merge_with_fix};
 use needless_bool::needless_bool;
 
 const IF: &str = "if_statement";
@@ -250,7 +250,7 @@ fn multiple_with(statement: Node<'_>, source: &[u8]) -> Option<Report> {
     if parent.is_some_and(|parent| mergeable_child(parent, source).is_some()) {
         return None;
     }
-    Some(Report::at(PythonRule::SIM117, statement, ""))
+    Some(Report::at(PythonRule::SIM117, statement, "").with_fix(merge_with_fix(statement, source)))
 }
 
 fn mergeable_child<'tree>(outer: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {

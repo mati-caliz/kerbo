@@ -1761,11 +1761,18 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     RUF030 sólo arregla `print("texto")` (ruff arma una f-string con varios argumentos); UP026 sólo
     arregla `import mock` con un nombre en la sentencia. Quedan para la próxima B006, C417, SIM905,
     SIM114, UP049, PYI025, RUF033, UP014, F601 y F602.
+  - Tanda 13 (7 arreglos, idénticos a ruff en todos los fixtures): SIM905 (la lista de pedazos, con
+    los espacios y los límites de `str.split`), B006 (el default pasa a `None` y se inicializa al
+    principio del cuerpo), SIM114, SIM102 y SIM117 (el `if` o el `with` de adentro sube un nivel, como
+    el libcst de ruff), RUF022 y RUF023 (orden de `__all__` y `__slots__` en una línea).
+  - Pendientes de esa tanda: RUF022 y RUF023 no se arreglan con varias líneas (ruff conserva los
+    comentarios de cada elemento); SIM102 y SIM117 desindentan línea por línea (un string de varias
+    líneas adentro quedaría corrido) y miden 88 columnas fijas; SIM117 no junta la forma con
+    paréntesis. Siguen pendientes C417, PYI025, UP014, UP049, RUF033, F601, F602 y PLW0245.
   - Lo que falta de arreglos (medido el 2026-10-26 con `../kerbo-parity/scripts/pending_by_frequency.txt`):
-    20 reglas que aparecen en el corpus (unos 18.000 arreglos, 16.000 de ellos UP031 y UP032) y 6
-    que no aparecen. Las próximas: B006, C417, SIM905, SIM114, UP049, PYI025, RUF033, UP014, F601,
-    F602, SIM117, SIM102, RUF022/RUF023, PYI034/PYI019, TC004, RUF028 y UP036; al final UP031/UP032
-    (pasar `%` y `.format` a f-string).
+    13 reglas que aparecen en el corpus (unos 16.700 arreglos, 16.000 de ellos UP031 y UP032) y 6
+    que no aparecen. Las próximas: C417, PYI025, UP014, UP049, RUF033, F601, F602, PLW0245,
+    PYI034/PYI019, TC004, RUF028 y UP036; al final UP031/UP032 (pasar `%` y `.format` a f-string).
     C417 (`map(lambda ...)`) queda para la tanda de libcst más pesada.
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.

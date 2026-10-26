@@ -15,8 +15,11 @@ use crate::test_support::TempTree;
 use fixtures::FIXTURES;
 
 // Arreglos que, como en ruff, pueden dejar el mismo aviso en el mismo lugar para la vuelta siguiente:
-// `((x))` pierde un par de paréntesis por vuelta.
-const REPEATED_FIXES: [LintKind; 1] = [LintKind::Python(PythonRule::UP034)];
+// `((x))` pierde un par de paréntesis por vuelta y tres `with` anidados se juntan de a dos.
+const REPEATED_FIXES: [LintKind; 2] = [
+    LintKind::Python(PythonRule::UP034),
+    LintKind::Python(PythonRule::SIM117),
+];
 
 fn strict() -> Limits {
     Preset::Strict.limits(Language::Python, false)
