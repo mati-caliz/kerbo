@@ -8,6 +8,7 @@ from builtins import str as text_type
 from typing import TypeVar
 
 import trio
+import trio.lowlevel
 
 T = TypeVar("U")
 V = TypeVar("V")
@@ -18,7 +19,7 @@ values["key"]: int
 other: int
 
 
-class Meta(metaclass=type):
+class Meta:
     pass
 
 
@@ -85,10 +86,10 @@ def lookups(mapping, items):
 
 def ternaries(a, b):
     return (
-        a if a > b else b,
-        b if a > b else a,
-        a if a >= b else b,
-        a if b > a else b,
+        max(b, a),
+        min(a, b),
+        max(a, b),
+        min(b, a),
         a if a > b else 0,
     )
 
@@ -165,7 +166,7 @@ async def asynchronous():
     time.sleep(1)
     with open("file") as handle:
         print(handle)
-    await trio.sleep(0)
+    await trio.lowlevel.checkpoint()
     await asyncio.sleep(0)
     await trio.sleep(1)
 

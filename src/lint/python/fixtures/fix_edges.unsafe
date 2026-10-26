@@ -7,7 +7,7 @@ x = "" ""
 y = "a" "b"
 
 
-class Base(metaclass=type):
+class Base:
     pass
 
 

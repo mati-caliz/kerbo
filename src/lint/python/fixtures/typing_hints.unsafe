@@ -1,7 +1,7 @@
 import builtins
 import collections.abc
 import typing
-from collections.abc import AsyncGenerator, AsyncIterator, Generator, Iterator, Set
+from collections.abc import AsyncGenerator, AsyncIterator, Iterator, Set
 from collections.abc import Set as AbstractSet
 from types import TracebackType
 from typing import (
@@ -26,14 +26,14 @@ _private_alias: TypeAlias = str
 type pep_alias = int
 type PepAlias = int
 
-none_literal: Literal[None]
-mixed_literal: Literal[1, None]
+none_literal: None
+mixed_literal: Literal[1] | None
 optional_literal: Literal[None] | None
-union_literal: Literal[None] | int
+union_literal: None | int
 duplicate_literal: Literal[1, 2, "a"]
 nested_literal: Literal[1]
-literal_union: Literal[1] | Literal[2]
-literal_union_three: Literal["a"] | Literal["b"] | int
+literal_union: Literal[1, 2]
+literal_union_three: Literal["a", "b"] | int
 duplicate_union: int | str
 duplicate_typing_union: int | str
 nested_duplicate: int | str
@@ -131,7 +131,7 @@ def protocol_user(value: _UsedProtocol) -> None:
 
 
 class Iterable:
-    def __iter__(self) -> Generator[int, None, None]:
+    def __iter__(self) -> Iterator[int]:
         yield 1
 
     async def __aiter__(self) -> AsyncGenerator[int, None]:
@@ -165,7 +165,7 @@ final_negative: Final[Literal[-1]] = -1
 
 
 class LoopIterable:
-    def __iter__(self) -> Generator[int, None, None]:
+    def __iter__(self) -> Iterator[int]:
         yield from range(3)
 
 

@@ -1,9 +1,10 @@
 use tree_sitter::Node;
 
+use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
 use super::integer_calls::is_integer_literal;
 use super::model::Model;
 use super::qualified::qualified_name;
-use crate::fix::Fix;
+use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::ast::{
     ASSIGNMENT, CALL, EXPRESSION_STATEMENT, FUNCTION_FIELD, KEYWORD_ARGUMENT, PARENTHESIZED, RIGHT_FIELD,
     text, unparenthesized,
@@ -15,6 +16,10 @@ const RETURN: &str = "return_statement";
 const INTEGER: &str = "integer";
 const FLOAT: &str = "float";
 const ROUND: &str = "builtins.round";
+const FUNCTOOLS: &str = "functools";
+const REDUCE: &str = "reduce";
+const OPERATOR: &str = "operator";
+const IADD: &str = "iadd";
 const SAFE_INTEGER_RESULTS: [&str; 11] = [
     "builtins.len",
     "builtins.id",
@@ -142,4 +147,26 @@ pub fn unnecessary_round_fix(call: Node<'_>, number: Node<'_>, source: &[u8]) ->
     let safe = is_integer_literal(unparenthesized(number), source)
         && !has_comment_within(call, call.start_byte(), call.end_byte());
     if safe { fix } else { fix.marked_unsafe() }
+}
+
+// RUF017: `sum(listas, [])` pasa a `functools.reduce(operator.iadd, listas, [])`, con los imports que
+// hagan falta; inseguro, como en ruff.
+pub fn reduce_fix(model: &Model<'_>, call: Node<'_>, iterable: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let request = |module, member| ImportRequest {
+        module,
+        member,
+        style: ImportStyle::Import,
+    };
+    let (reduce, reduce_import) = get_or_import_member(model, source, call, request(FUNCTOOLS, REDUCE))?;
+    let (iadd, iadd_import) = get_or_import_member(model, source, iterable, request(OPERATOR, IADD))?;
+    let mut edits = vec![TextEdit {
+        start: TextPoint::from_point(call.start_position()),
+        end: TextPoint::from_point(call.end_position()),
+        replacement: format!("{reduce}({iadd}, {}, [])", text(iterable, source)),
+    }];
+    edits.push(reduce_import);
+    if !edits.contains(&iadd_import) {
+        edits.push(iadd_import);
+    }
+    Some(Fix::from_edits(source, edits).marked_unsafe())
 }

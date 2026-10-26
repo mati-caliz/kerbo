@@ -4,7 +4,7 @@ use super::builtin_calls::{Arguments, arguments, keyword_value};
 use super::model::Model;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::tail_call_fixes::{
-    MATH_LOG_FUNCTION, bit_count_fix, get_logger_fix, identity_check_fix, log_base_fix,
+    MATH_LOG_FUNCTION, bit_count_fix, checkpoint_fix, get_logger_fix, identity_check_fix, log_base_fix,
 };
 use super::type_hints::Hints;
 use crate::lint::python::Report;
@@ -101,7 +101,16 @@ pub fn tail_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) -> Ve
         reports.push(Report::at(PythonRule::DTZ004, call, ""));
     }
     reports.extend(verbose_log_message(hints, call, function, &given));
-    reports.extend(blocking_async_call(source, call, qualified, &given));
+    reports.extend(
+        blocking_async_call(source, call, qualified, &given).map(|report| {
+            if report.rule == PythonRule::ASYNC115 {
+                let fix = qualified.and_then(|name| checkpoint_fix(model, call, name, source));
+                report.with_fix(fix)
+            } else {
+                report
+            }
+        }),
+    );
     reports
 }
 

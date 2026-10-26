@@ -1,0 +1,15 @@
+from collections.abc import Set
+from typing import NoReturn
+
+class Shown:
+    pass
+
+class Typed:
+    def __str__(self, extra: int) -> str: ...
+    def __repr__(self) -> int: ...
+
+class Abstract:
+    pass
+
+def never(value: NoReturn) -> None: ...
+def uses(value: Set[int]) -> None: ...

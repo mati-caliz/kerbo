@@ -15,24 +15,18 @@ qualified: str = "b"
 
 
 def bounds(value, highest, lowest, items):
-    if value > highest:
-        highest = value
-    if value < lowest:
-        lowest = value
-    if highest < value:
-        highest = value
-    if value >= highest:
-        highest = value
+    highest = max(highest, value)
+    lowest = min(lowest, value)
+    highest = max(highest, value)
+    highest = max(value, highest)
     if value > highest:
         highest = value
     else:
         pass
     if value > highest:
         highest = other = value
-    if value > items[0]:
-        items[0] = value
-    if value.x > highest.y:
-        highest.y = value.x
+    items[0] = max(items[0], value)
+    highest.y = max(highest.y, value.x)
     return highest, lowest, other
 
 

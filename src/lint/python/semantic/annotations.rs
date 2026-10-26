@@ -198,7 +198,9 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
             return;
         };
         if self.file.stub {
-            self.reports.push(Report::at(PythonRule::PYI020, string, ""));
+            let fix = Fix::replace(string, value, self.source);
+            self.reports
+                .push(Report::at(PythonRule::PYI020, string, "").with_fix(Some(fix)));
         }
         let typing_only =
             is_typing_only_annotation(string, self.boundaries.future_annotations() || self.file.stub);

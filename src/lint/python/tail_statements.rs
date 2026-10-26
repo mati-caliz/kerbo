@@ -8,6 +8,7 @@ use super::ast::{
 };
 use super::branches::equivalent;
 use super::codegen;
+use super::fix_edits::{Parentheses, commented_unsafe, remove_argument};
 use super::known_types::{Known, is_binding, is_known};
 use crate::fix::Fix;
 use crate::rules::PythonRule;
@@ -43,6 +44,8 @@ const ORDERINGS: [&str; 4] = ["<", "<=", ">", ">="];
 const MESSAGE_LITERALS: [&str; 6] = ["integer", "float", TRUE, FALSE, "none", "ellipsis"];
 const SCOPES: [&str; 3] = [FUNCTION, CLASS, LAMBDA];
 const SELF: &str = "self";
+const MAX: &str = "max";
+const MIN: &str = "min";
 const SIMPLE_ELEMENTS: [&str; 3] = ["string", "integer", "float"];
 
 // Más chequeos sobre sentencias: RUF040, FURB136, FURB132, B032, UP050, PLE0117, PLR1708 y PLW0711.
@@ -112,7 +115,44 @@ fn ternary_min_max(conditional: Node<'_>, source: &[u8]) -> Option<Report> {
     let (left, right) = ordering(*condition, source)?;
     let same = |first: Node<'_>, second: Node<'_>| equivalent(first, second, source);
     let selects = (same(*body, left) && same(*orelse, right)) || (same(*body, right) && same(*orelse, left));
-    selects.then(|| Report::at(PythonRule::FURB136, conditional, ""))
+    selects.then(|| {
+        let fix = min_max_fix(conditional, *body, *condition, source);
+        Report::at(PythonRule::FURB136, conditional, "").with_fix(fix)
+    })
+}
+
+// El arreglo de FURB136, como ruff: `>`/`>=` dan `max` y `<`/`<=` `min`; con `>` o `<` los argumentos
+// van al revés, y si el cuerpo es el lado derecho se invierten los dos. Inseguro con comentarios.
+fn min_max_fix(conditional: Node<'_>, body: Node<'_>, condition: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let comparison = unparenthesized(condition);
+    let (left, right) = ordering(comparison, source)?;
+    let mut cursor = comparison.walk();
+    let operator = comparison
+        .children_by_field_name(OPERATORS_FIELD, &mut cursor)
+        .next()
+        .map(|operator| text(operator, source))?;
+    let (mut use_max, mut flip) = match operator {
+        ">" => (true, true),
+        ">=" => (true, false),
+        "<" => (false, true),
+        _ => (false, false),
+    };
+    if !equivalent(body, left, source) {
+        use_max = !use_max;
+        flip = !flip;
+    }
+    let (first, second) = if flip { (right, left) } else { (left, right) };
+    let function = if use_max { MAX } else { MIN };
+    let replacement = format!(
+        "{function}({}, {})",
+        codegen::unparse(first, codegen::COMMA, source),
+        codegen::unparse(second, codegen::COMMA, source)
+    );
+    Some(commented_unsafe(
+        Fix::replace(conditional, &replacement, source),
+        conditional,
+        source,
+    ))
 }
 
 // FURB132: `if x in s: s.remove(x)` sobre un conjunto, que es `s.discard(x)`.
@@ -210,7 +250,13 @@ fn metaclass_type(class: Node<'_>, source: &[u8]) -> Vec<Report> {
                     .child_by_field_name(VALUE_FIELD)
                     .is_some_and(|value| text(value, source) == TYPE)
         })
-        .map(|argument| Report::at(PythonRule::UP050, argument, ""))
+        .map(|argument| {
+            let fix = class.child_by_field_name(SUPERCLASSES_FIELD).map(|arguments| {
+                let fix = remove_argument(argument, arguments, Parentheses::Remove, source);
+                commented_unsafe(fix, arguments, source)
+            });
+            Report::at(PythonRule::UP050, argument, "").with_fix(fix)
+        })
         .collect()
 }
 

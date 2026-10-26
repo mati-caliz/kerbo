@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use super::effects::contains_effect;
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ASSIGNMENT, COMMENT, COMPARISON, EXPRESSION_STATEMENT, IDENTIFIER, LEFT_FIELD, OPERATORS_FIELD,
@@ -11,6 +12,7 @@ use crate::lint::python::ast::{
 };
 use crate::lint::python::branches::equivalent;
 use crate::lint::python::container_checks::integer_value;
+use crate::lint::python::fix_edits::has_comment_within;
 use crate::lint::python::known_types::{Known, is_known};
 use crate::rules::PythonRule;
 
@@ -306,7 +308,10 @@ fn dict_get_block(model: &Model<'_>, source: &[u8], statement: Node<'_>) -> Opti
         .start_position()
         .column
         .saturating_add(contents.chars().count());
-    (width <= MAX_LINE_LENGTH).then(|| Report::at(PythonRule::SIM401, statement, &contents))
+    (width <= MAX_LINE_LENGTH).then(|| {
+        Report::at(PythonRule::SIM401, statement, &contents)
+            .with_fix(dict_get_fix(statement, &contents, source))
+    })
 }
 
 // SIM401 en su forma de expresión: `d[k] if k in d else default`, sobre cualquier valor y sin mirar el
@@ -335,7 +340,20 @@ pub fn dict_get_expression(model: &Model<'_>, source: &[u8], conditional: Node<'
         return None;
     }
     let contents = get_call(subscripted, comparison.left, default, source);
-    Some(Report::at(PythonRule::SIM401, conditional, &contents))
+    Some(
+        Report::at(PythonRule::SIM401, conditional, &contents).with_fix(dict_get_fix(
+            conditional,
+            &contents,
+            source,
+        )),
+    )
+}
+
+// El arreglo de SIM401: el bloque o la expresión pasan a la llamada a `get`; inseguro, y sin arreglo
+// si hay comentarios.
+fn dict_get_fix(node: Node<'_>, contents: &str, source: &[u8]) -> Option<Fix> {
+    (!has_comment_within(node, node.start_byte(), node.end_byte()))
+        .then(|| Fix::replace(node, contents, source).marked_unsafe())
 }
 
 fn is_not_in(comparison: &Comparison<'_>) -> bool {

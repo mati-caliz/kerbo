@@ -22,6 +22,7 @@ use super::type_names::is_type_name;
 use super::type_unions::{Deferral, redundant_type_union, runtime_string_union};
 use super::version_checks::{is_six_py3, version_subscript};
 use super::{Mode, Visitor};
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ATTRIBUTE, CALL, COMMENT, COMPARISON, CONCATENATED_STRING, IDENTIFIER, INTERPOLATION, KEYWORD_ARGUMENT,
@@ -80,8 +81,8 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
             self.deferred.annotations.push(self.snapshot(node));
             return;
         }
-        self.reports
-            .extend(type_hint_reports(&self.model, self.source, node, mode));
+        let found = type_hint_reports(&self.model, self.source, node, mode);
+        self.reports.extend(outside_stubs_unsafe(found, self.file.stub));
         self.union_reports(node, mode);
         match node.kind() {
             IDENTIFIER => {
@@ -377,4 +378,14 @@ fn is_literal_set_call(model: &Model<'_>, source: &[u8], function: Node<'_>, arg
     let single_literal = arguments.kind() == ARGUMENT_LIST
         && matches!(named(arguments).as_slice(), [argument] if LITERAL_SEQUENCES.contains(&crate::lint::python::ast::unparenthesized(*argument).kind()));
     is_set_name && single_literal && is_builtin_named(model, function, source, SET_BUILTIN)
+}
+
+// PYI061 sólo es seguro en un stub.
+fn outside_stubs_unsafe(reports: Vec<Report>, stub: bool) -> impl Iterator<Item = Report> {
+    reports.into_iter().map(move |mut report| {
+        if report.rule == PythonRule::PYI061 && !stub {
+            report.fix = report.fix.map(Fix::marked_unsafe);
+        }
+        report
+    })
 }

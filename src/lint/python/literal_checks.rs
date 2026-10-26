@@ -7,7 +7,7 @@ use super::ast::{
 };
 use super::branches::equivalent;
 use super::codegen;
-use super::fix_edits::pad;
+use super::fix_edits::{commented_unsafe, pad};
 use super::loop_variable_reads::is_read_in_scope;
 use super::spread_fix::unnecessary_spread_fix;
 use crate::fix::{Fix, TextEdit, TextPoint};
@@ -52,7 +52,13 @@ const PAIR_TARGETS: [&str; 3] = ["pattern_list", "tuple_pattern", TUPLE];
 const ITEMS: &str = "items";
 const KEYS: &str = "keys";
 const VALUES: &str = "values";
-const ORDERINGS: [&str; 4] = ["<", "<=", ">", ">="];
+const LESS: &str = "<";
+const LESS_EQUAL: &str = "<=";
+const GREATER: &str = ">";
+const GREATER_EQUAL: &str = ">=";
+const ORDERINGS: [&str; 4] = [LESS, LESS_EQUAL, GREATER, GREATER_EQUAL];
+const MAX: &str = "max";
+const MIN: &str = "min";
 const ASSIGNMENT: &str = "assignment";
 const EXPRESSION_STATEMENT: &str = "expression_statement";
 
@@ -299,5 +305,21 @@ fn min_max_if(statement: Node<'_>, source: &[u8]) -> Option<Report> {
     let same = |first: Node<'_>, second: Node<'_>| equivalent(first, second, source);
     let selects =
         (same(target, *left) && same(value, *right)) || (same(target, *right) && same(value, *left));
-    selects.then(|| Report::at(PythonRule::PLR1730, statement, ""))
+    let operator = operators.first().copied().unwrap_or_default();
+    selects.then(|| {
+        let target_first = same(target, *left);
+        let is_less = matches!(operator, LESS | LESS_EQUAL);
+        let inclusive = matches!(operator, LESS_EQUAL | GREATER_EQUAL);
+        let function = if is_less == target_first { MAX } else { MIN };
+        let flip = inclusive == target_first;
+        let (first, second) = if flip { (*right, *left) } else { (*left, *right) };
+        let replacement = format!(
+            "{} = {function}({}, {})",
+            text(target, source),
+            text(unparenthesized(first), source),
+            text(unparenthesized(second), source)
+        );
+        let fix = commented_unsafe(Fix::replace(statement, &replacement, source), statement, source);
+        Report::at(PythonRule::PLR1730, statement, "").with_fix(Some(fix))
+    })
 }

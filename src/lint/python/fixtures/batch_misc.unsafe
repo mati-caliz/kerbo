@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import functools
 import math
+import operator
 from functools import cache, lru_cache
 from typing import Any
 
 
 def flatten(groups):
-    first = sum(groups, [])
-    second = sum(groups, start=[])
+    first = functools.reduce(operator.iadd, groups, [])
+    second = functools.reduce(operator.iadd, groups, [])
     third = sum(groups, ())
-    fourth = sum(groups, [])
+    fourth = functools.reduce(operator.iadd, groups, [])
     fifth = sum(groups, [1])
     sixth = sum(groups)
     return first, second, third, fourth, fifth, sixth

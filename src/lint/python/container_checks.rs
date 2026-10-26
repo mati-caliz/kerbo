@@ -8,7 +8,9 @@ use super::ast::{
 };
 use super::branches::equivalent;
 use super::escapes::text_value;
+use super::fix_edits::commented_unsafe;
 use super::statement_removal::delete_statement;
+use crate::fix::Fix;
 use crate::rules::PythonRule;
 
 const IF: &str = "if_statement";
@@ -24,7 +26,6 @@ const OPERATOR_FIELD: &str = "operator";
 const ARGUMENT_FIELD: &str = "argument";
 const COLON: &str = ":";
 const MINUS: &str = "-";
-const STARTSWITH: &str = "startswith";
 const ENDSWITH: &str = "endswith";
 const LEN: &str = "len";
 const ONE: &str = "1";
@@ -39,6 +40,10 @@ const HEX_PREFIXES: [&str; 2] = ["0x", "0X"];
 const OCTAL_PREFIXES: [&str; 2] = ["0o", "0O"];
 const BINARY_PREFIXES: [&str; 2] = ["0b", "0B"];
 const DIGIT_SEPARATOR: char = '_';
+const STARTSWITH: &str = "startswith";
+const CONDITIONAL_EXPRESSION: &str = "conditional_expression";
+const REMOVEPREFIX: &str = "removeprefix";
+const REMOVESUFFIX: &str = "removesuffix";
 const RADIX_PREFIXES: [([&str; 2], u32); 3] = [(HEX_PREFIXES, 16), (OCTAL_PREFIXES, 8), (BINARY_PREFIXES, 2)];
 
 // FURB188 (`s[3:] if s.startswith("pre") else s`), PLE0643 (`[0, 1][2]`), RUF063
@@ -77,8 +82,10 @@ fn affix_expression(conditional: Node<'_>, source: &[u8]) -> Option<Report> {
         return None;
     };
     let body = unparenthesized(*body);
-    (body.kind() == SUBSCRIPT && removes_affix(body, *test, *orelse, source))
-        .then(|| Report::at(PythonRule::FURB188, conditional, ""))
+    (body.kind() == SUBSCRIPT && removes_affix(body, *test, *orelse, source)).then(|| {
+        let fix = remove_affix_fix(conditional, *test, *orelse, source);
+        Report::at(PythonRule::FURB188, conditional, "").with_fix(fix)
+    })
 }
 
 // FURB188 como sentencia: `if texto.startswith(p): texto = texto[n:]`, sin `else`.
@@ -103,7 +110,44 @@ fn affix_statement(statement: Node<'_>, source: &[u8]) -> Option<Report> {
         .child_by_field_name(RIGHT_FIELD)
         .map(unparenthesized)
         .filter(|value| value.kind() == SUBSCRIPT)?;
-    removes_affix(value, test, target, source).then(|| Report::at(PythonRule::FURB188, statement, ""))
+    removes_affix(value, test, target, source).then(|| {
+        let fix = remove_affix_fix(statement, test, target, source);
+        Report::at(PythonRule::FURB188, statement, "").with_fix(fix)
+    })
+}
+
+// El arreglo de FURB188: `texto.removeprefix(p)` (o `removesuffix`), como sentencia `texto = ...` si
+// era un `if`; inseguro con comentarios.
+fn remove_affix_fix(node: Node<'_>, test: Node<'_>, kept: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let assigns = node.kind() != CONDITIONAL_EXPRESSION;
+    let call = unparenthesized(test);
+    let function = call.child_by_field_name(FUNCTION_FIELD)?;
+    let method = function
+        .child_by_field_name(ATTRIBUTE_FIELD)
+        .map(|attribute| text(attribute, source))?;
+    let replacement_method = if method == STARTSWITH {
+        REMOVEPREFIX
+    } else {
+        REMOVESUFFIX
+    };
+    let affix = significant(call.child_by_field_name(ARGUMENTS_FIELD)?)
+        .into_iter()
+        .next()?;
+    let kept_text = text(unparenthesized(kept), source);
+    let call_text = format!(
+        "{kept_text}.{replacement_method}({})",
+        text(unparenthesized(affix), source)
+    );
+    let replacement = if assigns {
+        format!("{kept_text} = {call_text}")
+    } else {
+        call_text
+    };
+    Some(commented_unsafe(
+        Fix::replace(node, &replacement, source),
+        node,
+        source,
+    ))
 }
 
 struct SliceBounds<'tree> {

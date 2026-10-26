@@ -37,8 +37,8 @@ optional_literal: Literal[None] | None
 union_literal: Literal[None] | int
 duplicate_literal: Literal[1, 2, "a"]
 nested_literal: Literal[1]
-literal_union: Literal[1] | Literal[2]
-literal_union_three: Literal["a"] | Literal["b"] | int
+literal_union: Literal[1, 2]
+literal_union_three: Literal["a", "b"] | int
 duplicate_union: int | str
 duplicate_typing_union: int | str
 nested_duplicate: int | str
@@ -136,7 +136,7 @@ def protocol_user(value: _UsedProtocol) -> None:
 
 
 class Iterable:
-    def __iter__(self) -> Generator[int, None, None]:
+    def __iter__(self) -> Iterator[int]:
         yield 1
 
     async def __aiter__(self) -> AsyncGenerator[int, None]:

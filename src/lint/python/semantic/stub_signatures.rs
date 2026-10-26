@@ -4,6 +4,7 @@ use super::Mode;
 use super::call_fixes::builtin_fix;
 use super::decorators::is_abstract;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
+use super::type_hint_fixes::iterator_fix;
 use super::type_hints::{Hints, subscript_parts, unwrapped};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
@@ -12,10 +13,12 @@ use crate::lint::python::ast::{
 };
 use crate::lint::python::escapes::text_value;
 use crate::lint::python::methods::{MethodKind, method_kind};
+use crate::lint::python::statement_removal::delete_statement;
 use crate::rules::PythonRule;
 use crate::syntax::{SnippetLanguage, parse_snippet};
 
 const OBJECT: &str = "object";
+const DECORATED_DEFINITION: &str = "decorated_definition";
 const PARAMETERS_FIELD: &str = "parameters";
 const RETURN_TYPE_FIELD: &str = "return_type";
 const TYPE_FIELD: &str = "type";
@@ -316,6 +319,7 @@ fn generator_from_iter(
                 .unwrap_or(signature.function),
             "",
         )
+        .with_fix(iterator_fix(hints, value, &name, &slices))
     })
 }
 
@@ -352,6 +356,11 @@ fn redundant_string_method(
     }
     let returns = signature.function.child_by_field_name(RETURN_TYPE_FIELD)?;
     is_builtin_named(hints.model, unwrapped(returns), hints.source, STR).then(|| {
+        let definition = signature
+            .function
+            .parent()
+            .filter(|parent| parent.kind() == DECORATED_DEFINITION)
+            .unwrap_or(signature.function);
         Report::at(
             PythonRule::PYI029,
             signature
@@ -360,6 +369,7 @@ fn redundant_string_method(
                 .unwrap_or(signature.function),
             "",
         )
+        .with_fix(Some(delete_statement(definition, hints.source).isolated(None)))
     })
 }
 

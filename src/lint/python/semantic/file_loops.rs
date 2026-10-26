@@ -50,6 +50,9 @@ const PATH_TYPES: [&str; 4] = [
     "pathlib.PurePosixPath",
     "pathlib.PureWindowsPath",
 ];
+const EXPRESSION_LIST: &str = "expression_list";
+const LAMBDA_KIND: &str = "lambda";
+const CONDITIONAL_KIND: &str = "conditional_expression";
 const OPENERS: [&str; 4] = ["io.open", "io.open_code", "os.open", "builtins.open"];
 
 // FURB122: un `for` cuyo cuerpo es sólo `f.write(x)` sobre un archivo, que es `f.writelines(...)`.
@@ -96,7 +99,46 @@ pub fn loop_writes(model: &Model<'_>, source: &[u8], statement: Node<'_>) -> Opt
         let name = text(*name, source);
         !matches!(model.lookup(name), Resolution::Unresolved) || is_read_after(statement, name, source)
     });
-    (!escapes).then(|| Report::at(PythonRule::FURB122, statement, text(file, source)))
+    (!escapes).then(|| {
+        let fix = arguments
+            .first()
+            .and_then(|written| writelines_fix(statement, file, *written, source));
+        Report::at(PythonRule::FURB122, statement, text(file, source)).with_fix(fix)
+    })
+}
+
+// El arreglo de FURB122: `f.writelines(xs)` si se escribe la variable del loop tal cual, o
+// `f.writelines(expr for x in xs)`; el iterable va entre paréntesis si es una tupla sin ellos (o una
+// lambda o un `if` dentro de la comprensión). Inseguro con comentarios.
+fn writelines_fix(statement: Node<'_>, file: Node<'_>, written: Node<'_>, source: &[u8]) -> Option<Fix> {
+    let target = statement.child_by_field_name(LEFT_FIELD)?;
+    let iterable = statement.child_by_field_name(RIGHT_FIELD)?;
+    let same_name = target.kind() == IDENTIFIER
+        && written.kind() == IDENTIFIER
+        && text(target, source) == text(written, source);
+    let iterable_text = text(iterable, source);
+    let needs_parentheses = iterable.kind() == EXPRESSION_LIST
+        || (!same_name && matches!(iterable.kind(), LAMBDA_KIND | CONDITIONAL_KIND));
+    let iterable_text = if needs_parentheses {
+        format!("({iterable_text})")
+    } else {
+        iterable_text.to_owned()
+    };
+    let file_text = text(file, source);
+    let replacement = if same_name {
+        format!("{file_text}.writelines({iterable_text})")
+    } else {
+        format!(
+            "{file_text}.writelines({} for {} in {iterable_text})",
+            text(written, source),
+            text(target, source)
+        )
+    };
+    Some(commented_unsafe(
+        Fix::replace(statement, &replacement, source),
+        statement,
+        source,
+    ))
 }
 
 fn target_names<'tree>(target: Node<'tree>, names: &mut Vec<Node<'tree>>) {

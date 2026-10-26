@@ -3,7 +3,10 @@ use tree_sitter::Node;
 use super::Mode;
 use super::model::Model;
 use super::qualified::{is_typing, qualified_name};
-use super::type_hint_fixes::{final_literal_fix, generic_last_fix, literal_dedup_fix};
+use super::type_hint_fixes::{
+    final_literal_fix, generic_last_fix, literal_dedup_fix, literal_union_fix, nested_literal_fix,
+    none_literal_fix,
+};
 use super::union_duplicates::duplicate_union_fix;
 use crate::fix::Fix;
 use crate::lint::python::Report;
@@ -81,7 +84,9 @@ pub fn type_hint_reports(model: &Model<'_>, source: &[u8], node: Node<'_>, mode:
             .count()
             > 1
         {
-            reports.push(Report::at(PythonRule::PYI030, node, ""));
+            reports.push(
+                Report::at(PythonRule::PYI030, node, "").with_fix(literal_union_fix(hints, node, &members)),
+            );
         }
     }
     if hints.is_typing_subscript(node, LITERAL)
@@ -97,13 +102,18 @@ pub fn type_hint_reports(model: &Model<'_>, source: &[u8], node: Node<'_>, mode:
             .into_iter()
             .any(|slice| hints.is_typing_subscript(slice, LITERAL));
         if nested {
-            reports.push(Report::at(PythonRule::RUF041, node, ""));
+            reports.push(
+                Report::at(PythonRule::RUF041, node, "").with_fix(nested_literal_fix(node, &members, source)),
+            );
         }
         reports.extend(
             members
                 .iter()
                 .filter(|member| member.kind() == NONE_LITERAL)
-                .map(|member| Report::at(PythonRule::PYI061, *member, "")),
+                .map(|member| {
+                    Report::at(PythonRule::PYI061, *member, "")
+                        .with_fix(none_literal_fix(node, &members, source))
+                }),
         );
         let repeated = duplicates(&members, source, PythonRule::PYI062);
         let fix = if repeated.is_empty() {
@@ -235,7 +245,7 @@ impl<'tree> Hints<'_, '_, '_> {
         }
     }
 
-    fn literal_members(self, node: Node<'tree>, members: &mut Vec<Node<'tree>>) {
+    pub fn literal_members(self, node: Node<'tree>, members: &mut Vec<Node<'tree>>) {
         for slice in subscript_parts(node)
             .map(|(_, slices)| slices)
             .unwrap_or_default()

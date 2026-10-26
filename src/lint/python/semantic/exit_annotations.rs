@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::call_fixes::builtin_fix;
 use super::classes::DEFINITION_FIELD;
 use super::decorators::{decorators_of, is_overload};
 use super::parameters::{Signature, annotation, has_default, matches_annotation};
@@ -64,7 +65,14 @@ pub fn exit_annotation_reports(
             Some(variadic) => reports.extend(
                 annotation(variadic)
                     .filter(|annotation| !matches_annotation(hints, *annotation, &is_object_or_unused))
-                    .map(report),
+                    .map(|annotation| {
+                        report(annotation).with_fix(builtin_fix(
+                            hints.model,
+                            annotation,
+                            OBJECT,
+                            hints.source,
+                        ))
+                    }),
             ),
             None => reports.extend(signature.node.map(report)),
         }

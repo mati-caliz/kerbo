@@ -12,7 +12,7 @@ counter = 0
 Point = NamedTuple("Point", [("x", int), ("y", int)])
 Keyword = NamedTuple("Keyword", x=int)
 Dynamic = NamedTuple("Dynamic", fields)
-Nested = Literal[Literal["a"], "b"]
+Nested = Literal["a", "b"]
 Flat = Literal["a", "b"]
 logger = logging.getLogger(__name__)
 

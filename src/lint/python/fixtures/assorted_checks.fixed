@@ -19,19 +19,17 @@ else:
 
 
 def remove_affixes(filename: str, text: str, other: str) -> str:
-    filename = filename[:-4] if filename.endswith(".txt") else filename
-    filename = filename[4:] if filename.startswith("pre_") else filename
+    filename = filename.removesuffix(".txt")
+    filename = filename.removeprefix("pre_")
     filename = filename[:-4] if filename.startswith(".txt") else filename
-    filename = filename[len(other):] if filename.startswith(other) else filename
-    filename = filename[:-len(other)] if filename.endswith(other) else filename
+    filename = filename.removeprefix(other)
+    filename = filename.removesuffix(other)
     filename = filename[:-3] if filename.endswith(".txt") else filename
     filename = filename[4::2] if filename.startswith("pre_") else filename
-    filename = filename[4::1] if filename.startswith("pre_") else filename
+    filename = filename.removeprefix("pre_")
     filename = other[4:] if filename.startswith("pre_") else filename
-    if text.startswith("pre"):
-        text = text[3:]
-    if text.endswith("post"):
-        text = text[:-4]
+    text = text.removeprefix("pre")
+    text = text.removesuffix("post")
     if text.startswith("pre"):
         text = text[3:]
     else:
@@ -95,12 +93,9 @@ def dict_lookups(key, default):
 
 def file_writes(lines, pairs):
     with builtins.open("file", "w") as handle:
-        for line in lines:
-            handle.write(line)
-        for line in lines:
-            handle.write(line.encode())
-        for left, right in pairs:
-            handle.write(left + right)
+        handle.writelines(lines)
+        handle.writelines(line.encode() for line in lines)
+        handle.writelines(left + right for left, right in pairs)
         for line in lines:
             handle.write(line)
         else:
@@ -173,9 +168,9 @@ def annotations_access(cls):
     return cls
 
 
-__all__ = ["remove_affixes", "dict_lookups", "remove_affixes", "file_writes", "dict_lookups"]
-__all__ += ["format_characters", "format_characters"]
-__all__.extend(["annotations_access", "annotations_access"])
+__all__ = ["remove_affixes", "dict_lookups", "file_writes"]
+__all__ += ["format_characters"]
+__all__.extend(["annotations_access"])
 __all__ = ("single",)
 
 

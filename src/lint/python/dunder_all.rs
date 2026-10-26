@@ -9,6 +9,7 @@ use super::ast::{
     RIGHT_FIELD, SET, STRING, TUPLE, named, text, unparenthesized,
 };
 use super::escapes::text_value;
+use super::fix_edits::{commented_unsafe, remove_member};
 use crate::rules::PythonRule;
 
 const ALL: &str = "__all__";
@@ -112,7 +113,10 @@ fn duplicates(value: Node<'_>, source: &[u8]) -> Vec<Report> {
         .into_iter()
         .filter_map(|item| {
             let name = string_value(item, source)?;
-            (!seen.insert(name)).then(|| Report::at(PythonRule::RUF068, item, ""))
+            (!seen.insert(name)).then(|| {
+                let fix = commented_unsafe(remove_member(item, value, source), value, source);
+                Report::at(PythonRule::RUF068, item, "").with_fix(Some(fix))
+            })
         })
         .collect()
 }

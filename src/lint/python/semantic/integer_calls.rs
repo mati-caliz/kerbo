@@ -3,7 +3,7 @@ use tree_sitter::Node;
 use super::builtin_calls::{Arguments, arguments, keyword_value};
 use super::model::Model;
 use super::qualified::{is_builtin_named, qualified_name};
-use super::unwrap_fixes::cast_to_int_fix;
+use super::unwrap_fixes::{cast_to_int_fix, reduce_fix};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     CALL, FUNCTION_FIELD, LEFT_FIELD, LIST, RIGHT_FIELD, named, text, unparenthesized,
@@ -50,7 +50,11 @@ pub fn integer_call_reports(model: &Model<'_>, source: &[u8], call: Node<'_>) ->
         && !given.positional.is_empty()
         && argument(&given, START, 1, source).is_some_and(|start| is_empty_list(model, source, start))
     {
-        reports.push(Report::at(PythonRule::RUF017, call, ""));
+        let fix = given
+            .positional
+            .first()
+            .and_then(|iterable| reduce_fix(model, call, *iterable, source));
+        reports.push(Report::at(PythonRule::RUF017, call, "").with_fix(fix));
     }
     if is_builtin_named(model, function, source, INT)
         && given.keywords.is_empty()

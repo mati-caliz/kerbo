@@ -5,6 +5,7 @@ use super::ast::{
     ASSIGNMENT, ATTRIBUTE, CALL, CLASS, COMMENT, FUNCTION, FUNCTION_FIELD, IDENTIFIER, LAMBDA, LEFT_FIELD,
     RIGHT_FIELD, SUBSCRIPT, TUPLE, VALUE_FIELD, named, text, unparenthesized,
 };
+use super::fix_edits::{commented_unsafe, pad};
 use super::known_types::{Known, is_binding, is_known};
 use super::loop_variable_reads::is_load;
 use crate::fix::{Fix, TextEdit, TextPoint};
@@ -302,7 +303,11 @@ fn unnecessary_list_cast(statement: Node<'_>, source: &[u8]) -> Option<Report> {
                 text(iterable, source),
                 source,
             ));
-    iterable_ok.then(|| Report::at(PythonRule::PERF101, call, ""))
+    iterable_ok.then(|| {
+        let replacement = pad(text(iterable, source).to_owned(), call, source);
+        let fix = commented_unsafe(Fix::replace(call, &replacement, source), call, source);
+        Report::at(PythonRule::PERF101, call, "").with_fix(Some(fix))
+    })
 }
 fn mentions(body: Option<Node<'_>>, wanted: &str, source: &[u8]) -> bool {
     let mut nodes = Vec::new();

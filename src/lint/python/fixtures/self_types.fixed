@@ -4,7 +4,6 @@ import types
 import typing
 from types import TracebackType
 from typing import (
-    Any,
     AsyncIterator,
     Iterator,
     TypeVar,
@@ -32,7 +31,7 @@ class ObjectExit:
 
 
 class StarArgs:
-    def __exit__(self, *args: Any) -> None: ...
+    def __exit__(self, *args: object) -> None: ...
     async def __aexit__(self, *args) -> None: ...
 
 

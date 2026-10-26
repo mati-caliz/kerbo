@@ -6,12 +6,16 @@ use super::integer_calls::is_integer_literal;
 use super::model::Model;
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::lint::python::ast::{
-    CONCATENATED_STRING, FALSE, MODULE, NOT_OPERATOR, TRUE, text, unparenthesized,
+    ARGUMENTS_FIELD, CONCATENATED_STRING, FALSE, FUNCTION_FIELD, MODULE, NOT_OPERATOR, TRUE, text,
+    unparenthesized,
 };
 use crate::lint::python::codegen;
 use crate::lint::python::fix_edits::{commented_unsafe, has_comment_within};
 
 const MATH: &str = "math";
+const LOWLEVEL_SUFFIX: &str = ".lowlevel";
+const CHECKPOINT: &str = "checkpoint";
+const EMPTY_CALL: &str = "()";
 const LOGGING: &str = "logging";
 const GET_LOGGER: &str = "getLogger";
 const LIST_SPLAT: &str = "list_splat";
@@ -112,6 +116,31 @@ pub fn get_logger_fix(model: &Model<'_>, function: Node<'_>, source: &[u8]) -> O
         replacement: binding,
     };
     Some(Fix::from_edits(source, vec![reference, import]).marked_unsafe())
+}
+
+// ASYNC115: `trio.sleep(0)` pasa a `trio.lowlevel.checkpoint()`, con el import que haga falta;
+// inseguro con comentarios.
+pub fn checkpoint_fix(model: &Model<'_>, call: Node<'_>, qualified: &str, source: &[u8]) -> Option<Fix> {
+    let (library, _) = qualified.split_once('.')?;
+    let module = format!("{library}{LOWLEVEL_SUFFIX}");
+    let function = call.child_by_field_name(FUNCTION_FIELD)?;
+    let arguments = call.child_by_field_name(ARGUMENTS_FIELD)?;
+    let (binding, import) =
+        get_or_import_member(model, source, function, import_module(&module, CHECKPOINT))?;
+    let edits = vec![
+        import,
+        TextEdit {
+            start: TextPoint::from_point(function.start_position()),
+            end: TextPoint::from_point(function.end_position()),
+            replacement: binding,
+        },
+        TextEdit {
+            start: TextPoint::from_point(arguments.start_position()),
+            end: TextPoint::from_point(arguments.end_position()),
+            replacement: EMPTY_CALL.to_owned(),
+        },
+    ];
+    Some(commented_unsafe(Fix::from_edits(source, edits), call, source))
 }
 
 const fn import_module<'request>(module: &'request str, member: &'request str) -> ImportRequest<'request> {
