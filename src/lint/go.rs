@@ -1,4 +1,5 @@
 mod ast;
+mod build_constraints;
 mod error_strings;
 mod generated;
 mod imports;
@@ -10,9 +11,14 @@ mod resolver;
 mod tagged_switch;
 pub mod taint;
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::path::Path;
+
 use tree_sitter::Node;
 
 use super::{LintFinding, LintKind, finding_at};
+use crate::language::Language;
 use crate::limits::Limits;
 use crate::rules::{GoRule, RuleId};
 
@@ -29,8 +35,21 @@ const CHECKS: [(GoRule, GoCheck); 4] = [
     (GoRule::Qf1004, unlimited_call_findings),
 ];
 
-pub fn findings(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding> {
-    if root.has_error() || generated::is_generated(root, source) {
+// Lo que el resultado toma del archivo además del contenido: si el nombre lo deja fuera de la
+// plataforma por defecto.
+pub fn analysis_context(language: Language, path: &Path) -> Option<u64> {
+    (language == Language::Go).then(|| {
+        let mut hasher = DefaultHasher::new();
+        build_constraints::file_name_builds(path).hash(&mut hasher);
+        hasher.finish()
+    })
+}
+
+pub fn findings(root: Node<'_>, source: &[u8], limits: &Limits, path: Option<&Path>) -> Vec<LintFinding> {
+    if root.has_error()
+        || generated::is_generated(root, source)
+        || !build_constraints::builds_on_default_platform(path, source)
+    {
         return Vec::new();
     }
     CHECKS
@@ -103,8 +122,16 @@ fn unlimited_call_findings(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
 
 // Lo que el archivo aporta a ST1005 en su paquete: los mensajes con mayúscula y lo que declara. Un
 // archivo generado no avisa pero sus nombres cuentan, como en golangci-lint.
-pub fn package_facts(root: Node<'_>, source: &[u8], limits: &Limits) -> Option<GoPackageFacts> {
-    if limits.get(RuleId::Go(GoRule::St1005)).is_none() || root.has_error() {
+pub fn package_facts(
+    root: Node<'_>,
+    source: &[u8],
+    limits: &Limits,
+    path: Option<&Path>,
+) -> Option<GoPackageFacts> {
+    if limits.get(RuleId::Go(GoRule::St1005)).is_none()
+        || root.has_error()
+        || !build_constraints::builds_on_default_platform(path, source)
+    {
         return None;
     }
     let mut facts = error_strings(root, source).1;

@@ -178,7 +178,7 @@ pub fn analyze_unit(
             .then(|| taints_of(language, root, source))
             .flatten(),
         go_package: (language == Language::Go)
-            .then(|| package_facts(root, source, limits))
+            .then(|| package_facts(root, source, limits, unit.path))
             .flatten(),
     })
 }

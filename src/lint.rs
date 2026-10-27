@@ -114,6 +114,7 @@ pub const LINT_RULES: [RuleId; 6] = [
 ];
 
 pub use ecmascript::{DisabledRange, disabled_ranges as eslint_disabled_ranges};
+pub use go::analysis_context as go_analysis_context;
 pub use go::nolint_ranges as go_nolint_ranges;
 pub use java_style::relaxed_by as java_relaxed_by;
 pub use python::analysis_context as python_analysis_context;
@@ -129,7 +130,7 @@ pub fn find_lints(
         LintStyle::Unmeasured => Vec::new(),
         LintStyle::Checkstyle => java_lints(root, unit.source, limits),
         LintStyle::Ruff => python::findings(root, unit.source, limits, unit.path),
-        LintStyle::GolangciLint => go::findings(root, unit.source, limits),
+        LintStyle::GolangciLint => go::findings(root, unit.source, limits, unit.path),
         LintStyle::Eslint => {
             let file = ecmascript::SourceFile {
                 source: unit.source,

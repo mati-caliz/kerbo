@@ -13,6 +13,7 @@ use crate::analysis::{FileAnalysis, analyze};
 use crate::config::Config;
 use crate::language::Language;
 use crate::limits::{LimitOverride, Limits, Preset};
+use crate::lint::go_analysis_context;
 use crate::rules::RuleId;
 use crate::scan::{ScanOutcome, ScanRequest, scan};
 use crate::test_support::TempTree;
@@ -326,7 +327,8 @@ fn a_cached_scan_reports_exactly_what_a_fresh_one_does() {
     assert_ne!(shard_files(&directory).len(), 0);
     let warm = AnalysisCache::open(directory.clone(), DEFAULT_MAX_BYTES);
     let limits = strict(Language::Go).with_override(DUPLICATE_OVERRIDE[0]);
-    let key = warm.analysis_key(subject(Language::Go, GO_SOURCE.as_bytes(), None), &limits);
+    let context = go_analysis_context(Language::Go, &tree.path().join("src/many.go"));
+    let key = warm.analysis_key(subject(Language::Go, GO_SOURCE.as_bytes(), context), &limits);
     assert!(warm.analysis(key).is_some());
     assert_eq!(summary(&scan_project(tree.path(), Some(&warm))), fresh);
     for shard in shard_files(&directory) {

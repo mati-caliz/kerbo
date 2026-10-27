@@ -13,7 +13,7 @@ use crate::duplicates::{PooledFile, find_duplicates};
 use crate::i18n::Problem;
 use crate::language::{Language, Stack};
 use crate::limits::LimitOverride;
-use crate::lint::python_analysis_context;
+use crate::lint::{go_analysis_context, python_analysis_context};
 use crate::macro_rules::MacroIndex;
 use crate::rules::{Diagnostic, FileIdentity, evaluate};
 use crate::shell;
@@ -316,7 +316,8 @@ fn check_file(
         .as_ref()
         .map(|crate_macros| crate_macros.analysis_context(&file.identity.absolute))
         .or_else(|| shell::analysis_context(language, &file.identity.absolute))
-        .or_else(|| python_analysis_context(language, &file.identity.absolute));
+        .or_else(|| python_analysis_context(language, &file.identity.absolute))
+        .or_else(|| go_analysis_context(language, &file.identity.absolute));
     let subject = AnalysisSubject {
         language,
         source: &source,

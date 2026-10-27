@@ -2186,8 +2186,26 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Paridad contra golangci-lint v2.15.0 (staticcheck sólo con QF1001, QF1003 y QF1004, cada módulo
     con sus dependencias) en chi, cobra, gin, fzf, caddy, hugo, golang/tools, prometheus, terraform,
     syncthing, etcd y consul: los 100 avisos (67 de QF1004 y 33 de QF1003) idénticos por archivo,
-    línea y columna. Sobran 15, todos en archivos con `//go:build ignore`, `tools` o `integration`
-    (las restricciones de build de abajo).
+    línea y columna. Sobraban 15, todos en archivos con `//go:build ignore`, `tools` o
+    `integration`, que dejaron de avisar con las restricciones de build.
+- Restricciones de build (hecho, 2026-10-27): las reglas de golangci-lint sólo miran los archivos
+  que `go/build` incluye en linux/amd64, como golangci-lint por defecto. Se calcan `goodOSArchFile`
+  (`_windows.go`, `_linux_arm64_test.go`; `windows.go` solo no cuenta, y los que empiezan con `_` o
+  `.` quedan afuera) y `shouldBuild`: el `//go:build` en cualquier lugar de la cabecera, y sin él las
+  `// +build` hasta la última línea en blanco antes del código, con la sintaxis vieja (espacios,
+  comas, `!!` como `ignore`). Los tags son los del Go 1.27 de golangci-lint v2.15.0: `linux`,
+  `amd64`, `unix`, `cgo`, `gc`, `amd64.v1`, `go1.1` a `go1.27` y sus `goexperiment` prendidos. Una
+  restricción que no parsea no descarta el archivo (`go list` falla el paquete entero). Un archivo
+  descartado tampoco aporta nombres a ST1005. Las reglas universales siguen mirando todos los
+  archivos. El veredicto del nombre entra a la caché como contexto; el de la cabecera ya va en el
+  contenido.
+  - Contra `go list -json` de esa imagen: 42 nombres y cabeceras, todos con el mismo veredicto
+    (`src/lint/go/build_constraints/tests.rs`).
+  - Paridad de las cuatro reglas de Go (ineffassign, ST1005, QF1003, QF1004) contra golangci-lint
+    v2.15.0 en los 12 repos de arriba, cada módulo con sus dependencias: 1.369 coincidencias por
+    archivo, línea y columna, **ninguna de más** y 12 de menos, todas ST1005 de terraform con el
+    mensaje en una constante de otro archivo. syncthing pide `go run build.go assets` antes: sin
+    `lib/api/auto` generado, golangci-lint no analiza los paquetes que dependen de él.
 - Pendientes de Go contra golangci-lint:
   - ST1005 con el mensaje en una constante de otro archivo del paquete: pide guardar las constantes
     de texto de cada archivo y evaluar el mensaje en la pasada por paquete. Tampoco se verificó si las
@@ -2199,9 +2217,9 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - errcheck, SA1019, QF1008, QF1012, unused y govet: piden los tipos del compilador. Es el grueso
     del volumen (errcheck solo es el 75 %) y hay que decidir cómo traerlos sin reimplementar el
     chequeo de tipos de Go.
-  - Las restricciones de build: golangci-lint analiza sólo los archivos de la plataforma (por
-    defecto linux/amd64) y kerbo, todos los `.go`; en un `_windows.go` kerbo puede marcar algo que
-    golangci-lint no ve.
+  - La plataforma es fija: falta leer `GOOS`, `GOARCH` y `run.build-tags` de la configuración de
+    golangci-lint del repo. Tampoco se descartan los directorios que `./...` saltea (`testdata`,
+    `vendor`, los que empiezan con `_` o `.`); la paridad los filtró del lado de kerbo.
   - `uniq-by-line` (prendido por defecto en golangci-lint) deja un solo aviso por línea y linter;
     kerbo muestra todos.
   - El arnés de esta paridad (golangci-lint en JSON y `go list` contra kerbo en JSON) quedó fuera
