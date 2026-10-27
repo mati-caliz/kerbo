@@ -8,6 +8,7 @@ rule_family!(GoRule {
     Qf1004 => "qf1004",
     Qf1008 => "qf1008",
     Qf1012 => "qf1012",
+    Sa1019 => "sa1019",
 });
 
 const STATICCHECK: &str = "staticcheck";
@@ -17,7 +18,9 @@ impl GoRule {
     pub const fn linter(self) -> &'static str {
         match self {
             Self::Ineffassign | Self::Errcheck => self.as_str(),
-            Self::St1005 | Self::Qf1003 | Self::Qf1004 | Self::Qf1008 | Self::Qf1012 => STATICCHECK,
+            Self::St1005 | Self::Qf1003 | Self::Qf1004 | Self::Qf1008 | Self::Qf1012 | Self::Sa1019 => {
+                STATICCHECK
+            }
         }
     }
 }

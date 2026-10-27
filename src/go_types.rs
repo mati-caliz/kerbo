@@ -59,6 +59,16 @@ pub struct FprintFact {
     pub replacement: String,
 }
 
+// Un aviso que el helper decide entero, con la regla y lo que nombra.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct ReportFact {
+    pub rule: String,
+    pub line: usize,
+    pub column: usize,
+    #[serde(default)]
+    pub subject: String,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct FileFacts {
     pub file: PathBuf,
@@ -72,6 +82,8 @@ pub struct FileFacts {
     pub embedded: Option<Vec<PositionFact>>,
     #[serde(default)]
     pub fprints: Option<Vec<FprintFact>>,
+    #[serde(default)]
+    pub reports: Option<Vec<ReportFact>>,
 }
 
 // Los hechos de tipos de un módulo, por archivo (con la ruta canónica).
@@ -106,6 +118,7 @@ fn merge(into: &mut FileFacts, facts: FileFacts) {
     extend(&mut into.ranges, facts.ranges);
     extend(&mut into.embedded, facts.embedded);
     extend(&mut into.fprints, facts.fprints);
+    extend(&mut into.reports, facts.reports);
 }
 
 fn extend<Item>(into: &mut Option<Vec<Item>>, more: Option<Vec<Item>>) {

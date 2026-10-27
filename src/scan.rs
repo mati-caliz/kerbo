@@ -26,7 +26,6 @@ mod pooling;
 mod project;
 mod walk;
 
-const PATH_SEPARATOR: &str = "/";
 const SINGLE_FILE: usize = 1;
 
 #[derive(Debug)]
@@ -136,6 +135,7 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
     failures.extend(go_typed::confirm_typed_findings(
         &mut outcome.diagnostics,
         &mut outcome.suppressed,
+        &go_typed::direct_files(&files, request),
         &GoPlatform::of(request.config.go_target()),
     ));
     if project::covers_project(request.roots, &project_root(request.config)) {
@@ -254,7 +254,7 @@ fn source_file(walk_root: &Path, path: &Path, project_root: &Path) -> SourceFile
     let is_test = language.is_some_and(|language| language.is_test_path(test_path));
     let relative = absolute
         .strip_prefix(project_root)
-        .map_or_else(|_| portable(path), portable);
+        .map_or_else(|_| walk::portable(path), walk::portable);
     let identity = FileIdentity {
         display: path.display().to_string(),
         relative,
@@ -276,14 +276,6 @@ fn walked_file(walk_root: &Path, path: &Path, project_root: &Path) -> SourceFile
         };
     }
     file
-}
-
-fn portable(path: &Path) -> String {
-    let parts: Vec<String> = path
-        .components()
-        .map(|part| part.as_os_str().to_string_lossy().into_owned())
-        .collect();
-    parts.join(PATH_SEPARATOR)
 }
 
 // Los límites del archivo: los de la configuración con los `--max` de la línea de comandos encima.

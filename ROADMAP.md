@@ -2272,6 +2272,19 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   cadena; cada `Write` o `WriteString` de un argumento) y se confirman al final del escaneo como
   los de errcheck. Contra la corrida del conjunto por defecto en los 12 repos: 811 de 811 y 342 de
   342, ninguno de más.
+- staticcheck SA1019 (hecho, 2026-10-27), el uso de lo marcado con `Deprecated:`. Lo exportado no
+  trae comentarios, así que el helper lee el fuente de cada paquete listado (sólo los archivos que
+  nombran `Deprecated: `) con el recorrido del analizador `deprecated` de staticcheck y guarda las
+  deprecaciones por paquete y nombre (`Tipo.Metodo`, `Tipo.Campo`, también de interfaces); el uso
+  se busca con el mismo nombre desde el objeto de go/types. Lo de la biblioteca estándar sólo con
+  la tabla de staticcheck v0.8.2 (copiada en `src/go_types/stdlib_deprecations.go`, MIT) y si la
+  versión de Go del módulo o del archivo ya lo tenía deprecado; las excepciones de staticcheck
+  (lo propio, los tests externos, la función que está deprecada ella misma), los campos de un
+  literal de struct y los imports de paquetes deprecados.
+  - Es la primera regla "directa": no hay candidatos por archivo (serían todos los `x.y` del
+    código); el helper decide cada aviso y la pasada del escaneo lo convierte en aviso de los
+    archivos escaneados, con sus límites, sin los generados y pasado por los `//nolint` del archivo.
+  - Contra la corrida del conjunto por defecto en los 12 repos: 592 de 592, ninguno de más.
 - Pendientes de Go contra golangci-lint:
   - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
     eximen, como los tipos).
@@ -2280,9 +2293,8 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     fzf y hugo, todos comparaciones de campos o resultados `float64`, y `!(a == 1.0)` con `a int`
     avisa en staticcheck. Queda con las que piden tipos.
   - Lo que queda del conjunto por defecto, por volumen en el corpus (14.755 avisos de golangci-lint,
-    el 91 % ya en kerbo): SA1019 (592, pide además los comentarios `Deprecated:` de las
-    dependencias, que no vienen en lo exportado), unused (249), QF1001 (136), govet `inline` (130) y
-    `stdmethods` (28), y una cola larga de staticcheck con menos de 30 cada una.
+    el 95 % ya en kerbo): unused (249), QF1001 (136), govet `inline` (130) y `stdmethods` (28), y
+    una cola larga de staticcheck con menos de 30 cada una.
   - Los archivos que son symlinks no se recorren y golangci-lint sí los mira (55 avisos de errcheck
     en los `example_*_test.go` de etcd, que apuntan a `tests/integration`).
   - errcheck en el editor y en `kerbo fix`: el texto sin guardar no tiene tipos, así que ahí no se

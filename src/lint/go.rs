@@ -69,6 +69,15 @@ fn analyzed_path(path: &Path, platform: &GoPlatform) -> bool {
     build_constraints::file_name_builds(path, platform) && module_pattern::listed_by_module_pattern(path)
 }
 
+// Si un archivo Go es generado, como lo decide golangci-lint, sin tener el árbol a mano.
+pub fn is_generated_source(source: &[u8]) -> bool {
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_go::LANGUAGE.into()).is_ok()
+        && parser
+            .parse(source, None)
+            .is_some_and(|tree| generated::is_generated(tree.root_node(), source))
+}
+
 pub fn findings(root: Node<'_>, unit: SourceUnit<'_>, limits: &Limits) -> Vec<LintFinding> {
     let source = unit.source;
     if root.has_error() || generated::is_generated(root, source) || !analyzed(unit) {

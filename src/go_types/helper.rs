@@ -6,6 +6,11 @@ use std::process::{Command, Stdio};
 use crate::lint::go::platform::GoPlatform;
 
 pub const SOURCE: &str = include_str!("helper.go");
+// Los demás archivos del paquete `main` del helper, con el nombre con que se escriben.
+const OTHER_SOURCES: [(&str, &str); 2] = [
+    ("deprecated.go", include_str!("deprecated.go")),
+    ("stdlib_deprecations.go", include_str!("stdlib_deprecations.go")),
+];
 const MODULE: &str = "module kerbo-go-types\n\ngo 1.22\n";
 const SOURCE_FILE: &str = "main.go";
 const MODULE_FILE: &str = "go.mod";
@@ -63,6 +68,7 @@ pub fn facts(directory: &Path, module_root: &Path, platform: &GoPlatform) -> Res
 fn built_helper(directory: &Path) -> Result<PathBuf, String> {
     let mut hasher = DefaultHasher::new();
     SOURCE.hash(&mut hasher);
+    OTHER_SOURCES.hash(&mut hasher);
     let home = directory.join(format!("{:016x}", hasher.finish()));
     let binary = home.join(BINARY);
     if binary.is_file() {
@@ -70,6 +76,9 @@ fn built_helper(directory: &Path) -> Result<PathBuf, String> {
     }
     fs::create_dir_all(&home).map_err(|error| error.to_string())?;
     fs::write(home.join(SOURCE_FILE), SOURCE).map_err(|error| error.to_string())?;
+    for (name, contents) in OTHER_SOURCES {
+        fs::write(home.join(name), contents).map_err(|error| error.to_string())?;
+    }
     fs::write(home.join(MODULE_FILE), MODULE).map_err(|error| error.to_string())?;
     let mut command = quiet(Command::new(GO));
     for variable in PLATFORM_VARIABLES {

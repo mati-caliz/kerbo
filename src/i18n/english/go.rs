@@ -50,6 +50,12 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "Fprintf writes straight into the destination; Sprintf builds an intermediate string that is thrown away right after.",
         "w.Write([]byte(fmt.Sprintf(\"%d\", n))) becomes fmt.Fprintf(w, \"%d\", n).",
     ),
+    RuleText::new(
+        "Use of something marked as deprecated (staticcheck SA1019)",
+        "move to what the Deprecated: comment of the used symbol recommends",
+        "Deprecated things keep working until one day they are gone or stop getting fixes; the comment says what to use instead.",
+        "ioutil.ReadFile(path) becomes os.ReadFile(path).",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

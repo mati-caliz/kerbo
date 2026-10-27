@@ -5,6 +5,7 @@ use ignore::{DirEntry, Walk, WalkBuilder};
 const ANALYZED_HIDDEN_DIRECTORIES: [&str; 2] = [".github", ".devcontainer"];
 const GIT_DIRECTORY: &str = ".git";
 const HIDDEN_PREFIX: char = '.';
+const PATH_SEPARATOR: &str = "/";
 
 pub fn walk(root: &Path) -> Walk {
     WalkBuilder::new(root)
@@ -15,6 +16,15 @@ pub fn walk(root: &Path) -> Walk {
 
 fn is_visited(entry: &DirEntry) -> bool {
     entry.file_name() != GIT_DIRECTORY
+}
+
+// La ruta con `/` como separador en cualquier sistema.
+pub fn portable(path: &Path) -> String {
+    let parts: Vec<String> = path
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    parts.join(PATH_SEPARATOR)
 }
 
 pub fn is_analyzed(walk_root: &Path, path: &Path) -> bool {

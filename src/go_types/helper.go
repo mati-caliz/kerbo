@@ -37,6 +37,9 @@ type listedPackage struct {
 	ForTest         string
 	Export          string
 	CompiledGoFiles []string
+	GoFiles         []string
+	TestGoFiles     []string
+	XTestGoFiles    []string
 	ImportMap       map[string]string
 	DepOnly         bool
 	Module          *listedModule
@@ -76,6 +79,7 @@ type fileFacts struct {
 	Ranges   []rangeFact    `json:"ranges"`
 	Embedded []positionFact `json:"embedded"`
 	Fprints  []fprintFact   `json:"fprints"`
+	Reports  []report       `json:"reports"`
 }
 
 var errorInterface = types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
@@ -93,6 +97,7 @@ func main() {
 		exports[listed.ImportPath] = listed.Export
 	}
 	targets := checkedPackages(packages)
+	index := indexDeprecations(packages)
 	output := json.NewEncoder(os.Stdout)
 	var writing sync.Mutex
 	var group sync.WaitGroup
@@ -103,7 +108,7 @@ func main() {
 		go func(target listedPackage) {
 			defer group.Done()
 			defer func() { <-slots }()
-			facts := checkPackage(target, exports)
+			facts := checkPackage(target, exports, index)
 			writing.Lock()
 			defer writing.Unlock()
 			for _, file := range facts {
@@ -119,7 +124,7 @@ func main() {
 
 func listPackages(directory, tags string) ([]listedPackage, error) {
 	arguments := []string{"list", "-e", "-export", "-deps", "-test", "-compiled",
-		"-json=Dir,ImportPath,Name,ForTest,Export,CompiledGoFiles,ImportMap,DepOnly,Module"}
+		"-json=Dir,ImportPath,Name,ForTest,Export,CompiledGoFiles,GoFiles,TestGoFiles,XTestGoFiles,ImportMap,DepOnly,Module"}
 	if tags != "" {
 		arguments = append(arguments, "-tags", tags)
 	}
@@ -169,14 +174,14 @@ func checkedPackages(packages []listedPackage) []listedPackage {
 	return targets
 }
 
-func checkPackage(listed listedPackage, exports map[string]string) []fileFacts {
+func checkPackage(listed listedPackage, exports map[string]string, index deprecations) []fileFacts {
 	fset := token.NewFileSet()
 	var files []*ast.File
 	for _, name := range listed.CompiledGoFiles {
 		if !filepath.IsAbs(name) {
 			name = filepath.Join(listed.Dir, name)
 		}
-		file, err := parser.ParseFile(fset, name, nil, parser.SkipObjectResolution)
+		file, err := parser.ParseFile(fset, name, nil, parser.ParseComments|parser.SkipObjectResolution)
 		if err == nil {
 			files = append(files, file)
 		}
@@ -205,12 +210,13 @@ func checkPackage(listed listedPackage, exports map[string]string) []fileFacts {
 		Defs:       map[*ast.Ident]types.Object{},
 		Selections: map[*ast.SelectorExpr]*types.Selection{},
 	}
-	checked, _ := config.Check(listed.ImportPath, fset, files, info)
+	checked, _ := config.Check(strings.Fields(listed.ImportPath)[0], fset, files, info)
 	byFile := map[string]*fileFacts{}
 	collector := &collector{info: info, fset: fset, directory: filepath.Clean(listed.Dir), byFile: byFile, pkg: checked}
 	for _, file := range files {
 		ast.Inspect(file, collector.visit)
 		collector.collectEmbedded(file)
+		collector.collectDeprecatedUses(file, index)
 	}
 	var facts []fileFacts
 	for _, file := range byFile {

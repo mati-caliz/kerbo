@@ -10,6 +10,9 @@ use crate::rules::{Diagnostic, GoRule, RuleId};
 use crate::suppressions::Suppressed;
 
 use super::ScanFailure;
+pub use direct::{DirectFile, direct_files};
+
+mod direct;
 
 const ARGUMENT_OPEN: &str = "(";
 const ARGUMENT_CLOSE: &str = ")";
@@ -67,16 +70,16 @@ fn typed_rule(rule: RuleId) -> Option<GoRule> {
 pub fn confirm_typed_findings(
     diagnostics: &mut Vec<Diagnostic>,
     suppressed: &mut Vec<Suppressed>,
+    direct_files: &[DirectFile<'_>],
     platform: &GoPlatform,
 ) -> Vec<ScanFailure> {
     let roots: HashMap<PathBuf, PathBuf> = diagnostics
         .iter()
         .chain(suppressed.iter().map(|entry| &entry.diagnostic))
         .filter(|diagnostic| typed_rule(diagnostic.rule).is_some())
-        .filter_map(|diagnostic| {
-            let root = module_root(&diagnostic.absolute_path)?;
-            Some((diagnostic.absolute_path.clone(), root))
-        })
+        .map(|diagnostic| &diagnostic.absolute_path)
+        .chain(direct_files.iter().map(|file| &file.identity.absolute))
+        .filter_map(|path| Some((path.clone(), module_root(path)?)))
         .collect();
     let mut failures = Vec::new();
     let modules: HashMap<&Path, ModuleFacts> = roots
@@ -97,6 +100,9 @@ pub fn confirm_typed_findings(
         })
         .collect();
     keep_confirmed(diagnostics, suppressed, &roots, &modules);
+    let (direct, direct_suppressed) = direct::direct_reports(direct_files, &roots, &modules);
+    diagnostics.extend(direct);
+    suppressed.extend(direct_suppressed);
     failures
 }
 
@@ -125,7 +131,7 @@ fn keep_confirmed(
             GoRule::Errcheck => unchecked_subject(facts, position.0, position.1),
             GoRule::Qf1012 => fprint_replacement(facts, position),
             GoRule::Qf1008 => removable_embedded_field(facts, position, &diagnostic.message),
-            GoRule::Ineffassign | GoRule::St1005 | GoRule::Qf1003 | GoRule::Qf1004 => None,
+            GoRule::Ineffassign | GoRule::St1005 | GoRule::Qf1003 | GoRule::Qf1004 | GoRule::Sa1019 => None,
         });
         let Some(subject) = confirmed else {
             return false;
