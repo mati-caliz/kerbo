@@ -256,9 +256,10 @@ fn fix_file(target: &Target<'_>, relative: &str, write: bool) -> Result<Option<F
 }
 
 // Aplica los arreglos compatibles, vuelve a analizar y repite: lo que destapa una vuelta (una clase
-// que pasa a `final` deja de más el `final` de sus métodos) entra en la siguiente. Una vuelta que
-// deja más errores de sintaxis de los que había no se acepta: tree-sitter se recupera y el análisis
-// no lo notaría.
+// que pasa a `final` deja de más el `final` de sus métodos) entra en la siguiente. Si una vuelta deja
+// más errores de sintaxis de los que había, el archivo queda como estaba, como en ruff: las vueltas
+// anteriores pueden ser parte de la cadena que lo rompió, y tree-sitter se recupera sin que el
+// análisis lo note.
 pub fn converge(fixer: &Fixer<'_>, original: &str, before: Vec<Diagnostic>) -> Option<Converged> {
     let errors_before = fixer
         .language
@@ -289,7 +290,7 @@ pub fn converge(fixer: &Fixer<'_>, original: &str, before: Vec<Diagnostic>) -> O
                 syntax_errors(language, text.as_bytes()).is_some_and(|after| after > errors)
             });
         if breaks_syntax {
-            break;
+            return None;
         }
         let Some(after) = (fixer.analyze)(&text) else {
             break;

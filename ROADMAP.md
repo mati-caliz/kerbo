@@ -1796,9 +1796,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Pendientes de esa tanda: ruff deja f-strings inválidas en `"{}".format(lambda: x)`,
     `"{0!x}".format(1)` y `"{}".format({…}.get(1))`, ve el error de sintaxis y revierte todos los
     arreglos del archivo; kerbo no ofrece esos arreglos y sí aplica el resto (`reverted_formats.py`
-    tiene los casos donde los dos coinciden). Para calcar a ruff, `kerbo fix` tendría que descartar
-    el archivo entero cuando una vuelta rompe la sintaxis, y hoy descarta sólo esa vuelta. UP031
-    con `(("…")) % x` repite los paréntesis como ruff y también rompe la sintaxis.
+    tiene los casos donde los dos coinciden). UP031 con `(("…")) % x` repite los paréntesis como
+    ruff y también rompe la sintaxis.
+  - `kerbo fix` (y el LSP) ahora deja el archivo como estaba si una vuelta deja más errores de
+    sintaxis, como ruff, en vez de quedarse con las vueltas anteriores: pueden ser parte de la cadena
+    que lo rompió. Vale para todos los lenguajes.
   - Lo que falta de arreglos (medido el 2026-10-26 con `../kerbo-parity/scripts/pending_by_frequency.txt`):
     en el corpus quedan TC004 (sacar imports del `if TYPE_CHECKING`, que se cruza con I001) y
     PYI034/PYI019 (análisis de `Self`); PLW1510 no va (el arreglo de ruff es sólo para mostrar).

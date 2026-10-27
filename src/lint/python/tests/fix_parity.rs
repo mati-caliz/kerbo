@@ -3,6 +3,8 @@ use std::path::Path;
 use super::fixtures::FIXTURES;
 use super::{lints_at, strict};
 use crate::fix::{apply, compatible, edits_of};
+use crate::language::Language;
+use crate::syntax::syntax_errors;
 
 const FIXTURE_DIRECTORY: &str = "src/lint/python/fixtures";
 const SAFE_SUFFIX: &str = "fixed";
@@ -13,8 +15,10 @@ const PACKAGE_INIT_STEM: &str = "_init";
 const DUMP_VARIABLE: &str = "KERBO_FIX_DUMP";
 const PASS_SEPARATOR: &str = "\n";
 
-// Lo que hace `ruff check --fix`: aplica los arreglos que no se pisan, vuelve a analizar y repite.
+// Lo que hace `ruff check --fix`: aplica los arreglos que no se pisan, vuelve a analizar y repite. Si
+// una vuelta rompe la sintaxis, el archivo queda como estaba.
 fn fixed_like_ruff(path: &str, source: &str, unsafe_fixes: bool) -> (String, String) {
+    let errors_before = syntax_errors(Language::Python, source.as_bytes());
     let mut text = source.to_owned();
     let mut passes: Vec<String> = Vec::new();
     for pass in 0..MAX_FIX_PASSES {
@@ -42,6 +46,12 @@ fn fixed_like_ruff(path: &str, source: &str, unsafe_fixes: bool) -> (String, Str
         let Some(next) = apply(&edits_of(&chosen), &text) else {
             break;
         };
+        let breaks_syntax = errors_before
+            .zip(syntax_errors(Language::Python, next.as_bytes()))
+            .is_some_and(|(before, after)| after > before);
+        if breaks_syntax {
+            return (source.to_owned(), passes.join(PASS_SEPARATOR));
+        }
         text = next;
     }
     (text, passes.join(PASS_SEPARATOR))

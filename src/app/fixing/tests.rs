@@ -194,3 +194,53 @@ fn a_pass_that_breaks_the_syntax_is_not_accepted() {
         "sacar la llave final rompe la clase"
     );
 }
+
+fn deletion(diagnostic: &Diagnostic, start: TextPoint, end: TextPoint) -> Diagnostic {
+    let mut deleting = diagnostic.clone();
+    deleting.fix = Some(Fix {
+        edits: vec![TextEdit {
+            start,
+            end,
+            replacement: String::new(),
+        }],
+        hunk: String::new(),
+        safe: true,
+        isolation: None,
+        rank: 0,
+    });
+    deleting
+}
+
+#[test]
+fn a_breaking_pass_also_discards_the_passes_before_it() {
+    let tree = project("fix-syntax-later", "Broken.java", GREETER);
+    let config = Config::load(None, tree.path()).expect("sin configuración");
+    let path = tree.path().join("Broken.java");
+    let before = check_text(&path, GREETER.as_bytes(), &config).expect("se analiza");
+    let template = before.first().expect("hay avisos").clone();
+    let first_import = TextPoint { line: 1, column: 1 };
+    let after_first_import = TextPoint { line: 2, column: 1 };
+    let harmless = vec![deletion(&template, first_import, after_first_import)];
+    let analyze = |text: &str| {
+        let last_line = text.lines().count();
+        let closing_brace = TextPoint {
+            line: last_line,
+            column: 1,
+        };
+        let after_brace = TextPoint {
+            line: last_line,
+            column: 2,
+        };
+        Some(vec![deletion(&template, closing_brace, after_brace)])
+    };
+    let accepts = |diagnostic: &Diagnostic| diagnostic.fix.is_some();
+    let fixer = Fixer {
+        language: Language::from_path(&path),
+        analyze: &analyze,
+        accepts: &accepts,
+    };
+    assert!(
+        converge(&fixer, GREETER, harmless).is_none(),
+        "la segunda vuelta saca la llave final: la primera tampoco queda"
+    );
+}
