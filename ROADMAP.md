@@ -2294,12 +2294,20 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   conocida (`Seek`, `ReadByte`, `MarshalJSON`, `Unwrap`...) con otra firma, con la tabla y las
   excepciones de x/tools v0.52.0 (`WriteTo` de más de un argumento; `Is`, `As` y `Unwrap` sólo si
   el tipo es un error). `//nolint:govet` la silencia. 28 de 28 contra golangci-lint.
+- La cola chica de staticcheck (hecho, 2026-10-27), siete reglas directas en
+  `src/go_types/staticcheck_tail.go`, calcadas de v0.8.2: ST1012 (variable de error del paquete
+  sin `err`/`Err`), QF1011 y ST1023 (tipo de un `var` local que el valor ya da; ST1023 además
+  saltea `_`, lo que no sea literal y los paquetes que importan `syscall` o `unsafe`), QF1002
+  (`switch` sin valor que compara siempre lo mismo con `==`, con `astutil.Equal` y
+  `MayHaveSideEffects` de staticcheck), S1005 (`_` que sobra en una recepción o un `range`),
+  SA9003 (`if` o `else` vacío fuera de los `Example` de los tests) y QF1006 (`for` infinito que
+  empieza con `if cond { break }`). 135 de 135 contra golangci-lint, ninguno de más.
 - Pendientes de Go contra golangci-lint:
   - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
     eximen, como los tipos).
   - Lo que queda del conjunto por defecto, por volumen en el corpus (14.755 avisos de golangci-lint,
-    el 96 % ya en kerbo): unused (249), govet `inline` (130) y una cola larga de staticcheck con
-    menos de 30 cada una.
+    el 97 % ya en kerbo): unused (249), govet `inline` (130) y una cola de staticcheck con menos
+    de 25 cada una (S1034 22, SA4006 15, ST1019 7...).
   - govet `inline`: 32 son "debería inlinearse" (lo anotado con `//go:fix inline`) y 98 son
     "cannot inline", que salen de correr el inliner de x/tools (versión de Go del archivo,
     inferencia de tipos genéricos y otros casos): calcarlo es reimplementar un motor de refactor.

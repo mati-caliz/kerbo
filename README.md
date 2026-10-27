@@ -623,7 +623,8 @@ está antes de `package`). Sin lista o con `all` silencia todas las reglas, y el
 Paridad, contra golangci-lint 2.15 en linux/amd64: cero diferencias por archivo, línea y columna
 en golang/tools, terraform, hugo, caddy, consul, prometheus, etcd, syncthing y otros (1.381
 avisos), en errcheck 10.699, en `qf1008` y `qf1012` 1.153 y en `sa1019` (uso de lo deprecado)
-592, `qf1001` 136 y `stdmethods` de govet 28, sin ninguno de más: el 96 % de lo que marca golangci-lint por defecto. govet, unused y lo
+592, `qf1001` 136, `stdmethods` de govet 28 y la cola chica de staticcheck (`st1012`, `qf1011`,
+`st1023`, `qf1002`, `s1005`, `sa9003` y `qf1006`) 135, sin ninguno de más: el 97 % de lo que marca golangci-lint por defecto. govet, unused y lo
 demás de staticcheck siguen en golangci-lint.
 
 ### Secretos y dependencias vulnerables

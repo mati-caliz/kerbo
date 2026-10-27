@@ -68,6 +68,48 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "Con ese nombre, quien lo lee (y fmt, encoding/json o io) espera la interfaz conocida; con otra firma no la implementa y nadie se entera.",
         "func (t T) Seek(off int64) int64 se vuelve func (t T) Seek(off int64, whence int) (int64, error).",
     ),
+    RuleText::new(
+        "Variable de error del paquete que no se llama errFoo (ST1012 de staticcheck)",
+        "llamala errAlgo, o ErrAlgo si se exporta",
+        "El prefijo dice de entrada que es un error y no un mensaje cualquiera, y es lo que busca quien la compara con errors.Is.",
+        "var notFound = errors.New(\"no está\") se vuelve var errNotFound = errors.New(\"no está\").",
+    ),
+    RuleText::new(
+        "Tipo de una variable que el valor ya da (QF1011 de staticcheck)",
+        "sacá el tipo de la declaración: se infiere del valor",
+        "El tipo repetido no agrega nada y hay que cambiarlo en dos lugares si cambia.",
+        "var total int64 = suma() se vuelve var total = suma().",
+    ),
+    RuleText::new(
+        "Tipo redundante en una declaración de variable (ST1023 de staticcheck)",
+        "sacá el tipo de la declaración: se infiere del valor",
+        "El tipo repetido no agrega nada y hay que cambiarlo en dos lugares si cambia.",
+        "var nombres []string = lista() se vuelve var nombres = lista().",
+    ),
+    RuleText::new(
+        "switch sin valor que compara siempre lo mismo con == (QF1002 de staticcheck)",
+        "pasá lo que se compara al switch y dejá sólo los valores en cada case",
+        "Un switch sobre el valor dice de entrada que todos los case miran lo mismo.",
+        "switch { case x == 1: ... } se vuelve switch x { case 1: ... }.",
+    ),
+    RuleText::new(
+        "Asignación innecesaria al identificador _ (S1005 de staticcheck)",
+        "sacá el _ que sobra",
+        "El _ de más sólo agrega ruido: la recepción o el range ya descartan ese valor.",
+        "for i, _ := range lista se vuelve for i := range lista.",
+    ),
+    RuleText::new(
+        "if o else vacío (SA9003 de staticcheck)",
+        "borrá la rama vacía o completala",
+        "Una rama vacía suele ser algo que se quedó a medio escribir o una condición que sobra.",
+        "if err != nil { } se vuelve if err != nil { return err }.",
+    ),
+    RuleText::new(
+        "for infinito que empieza con un if que corta (QF1006 de staticcheck)",
+        "llevá la condición negada al for y sacá el if con el break",
+        "La condición en el for dice de entrada hasta cuándo se repite.",
+        "for { if hecho { break } ... } se vuelve for !hecho { ... }.",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

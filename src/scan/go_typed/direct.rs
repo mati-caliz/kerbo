@@ -13,7 +13,18 @@ use crate::suppressions::{Suppressed, split};
 
 // Las reglas que el helper decide entero: aparecen poco y cada una pide tipos para saber si va, así
 // que no hay candidatos por archivo; el aviso sale directo de los hechos.
-pub const DIRECT_RULES: [GoRule; 3] = [GoRule::Sa1019, GoRule::Qf1001, GoRule::Stdmethods];
+pub const DIRECT_RULES: [GoRule; 10] = [
+    GoRule::Sa1019,
+    GoRule::Qf1001,
+    GoRule::Stdmethods,
+    GoRule::St1012,
+    GoRule::Qf1011,
+    GoRule::St1023,
+    GoRule::Qf1002,
+    GoRule::S1005,
+    GoRule::Sa9003,
+    GoRule::Qf1006,
+];
 
 // Un archivo Go del escaneo con alguna regla directa prendida.
 #[derive(Debug)]

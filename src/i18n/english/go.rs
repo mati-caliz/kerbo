@@ -68,6 +68,48 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "With that name, readers (and fmt, encoding/json or io) expect the known interface; with another signature it does not implement it and nobody notices.",
         "func (t T) Seek(off int64) int64 becomes func (t T) Seek(off int64, whence int) (int64, error).",
     ),
+    RuleText::new(
+        "Package error variable not named errFoo (staticcheck ST1012)",
+        "call it errSomething, or ErrSomething if exported",
+        "The prefix says up front that it is an error and not just any message, and it is what readers comparing with errors.Is look for.",
+        "var notFound = errors.New(\"missing\") becomes var errNotFound = errors.New(\"missing\").",
+    ),
+    RuleText::new(
+        "Variable type that the value already gives (staticcheck QF1011)",
+        "drop the type from the declaration: it is inferred from the value",
+        "The repeated type adds nothing and has to change in two places if it changes.",
+        "var total int64 = sum() becomes var total = sum().",
+    ),
+    RuleText::new(
+        "Redundant type in a variable declaration (staticcheck ST1023)",
+        "drop the type from the declaration: it is inferred from the value",
+        "The repeated type adds nothing and has to change in two places if it changes.",
+        "var names []string = list() becomes var names = list().",
+    ),
+    RuleText::new(
+        "Switch without a tag that always compares the same thing with == (staticcheck QF1002)",
+        "move the compared value to the switch and keep only the values in each case",
+        "A switch on the value says up front that every case looks at the same thing.",
+        "switch { case x == 1: ... } becomes switch x { case 1: ... }.",
+    ),
+    RuleText::new(
+        "Unnecessary assignment to the blank identifier (staticcheck S1005)",
+        "drop the extra _",
+        "The extra _ only adds noise: the receive or the range already discards that value.",
+        "for i, _ := range list becomes for i := range list.",
+    ),
+    RuleText::new(
+        "Empty if or else branch (staticcheck SA9003)",
+        "delete the empty branch or fill it in",
+        "An empty branch is usually something left half written or a condition that is not needed.",
+        "if err != nil { } becomes if err != nil { return err }.",
+    ),
+    RuleText::new(
+        "Infinite for that starts with an if that breaks (staticcheck QF1006)",
+        "lift the negated condition into the for and drop the if with the break",
+        "The condition in the for says up front how long it repeats.",
+        "for { if done { break } ... } becomes for !done { ... }.",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

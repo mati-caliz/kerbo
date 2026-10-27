@@ -137,7 +137,14 @@ fn keep_confirmed(
             | GoRule::Qf1004
             | GoRule::Sa1019
             | GoRule::Qf1001
-            | GoRule::Stdmethods => None,
+            | GoRule::Stdmethods
+            | GoRule::St1012
+            | GoRule::Qf1011
+            | GoRule::St1023
+            | GoRule::Qf1002
+            | GoRule::S1005
+            | GoRule::Sa9003
+            | GoRule::Qf1006 => None,
         });
         let Some(subject) = confirmed else {
             return false;
