@@ -1,0 +1,19 @@
+"""PYI019 con las anotaciones diferidas."""
+
+from __future__ import annotations
+
+from typing import Self
+
+
+class Shape:
+    def copy(self, other: Self) -> Self:
+        return other
+
+    @classmethod
+    def build(cls) -> Self:
+        return cls()
+
+    def generic(self, value: Self) -> Self:
+        return value
+
+

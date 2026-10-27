@@ -1,0 +1,63 @@
+"""Bordes del arreglo de PYI019."""
+
+import typing
+from typing import TypeVar, cast
+
+_S = TypeVar("_S", bound="Shape")
+_T = TypeVar("_T")
+_Q = TypeVar("_Q")
+
+
+class Shape:
+    def copy(self, other: typing.Self) -> typing.Self:
+        clone = cast(typing.Self, other)
+        return clone
+
+    @classmethod
+    def build(cls, count: int) -> list[typing.Self]:
+        return [cls() for _ in range(count)]
+
+    def quoted(self) -> "typing.Self":
+        return self
+
+    def first[A, B](self, value: A) -> typing.Self:
+        return self
+
+    def middle[A, B](self, value: A, other: B) -> typing.Self:
+        return self
+
+    def last[A](self, value: A) -> typing.Self:
+        return self
+
+    def only(self) -> typing.Self:
+        return self
+
+    def bounded(self) -> typing.Self:
+        return self
+
+    def commented[
+        S,  # la variable
+    ](self: S) -> S:
+        return self
+
+    def escaped(self: _Q) -> "\x5fQ":
+        return self
+
+
+def outside(value: _S) -> _S:
+    return value
+
+
+class Other:
+    def method(self) -> typing.Self:
+        return self
+
+
+def shadowed():
+    Self = 1
+
+    class Inner:
+        def method(self) -> typing.Self:
+            return self
+
+    return Self, Inner, typing

@@ -114,6 +114,8 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
                 } else {
                     custom_type_variable_report(&resolver, function, &decorators)
                 };
+                let (type_variable, pending_fix) = type_variable.unzip();
+                self.type_variables.extend(pending_fix);
                 self.reports.extend(non_self.into_iter().chain(type_variable));
                 self.reports.extend(useless_return(self.source, function));
                 self.function(function);

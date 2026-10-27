@@ -1822,9 +1822,17 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     kerbo los mueve todos. La estrategia de poner comillas (`quote-annotations`, apagada por
     defecto en ruff) no está. PYI034 con `self: (Clase)` borra hasta antes del paréntesis y rompe la
     sintaxis, en ruff y en kerbo: los dos revierten el archivo.
-  - Lo que falta de arreglos (medido el 2026-10-26 con `../kerbo-parity/scripts/pending_by_frequency.txt`):
-    en el corpus queda PYI019 (pasar la variable de tipo propia a `Self`); PLW1510 no va (el arreglo
-    de ruff es sólo para mostrar).
+  - Tanda 17: PYI019, idéntico a ruff en todos los fixtures (`self_type_variables.py` y
+    `self_type_variables_future.py` juntan los bordes). Importa `Self`, le saca la anotación al
+    primer parámetro, saca el parámetro de tipo de la lista si lo era y cambia por `Self` cada uso de
+    la variable después de esa anotación y dentro del método, también adentro de una anotación entre
+    comillas. Si algún uso de la variable en el archivo está en un string con escapes no hay arreglo,
+    y es inseguro si alguna edición se lleva un comentario, como en ruff. Como ruff lo calcula al
+    analizar los bindings, kerbo avisa al recorrer el árbol y arma el arreglo al final, cuando el
+    modelo ya tiene todas las referencias.
+  - Con eso no quedan arreglos de ruff pendientes en el corpus (medido el 2026-10-26 con
+    `../kerbo-parity/scripts/pending_by_frequency.txt`); PLW1510 no va (el arreglo de ruff es sólo
+    para mostrar).
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

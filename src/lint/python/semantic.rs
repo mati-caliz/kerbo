@@ -83,6 +83,7 @@ mod type_hint_fixes;
 mod type_hints;
 mod type_names;
 mod type_unions;
+mod type_variable_fix;
 mod typecheck;
 mod union_duplicates;
 mod unwrap_fixes;
@@ -150,6 +151,7 @@ pub struct Visitor<'tree> {
     pub exports: Vec<(String, Point)>,
     pub classes: Vec<Pending<'tree>>,
     pub methods: Vec<Pending<'tree>>,
+    pub type_variables: Vec<type_variable_fix::SelfTypeVariable<'tree>>,
 }
 
 pub fn reports(root: Node<'_>, source: &[u8], file: FileKind) -> Vec<Report> {
@@ -163,11 +165,18 @@ pub fn reports(root: Node<'_>, source: &[u8], file: FileKind) -> Vec<Report> {
         exports: Vec::new(),
         classes: Vec::new(),
         methods: Vec::new(),
+        type_variables: Vec::new(),
     };
     visitor.block(root);
     visitor.run_deferred();
     visitor.visit_exports();
     let mut reports = std::mem::take(&mut visitor.reports);
+    type_variable_fix::attach_self_type_variable_fixes(
+        &visitor.model,
+        source,
+        &mut reports,
+        &visitor.type_variables,
+    );
     reports.extend(classes::mutable_class_defaults(
         &visitor.model,
         source,

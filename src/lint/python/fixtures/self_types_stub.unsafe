@@ -1,13 +1,10 @@
 import typing
 from types import TracebackType
-from typing import TypeVar
-
-_S = TypeVar("_S")
 
 class Shape:
     def __enter__(self) -> typing.Self: ...
     def __exit__(self, typ: type[BaseException], exc: BaseException | None, tb: TracebackType | None) -> None: ...
-    def copy(self: _S) -> _S: ...
+    def copy(self) -> typing.Self: ...
 
 field: type[int | float] | str
 union: type[int | float]

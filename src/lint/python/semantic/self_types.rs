@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashSet;
 
 use tree_sitter::Node;
@@ -6,13 +7,14 @@ use super::Pending;
 use super::classes::{DEFINITION_FIELD, any_base, bases};
 use super::decorators::{decorators_of, is_abstract, is_final, is_overload};
 use super::definitions::type_parameter_parts;
-use super::model::{BindingKind, Model, Resolution};
+use super::model::{BindingId, BindingKind, Model, Resolution};
 use super::mutability::{Resolver, without_subscript};
 use super::parameters::{Signature, annotation, matches_annotation};
 use super::private_types::assigned_call;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::self_return_fix::self_return_fix;
 use super::type_hints::{Hints, subscript_parts, unwrapped};
+use super::type_variable_fix::{SelfTypeVariable, TypeVariable, self_type_variable_fix};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, BODY_FIELD, CALL, CLASS, DECORATED, FUNCTION, FUNCTION_FIELD, IDENTIFIER, LAMBDA,
@@ -90,12 +92,13 @@ pub fn non_self_return_report(
         .flatten()
 }
 
-// PYI019 sobre un método: el `TypeVar` propio para `self` o `cls` donde alcanza con `Self`.
-pub fn custom_type_variable_report(
+// PYI019 sobre un método: el `TypeVar` propio para `self` o `cls` donde alcanza con `Self`. El
+// arreglo se arma al final, cuando el modelo ya tiene todas las referencias a la variable.
+pub fn custom_type_variable_report<'tree>(
     resolver: &Resolver<'_, '_>,
-    function: Node<'_>,
+    function: Node<'tree>,
     decorators: &[Node<'_>],
-) -> Option<Report> {
+) -> Option<(Report, SelfTypeVariable<'tree>)> {
     let (method, metaclass) = method_of(resolver, function, decorators)?;
     (metaclass != Metaclass::Yes)
         .then(|| custom_type_variable(resolver, method))
@@ -113,7 +116,9 @@ pub fn deferred_type_variables(model: &Model<'_>, source: &[u8], methods: &[Pend
                 source,
                 scope: method.scope,
             };
-            custom_type_variable_report(&resolver, method.node, &decorators_of(method.node))
+            let (report, variable) =
+                custom_type_variable_report(&resolver, method.node, &decorators_of(method.node))?;
+            Some(report.with_fix(self_type_variable_fix(model, source, variable)))
         })
         .collect()
 }
@@ -209,7 +214,10 @@ fn non_self_return(resolver: &Resolver<'_, '_>, method: Method<'_>) -> Option<Re
 
 // PYI019: `self: _S` o `cls: type[_S]` con un `TypeVar` propio (o un parámetro de tipo del método).
 // Avisa desde el final del nombre.
-fn custom_type_variable(resolver: &Resolver<'_, '_>, method: Method<'_>) -> Option<Report> {
+fn custom_type_variable<'tree>(
+    resolver: &Resolver<'_, '_>,
+    method: Method<'tree>,
+) -> Option<(Report, SelfTypeVariable<'tree>)> {
     let source = resolver.source;
     let hints = Hints {
         model: resolver.model,
@@ -219,6 +227,7 @@ fn custom_type_variable(resolver: &Resolver<'_, '_>, method: Method<'_>) -> Opti
     let first = *Signature::of(method.function).positional.first()?;
     let annotation = annotation(first)?;
     let type_parameters = own_type_parameters(method.function, source);
+    let found_name: RefCell<Option<String>> = RefCell::new(None);
     let found = matches_annotation(hints, annotation, &|inner, expression| {
         let variable = match kind {
             MethodKind::Class | MethodKind::New => class_type_argument(inner, expression),
@@ -227,10 +236,26 @@ fn custom_type_variable(resolver: &Resolver<'_, '_>, method: Method<'_>) -> Opti
         };
         variable.is_some_and(|variable| {
             let name = text(variable, inner.source);
-            type_parameters.iter().any(|parameter| parameter == name) || is_type_variable(resolver, name)
+            found_name.replace(Some(name.to_owned()));
+            type_parameters.iter().any(|(parameter, _)| parameter == name)
+                || type_variable_binding(resolver, name).is_some()
         })
     });
-    found.then(|| Report::at_point(PythonRule::PYI019, method.name.end_position(), ""))
+    if !found {
+        return None;
+    }
+    let name = found_name.into_inner()?;
+    let variable = match type_parameters.iter().find(|(parameter, _)| *parameter == name) {
+        Some((_, parameter)) => TypeVariable::Parameter(*parameter),
+        None => TypeVariable::Assigned(type_variable_binding(resolver, &name)?),
+    };
+    let report = Report::at_point(PythonRule::PYI019, method.name.end_position(), "");
+    let use_site = SelfTypeVariable {
+        function: method.function,
+        first,
+        variable,
+    };
+    Some((report, use_site))
 }
 
 // `_S` en `type[_S]`, con el `type` del builtin escrito tal cual.
@@ -244,30 +269,33 @@ fn class_type_argument<'tree>(hints: Hints<'_, '_, '_>, annotation: Node<'tree>)
     }
 }
 
-fn own_type_parameters(function: Node<'_>, source: &[u8]) -> Vec<String> {
+fn own_type_parameters<'tree>(function: Node<'tree>, source: &[u8]) -> Vec<(String, Node<'tree>)> {
     function
         .child_by_field_name(TYPE_PARAMETERS_FIELD)
         .map(named)
         .unwrap_or_default()
         .into_iter()
-        .filter_map(|parameter| type_parameter_parts(parameter).0)
-        .map(|name| text(name, source).to_owned())
+        .filter_map(|parameter| {
+            let name = type_parameter_parts(parameter).0?;
+            Some((text(name, source).to_owned(), parameter))
+        })
         .collect()
 }
 
 // Un nombre ligado a `X = TypeVar(...)`.
-fn is_type_variable(resolver: &Resolver<'_, '_>, name: &str) -> bool {
+fn type_variable_binding(resolver: &Resolver<'_, '_>, name: &str) -> Option<BindingId> {
     let Resolution::Binding(id) = resolver.model.lookup_from(resolver.scope, name) else {
-        return false;
+        return None;
     };
-    resolver
+    let is_type_variable = resolver
         .model
         .binding(id)
         .filter(|binding| binding.kind == BindingKind::Assignment)
         .and_then(|binding| binding.site.node)
         .and_then(assigned_call)
         .and_then(|function| resolver.qualified(function))
-        .is_some_and(|qualified| is_typing(&qualified, TYPE_VAR))
+        .is_some_and(|qualified| is_typing(&qualified, TYPE_VAR));
+    is_type_variable.then_some(id)
 }
 
 // `is_metaclass` de ruff: hereda de `type`, `ABCMeta` o `EnumMeta` (o quizás, si alguna base es una
