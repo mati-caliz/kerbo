@@ -178,7 +178,7 @@ fn markers_of(source: &str, language: Language) -> Vec<Marker> {
         .map(|marker| marker.line)
         .collect();
     markers.extend(
-        directives(source, language == Language::Go)
+        directives(source, Some(language))
             .into_iter()
             .filter(|directive| !marked.contains(&directive.line))
             .map(|directive| directive_marker(directive.line, &directive.text)),

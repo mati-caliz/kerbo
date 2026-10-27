@@ -8,6 +8,8 @@ mod comparisons;
 mod constant_binary;
 mod constant_condition;
 mod constants;
+mod disable_directives;
+pub use disable_directives::{DisabledRange, disabled_ranges};
 mod duplicates;
 mod errors;
 mod escapes;

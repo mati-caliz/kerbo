@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use super::{Scope, directives, split};
 use crate::i18n::Message;
-use crate::rules::{Diagnostic, DockerfileRule, MigrationRule, RuleId};
+use crate::language::Language;
+use crate::rules::{Diagnostic, DockerfileRule, EslintRule, MigrationRule, RuleId};
 
 fn diagnostic(rule: RuleId, line: usize) -> Diagnostic {
     Diagnostic {
@@ -27,7 +28,7 @@ const NO_CACHE: RuleId = RuleId::Dockerfile(DockerfileRule::Dl3009);
 #[test]
 fn reads_codes_reason_and_the_line_each_directive_covers() {
     let source = "FROM debian\n# hadolint ignore=DL3008, DL3009 # la imagen base fija las versiones\n\n# otro comentario\nRUN apt-get install -y curl\n";
-    let found = directives(source, false);
+    let found = directives(source, None);
     assert_eq!(found.len(), 1);
     let directive = found.first().expect("hay una directiva");
     assert_eq!(directive.line, 2);
@@ -69,17 +70,17 @@ fn file_directives_cover_every_line() {
             .collect::<Vec<_>>(),
         ["la columna ya no se lee", "la columna ya no se lee"]
     );
-    let global = directives("# hadolint global ignore=DL3008\nRUN x\n", false);
+    let global = directives("# hadolint global ignore=DL3008\nRUN x\n", None);
     assert_eq!(global.first().map(|directive| directive.scope), Some(Scope::File));
 }
 
 #[test]
 fn ignores_markers_that_are_not_a_leading_comment() {
     assert_eq!(
-        directives("RUN echo '# hadolint ignore=DL3008'\n", false),
+        directives("RUN echo '# hadolint ignore=DL3008'\n", None),
         Vec::new()
     );
-    let shell = directives("#!/bin/sh\n# shellcheck disable=SC2086\necho $a\n", false);
+    let shell = directives("#!/bin/sh\n# shellcheck disable=SC2086\necho $a\n", None);
     assert_eq!(
         shell.first().map(|directive| directive.covered_line),
         Some(Some(3))
@@ -128,4 +129,110 @@ ALTER TABLE a DROP COLUMN b;
         vec![diagnostic(drop_column, 2), diagnostic(PINNED, 2)],
     );
     assert_eq!((file.0.len(), file.1.len()), (1, 1));
+}
+
+const ANY: RuleId = RuleId::Eslint(EslintRule::NoExplicitAny);
+const VAR: RuleId = RuleId::Eslint(EslintRule::NoVar);
+
+fn typescript(rule: RuleId, line: usize, column: usize) -> Diagnostic {
+    Diagnostic {
+        path: "src/module.ts".to_owned(),
+        column,
+        ..diagnostic(rule, line)
+    }
+}
+
+fn kept_positions(source: &str, diagnostics: Vec<Diagnostic>) -> Vec<(RuleId, usize, usize)> {
+    split(source.as_bytes(), diagnostics)
+        .0
+        .iter()
+        .map(|item| (item.rule, item.line, item.column))
+        .collect()
+}
+
+#[test]
+fn eslint_line_directives_cover_their_line_or_the_next_one() {
+    let source = "// eslint-disable-next-line @typescript-eslint/no-explicit-any -- viene de la API
+let a: any;
+var b: any; /* eslint-disable-line no-var */
+var c: any;
+";
+    let kept = kept_positions(
+        source,
+        vec![
+            typescript(ANY, 2, 8),
+            typescript(VAR, 3, 1),
+            typescript(ANY, 3, 8),
+            typescript(VAR, 4, 1),
+        ],
+    );
+    assert_eq!(kept, [(ANY, 3, 8), (VAR, 4, 1)]);
+    let reasons: Vec<String> = directives(source, Some(Language::TypeScript))
+        .into_iter()
+        .map(|directive| directive.reason)
+        .collect();
+    assert_eq!(reasons, ["viene de la API", ""]);
+}
+
+#[test]
+fn eslint_block_directives_run_until_their_enable_and_ignore_line_comments() {
+    let source = "var a;
+/* eslint-disable no-var */ var b;
+var c;
+/* eslint-enable no-var */
+var d;
+// eslint-disable
+var e;
+const s = \"/* eslint-disable */\";
+var f;
+/* eslint-disable */
+var g: any;
+";
+    let kept = kept_positions(
+        source,
+        vec![
+            typescript(VAR, 1, 1),
+            typescript(VAR, 2, 29),
+            typescript(VAR, 3, 1),
+            typescript(VAR, 5, 1),
+            typescript(VAR, 7, 1),
+            typescript(VAR, 9, 1),
+            typescript(ANY, 11, 8),
+        ],
+    );
+    assert_eq!(kept, [(VAR, 1, 1), (VAR, 5, 1), (VAR, 7, 1), (VAR, 9, 1)]);
+}
+
+#[test]
+fn eslint_directives_name_the_universal_rules_like_eslint() {
+    let source = "/* eslint-disable complexity, max-params */
+function f(a, b, c, d, e) {}
+";
+    let path = |rule| Diagnostic {
+        path: "src/module.js".to_owned(),
+        ..diagnostic(rule, 2)
+    };
+    let kept = kept_positions(
+        source,
+        vec![
+            path(RuleId::CyclomaticComplexity),
+            path(RuleId::ParameterCount),
+            path(RuleId::FunctionLength),
+        ],
+    );
+    assert_eq!(kept, [(RuleId::FunctionLength, 2, 1)]);
+}
+
+#[test]
+fn eslint_inline_configuration_turns_rules_off_in_the_whole_file() {
+    let source = "var a;\n/* eslint no-var: 0, valid-typeof: [\"off\"], no-debugger: \"error\" */\nvar b;\n// eslint no-explicit-any: 0\nlet c: any;\n";
+    let kept = kept_positions(
+        source,
+        vec![
+            typescript(VAR, 1, 1),
+            typescript(VAR, 3, 1),
+            typescript(ANY, 5, 8),
+        ],
+    );
+    assert_eq!(kept, [(ANY, 5, 8)]);
 }

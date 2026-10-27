@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::path::Path;
 
 use crate::deploy::squawk_ignores;
-use crate::lint::go_nolint_ranges;
+use crate::language::Language;
+use crate::lint::{DisabledRange, eslint_disabled_ranges, go_nolint_ranges};
 use crate::rules::{Diagnostic, RuleId};
 use crate::shell::{self, Coverage};
 
@@ -20,6 +22,7 @@ pub enum Scope {
     GoNolint,
     SquawkLines,
     SquawkFile,
+    EslintRange { first_column: usize, last_column: usize },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,11 +73,18 @@ impl Directive {
         if squawk && !matches!(diagnostic.rule, RuleId::Migration(_)) {
             return false;
         }
+        if let Scope::EslintRange {
+            first_column,
+            last_column,
+        } = self.scope
+        {
+            return self.covers_position(diagnostic, first_column, last_column);
+        }
         let in_scope = match self.scope {
             Scope::File | Scope::SquawkFile => true,
             Scope::NextLine => self.covered_line == Some(diagnostic.line),
             Scope::GoNolint if !diagnostic.path.ends_with(GO_EXTENSION) => false,
-            Scope::ShellStatement | Scope::GoNolint | Scope::SquawkLines => self
+            Scope::ShellStatement | Scope::GoNolint | Scope::SquawkLines | Scope::EslintRange { .. } => self
                 .covered_line
                 .zip(self.last_covered_line)
                 .is_some_and(|(first, last)| (first..=last).contains(&diagnostic.line)),
@@ -87,6 +97,22 @@ impl Directive {
                         || (self.scope == Scope::GoNolint
                             && matches!(diagnostic.rule, RuleId::Go(rule) if rule.linter() == code))
                 }))
+    }
+
+    // Como `applyDisableDirectives` de ESLint: desde la posición del comentario hasta antes de la del
+    // `eslint-enable`, con la lista vacía para todas las reglas.
+    fn covers_position(&self, diagnostic: &Diagnostic, first_column: usize, last_column: usize) -> bool {
+        let Some((first_line, last_line)) = self.covered_line.zip(self.last_covered_line) else {
+            return false;
+        };
+        let at = (diagnostic.line, diagnostic.column);
+        let in_range = (first_line, first_column) <= at && at < (last_line, last_column);
+        in_range
+            && (self.codes.is_empty()
+                || self
+                    .codes
+                    .iter()
+                    .any(|code| diagnostic.rule.as_str().eq_ignore_ascii_case(code)))
     }
 
     const fn with_shell_coverage(mut self, coverage: Option<Coverage>) -> Self {
@@ -102,8 +128,14 @@ impl Directive {
     }
 }
 
-pub fn directives(source: &str, go: bool) -> Vec<Directive> {
-    let mut found = if go { go_directives(source) } else { Vec::new() };
+pub fn directives(source: &str, language: Option<Language>) -> Vec<Directive> {
+    let mut found = match language {
+        Some(Language::Go) => go_directives(source),
+        Some(language @ (Language::TypeScript | Language::Tsx | Language::JavaScript)) => {
+            eslint_directives(source, language)
+        }
+        _ => Vec::new(),
+    };
     found.extend(squawk_directives(source));
     found.extend(comment_directives(source));
     found
@@ -139,6 +171,27 @@ fn go_directives(source: &str) -> Vec<Directive> {
             reason: range.reason,
             covered_line: Some(range.line),
             last_covered_line: Some(range.last_line),
+        })
+        .collect()
+}
+
+fn eslint_directives(source: &str, language: Language) -> Vec<Directive> {
+    eslint_disabled_ranges(source, language)
+        .into_iter()
+        .map(|range: DisabledRange| {
+            let (last_line, last_column) = range.end.unwrap_or((usize::MAX, usize::MAX));
+            Directive {
+                line: range.line,
+                text: range.text,
+                scope: Scope::EslintRange {
+                    first_column: range.start.1,
+                    last_column,
+                },
+                codes: range.rules,
+                reason: range.reason,
+                covered_line: Some(range.start.0),
+                last_covered_line: Some(last_line),
+            }
         })
         .collect()
 }
@@ -195,10 +248,10 @@ pub fn split(source: &[u8], diagnostics: Vec<Diagnostic>) -> (Vec<Diagnostic>, V
     if diagnostics.is_empty() {
         return (diagnostics, Vec::new());
     }
-    let go = diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.path.ends_with(GO_EXTENSION));
-    let found = directives(&String::from_utf8_lossy(source), go);
+    let language = diagnostics
+        .first()
+        .and_then(|diagnostic| Language::from_path(Path::new(&diagnostic.path)));
+    let found = directives(&String::from_utf8_lossy(source), language);
     if found.is_empty() {
         return (diagnostics, Vec::new());
     }

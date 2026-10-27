@@ -2009,6 +2009,22 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   paréntesis como lo llamado es un error de tree-sitter, que no ve el punto y coma automático), y
   los `#miembros` que la clase sólo escribe, incrementa como sentencia o desestructura. Paridad: 2
   de 2 y 3 de 3. Los casos quedaron en `fixtures/multiline.js`.
+- `eslint-disable` en el registro de supresiones de `src/suppressions.rs` (hecho, 2026-10-27), así lo
+  silenciado aparece como suprimido con su motivo (lo de después de ` -- `) y entra en la
+  antitrampa: `eslint-disable-line` y `eslint-disable-next-line` en cualquier comentario,
+  `/* eslint-disable */` hasta su `/* eslint-enable */` por posición (en un comentario de línea no
+  valen, como en ESLint), y las reglas apagadas en todo el archivo con `/* eslint regla: 0 */`. Las
+  directivas salen de los comentarios del árbol, no de strings. Los nombres de typescript-eslint
+  valen sin el prefijo del plugin, y `complexity`, `max-lines`, `max-lines-per-function`,
+  `max-params`, `max-depth`, `no-magic-numbers` y `sonarjs/cognitive-complexity` silencian sus
+  reglas universales.
+  - Paridad contra ESLint 10.13 con los comentarios activos, en express, VS Code, juice-shop, react
+    y zod: de los 40 avisos que silencian los comentarios, kerbo silencia los mismos 40 y ninguno
+    más. A propósito, `no-unused-vars` y `@typescript-eslint/no-unused-vars` son la misma regla para
+    kerbo: un `eslint-disable-next-line no-unused-vars` la silencia aunque el repo use la de
+    typescript-eslint (ESLint no; son 16 avisos en tests de react, que usa la del núcleo).
+  - El arnés quedó en `../kerbo-parity/eslint/` (config con todo `recommended` de los dos limitado a
+    las reglas de kerbo, `INLINE=1` para leer los comentarios, y `compare.py`).
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
   - Sobre el análisis de caminos que ya está: `no-this-before-super` (9) y `constructor-super` (7).
   - `no-misleading-character-class` (290, casi todo en código compilado),
@@ -2016,8 +2032,10 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - `no-undef`: pide las variables globales de cada entorno (navegador, Node, Jest).
   - `no-useless-escape` no mira las expresiones regulares con el flag `v`.
   - Los `.js` con argumentos de tipo en llamadas y los huecos de la gramática de arriba.
-  - `eslint-disable` no pasa por el registro de supresiones de `src/suppressions.rs`: hoy no
-    silencia nada (la paridad se midió con `noInlineConfig`).
+  - Los `/* global x */` y `/* globals */` no se leen: con los comentarios activos ESLint avisa
+    `no-unused-vars` en los globales declarados ahí que no se usan (3 en react).
+  - Un `/* eslint-enable regla */` adentro de un `/* eslint-disable */` de todas no la vuelve a
+    prender (ESLint sí, sólo a ella).
   - Las reglas con tipos de `typescript-eslint` (`recommended-type-checked`): esperan a los tipos
     del compilador.
   - El arnés de esta paridad (ESLint con un `eslint.config.mjs` de sólo estas reglas, kerbo en JSON
