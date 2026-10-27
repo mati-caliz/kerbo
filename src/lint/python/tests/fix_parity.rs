@@ -9,7 +9,7 @@ use crate::syntax::syntax_errors;
 const FIXTURE_DIRECTORY: &str = "src/lint/python/fixtures";
 const SAFE_SUFFIX: &str = "fixed";
 const UNSAFE_SUFFIX: &str = "unsafe";
-const MAX_FIX_PASSES: usize = 10;
+const MAX_FIX_PASSES: usize = 100;
 const PACKAGE_INIT: &str = "/__init__";
 const PACKAGE_INIT_STEM: &str = "_init";
 const DUMP_VARIABLE: &str = "KERBO_FIX_DUMP";

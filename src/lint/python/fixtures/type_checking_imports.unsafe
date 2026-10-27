@@ -1,24 +1,28 @@
+import json
+import os.path
 import typing
+from abc import ABC
+from collections import OrderedDict, defaultdict
+from datetime import date
+from decimal import Decimal as Number
+from enum import Enum
+from fractions import Fraction
+from io import StringIO
+from pathlib import PurePath
+from string import Template
+from textwrap import dedent
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import json
-    import os.path
-    from abc import ABC
-    from collections import OrderedDict, defaultdict
-    from decimal import Decimal as Number
-    from enum import Enum
-    from fractions import Fraction
-    from pathlib import Path, PurePath
+    from pathlib import Path
     from re import Pattern
-    from string import Template
     from uuid import UUID
 
 if typing.TYPE_CHECKING:
-    from datetime import date, time
+    from datetime import time
 
 if TYPE_CHECKING:
-    from io import StringIO
+    pass
 else:
     from io import BytesIO
 
@@ -62,7 +66,7 @@ isinstance(1, StringIO)
 
 def nested():
     if TYPE_CHECKING:
-        from textwrap import dedent, indent
+        from textwrap import indent
 
     dedent("x")
     value: indent = None

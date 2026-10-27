@@ -658,8 +658,8 @@ En orden. Cada etapa se cierra con la paridad medida y los tests del caso que la
       sus rangos; uno que termina donde empieza otro no se pisa (`fix::compatible`, en el orden
       del reporte).
     - Por archivo: elegir los compatibles, aplicarlos, volver a analizar el texto en memoria y
-      repetir, hasta diez vueltas. Así entra lo que destapa un arreglo (una clase que pasa a
-      `final` deja de más el `final` de sus métodos, y se saca en la vuelta siguiente).
+      repetir, hasta cien vueltas (como ruff). Así entra lo que destapa un arreglo (una clase que
+      pasa a `final` deja de más el `final` de sus métodos, y se saca en la vuelta siguiente).
     - Antes de escribir se comparan las huellas de lo que queda con las de antes: si aparece un
       problema nuevo, el archivo no se escribe, se listan los problemas y sale con `1`. Se
       escribe a un temporal oculto en la misma carpeta (con los permisos del original) y se
@@ -1801,9 +1801,30 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - `kerbo fix` (y el LSP) ahora deja el archivo como estaba si una vuelta deja más errores de
     sintaxis, como ruff, en vez de quedarse con las vueltas anteriores: pueden ser parte de la cadena
     que lo rompió. Vale para todos los lenguajes.
+  - Tanda 16 (PYI034 y TC004, idénticos a ruff en todos los fixtures; `self_return_fixes.py` y
+    `type_checking_moves.py` juntan los bordes): PYI034 pasa el retorno a `Self` con el importer y
+    le saca la anotación a un `self: Clase` o `cls: type[Clase]` (también `typing.Type`); si la
+    clase podría ser genérica (parámetros de tipo, o una base `X[...]` con `AnyStr`, un atributo, un
+    `*X`, un nombre desconocido o uno ligado una sola vez a `TypeVar`, `ParamSpec` o
+    `TypeVarTuple`) ruff sólo lo muestra y kerbo no lo ofrece. TC004 es el `move_imports` de ruff:
+    saca los nombres de la sentencia y los importa después del último import de primer nivel antes
+    del primer uso, con la sentencia reconstruida como el `retain_imports` de libcst.
+  - Esa reconstrucción (cada nombre con su coma y lo que la sigue, la coma final para el último salvo
+    que la suya tenga un comentario) es ahora también la de F401 y los demás que sacan nombres de un
+    import, como el `remove_imports` de ruff: antes se borraban líneas y un import de varias líneas
+    con comentarios quedaba sin arreglo.
+  - `kerbo fix` hace hasta 100 vueltas, como ruff (eran 10): TC004 mueve una sentencia por vuelta en
+    cada bloque, así que un bloque con muchas no llegaba a vaciarse.
+  - Pendientes de esa tanda: con varias sentencias para mover, ruff las recorre en el orden de un
+    `FxHashMap` (por el número de nodo de la sentencia) y kerbo en el del código; los imports
+    insertados quedan en otro orden, que I001 después iguala (con `--select TC004` solo pueden
+    diferir). Si un nombre de la sentencia está silenciado con `noqa`, ruff mueve sólo los demás y
+    kerbo los mueve todos. La estrategia de poner comillas (`quote-annotations`, apagada por
+    defecto en ruff) no está. PYI034 con `self: (Clase)` borra hasta antes del paréntesis y rompe la
+    sintaxis, en ruff y en kerbo: los dos revierten el archivo.
   - Lo que falta de arreglos (medido el 2026-10-26 con `../kerbo-parity/scripts/pending_by_frequency.txt`):
-    en el corpus quedan TC004 (sacar imports del `if TYPE_CHECKING`, que se cruza con I001) y
-    PYI034/PYI019 (análisis de `Self`); PLW1510 no va (el arreglo de ruff es sólo para mostrar).
+    en el corpus queda PYI019 (pasar la variable de tipo propia a `Self`); PLW1510 no va (el arreglo
+    de ruff es sólo para mostrar).
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

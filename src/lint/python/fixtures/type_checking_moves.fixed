@@ -1,0 +1,39 @@
+"""Bordes del arreglo de TC004."""
+
+# Comentario del principio.
+
+if TYPE_CHECKING:
+    import epsilon.zeta
+    import eta
+    from alpha import (
+        first,  # se queda el comentario
+        second,
+    )
+    from beta import (
+        fourth,  # el último
+        third,  # otro
+    )
+    from delta import ninth
+    from delta import seventh as eighth
+    from gamma import fifth, sixth
+    from theta import iota  # al costado
+
+print(first, third, fifth, eighth, epsilon.zeta, iota)
+
+
+def nested():
+    if TYPE_CHECKING:
+        from kappa import lam
+
+    return lam
+
+
+class Holder:
+    if TYPE_CHECKING:
+        from nu import xi
+
+    value = xi
+
+
+def annotations(a: "second", b: "fourth", c: "sixth", d: "ninth", e: "eta", f: "mu") -> None:
+    return None

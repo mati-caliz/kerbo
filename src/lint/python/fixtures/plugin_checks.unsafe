@@ -178,13 +178,15 @@ def test_four():
 
 import typing
 import typing as t
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, TypeAlias, TypeVar, cast
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
+import pkg
+from foo import Bar, Foo, Qux
 
-    import pkg
-    from foo import Bar, Baz, Foo, Qux
+if TYPE_CHECKING:
+
+    from foo import Baz
 
 OptFoo: TypeAlias = Foo | None
 OptBar: typing.TypeAlias = list[Bar]

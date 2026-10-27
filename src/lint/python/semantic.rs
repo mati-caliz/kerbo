@@ -66,6 +66,7 @@ mod renames;
 mod resources;
 mod returns;
 mod ruff_calls;
+mod self_return_fix;
 mod self_types;
 mod short_circuit;
 mod statements;

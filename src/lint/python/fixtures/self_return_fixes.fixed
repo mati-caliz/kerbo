@@ -1,0 +1,105 @@
+"""Bordes del arreglo de PYI034."""
+
+from __future__ import annotations
+
+import os
+from typing import AnyStr, Generic, ParamSpec, TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+Alias = int
+Twice = 1
+Twice = 2
+
+
+class Annotated:
+    def __enter__(self: Annotated) -> Annotated:
+        return self
+
+    def __new__(cls: type[Annotated], *args) -> Annotated:
+        return object.__new__(cls)
+
+    def __iadd__(self: Annotated, other) -> Annotated:
+        return self
+
+    def __isub__(self: type[Other], other) -> Annotated:
+        return self
+
+
+class Typed:
+    def __new__(cls: type[Typed]) -> Typed:
+        return object.__new__(cls)
+
+    def __imul__(self: list[Typed], other) -> Typed:
+        return self
+
+
+class WithGeneric(Generic[T]):
+    def __enter__(self) -> WithGeneric:
+        return self
+
+
+class WithParameters[U]:
+    def __enter__(self) -> WithParameters:
+        return self
+
+
+class Unknown(list[Missing]):
+    def __enter__(self) -> Unknown:
+        return self
+
+
+class Builtin(list[str]):
+    def __enter__(self) -> Builtin:
+        return self
+
+
+class Dotted(list[os.PathLike]):
+    def __enter__(self) -> Dotted:
+        return self
+
+
+class Starred(tuple[*Ts]):
+    def __enter__(self) -> Starred:
+        return self
+
+
+class Strings(dict[str, AnyStr]):
+    def __enter__(self) -> Strings:
+        return self
+
+
+class Aliased(list[Alias]):
+    def __enter__(self) -> Aliased:
+        return self
+
+
+class Quoted(list["T"]):
+    def __enter__(self) -> Quoted:
+        return self
+
+
+class Specified(Base[P]):
+    def __enter__(self) -> Specified:
+        return self
+
+
+class Nested(list[list[T]]):
+    def __enter__(self) -> Nested:
+        return self
+
+
+class Rebound(list[Twice]):
+    def __enter__(self) -> Rebound:
+        return self
+
+
+def shadowed():
+    Self = 1
+
+    class Inner:
+        def __enter__(self) -> Inner:
+            return self
+
+    return Self, Inner

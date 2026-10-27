@@ -24,7 +24,7 @@ const BEFORE_FSTRING: [PythonRule; 8] = [
 
 // El puesto de cada arreglo en la lista de avisos que ruff le pasa a `apply_fixes`, que desempata dos
 // arreglos que empiezan en el mismo lugar: primero los del árbol, después los de los alcances
-// diferidos (F401, F841, RUF059), los de imports (I001) y al final los RUF100; los silenciados por
+// diferidos (TC004, F401, F841, RUF059), los de imports (I001) y al final los RUF100; los silenciados por
 // un `noqa` se sacan con `swap_remove` desde el último, así que los últimos avisos pasan a ocupar
 // su lugar.
 pub fn rank_fixes_like_ruff(reports: &mut [Report], silenced: &[bool]) {
@@ -87,7 +87,10 @@ const fn generation_stage(rule: PythonRule) -> u8 {
         IMPORTS_STAGE
     } else if matches!(rule, PythonRule::RUF100) {
         DIRECTIVES_STAGE
-    } else if matches!(rule, PythonRule::F401 | PythonRule::F841 | PythonRule::RUF059) {
+    } else if matches!(
+        rule,
+        PythonRule::TC004 | PythonRule::F401 | PythonRule::F841 | PythonRule::RUF059
+    ) {
         DEFERRED_SCOPES_STAGE
     } else {
         SYNTAX_TREE_STAGE

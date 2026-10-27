@@ -11,6 +11,7 @@ use super::mutability::{Resolver, without_subscript};
 use super::parameters::{Signature, annotation, matches_annotation};
 use super::private_types::assigned_call;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
+use super::self_return_fix::self_return_fix;
 use super::type_hints::{Hints, subscript_parts, unwrapped};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
@@ -170,7 +171,13 @@ fn non_self_return(resolver: &Resolver<'_, '_>, method: Method<'_>) -> Option<Re
     let returns_class = matches_annotation(hints, returns, &|inner, expression| {
         expression.kind() == IDENTIFIER && text(expression, inner.source) == class_name
     });
-    let report = || Report::at(PythonRule::PYI034, method.name, method_name);
+    let report = || {
+        Report::at(PythonRule::PYI034, method.name, method_name).with_fix(self_return_fix(
+            resolver,
+            method.function,
+            method.class,
+        ))
+    };
     if is_async(method.function, source) {
         return (method_name == ASYNC_ENTER && returns_class && !is_final_class).then(report);
     }

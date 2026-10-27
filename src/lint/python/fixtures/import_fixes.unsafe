@@ -3,6 +3,7 @@
 # comentario después del docstring
 
 import datetime as dt
+import logging
 import re as regex
 from collections import (
     OrderedDict,
@@ -10,10 +11,6 @@ from collections import (
     defaultdict,
     deque,
 )
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import logging
 
 stamp = dt.UTC
 other = dt.UTC
@@ -30,7 +27,7 @@ def uses_late():
 
 
 def logs():
-    return logging.WARN
+    return logging.WARNING
 
 
 import os

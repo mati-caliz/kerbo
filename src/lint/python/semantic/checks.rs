@@ -1,6 +1,8 @@
 mod assert_bindings;
+mod import_rebuild;
 mod redefinitions;
 mod removal;
+mod runtime_import_fix;
 pub use removal::removal as import_removal;
 mod type_checking_imports;
 mod unused_variables;
@@ -72,10 +74,10 @@ fn scope_reports(visitor: &Visitor<'_>, scope: ScopeId) -> Vec<Report> {
     reports.extend(super::private_types::unused_private_types(visitor, &latest));
     reports.extend(assert_bindings::assignments_in_assert(visitor, &latest));
     if matches!(kind, ScopeKind::Module | ScopeKind::Function) {
-        reports.extend(removal::unused_imports(visitor, &latest));
         if !visitor.file.stub {
             reports.extend(type_checking_imports::runtime_imports(visitor, &latest));
         }
+        reports.extend(removal::unused_imports(visitor, &latest));
     }
     if kind == ScopeKind::Function {
         reports.extend(unused_locals(visitor, scope, &latest));

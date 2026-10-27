@@ -186,7 +186,7 @@ fn add_member(statement: Node<'_>, member: &str, source: &[u8]) -> TextEdit {
 
 // `add_import`: después del último import de primer nivel antes de `at`; si no hay, después del
 // último `from __future__`, o al principio del archivo pasando el docstring y los comentarios.
-fn add_import(source: &[u8], root: Node<'_>, at: Node<'_>, statement: &str) -> TextEdit {
+pub fn add_import(source: &[u8], root: Node<'_>, at: Node<'_>, statement: &str) -> TextEdit {
     let imports = top_level_imports(root);
     let preceding = imports
         .iter()

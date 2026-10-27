@@ -17,7 +17,7 @@ use crate::rules::{Diagnostic, RuleId};
 use crate::scan::{ScanFailure, check_text};
 use crate::syntax::syntax_errors;
 
-const MAX_FIX_PASSES: usize = 10;
+const MAX_FIX_PASSES: usize = 100;
 const TEMPORARY_SUFFIX: &str = ".kerbo-fix.tmp";
 const HIDDEN_PREFIX: &str = ".";
 

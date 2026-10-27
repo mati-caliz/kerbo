@@ -1,8 +1,13 @@
+use std::collections::BTreeMap;
+
 use tree_sitter::{Node, Point};
 
 use super::super::Visitor;
-use super::super::model::{BindingId, MODULE_SCOPE, Reference};
+use super::super::model::{Binding, BindingId, MODULE_SCOPE, Reference};
 use super::super::pep::is_typing_only;
+use super::removal::entry_of;
+use super::runtime_import_fix::move_out_of_type_checking;
+use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ASSIGNMENT, AUGMENTED_ASSIGNMENT, CALL, CONCATENATED_STRING, EXPRESSION_STATEMENT, FUNCTION_FIELD,
@@ -15,9 +20,15 @@ const MODULE_GETATTR: &str = "__getattr__";
 const TYPE_PARAMETER: &str = "type_parameter";
 
 // TC004: un import de adentro de `if TYPE_CHECKING:` que se usa en ejecución, donde el nombre no
-// existe. Avisa en cada nombre importado, con el `noqa` también en la línea de la sentencia.
+// existe. Avisa en cada nombre importado, con el `noqa` también en la línea de la sentencia; los
+// nombres de una misma sentencia comparten el arreglo.
 pub fn runtime_imports(visitor: &Visitor<'_>, latest: &[(&str, BindingId)]) -> Vec<Report> {
-    latest
+    let module_getattr = visitor
+        .model
+        .scope_of(MODULE_SCOPE)
+        .names
+        .contains_key(MODULE_GETATTR);
+    let moved: Vec<(&Binding<'_>, Node<'_>, Node<'_>)> = latest
         .iter()
         .filter_map(|(_, id)| visitor.model.binding(*id))
         .filter(|binding| binding.kind.is_import())
@@ -30,22 +41,45 @@ pub fn runtime_imports(visitor: &Visitor<'_>, latest: &[(&str, BindingId)]) -> V
                 visitor,
                 root: std::iter::successors(Some(statement), Node::parent).last()?,
                 deferred: visitor.boundaries.future_annotations(),
-                module_getattr: visitor
-                    .model
-                    .scope_of(MODULE_SCOPE)
-                    .names
-                    .contains_key(MODULE_GETATTR),
+                module_getattr,
             };
             let used_at_runtime = binding
                 .references
                 .iter()
                 .any(|reference| context.is_runtime_reference(reference));
-            used_at_runtime.then(|| {
-                Report::at_point(PythonRule::TC004, binding.site.at, &binding.qualified)
-                    .with_statement_row(statement.start_position().row)
-            })
+            used_at_runtime.then_some((binding, statement, context.root))
+        })
+        .collect();
+    let mut by_statement: BTreeMap<usize, Vec<&Binding<'_>>> = BTreeMap::new();
+    for (binding, statement, _) in &moved {
+        by_statement.entry(statement.id()).or_default().push(binding);
+    }
+    moved
+        .iter()
+        .map(|(binding, statement, root)| {
+            let fix = by_statement
+                .get(&statement.id())
+                .and_then(|group| statement_fix(*root, *statement, group, visitor.source));
+            Report::at_point(PythonRule::TC004, binding.site.at, &binding.qualified)
+                .with_fix(fix)
+                .with_statement_row(statement.start_position().row)
         })
         .collect()
+}
+
+// El import nuevo va antes del primer uso de cualquiera de los nombres de la sentencia.
+fn statement_fix(root: Node<'_>, statement: Node<'_>, group: &[&Binding<'_>], source: &[u8]) -> Option<Fix> {
+    let entries: Vec<Node<'_>> = group
+        .iter()
+        .filter_map(|binding| binding.site.node.map(entry_of))
+        .collect();
+    let first_use = group
+        .iter()
+        .filter_map(|binding| binding.references.first())
+        .map(|reference| reference.at)
+        .min()?;
+    let first_use = node_at(root, first_use)?;
+    move_out_of_type_checking(statement, &entries, first_use, source)
 }
 
 struct Context<'visitor, 'tree> {
