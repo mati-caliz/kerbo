@@ -22,7 +22,7 @@ use crate::language::Language;
 use crate::limits::Limits;
 use crate::rules::{GoRule, RuleId};
 
-pub use error_strings::{CapitalizedError, GoPackageFacts};
+pub use error_strings::{CapitalizedError, GoPackageFacts, MessagePiece, PendingMessage, message_problems};
 use error_strings::{ErrorStringProblem, error_strings};
 pub use nolint::ranges as nolint_ranges;
 
@@ -75,12 +75,14 @@ fn error_string_findings(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
         .capitalized
         .iter()
         .map(|capitalized| capitalized.word.as_str());
+    let mut unresolved = facts.pending.iter().map(PendingMessage::constant_names);
     strings
         .iter()
         .map(|string| {
             let subject = match string.problem {
                 ErrorStringProblem::Punctuation => string.callee.clone(),
                 ErrorStringProblem::Capitalized => words.next().unwrap_or_default().to_owned(),
+                ErrorStringProblem::Unresolved => unresolved.next().unwrap_or_default(),
             };
             finding_at(
                 LintKind::Go(GoRule::St1005),

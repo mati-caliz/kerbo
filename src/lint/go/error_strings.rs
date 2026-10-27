@@ -1,11 +1,14 @@
 mod constants;
+mod pending;
 
 use std::collections::HashMap;
 
 use tree_sitter::Node;
 
 use crate::syntax::{children_with_fields, descendants, named_children, one_based};
-use constants::{constant_specs, constant_text};
+use constants::constant_specs;
+use pending::{FileNames, has_constants, message_pieces, package_constants};
+pub use pending::{MessagePiece, PendingMessage};
 
 const CALL: &str = "call_expression";
 const SELECTOR: &str = "selector_expression";
@@ -56,12 +59,15 @@ pub struct GoPackageFacts {
     pub declared: Vec<String>,
     pub capitalized: Vec<CapitalizedError>,
     pub outside_functions: Vec<(usize, usize)>,
+    pub constants: Vec<(String, String)>,
+    pub pending: Vec<PendingMessage>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorStringProblem {
     Punctuation,
     Capitalized,
+    Unresolved,
 }
 
 #[derive(Debug)]
@@ -71,67 +77,106 @@ pub struct ErrorString<'tree> {
     pub problem: ErrorStringProblem,
 }
 
-// `CheckErrorStrings` de staticcheck (ST1005), sobre los mensajes constantes del archivo.
+// `CheckErrorStrings` de staticcheck (ST1005), sobre los mensajes constantes del archivo. Los que
+// nombran constantes de otro archivo quedan pendientes para la pasada por paquete.
 pub fn error_strings<'tree>(root: Node<'tree>, source: &[u8]) -> (Vec<ErrorString<'tree>>, GoPackageFacts) {
-    let text = |node: Node<'_>| node.utf8_text(source).unwrap_or_default();
     let imports = imported_packages(root, source);
-    let constants = constant_specs(root, source);
-    let mut found = Vec::new();
-    let mut capitalized = Vec::new();
-    let mut outside_functions = Vec::new();
+    let names = FileNames {
+        constants: constant_specs(root, source),
+    };
+    let mut collected = Collected::default();
     for call in descendants(root).into_iter().filter(|node| node.kind() == CALL) {
         let Some(callee) = constructor(call, &imports, source) else {
             continue;
         };
-        let Some(message) = call
+        let Some(pieces) = call
             .child_by_field_name(ARGUMENTS_FIELD)
             .and_then(|arguments| {
                 named_children(arguments)
                     .into_iter()
                     .find(|argument| argument.kind() != COMMENT)
             })
-            .and_then(|first| constant_text(first, source, &constants, 0))
+            .and_then(|first| message_pieces(first, source, &names))
         else {
             continue;
         };
+        collected.add(call, callee, pieces);
+    }
+    let facts = GoPackageFacts {
+        package: package_name(root, source),
+        declared: declared_names(root, source),
+        capitalized: collected.capitalized,
+        outside_functions: collected.outside_functions,
+        constants: package_constants(root, source, &names),
+        pending: collected.pending,
+    };
+    (collected.found, facts)
+}
+
+#[derive(Default)]
+struct Collected<'tree> {
+    found: Vec<ErrorString<'tree>>,
+    capitalized: Vec<CapitalizedError>,
+    outside_functions: Vec<(usize, usize)>,
+    pending: Vec<PendingMessage>,
+}
+
+impl<'tree> Collected<'tree> {
+    fn add(&mut self, call: Node<'tree>, callee: String, pieces: Vec<MessagePiece>) {
         let start = call.start_position();
-        let position = (one_based(start.row), one_based(start.column));
+        let (line, column) = (one_based(start.row), one_based(start.column));
         if !inside_a_function(call) {
-            outside_functions.push(position);
+            self.outside_functions.push((line, column));
         }
-        if message.ends_with(FINAL_PUNCTUATION) {
-            found.push(ErrorString {
+        let mut report = |problem: ErrorStringProblem| {
+            self.found.push(ErrorString {
                 call,
                 callee: callee.clone(),
-                problem: ErrorStringProblem::Punctuation,
+                problem,
             });
-        }
-        if let Some(word) = capitalized_word(&message) {
-            capitalized.push(CapitalizedError {
-                line: position.0,
-                column: position.1,
-                word,
-            });
-            found.push(ErrorString {
-                call,
+        };
+        if has_constants(&pieces) {
+            report(ErrorStringProblem::Punctuation);
+            report(ErrorStringProblem::Unresolved);
+            self.pending.push(PendingMessage {
+                line,
+                column,
                 callee,
-                problem: ErrorStringProblem::Capitalized,
+                pieces,
             });
+            return;
+        }
+        let message: String = pieces
+            .iter()
+            .filter_map(|piece| match piece {
+                MessagePiece::Text(text) => Some(text.as_str()),
+                MessagePiece::Constant(_) => None,
+            })
+            .collect();
+        let (punctuated, word) = message_problems(&message);
+        if punctuated {
+            report(ErrorStringProblem::Punctuation);
+        }
+        if let Some(word) = word {
+            report(ErrorStringProblem::Capitalized);
+            self.capitalized.push(CapitalizedError { line, column, word });
         }
     }
-    let package = named_children(root)
+}
+
+// Lo que ST1005 mira de un mensaje: si termina en puntuación y la primera palabra con mayúscula.
+pub fn message_problems(message: &str) -> (bool, Option<String>) {
+    (message.ends_with(FINAL_PUNCTUATION), capitalized_word(message))
+}
+
+fn package_name(root: Node<'_>, source: &[u8]) -> String {
+    named_children(root)
         .into_iter()
         .find(|node| node.kind() == PACKAGE_CLAUSE)
         .and_then(|clause| named_children(clause).into_iter().next())
-        .map(|name| text(name).to_owned())
-        .unwrap_or_default();
-    let facts = GoPackageFacts {
-        package,
-        declared: declared_names(root, source),
-        capitalized,
-        outside_functions,
-    };
-    (found, facts)
+        .and_then(|name| name.utf8_text(source).ok())
+        .unwrap_or_default()
+        .to_owned()
 }
 
 fn inside_a_function(node: Node<'_>) -> bool {

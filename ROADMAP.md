@@ -2204,12 +2204,21 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Paridad de las cuatro reglas de Go (ineffassign, ST1005, QF1003, QF1004) contra golangci-lint
     v2.15.0 en los 12 repos de arriba, cada módulo con sus dependencias: 1.369 coincidencias por
     archivo, línea y columna, **ninguna de más** y 12 de menos, todas ST1005 de terraform con el
-    mensaje en una constante de otro archivo. syncthing pide `go run build.go assets` antes: sin
+    mensaje en una constante de otro archivo (resueltas abajo). syncthing pide `go run build.go assets` antes: sin
     `lib/api/auto` generado, golangci-lint no analiza los paquetes que dependen de él.
+- ST1005 con el mensaje en una constante de otro archivo del paquete (hecho, 2026-10-27): cada
+  archivo guarda en la caché sus constantes de texto del paquete (las que resuelve solo) y los
+  mensajes que nombran una constante que no tiene, como texto y nombres en orden; emite el aviso de
+  puntuación y uno pendiente, así pasan por `//nolint` como cualquier otro. Al final del escaneo se
+  arma el texto con las constantes del paquete (carpeta y nombre de `package`) y cada aviso se
+  descarta o pasa a nombrar la palabra con mayúscula, con las mismas exenciones que el resto. Un
+  nombre declarado como variable o parámetro en la función de la llamada no es una constante.
+  - Paridad de las cuatro reglas de Go contra golangci-lint v2.15.0 en los 12 repos: **1.381 avisos
+    idénticos por archivo, línea y columna, ninguno de más ni de menos** (1.252 de ST1005, 67 de
+    QF1004, 33 de QF1003 y 29 de ineffassign).
 - Pendientes de Go contra golangci-lint:
-  - ST1005 con el mensaje en una constante de otro archivo del paquete: pide guardar las constantes
-    de texto de cada archivo y evaluar el mensaje en la pasada por paquete. Tampoco se verificó si las
-    variables del paquete eximen (en el corpus no hubo caso; se eximen, como los tipos).
+  - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
+    eximen, como los tipos).
   - QF1001 (De Morgan): staticcheck no avisa si algo de adentro de la negación es un float, y eso
     pide los tipos. Probado sin ellos (sólo los literales y las conversiones): sobraban 9 de 34 en
     fzf y hugo, todos comparaciones de campos o resultados `float64`, y `!(a == 1.0)` con `a int`
