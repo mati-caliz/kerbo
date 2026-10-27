@@ -237,6 +237,10 @@ pub enum Problem {
         version: u32,
     },
     GitUnavailable(String),
+    GoTypesUnavailable {
+        module: String,
+        detail: String,
+    },
     GitFailed {
         command: String,
         detail: String,

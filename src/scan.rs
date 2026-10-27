@@ -20,6 +20,7 @@ use crate::rules::{Diagnostic, FileIdentity, evaluate};
 use crate::shell;
 use crate::suppressions::{Suppressed, split};
 
+mod go_errcheck;
 mod go_packages;
 mod pooling;
 mod project;
@@ -132,6 +133,11 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
     }
     outcome.diagnostics.extend(pooling::duplicate_diagnostics(pooled));
     go_packages::drop_package_names(&mut outcome.diagnostics, &go_packages);
+    failures.extend(go_errcheck::confirm_unchecked_errors(
+        &mut outcome.diagnostics,
+        &mut outcome.suppressed,
+        &GoPlatform::of(request.config.go_target()),
+    ));
     if project::covers_project(request.roots, &project_root(request.config)) {
         outcome
             .diagnostics
@@ -194,6 +200,7 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
     let pooled = pooling::pooled_file(&file.identity, &mut analysis, &limits);
     diagnostics.extend(evaluate(&file.identity, &analysis, &limits));
     let (mut diagnostics, _suppressed) = split(source, diagnostics);
+    go_errcheck::drop_unconfirmed(&mut diagnostics);
     diagnostics.extend(find_duplicates(pooled.into_iter().collect()));
     Some(diagnostics)
 }

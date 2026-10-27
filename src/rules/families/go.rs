@@ -2,6 +2,7 @@ use super::{ComposeRule, DockerfileRule, EslintRule, MigrationRule, PythonRule, 
 
 rule_family!(GoRule {
     Ineffassign => "ineffassign",
+    Errcheck => "errcheck",
     St1005 => "st1005",
     Qf1003 => "qf1003",
     Qf1004 => "qf1004",
@@ -13,7 +14,7 @@ impl GoRule {
     // El linter de golangci-lint que la reporta: es el nombre que silencia un `//nolint`.
     pub const fn linter(self) -> &'static str {
         match self {
-            Self::Ineffassign => self.as_str(),
+            Self::Ineffassign | Self::Errcheck => self.as_str(),
             Self::St1005 | Self::Qf1003 | Self::Qf1004 => STATICCHECK,
         }
     }

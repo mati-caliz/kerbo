@@ -289,6 +289,9 @@ impl Catalog for English {
             } => format!("{path}: pattern `{pattern}`: {detail}"),
             Problem::UnknownBaselineVersion { path, version } => format!("{path}: unknown version {version}"),
             Problem::GitUnavailable(detail) => format!("could not run git: {detail}"),
+            Problem::GoTypesUnavailable { module, detail } => format!(
+                "{module}: errcheck needs Go's types and they could not be obtained (it needs `go`; otherwise `errcheck = \"off\"`): {detail}"
+            ),
             Problem::GitFailed { command, detail } => format!("git {command}: {detail}"),
             Problem::UnknownRule(rule) => format!("there is no rule `{rule}`"),
             Problem::ExpectedRuleLimit(text) => format!("expected rule=value and got `{text}`"),

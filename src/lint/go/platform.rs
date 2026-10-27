@@ -103,6 +103,22 @@ impl GoPlatform {
         }
     }
 
+    pub fn os(&self) -> &str {
+        &self.os
+    }
+
+    pub fn arch(&self) -> &str {
+        &self.arch
+    }
+
+    pub const fn cgo(&self) -> bool {
+        self.cgo
+    }
+
+    pub fn build_tags(&self) -> &[String] {
+        &self.build_tags
+    }
+
     // `matchTag` de `go/build`.
     pub fn matches(&self, tag: &str) -> bool {
         tag == self.os

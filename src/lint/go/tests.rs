@@ -38,6 +38,13 @@ fn lints(source: &str) -> Vec<LintFinding> {
     )
 }
 
+fn ineffassign(source: &str) -> Vec<LintFinding> {
+    lints(source)
+        .into_iter()
+        .filter(|finding| finding.kind.rule().as_str() == LINTER)
+        .collect()
+}
+
 fn rendered(found: &[LintFinding]) -> Vec<String> {
     found
         .iter()
@@ -48,7 +55,7 @@ fn rendered(found: &[LintFinding]) -> Vec<String> {
 #[test]
 fn ineffassign_matches_golangci_lint_on_the_fixture() {
     let expected: Vec<String> = INEFFASSIGN_EXPECTED.lines().map(str::to_owned).collect();
-    assert_eq!(rendered(&lints(INEFFASSIGN_SOURCE)), expected);
+    assert_eq!(rendered(&ineffassign(INEFFASSIGN_SOURCE)), expected);
 }
 
 #[test]
@@ -78,7 +85,7 @@ fn a_comment_after_the_first_declaration_does_not_mark_the_file_as_generated() {
 
 fn unsuppressed(source: &str) -> Vec<String> {
     let ranges = nolint_ranges(source);
-    let kept: Vec<LintFinding> = lints(source)
+    let kept: Vec<LintFinding> = ineffassign(source)
         .into_iter()
         .filter(|finding| {
             !ranges.iter().any(|range| {
@@ -215,4 +222,64 @@ fn quickfixes_match_golangci_lint_on_the_fixture() {
     found.sort_unstable();
     expected.sort_unstable();
     assert_eq!(found, expected);
+}
+
+const ERRCHECK_SOURCE: &str = r#"package a
+
+func f(file *os.File, values <-chan error, seq func(func(error) bool), x any) {
+	file.Close()
+	(file.Close())
+	go file.Sync()
+	defer os.Remove("a")
+	<-values
+	(<-values)
+	for range seq {
+	}
+	for err := range seq {
+		_ = err
+	}
+	for k, v := range pairs {
+		_, _ = k, v
+	}
+	value := x.(interface{ Close() error })
+	_ = value
+	x.(interface{ Close() error }).Close()
+	handlers[0]()
+	pkg.sub.Call[int](1)
+	go func() {
+		os.Remove("b")
+	}()
+	select {
+	case <-values:
+	case err := <-values:
+		_ = err
+	}
+}
+"#;
+
+#[test]
+fn errcheck_candidates_follow_the_statements_errcheck_looks_at() {
+    let found: Vec<String> = lints(ERRCHECK_SOURCE)
+        .iter()
+        .filter(|finding| finding.kind.rule().as_str() == "errcheck")
+        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            "4:12 file.Close",
+            "6:14 file.Sync",
+            "7:17 os.Remove",
+            "8:2 ",
+            "9:3 ",
+            "10:2 ",
+            "12:2 ",
+            "20:38 ",
+            "21:13 ",
+            "22:19 pkg.sub.Call",
+            "25:3 ",
+            "24:12 os.Remove",
+            "27:7 ",
+        ]
+    );
 }

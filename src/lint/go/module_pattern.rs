@@ -1,5 +1,5 @@
 use std::ffi::OsStr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const MODULE_FILE: &str = "go.mod";
 const SKIPPED_DIRECTORIES: &[&str] = &["testdata", "vendor"];
@@ -22,6 +22,14 @@ pub fn listed_by_module_pattern(path: &Path) -> bool {
             .is_some_and(is_skipped_directory);
     }
     true
+}
+
+// La carpeta del `go.mod` más cercano.
+pub fn module_root(path: &Path) -> Option<PathBuf> {
+    path.parent()?
+        .ancestors()
+        .find(|ancestor| ancestor.join(MODULE_FILE).is_file())
+        .map(Path::to_path_buf)
 }
 
 fn is_skipped_directory(name: &str) -> bool {

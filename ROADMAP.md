@@ -2231,6 +2231,28 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   solaris e ios como darwin, como `matchTag`. Las configuraciones de golangci-lint no se leen: kerbo
   lo reemplaza y su configuración es la propia. La plataforma entra al contexto de la caché.
   - El README dejó de decir que en Go sólo está `ineffassign`.
+- Tipos de Go y errcheck (hecho, 2026-10-27). La decisión: los tipos los saca `go/types`, el
+  chequeo de tipos del propio Go, a través de un helper chico en Go (`src/go_types/helper.go`, sólo
+  biblioteca estándar) que kerbo lleva embebido y compila una vez con el `go` del sistema en su
+  caché, como Java toma las firmas de los `.class` en vez de compilar. El helper corre `go list
+  -export -deps -test -compiled` en el módulo (con la plataforma y los build tags de `[go]`), chequea
+  cada paquete y su variante de test importando lo exportado de las dependencias, y escribe hechos
+  por archivo: las llamadas que devuelven un `error` (con los nombres de errcheck para excluirlas,
+  también por interfaces embebidas, y el tipo del primer argumento), los `<-` de canales de errores
+  y los `range` sobre funciones que entregan uno. Las reglas siguen en Rust.
+  - `errcheck`: cada archivo emite candidatos sintácticos (llamada suelta, `go`, `defer`, `<-` suelto
+    o en un `case`, `range` sin clave o valor), con los saltos del visitor de errcheck (no entra en
+    aserciones de tipo ni en asignaciones de una sola aserción), y pasan por `//nolint` y la caché
+    como cualquier aviso. Al final del escaneo se confirman con los hechos del módulo (el `go.mod`
+    más cercano) y la lista de exclusiones de errcheck v1.30.0, y el aviso nombra la función como
+    golangci-lint (`f.Close`). Sin `go`, el escaneo falla con el motivo (o `errcheck = "off"`).
+  - Los hechos se guardan con la huella del helper, la plataforma y cada `.go`, `go.mod` y `go.sum`
+    (tamaño y fecha); si el helper no pudo leer lo exportado de alguna dependencia, la salida se usa
+    pero no se guarda. Con la caché de build de Go caliente, consul (2.470 archivos) tarda 23 s de
+    punta a punta.
+  - Paridad contra golangci-lint v2.15.0 (sólo errcheck) en los 12 repos: **10.586 avisos idénticos
+    por archivo, línea y columna, ninguno de más** y 168 de menos, todos explicados abajo (symlinks
+    y la gramática de tree-sitter-go).
 - Pendientes de Go contra golangci-lint:
   - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
     eximen, como los tipos).
@@ -2238,9 +2260,17 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     pide los tipos. Probado sin ellos (sólo los literales y las conversiones): sobraban 9 de 34 en
     fzf y hugo, todos comparaciones de campos o resultados `float64`, y `!(a == 1.0)` con `a int`
     avisa en staticcheck. Queda con las que piden tipos.
-  - errcheck, SA1019, QF1008, QF1012, unused y govet: piden los tipos del compilador. Es el grueso
-    del volumen (errcheck solo es el 75 %) y hay que decidir cómo traerlos sin reimplementar el
-    chequeo de tipos de Go.
+  - SA1019, QF1008, QF1012, QF1001, unused y govet: piden tipos; van sobre el mismo helper que
+    errcheck, sumándole los hechos que cada una necesita.
+  - tree-sitter-go 0.25 (la última) no parsea `new(expresión)` de Go 1.26 ni los métodos con
+    parámetros de tipo de Go 1.27: esos archivos quedan afuera de todas las reglas de Go (son 110 y
+    3 de los avisos de errcheck que faltan en etcd y golang/tools). Pide una gramática propia o
+    esperar la de arriba.
+  - Los archivos que son symlinks no se recorren y golangci-lint sí los mira (55 avisos de errcheck
+    en los `example_*_test.go` de etcd, que apuntan a `tests/integration`).
+  - errcheck en el editor y en `kerbo fix`: el texto sin guardar no tiene tipos, así que ahí no se
+    muestra. Y los `exclude-functions`, `check-blank` y `check-type-assertions` de errcheck no se
+    configuran todavía.
   - Los tags de versión de arquitectura sólo están para amd64 (`amd64.v1`); `arm64.v8.0` y los
     demás no cumplen. Los `goexperiment` son los fijos de Go 1.27.
   - `uniq-by-line` (prendido por defecto en golangci-lint) deja un solo aviso por línea y linter;

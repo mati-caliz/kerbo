@@ -289,6 +289,9 @@ impl Catalog for Spanish {
                 format!("{path}: versión {version} desconocida")
             }
             Problem::GitUnavailable(detail) => format!("no se pudo correr git: {detail}"),
+            Problem::GoTypesUnavailable { module, detail } => format!(
+                "{module}: errcheck pide los tipos de Go y no se pudieron sacar (hace falta `go`; si no, `errcheck = \"off\"`): {detail}"
+            ),
             Problem::GitFailed { command, detail } => format!("git {command}: {detail}"),
             Problem::UnknownRule(rule) => format!("no existe la regla `{rule}`"),
             Problem::ExpectedRuleLimit(text) => format!("se esperaba regla=valor y llegó `{text}`"),

@@ -15,6 +15,12 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "x := cargar(); x = otro() se vuelve x := otro().",
     ),
     RuleText::new(
+        "Error que devuelve una llamada y nadie revisa (errcheck)",
+        "revisá el error, devolvelo o, si de verdad no importa, asignalo a _ con un comentario del motivo",
+        "Un error ignorado deja seguir como si todo hubiera salido bien: un archivo que no se cerró, un dato que no se guardó, una conexión que se cayó.",
+        "f.Close() se vuelve if err := f.Close(); err != nil { return err }.",
+    ),
+    RuleText::new(
         "Mensaje de error con mayúscula al principio o puntuación al final (ST1005 de staticcheck)",
         "empezá el mensaje en minúscula y sacale el punto, los dos puntos, el signo o el salto de línea del final",
         "Los errores se encadenan: fmt.Errorf(\"guardar: %w\", err) arma una sola oración, y una mayúscula o un punto en el medio la cortan.",

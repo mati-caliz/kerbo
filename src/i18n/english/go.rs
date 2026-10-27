@@ -15,6 +15,12 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "x := load(); x = other() becomes x := other().",
     ),
     RuleText::new(
+        "Error returned by a call that nobody checks (errcheck)",
+        "check the error, return it or, if it truly does not matter, assign it to _ with a comment on why",
+        "An ignored error carries on as if everything went fine: a file that was not closed, data that was not saved, a connection that dropped.",
+        "f.Close() becomes if err := f.Close(); err != nil { return err }.",
+    ),
+    RuleText::new(
         "Error message that starts with a capital letter or ends with punctuation (staticcheck ST1005)",
         "start the message in lowercase and drop the trailing period, colon, mark or newline",
         "Errors get wrapped: fmt.Errorf(\"save: %w\", err) builds one sentence, and a capital letter or a period in the middle breaks it.",

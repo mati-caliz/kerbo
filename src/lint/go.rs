@@ -1,5 +1,6 @@
 mod ast;
 mod build_constraints;
+mod errcheck;
 mod error_strings;
 mod generated;
 mod imports;
@@ -27,13 +28,15 @@ use crate::rules::{GoRule, RuleId};
 
 pub use error_strings::{CapitalizedError, GoPackageFacts, MessagePiece, PendingMessage, message_problems};
 use error_strings::{ErrorStringProblem, error_strings};
+pub use module_pattern::module_root;
 pub use nolint::ranges as nolint_ranges;
 use platform::GoPlatform;
 
 type GoCheck = fn(Node<'_>, &[u8]) -> Vec<LintFinding>;
 
-const CHECKS: [(GoRule, GoCheck); 4] = [
+const CHECKS: [(GoRule, GoCheck); 5] = [
     (GoRule::Ineffassign, ineffectual_assignments),
+    (GoRule::Errcheck, unchecked_error_candidates),
     (GoRule::St1005, error_string_findings),
     (GoRule::Qf1003, tagged_switch_findings),
     (GoRule::Qf1004, unlimited_call_findings),
@@ -104,6 +107,20 @@ fn error_string_findings(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
                 LintKind::Go(GoRule::St1005),
                 string.call.start_position(),
                 &subject,
+                None,
+            )
+        })
+        .collect()
+}
+
+fn unchecked_error_candidates(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
+    errcheck::candidates(root, source)
+        .into_iter()
+        .map(|candidate| {
+            finding_at(
+                LintKind::Go(GoRule::Errcheck),
+                candidate.position,
+                &candidate.subject,
                 None,
             )
         })

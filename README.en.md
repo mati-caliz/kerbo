@@ -600,9 +600,11 @@ Files tree-sitter-bash cannot parse are skipped.
 
 ### Go against golangci-lint
 
-In Go, kerbo runs the rules from golangci-lint's default set that do not need the compiler's
-types, under the same names: `kerbo explain st1005`, `--max ineffassign=0` or `qf1003 = "off"` in
-`kerbo.toml`. `ineffassign` reports an assignment nobody reads before it is overwritten or the
+In Go, kerbo runs rules from golangci-lint's default set under the same names:
+`kerbo explain errcheck`, `--max ineffassign=0` or `qf1003 = "off"` in `kerbo.toml`. `errcheck`
+reports the `error` a call returns that nobody checks, with errcheck's exclusions; the types come
+from Go's own type checker through a helper kerbo builds once with the system's `go` (without
+`go`, the scan fails with the reason, or it is turned off with `errcheck = "off"`). `ineffassign` reports an assignment nobody reads before it is overwritten or the
 function ends, following branches, loops, `switch` with `fallthrough`, `select`, `goto` and labels;
 variables captured by a closure or whose address is taken do not count. From staticcheck: `st1005`,
 error messages with a leading capital or trailing punctuation (with the whole package's constants
@@ -622,8 +624,8 @@ before `package`). Without a list or with `all` it silences every rule, and the 
 
 Parity, against golangci-lint 2.15 on linux/amd64: zero differences by file, line and column in
 golang/tools, terraform, hugo, caddy, consul, prometheus, etcd, syncthing and others (1,381
-reports). The rest of the default set (errcheck, govet, unused and the rest of staticcheck) needs
-the compiler's types and stays in golangci-lint.
+reports), and in errcheck 10,586 identical reports and none extra. govet, unused and the rest of
+staticcheck stay in golangci-lint.
 
 ### Secrets and vulnerable dependencies
 
