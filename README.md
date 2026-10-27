@@ -622,7 +622,7 @@ está antes de `package`). Sin lista o con `all` silencia todas las reglas, y el
 
 Paridad, contra golangci-lint 2.15 en linux/amd64: cero diferencias por archivo, línea y columna
 en golang/tools, terraform, hugo, caddy, consul, prometheus, etcd, syncthing y otros (1.381
-avisos), en errcheck 10.699, en `qf1008` y `qf1012` 1.153 y en `sa1019` (uso de lo deprecado)
+avisos), en errcheck 10.754, en `qf1008` y `qf1012` 1.153 y en `sa1019` (uso de lo deprecado)
 592, `qf1001` 136, `stdmethods` de govet 28 y la cola chica de staticcheck (`st1012`, `qf1011`,
 `st1023`, `qf1002`, `s1005`, `sa9003`, `qf1006`, `st1019`, `sa1029`, `sa9004`, `qf1009`, `st1013`,
 `s1000`, `st1017`, `st1006`, `s1008` y `s1002`) 180 y en `unused` (código que nadie usa) 249, sin

@@ -1,6 +1,9 @@
-use std::path::{Component, Path};
+use std::fs;
+use std::path::{Component, Path, PathBuf};
 
 use ignore::{DirEntry, Walk, WalkBuilder};
+
+use crate::language::Language;
 
 const ANALYZED_HIDDEN_DIRECTORIES: [&str; 2] = [".github", ".devcontainer"];
 const GIT_DIRECTORY: &str = ".git";
@@ -12,6 +15,22 @@ pub fn walk(root: &Path) -> Walk {
         .hidden(false)
         .filter_entry(is_visited)
         .build()
+}
+
+// Un `.go` que es symlink a un archivo es parte del paquete de su carpeta, como en `go list`; en los
+// demás lenguajes los symlinks no se recorren.
+pub fn is_walked_symlink(path: &Path) -> bool {
+    Language::from_path(path) == Some(Language::Go)
+        && fs::metadata(path).is_ok_and(|metadata| metadata.is_file())
+}
+
+// La ruta con las carpetas resueltas pero sin seguir el archivo: un symlink queda en su carpeta.
+pub fn canonical_location(path: &Path) -> PathBuf {
+    let parent = path.parent().filter(|parent| !parent.as_os_str().is_empty());
+    match (parent.map(fs::canonicalize), path.file_name()) {
+        (Some(Ok(directory)), Some(name)) => directory.join(name),
+        _ => path.canonicalize().unwrap_or_else(|_| path.to_path_buf()),
+    }
 }
 
 fn is_visited(entry: &DirEntry) -> bool {

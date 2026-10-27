@@ -2321,6 +2321,11 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   que el helper siga compilando con Go 1.22. 249 de 249 contra golangci-lint, ninguno de más; los
   2 que kerbo marca en un módulo dentro de `testdata` de golang/tools también los marca
   golangci-lint corrido ahí (el arnés saltea esos módulos).
+- Los `.go` que son symlinks (hecho, 2026-10-27): como en `go list`, un symlink a un archivo es parte
+  del paquete de su carpeta, así que se recorre y su ruta resuelve las carpetas pero no el archivo
+  (`canonical_location` en `src/scan/walk.rs`, la misma clave con la que el helper guarda sus
+  hechos). En los demás lenguajes los symlinks se siguen salteando. errcheck queda en 10.754 de
+  10.754 contra golangci-lint (los 55 de los `example_*_test.go` de etcd), ninguno de más.
 - Pendientes de Go contra golangci-lint:
   - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
     eximen, como los tipos).
@@ -2330,8 +2335,6 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - govet `inline`: 32 son "debería inlinearse" (lo anotado con `//go:fix inline`) y 98 son
     "cannot inline", que salen de correr el inliner de x/tools (versión de Go del archivo,
     inferencia de tipos genéricos y otros casos): calcarlo es reimplementar un motor de refactor.
-  - Los archivos que son symlinks no se recorren y golangci-lint sí los mira (55 avisos de errcheck
-    en los `example_*_test.go` de etcd, que apuntan a `tests/integration`).
   - errcheck en el editor y en `kerbo fix`: el texto sin guardar no tiene tipos, así que ahí no se
     muestra. Y los `exclude-functions`, `check-blank` y `check-type-assertions` de errcheck no se
     configuran todavía.

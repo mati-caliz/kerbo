@@ -26,6 +26,8 @@ mod pooling;
 mod project;
 mod walk;
 
+pub use walk::canonical_location;
+
 const SINGLE_FILE: usize = 1;
 
 #[derive(Debug)]
@@ -221,7 +223,7 @@ fn collect_files(roots: &[PathBuf], project_root: &Path) -> (Vec<SourceFile>, Ve
     for root in roots {
         for entry in walk::walk(root) {
             match entry {
-                Ok(entry) if entry.file_type().is_some_and(|file_type| file_type.is_file()) => {
+                Ok(entry) if is_scanned_entry(&entry) => {
                     files.push(walked_file(root, entry.path(), project_root));
                 }
                 Ok(_) => {}
@@ -239,9 +241,15 @@ fn collect_files(roots: &[PathBuf], project_root: &Path) -> (Vec<SourceFile>, Ve
     (files, failures)
 }
 
+fn is_scanned_entry(entry: &ignore::DirEntry) -> bool {
+    entry.file_type().is_some_and(|file_type| {
+        file_type.is_file() || (file_type.is_symlink() && walk::is_walked_symlink(entry.path()))
+    })
+}
+
 fn source_file(walk_root: &Path, path: &Path, project_root: &Path) -> SourceFile {
     let language = Language::from_path(path);
-    let absolute = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let absolute = canonical_location(path);
     let test_path = absolute
         .strip_prefix(project_root)
         .ok()

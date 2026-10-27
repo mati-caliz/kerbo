@@ -91,6 +91,30 @@ fn accepts_several_roots_and_single_files() {
     assert_eq!(only_go.files, 1);
 }
 
+#[cfg(unix)]
+#[test]
+fn go_files_that_are_symlinks_belong_to_their_folder_and_other_symlinks_are_skipped() {
+    let tree = TempTree::new("scan-symlinks");
+    tree.write(
+        "real/a.go",
+        "package real\n\nfunc F(a, b, c, d, e, f, g int) {}\n",
+    );
+    tree.write("real/b.py", "def f(a, b, c, d, e, f, g):\n    pass\n");
+    tree.write("link/keep.txt", "");
+    std::os::unix::fs::symlink(tree.path().join("real/a.go"), tree.path().join("link/a.go"))
+        .expect("se crea el symlink");
+    std::os::unix::fs::symlink(tree.path().join("real/b.py"), tree.path().join("link/b.py"))
+        .expect("se crea el symlink");
+    let outcome = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
+    let mut paths: Vec<&str> = outcome
+        .diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.relative_path.as_str())
+        .collect();
+    paths.sort_unstable();
+    assert_eq!(paths, ["link/a.go", "real/a.go", "real/b.py"]);
+}
+
 #[test]
 fn follows_the_project_configuration() {
     let tree = TempTree::new("scan-config");

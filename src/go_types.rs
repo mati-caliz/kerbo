@@ -10,6 +10,7 @@ use serde::Deserialize;
 
 use crate::cache::location::default_directory;
 use crate::lint::go::platform::GoPlatform;
+use crate::scan::canonical_location;
 
 const TYPES_DIRECTORY: &str = "go-types";
 const FACTS_DIRECTORY: &str = "facts";
@@ -99,7 +100,7 @@ impl ModuleFacts {
             .lines()
             .filter_map(|line| serde_json::from_str::<FileFacts>(line).ok())
         {
-            let key = canonical(&facts.file);
+            let key = canonical_location(&facts.file);
             let merged = files.entry(key).or_default();
             merge(merged, facts);
         }
@@ -107,7 +108,7 @@ impl ModuleFacts {
     }
 
     pub fn file(&self, path: &Path) -> Option<&FileFacts> {
-        self.files.get(&canonical(path))
+        self.files.get(&canonical_location(path))
     }
 }
 
@@ -125,10 +126,6 @@ fn extend<Item>(into: &mut Option<Vec<Item>>, more: Option<Vec<Item>>) {
     if let Some(more) = more {
         into.get_or_insert_with(Vec::new).extend(more);
     }
-}
-
-fn canonical(path: &Path) -> PathBuf {
-    fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 // Los hechos del módulo: de la caché si ningún `.go` ni el `go.mod` cambiaron, si no del helper.
