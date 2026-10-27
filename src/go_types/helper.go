@@ -219,6 +219,7 @@ func checkPackage(listed listedPackage, exports map[string]string, index depreca
 		collector.collectDeprecatedUses(file, index)
 		collector.collectCanonicalMethods(file)
 		collector.collectStaticcheckTail(file, fset.File(file.Pos()).Name())
+		collector.collectStaticcheckPatterns(file, fset.File(file.Pos()).Name())
 	}
 	var facts []fileFacts
 	for _, file := range byFile {

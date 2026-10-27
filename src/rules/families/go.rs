@@ -18,6 +18,16 @@ rule_family!(GoRule {
     S1005 => "s1005",
     Sa9003 => "sa9003",
     Qf1006 => "qf1006",
+    St1019 => "st1019",
+    Sa1029 => "sa1029",
+    Sa9004 => "sa9004",
+    Qf1009 => "qf1009",
+    St1013 => "st1013",
+    S1000 => "s1000",
+    St1017 => "st1017",
+    St1006 => "st1006",
+    S1008 => "s1008",
+    S1002 => "s1002",
 });
 
 const STATICCHECK: &str = "staticcheck";
@@ -42,7 +52,17 @@ impl GoRule {
             | Self::Qf1002
             | Self::S1005
             | Self::Sa9003
-            | Self::Qf1006 => STATICCHECK,
+            | Self::Qf1006
+            | Self::St1019
+            | Self::Sa1029
+            | Self::Sa9004
+            | Self::Qf1009
+            | Self::St1013
+            | Self::S1000
+            | Self::St1017
+            | Self::St1006
+            | Self::S1008
+            | Self::S1002 => STATICCHECK,
         }
     }
 }

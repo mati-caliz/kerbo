@@ -2302,12 +2302,20 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   `MayHaveSideEffects` de staticcheck), S1005 (`_` que sobra en una recepción o un `range`),
   SA9003 (`if` o `else` vacío fuera de los `Example` de los tests) y QF1006 (`for` infinito que
   empieza con `if cond { break }`). 135 de 135 contra golangci-lint, ninguno de más.
+- Diez más de la cola de staticcheck (hecho, 2026-10-27), en `src/go_types/staticcheck_patterns.go`:
+  ST1019 (import repetido; como golangci-lint, marca también cada import de más, que staticcheck
+  da como "related information"), SA1029 (clave básica, struct vacío o no comparable en
+  `context.WithValue`), SA9004 (grupo de constantes con tipo sólo en la primera), QF1009
+  (`time.Time` con `==`), ST1013 (código HTTP como número, salvo 200, 400, 404 y 500), S1000
+  (`select` de un solo case), ST1017 (condición Yoda), ST1006 (receptor `self`, `this` o `_`,
+  salvo en tipos genéricos), S1008 (`if c { return true }; return false`) y S1002 (comparar con
+  `true` o `false`, fuera de los tests). 45 de 45 contra golangci-lint, ninguno de más.
 - Pendientes de Go contra golangci-lint:
   - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
     eximen, como los tipos).
   - Lo que queda del conjunto por defecto, por volumen en el corpus (14.755 avisos de golangci-lint,
-    el 97 % ya en kerbo): unused (249), govet `inline` (130) y una cola de staticcheck con menos
-    de 25 cada una (S1034 22, SA4006 15, ST1019 7...).
+    el 97 % ya en kerbo): unused (249), govet `inline` (130), S1034 (2 avisos y 22 de "related
+    information"), SA4006 (15, pide SSA) y una cola de staticcheck con menos de 5 cada una.
   - govet `inline`: 32 son "debería inlinearse" (lo anotado con `//go:fix inline`) y 98 son
     "cannot inline", que salen de correr el inliner de x/tools (versión de Go del archivo,
     inferencia de tipos genéricos y otros casos): calcarlo es reimplementar un motor de refactor.

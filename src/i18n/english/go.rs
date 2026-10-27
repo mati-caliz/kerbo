@@ -110,6 +110,66 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "The condition in the for says up front how long it repeats.",
         "for { if done { break } ... } becomes for !done { ... }.",
     ),
+    RuleText::new(
+        "Package imported more than once (staticcheck ST1019)",
+        "keep a single import of the package",
+        "Two names for the same package are confusing: readers cannot tell whether they are the same.",
+        "import ( \"fmt\"; f \"fmt\" ) becomes import \"fmt\".",
+    ),
+    RuleText::new(
+        "context.WithValue key of a built-in type (staticcheck SA1029)",
+        "define your own type for the key",
+        "With a string or an int as key, another package can use the same one and overwrite the value.",
+        "context.WithValue(ctx, \"user\", u) becomes context.WithValue(ctx, userKey{}, u).",
+    ),
+    RuleText::new(
+        "Constant group where only the first one has a type (staticcheck SA9004)",
+        "give every constant in the group the type",
+        "The others are untyped and not of the first one's type, even if it looks like they are.",
+        "const ( A T = 1; B = 2 ) becomes const ( A T = 1; B T = 2 ).",
+    ),
+    RuleText::new(
+        "time.Time compared with == (staticcheck QF1009)",
+        "use Equal",
+        "With == the location and the monotonic reading count too: the same instant can compare different.",
+        "a == b becomes a.Equal(b).",
+    ),
+    RuleText::new(
+        "HTTP status code written as a number (staticcheck ST1013)",
+        "use the net/http constant",
+        "The name says what the code means without having to know it by heart.",
+        "http.Error(w, msg, 403) becomes http.Error(w, msg, http.StatusForbidden).",
+    ),
+    RuleText::new(
+        "select with a single case (staticcheck S1000)",
+        "use the plain receive or send, or a for range inside a for",
+        "A select with a single case does the same as the operation alone, in a roundabout way.",
+        "for { select { case v := <-ch: use(v) } } becomes for v := range ch { use(v) }.",
+    ),
+    RuleText::new(
+        "Yoda condition: the constant on the left (staticcheck ST1017)",
+        "put what varies on the left and the constant on the right",
+        "Go does not need it (assigning in a condition does not compile) and it reads backwards.",
+        "if 5 == x becomes if x == 5.",
+    ),
+    RuleText::new(
+        "Receiver named self, this or _ (staticcheck ST1006)",
+        "name it for what it is (one or two letters of the type), or drop the name if unused",
+        "In Go the receiver is just another parameter and its short name says which type it is.",
+        "func (this *Server) Start() becomes func (s *Server) Start().",
+    ),
+    RuleText::new(
+        "if returning true or false followed by the opposite (staticcheck S1008)",
+        "return the condition directly",
+        "The if adds nothing: the condition already is the bool being returned.",
+        "if x > 0 { return true }; return false becomes return x > 0.",
+    ),
+    RuleText::new(
+        "Comparison with true or false (staticcheck S1002)",
+        "use the bool directly, negated if needed",
+        "Comparing a bool with a constant says the same thing twice.",
+        "if ok == true becomes if ok.",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

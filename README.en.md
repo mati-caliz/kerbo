@@ -626,7 +626,8 @@ Parity, against golangci-lint 2.15 on linux/amd64: zero differences by file, lin
 golang/tools, terraform, hugo, caddy, consul, prometheus, etcd, syncthing and others (1,381
 reports), in errcheck 10,699, in `qf1008` and `qf1012` 1,153 and in `sa1019` (use of deprecated
 APIs) 592, `qf1001` 136, govet's `stdmethods` 28 and the small staticcheck tail (`st1012`, `qf1011`,
-`st1023`, `qf1002`, `s1005`, `sa9003` and `qf1006`) 135, with none extra: 97 % of what golangci-lint reports by default. govet, unused and the
+`st1023`, `qf1002`, `s1005`, `sa9003`, `qf1006`, `st1019`, `sa1029`, `sa9004`, `qf1009`, `st1013`,
+`s1000`, `st1017`, `st1006`, `s1008` and `s1002`) 180, with none extra: 97 % of what golangci-lint reports by default. govet, unused and the
 rest of staticcheck stay in golangci-lint.
 
 ### Secrets and vulnerable dependencies
