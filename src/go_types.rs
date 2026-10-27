@@ -155,7 +155,7 @@ pub fn module_facts(module_root: &Path, platform: &GoPlatform) -> Result<ModuleF
 // fecha de modificación.
 fn fingerprint(module_root: &Path, platform: &GoPlatform) -> u64 {
     let mut hasher = DefaultHasher::new();
-    helper::SOURCE.hash(&mut hasher);
+    helper::hash_sources(&mut hasher);
     platform.hash(&mut hasher);
     let mut files = module_files(module_root);
     files.sort();

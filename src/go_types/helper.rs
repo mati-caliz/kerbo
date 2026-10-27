@@ -72,11 +72,16 @@ pub fn facts(directory: &Path, module_root: &Path, platform: &GoPlatform) -> Res
     Ok(HelperOutput { lines, complete })
 }
 
+// Todos los archivos del helper: cambiar cualquiera cambia el binario y los hechos que da.
+pub fn hash_sources(hasher: &mut DefaultHasher) {
+    SOURCE.hash(hasher);
+    OTHER_SOURCES.hash(hasher);
+}
+
 // El helper se compila una vez por versión de su fuente, para la máquina, con el `go` del sistema.
 fn built_helper(directory: &Path) -> Result<PathBuf, String> {
     let mut hasher = DefaultHasher::new();
-    SOURCE.hash(&mut hasher);
-    OTHER_SOURCES.hash(&mut hasher);
+    hash_sources(&mut hasher);
     let home = directory.join(format!("{:016x}", hasher.finish()));
     let binary = home.join(BINARY);
     if binary.is_file() {
