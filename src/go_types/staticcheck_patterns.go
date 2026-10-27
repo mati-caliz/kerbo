@@ -1,5 +1,5 @@
 // Más reglas chicas de staticcheck v0.8.2 calcadas sobre go/ast y go/types: ST1019, SA1029, SA9004,
-// QF1009, ST1013, S1000, ST1017, ST1006, S1008 y S1002.
+// QF1009, ST1013, S1000, ST1017, ST1006, S1008, S1002 y S1034.
 package main
 
 import (
@@ -39,6 +39,8 @@ func (c *collector) collectStaticcheckPatterns(file *ast.File, filename string) 
 			c.checkReceiverName(node)
 		case *ast.BlockStmt:
 			c.checkIfReturnBool(node, comments)
+		case *ast.TypeSwitchStmt:
+			c.checkTypeSwitchAssertions(node)
 		}
 		return true
 	})
@@ -458,6 +460,67 @@ func allTermsBool(typ types.Type) bool {
 func isBool(typ types.Type) bool {
 	basic, ok := typ.Underlying().(*types.Basic)
 	return ok && basic.Kind() == types.Bool
+}
+
+// S1034: `switch x.(type)` sin asignar, con case que vuelven a hacer `x.(T)` del mismo tipo; marca el
+// switch y, como golangci-lint con la "related information" de staticcheck, cada aserción.
+func (c *collector) checkTypeSwitchAssertions(statement *ast.TypeSwitchStmt) {
+	if statement.Init != nil {
+		return
+	}
+	switched, ok := statement.Assign.(*ast.ExprStmt)
+	if !ok {
+		return
+	}
+	assertion, ok := ast.Unparen(switched.X).(*ast.TypeAssertExpr)
+	if !ok {
+		return
+	}
+	ident, ok := ast.Unparen(assertion.X).(*ast.Ident)
+	if !ok {
+		return
+	}
+	switchedObject := c.info.ObjectOf(ident)
+	var offenders []*ast.TypeAssertExpr
+	for _, clause := range statement.Body.List {
+		caseClause := clause.(*ast.CaseClause)
+		if len(caseClause.List) == 1 {
+			offenders = append(offenders, c.repeatedAssertions(caseClause, switchedObject)...)
+		}
+	}
+	if len(offenders) == 0 {
+		return
+	}
+	c.addReport("s1034", assertion.Pos(), ident.Name)
+	for _, offender := range offenders {
+		c.addReport("s1034", offender.Pos(), ident.Name)
+	}
+}
+
+// Las aserciones del case sobre lo mismo que el switch y al tipo del case; ninguna si hay otra
+// aserción en el case (suele estar por simetría con otro valor).
+func (c *collector) repeatedAssertions(clause *ast.CaseClause, switchedObject types.Object) []*ast.TypeAssertExpr {
+	caseType := c.info.TypeOf(clause.List[0])
+	var offenders []*ast.TypeAssertExpr
+	unrelated := false
+	ast.Inspect(clause, func(node ast.Node) bool {
+		assertion, ok := node.(*ast.TypeAssertExpr)
+		if !ok {
+			return true
+		}
+		ident, ok := assertion.X.(*ast.Ident)
+		if !ok || c.info.ObjectOf(ident) != switchedObject || assertion.Type == nil ||
+			!types.Identical(caseType, c.info.TypeOf(assertion.Type)) {
+			unrelated = true
+			return false
+		}
+		offenders = append(offenders, assertion)
+		return true
+	})
+	if unrelated {
+		return nil
+	}
+	return offenders
 }
 
 var httpStatusCodes = map[int64]string{

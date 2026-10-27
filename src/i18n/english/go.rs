@@ -176,6 +176,12 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "An unused function, type, field or constant still has to be read and maintained, and sometimes it is something someone forgot to call.",
         "func oldFormat() string { ... } with no call anywhere: delete it.",
     ),
+    RuleText::new(
+        "Type switch that repeats the assertion in its cases (staticcheck S1034)",
+        "assign the result in the switch and use it in the cases",
+        "With switch v := x.(type) each case already has the typed value; repeating x.(T) is noise.",
+        "switch x.(type) { case int: f(x.(int)) } becomes switch v := x.(type) { case int: f(v) }.",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

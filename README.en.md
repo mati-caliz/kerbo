@@ -627,7 +627,7 @@ golang/tools, terraform, hugo, caddy, consul, prometheus, etcd, syncthing and ot
 reports), in errcheck 10,754, in `qf1008` and `qf1012` 1,153 and in `sa1019` (use of deprecated
 APIs) 592, `qf1001` 136, govet's `stdmethods` 28 and the small staticcheck tail (`st1012`, `qf1011`,
 `st1023`, `qf1002`, `s1005`, `sa9003`, `qf1006`, `st1019`, `sa1029`, `sa9004`, `qf1009`, `st1013`,
-`s1000`, `st1017`, `st1006`, `s1008` and `s1002`) 180 and in `unused` (code nothing uses) 249, with
+`s1000`, `st1017`, `st1006`, `s1008`, `s1002` and `s1034`) 204 and in `unused` (code nothing uses) 249, with
 none extra: 99 % of what golangci-lint reports by default. The rest of govet and staticcheck
 stays in golangci-lint.
 

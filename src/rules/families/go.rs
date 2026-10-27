@@ -29,6 +29,7 @@ rule_family!(GoRule {
     S1008 => "s1008",
     S1002 => "s1002",
     Unused => "unused",
+    S1034 => "s1034",
 });
 
 const STATICCHECK: &str = "staticcheck";
@@ -63,7 +64,8 @@ impl GoRule {
             | Self::St1017
             | Self::St1006
             | Self::S1008
-            | Self::S1002 => STATICCHECK,
+            | Self::S1002
+            | Self::S1034 => STATICCHECK,
         }
     }
 }

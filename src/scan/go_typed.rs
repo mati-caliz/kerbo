@@ -155,7 +155,8 @@ fn keep_confirmed(
             | GoRule::St1006
             | GoRule::S1008
             | GoRule::S1002
-            | GoRule::Unused => None,
+            | GoRule::Unused
+            | GoRule::S1034 => None,
         });
         let Some(subject) = confirmed else {
             return false;

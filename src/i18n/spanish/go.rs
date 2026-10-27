@@ -176,6 +176,12 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "Una función, un tipo, un campo o una constante sin usar hay que leerlo y mantenerlo igual, y a veces es algo que se olvidó de llamar.",
         "func viejoFormato() string { ... } sin ninguna llamada: se borra.",
     ),
+    RuleText::new(
+        "switch de tipos que repite la aserción en los case (S1034 de staticcheck)",
+        "asigná el resultado en el switch y usalo en los case",
+        "Con switch v := x.(type) cada case ya tiene el valor del tipo; repetir x.(T) es ruido.",
+        "switch x.(type) { case int: f(x.(int)) } se vuelve switch v := x.(type) { case int: f(v) }.",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {
