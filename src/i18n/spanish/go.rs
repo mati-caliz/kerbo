@@ -170,6 +170,12 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "Comparar un bool con una constante es decir dos veces lo mismo.",
         "if ok == true se vuelve if ok.",
     ),
+    RuleText::new(
+        "Código que nadie usa (unused)",
+        "borralo, o usalo si quedó sin conectar",
+        "Una función, un tipo, un campo o una constante sin usar hay que leerlo y mantenerlo igual, y a veces es algo que se olvidó de llamar.",
+        "func viejoFormato() string { ... } sin ninguna llamada: se borra.",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

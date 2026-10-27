@@ -7,12 +7,16 @@ use crate::lint::go::platform::GoPlatform;
 
 pub const SOURCE: &str = include_str!("helper.go");
 // Los demás archivos del paquete `main` del helper, con el nombre con que se escriben.
-const OTHER_SOURCES: [(&str, &str); 6] = [
+const OTHER_SOURCES: [(&str, &str); 10] = [
     ("deprecated.go", include_str!("deprecated.go")),
     ("de_morgan.go", include_str!("de_morgan.go")),
     ("stdmethods.go", include_str!("stdmethods.go")),
     ("staticcheck_tail.go", include_str!("staticcheck_tail.go")),
     ("staticcheck_patterns.go", include_str!("staticcheck_patterns.go")),
+    ("unused.go", include_str!("unused.go")),
+    ("unused_graph.go", include_str!("unused_graph.go")),
+    ("unused_implements.go", include_str!("unused_implements.go")),
+    ("unused_unify.go", include_str!("unused_unify.go")),
     ("stdlib_deprecations.go", include_str!("stdlib_deprecations.go")),
 ];
 const MODULE: &str = "module kerbo-go-types\n\ngo 1.22\n";

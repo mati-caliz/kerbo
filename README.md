@@ -625,8 +625,9 @@ en golang/tools, terraform, hugo, caddy, consul, prometheus, etcd, syncthing y o
 avisos), en errcheck 10.699, en `qf1008` y `qf1012` 1.153 y en `sa1019` (uso de lo deprecado)
 592, `qf1001` 136, `stdmethods` de govet 28 y la cola chica de staticcheck (`st1012`, `qf1011`,
 `st1023`, `qf1002`, `s1005`, `sa9003`, `qf1006`, `st1019`, `sa1029`, `sa9004`, `qf1009`, `st1013`,
-`s1000`, `st1017`, `st1006`, `s1008` y `s1002`) 180, sin ninguno de más: el 97 % de lo que marca golangci-lint por defecto. govet, unused y lo
-demás de staticcheck siguen en golangci-lint.
+`s1000`, `st1017`, `st1006`, `s1008` y `s1002`) 180 y en `unused` (código que nadie usa) 249, sin
+ninguno de más: el 99 % de lo que marca golangci-lint por defecto. Lo demás de govet y de
+staticcheck sigue en golangci-lint.
 
 ### Secretos y dependencias vulnerables
 

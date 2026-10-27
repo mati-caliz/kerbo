@@ -98,7 +98,7 @@ func (c *collector) checkConstGroupTypes(declaration *ast.GenDecl) {
 	if !declaration.Lparen.IsValid() || declaration.Tok != token.CONST {
 		return
 	}
-	for _, group := range c.groupSpecs(declaration.Specs) {
+	for _, group := range groupSpecs(c.fset, declaration.Specs) {
 		if len(group) < 2 || group[0].(*ast.ValueSpec).Type == nil {
 			continue
 		}
@@ -109,14 +109,14 @@ func (c *collector) checkConstGroupTypes(declaration *ast.GenDecl) {
 }
 
 // `astutil.GroupSpecs`: las especificaciones en líneas seguidas, sin las líneas en blanco entre medio.
-func (c *collector) groupSpecs(specs []ast.Spec) [][]ast.Spec {
+func groupSpecs(fset *token.FileSet, specs []ast.Spec) [][]ast.Spec {
 	if len(specs) == 0 {
 		return nil
 	}
 	groups := [][]ast.Spec{{specs[0]}}
 	for _, spec := range specs[1:] {
 		last := groups[len(groups)-1]
-		if c.fset.PositionFor(spec.Pos(), false).Line-1 != c.fset.PositionFor(last[len(last)-1].End(), false).Line {
+		if fset.PositionFor(spec.Pos(), false).Line-1 != fset.PositionFor(last[len(last)-1].End(), false).Line {
 			groups = append(groups, nil)
 		}
 		groups[len(groups)-1] = append(groups[len(groups)-1], spec)

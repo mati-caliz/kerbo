@@ -209,6 +209,9 @@ func checkPackage(listed listedPackage, exports map[string]string, index depreca
 		Uses:       map[*ast.Ident]types.Object{},
 		Defs:       map[*ast.Ident]types.Object{},
 		Selections: map[*ast.SelectorExpr]*types.Selection{},
+		Instances:  map[*ast.Ident]types.Instance{},
+		Scopes:     map[ast.Node]*types.Scope{},
+		Implicits:  map[ast.Node]types.Object{},
 	}
 	checked, _ := config.Check(strings.Fields(listed.ImportPath)[0], fset, files, info)
 	byFile := map[string]*fileFacts{}
@@ -221,6 +224,7 @@ func checkPackage(listed listedPackage, exports map[string]string, index depreca
 		collector.collectStaticcheckTail(file, fset.File(file.Pos()).Name())
 		collector.collectStaticcheckPatterns(file, fset.File(file.Pos()).Name())
 	}
+	collector.collectUnused(files)
 	var facts []fileFacts
 	for _, file := range byFile {
 		facts = append(facts, *file)

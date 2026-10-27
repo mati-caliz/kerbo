@@ -170,6 +170,12 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "Comparing a bool with a constant says the same thing twice.",
         "if ok == true becomes if ok.",
     ),
+    RuleText::new(
+        "Code that nothing uses (unused)",
+        "delete it, or use it if it was left unwired",
+        "An unused function, type, field or constant still has to be read and maintained, and sometimes it is something someone forgot to call.",
+        "func oldFormat() string { ... } with no call anywhere: delete it.",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

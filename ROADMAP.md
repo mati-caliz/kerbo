@@ -2310,12 +2310,23 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   (`select` de un solo case), ST1017 (condición Yoda), ST1006 (receptor `self`, `this` o `_`,
   salvo en tipos genéricos), S1008 (`if c { return true }; return false`) y S1002 (comparar con
   `true` o `false`, fuera de los tests). 45 de 45 contra golangci-lint, ninguno de más.
+- unused (hecho, 2026-10-27), regla directa: el grafo de usos de staticcheck v0.8.2 copiado entero
+  (`src/go_types/unused_graph.go`, `unused_implements.go` y `unused_unify.go`, MIT y BSD) con las
+  opciones por defecto de golangci-lint, un paquete por vez, y lo que golangci-lint agrega encima:
+  sin parámetros de tipo y sin repetir un objeto que aparece usado en el mismo archivo, línea y
+  nombre. Lo propio (`src/go_types/unused.go`) reemplaza lo que venía de otros paquetes: archivos
+  generados, `//lint:ignore U1000`, la posición que se muestra y un `CoreType` que sólo mira la
+  única unión de la restricción (staticcheck usa `NormalTerms` de x/exp, que calcula
+  intersecciones). Los loops sobre los iteradores de go/types de Go 1.24 pasaron a índices para
+  que el helper siga compilando con Go 1.22. 249 de 249 contra golangci-lint, ninguno de más; los
+  2 que kerbo marca en un módulo dentro de `testdata` de golang/tools también los marca
+  golangci-lint corrido ahí (el arnés saltea esos módulos).
 - Pendientes de Go contra golangci-lint:
   - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
     eximen, como los tipos).
   - Lo que queda del conjunto por defecto, por volumen en el corpus (14.755 avisos de golangci-lint,
-    el 97 % ya en kerbo): unused (249), govet `inline` (130), S1034 (2 avisos y 22 de "related
-    information"), SA4006 (15, pide SSA) y una cola de staticcheck con menos de 5 cada una.
+    el 99 % ya en kerbo): govet `inline` (130), S1034 (2 avisos y 22 de "related information"),
+    SA4006 (15, pide SSA) y una cola de staticcheck con menos de 5 cada una.
   - govet `inline`: 32 son "debería inlinearse" (lo anotado con `//go:fix inline`) y 98 son
     "cannot inline", que salen de correr el inliner de x/tools (versión de Go del archivo,
     inferencia de tipos genéricos y otros casos): calcarlo es reimplementar un motor de refactor.
