@@ -51,6 +51,14 @@ pub struct RangeFact {
     pub call: Option<CallFact>,
 }
 
+// Una escritura que QF1012 pasa a fmt.Fprint*, con la función que la reemplaza.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct FprintFact {
+    pub line: usize,
+    pub column: usize,
+    pub replacement: String,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct FileFacts {
     pub file: PathBuf,
@@ -60,6 +68,10 @@ pub struct FileFacts {
     pub receives: Option<Vec<PositionFact>>,
     #[serde(default)]
     pub ranges: Option<Vec<RangeFact>>,
+    #[serde(default)]
+    pub embedded: Option<Vec<PositionFact>>,
+    #[serde(default)]
+    pub fprints: Option<Vec<FprintFact>>,
 }
 
 // Los hechos de tipos de un módulo, por archivo (con la ruta canónica).
@@ -92,6 +104,8 @@ fn merge(into: &mut FileFacts, facts: FileFacts) {
     extend(&mut into.calls, facts.calls);
     extend(&mut into.receives, facts.receives);
     extend(&mut into.ranges, facts.ranges);
+    extend(&mut into.embedded, facts.embedded);
+    extend(&mut into.fprints, facts.fprints);
 }
 
 fn extend<Item>(into: &mut Option<Vec<Item>>, more: Option<Vec<Item>>) {

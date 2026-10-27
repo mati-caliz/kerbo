@@ -20,16 +20,27 @@ const FACTS: &str = r#""calls":[
   "ranges":[
     {"line":9,"column":2,"call":null},
     {"line":10,"column":2,"call":{"line":10,"column":20,"names":["(hash.Hash).Write"],"function":"(hash.Hash).Write","selector":"h.Write"}}
-  ]"#;
+  ],
+  "embedded":[{"line":13,"column":8}],
+  "fprints":[{"line":14,"column":2,"replacement":"fmt.Fprintf"}]"#;
 
 fn candidates(identity: &FileIdentity, positions: &[(usize, usize)]) -> Vec<Diagnostic> {
+    typed_candidates(identity, GoRule::Errcheck, positions, "")
+}
+
+fn typed_candidates(
+    identity: &FileIdentity,
+    rule: GoRule,
+    positions: &[(usize, usize)],
+    subject: &str,
+) -> Vec<Diagnostic> {
     let found: Vec<LintFinding> = positions
         .iter()
         .map(|(line, column)| LintFinding {
-            kind: LintKind::Go(GoRule::Errcheck),
+            kind: LintKind::Go(rule),
             line: *line,
             column: *column,
-            subject: String::new(),
+            subject: subject.to_owned(),
             fix: None,
         })
         .collect();
@@ -78,6 +89,18 @@ fn candidates_stay_only_where_the_types_say_an_error_is_dropped() {
         (11, 1),
     ];
     let mut diagnostics = candidates(&identity, &positions);
+    diagnostics.extend(typed_candidates(
+        &identity,
+        GoRule::Qf1008,
+        &[(13, 8), (13, 20)],
+        "Base",
+    ));
+    diagnostics.extend(typed_candidates(
+        &identity,
+        GoRule::Qf1012,
+        &[(14, 2), (15, 2)],
+        "",
+    ));
     let mut suppressed: Vec<Suppressed> = candidates(&identity, &[(3, 9), (12, 1)])
         .into_iter()
         .map(|diagnostic| Suppressed {
@@ -86,6 +109,16 @@ fn candidates_stay_only_where_the_types_say_an_error_is_dropped() {
         })
         .collect();
     keep_confirmed(&mut diagnostics, &mut suppressed, &roots, &modules);
-    assert_eq!(subjects(&diagnostics), ["3:9 file.Close", "6:8 ", "8:2 ", "9:2 "]);
+    assert_eq!(
+        subjects(&diagnostics),
+        [
+            "3:9 file.Close",
+            "6:8 ",
+            "8:2 ",
+            "9:2 ",
+            "13:8 Base",
+            "14:2 fmt.Fprintf"
+        ]
+    );
     assert_eq!(suppressed.len(), 1);
 }

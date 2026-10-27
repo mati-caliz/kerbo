@@ -13,6 +13,7 @@ mod replace_all;
 mod resolver;
 mod tagged_switch;
 pub mod taint;
+mod typed_candidates;
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -34,12 +35,14 @@ use platform::GoPlatform;
 
 type GoCheck = fn(Node<'_>, &[u8]) -> Vec<LintFinding>;
 
-const CHECKS: [(GoRule, GoCheck); 5] = [
+const CHECKS: [(GoRule, GoCheck); 7] = [
     (GoRule::Ineffassign, ineffectual_assignments),
     (GoRule::Errcheck, unchecked_error_candidates),
     (GoRule::St1005, error_string_findings),
     (GoRule::Qf1003, tagged_switch_findings),
     (GoRule::Qf1004, unlimited_call_findings),
+    (GoRule::Qf1008, embedded_field_findings),
+    (GoRule::Qf1012, fprint_findings),
 ];
 
 // Lo que el resultado toma del archivo además del contenido: la plataforma y si el nombre o la
@@ -124,6 +127,20 @@ fn unchecked_error_candidates(root: Node<'_>, source: &[u8]) -> Vec<LintFinding>
                 None,
             )
         })
+        .collect()
+}
+
+fn embedded_field_findings(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
+    typed_candidates::embedded_field_candidates(root, source)
+        .into_iter()
+        .map(|(position, field)| finding_at(LintKind::Go(GoRule::Qf1008), position, field, None))
+        .collect()
+}
+
+fn fprint_findings(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
+    typed_candidates::fprint_candidates(root, source)
+        .into_iter()
+        .map(|position| finding_at(LintKind::Go(GoRule::Qf1012), position, "", None))
         .collect()
 }
 

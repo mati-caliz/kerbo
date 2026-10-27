@@ -63,11 +63,19 @@ type rangeFact struct {
 	Call   *callFact `json:"call"`
 }
 
+type fprintFact struct {
+	Line        int    `json:"line"`
+	Column      int    `json:"column"`
+	Replacement string `json:"replacement"`
+}
+
 type fileFacts struct {
 	File     string         `json:"file"`
 	Calls    []callFact     `json:"calls"`
 	Receives []positionFact `json:"receives"`
 	Ranges   []rangeFact    `json:"ranges"`
+	Embedded []positionFact `json:"embedded"`
+	Fprints  []fprintFact   `json:"fprints"`
 }
 
 var errorInterface = types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
@@ -197,11 +205,12 @@ func checkPackage(listed listedPackage, exports map[string]string) []fileFacts {
 		Defs:       map[*ast.Ident]types.Object{},
 		Selections: map[*ast.SelectorExpr]*types.Selection{},
 	}
-	_, _ = config.Check(listed.ImportPath, fset, files, info)
+	checked, _ := config.Check(listed.ImportPath, fset, files, info)
 	byFile := map[string]*fileFacts{}
-	collector := &collector{info: info, fset: fset, directory: filepath.Clean(listed.Dir), byFile: byFile}
+	collector := &collector{info: info, fset: fset, directory: filepath.Clean(listed.Dir), byFile: byFile, pkg: checked}
 	for _, file := range files {
 		ast.Inspect(file, collector.visit)
+		collector.collectEmbedded(file)
 	}
 	var facts []fileFacts
 	for _, file := range byFile {
@@ -218,6 +227,7 @@ func goarch() string {
 }
 
 type collector struct {
+	pkg       *types.Package
 	info      *types.Info
 	fset      *token.FileSet
 	directory string
@@ -245,6 +255,11 @@ func (c *collector) visit(node ast.Node) bool {
 				fact := c.callFact(expression)
 				fact.Line, fact.Column = position.Line, position.Column
 				facts.Calls = append(facts.Calls, fact)
+			}
+		}
+		if replacement, ok := c.fprintReplacement(expression); ok {
+			if facts, position, ok := c.file(expression.Pos()); ok {
+				facts.Fprints = append(facts.Fprints, fprintFact{position.Line, position.Column, replacement})
 			}
 		}
 	case *ast.UnaryExpr:
@@ -552,4 +567,202 @@ func unname(typ types.Type) types.Type {
 		return named.Underlying()
 	}
 	return typ
+}
+
+var (
+	writerInterface       = methodInterface("Write", types.NewSlice(types.Typ[types.Byte]))
+	stringWriterInterface = methodInterface("WriteString", types.Typ[types.String])
+	sprintFunctions       = map[string]bool{"fmt.Sprint": true, "fmt.Sprintf": true, "fmt.Sprintln": true}
+)
+
+func methodInterface(name string, parameter types.Type) *types.Interface {
+	parameters := types.NewTuple(types.NewVar(token.NoPos, nil, "p", parameter))
+	results := types.NewTuple(
+		types.NewVar(token.NoPos, nil, "n", types.Typ[types.Int]),
+		types.NewVar(token.NoPos, nil, "err", types.Universe.Lookup("error").Type()))
+	signature := types.NewSignatureType(nil, nil, nil, parameters, results, false)
+	return types.NewInterfaceType([]*types.Func{types.NewFunc(token.NoPos, nil, name, signature)}, nil).Complete()
+}
+
+// QF1012 de staticcheck: `x.Write([]byte(fmt.Sprintf(...)))` y `x.WriteString(fmt.Sprintf(...))`
+// sobre algo que es un io.Writer se escriben con fmt.Fprintf.
+func (c *collector) fprintReplacement(call *ast.CallExpr) (string, bool) {
+	selector, ok := ast.Unparen(call.Fun).(*ast.SelectorExpr)
+	if !ok || len(call.Args) != 1 {
+		return "", false
+	}
+	inner, ok := ast.Unparen(call.Args[0]).(*ast.CallExpr)
+	if !ok {
+		return "", false
+	}
+	switch selector.Sel.Name {
+	case "Write":
+		conversion, ok := ast.Unparen(inner.Fun).(*ast.ArrayType)
+		if !ok || conversion.Len != nil || len(inner.Args) != 1 {
+			return "", false
+		}
+		if element, ok := ast.Unparen(conversion.Elt).(*ast.Ident); !ok || element.Name != "byte" {
+			return "", false
+		}
+		if inner, ok = ast.Unparen(inner.Args[0]).(*ast.CallExpr); !ok {
+			return "", false
+		}
+	case "WriteString":
+	default:
+		return "", false
+	}
+	name := c.symbolName(inner.Fun)
+	if !sprintFunctions[name] {
+		return "", false
+	}
+	receiver := c.info.TypeOf(selector.X)
+	if receiver == nil {
+		return "", false
+	}
+	if _, ok := types.Unalias(receiver).(*types.Named); ok && !types.IsInterface(receiver) {
+		receiver = types.NewPointer(receiver)
+	}
+	if !types.Implements(receiver, writerInterface) {
+		return "", false
+	}
+	if selector.Sel.Name == "WriteString" && !types.Implements(receiver, stringWriterInterface) {
+		return "", false
+	}
+	return "fmt.F" + strings.TrimPrefix(strings.TrimPrefix(name, "fmt."), "S"), true
+}
+
+// El nombre completo de lo que se llama, como `Symbol` en los patrones de staticcheck.
+func (c *collector) symbolName(function ast.Expr) string {
+	switch index := function.(type) {
+	case *ast.IndexExpr:
+		function = index.X
+	case *ast.IndexListExpr:
+		function = index.X
+	}
+	var object types.Object
+	switch inner := ast.Unparen(function).(type) {
+	case *ast.Ident:
+		object = c.info.ObjectOf(inner)
+	case *ast.SelectorExpr:
+		object = c.info.ObjectOf(inner.Sel)
+	}
+	if called, ok := object.(*types.Func); ok {
+		return called.FullName()
+	}
+	return ""
+}
+
+// QF1008 de staticcheck: un campo embebido que se puede sacar de una cadena de selectores porque
+// lleva al mismo objeto por el mismo camino.
+func (c *collector) collectEmbedded(file *ast.File) {
+	var stack []ast.Node
+	ast.Inspect(file, func(node ast.Node) bool {
+		if node == nil {
+			stack = stack[:len(stack)-1]
+			return false
+		}
+		stack = append(stack, node)
+		selector, ok := node.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		if _, ok := selector.X.(*ast.SelectorExpr); !ok {
+			return true
+		}
+		for _, sequence := range selectorSequences(stack, selector) {
+			c.embeddedHops(sequence)
+		}
+		return true
+	})
+}
+
+type selectorSequence struct {
+	root   ast.Expr
+	fields []*ast.Ident
+}
+
+// `extractSelectors` de QF1008: los nodos que encierran el comienzo de la expresión, de adentro
+// hacia afuera; sólo cuenta si la expresión es el selector más externo de ese camino.
+func selectorSequences(ancestors []ast.Node, expression *ast.SelectorExpr) []selectorSequence {
+	position := expression.Pos()
+	var path []ast.Node
+	ast.Inspect(expression, func(node ast.Node) bool {
+		if node == nil || node.Pos() > position || position >= node.End() {
+			return false
+		}
+		path = append(path, node)
+		return true
+	})
+	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+		path[i], path[j] = path[j], path[i]
+	}
+	for i := len(ancestors) - 2; i >= 0; i-- {
+		path = append(path, ancestors[i])
+	}
+	for i := len(path) - 1; i >= 0; i-- {
+		if outer, ok := path[i].(*ast.SelectorExpr); ok {
+			if outer != expression {
+				return nil
+			}
+			break
+		}
+	}
+	var sequences []selectorSequence
+	inChain := false
+	for _, node := range path {
+		if selector, ok := node.(*ast.SelectorExpr); ok {
+			if !inChain {
+				inChain = true
+				sequences = append(sequences, selectorSequence{root: selector.X})
+			}
+			last := &sequences[len(sequences)-1]
+			last.fields = append(last.fields, selector.Sel)
+		} else if inChain {
+			inChain = false
+		}
+	}
+	return sequences
+}
+
+func (c *collector) embeddedHops(sequence selectorSequence) {
+	base := c.info.TypeOf(sequence.root)
+	for fields := sequence.fields; len(fields) >= 2 && base != nil; fields = fields[1:] {
+		first, second := fields[0], fields[1]
+		if base != types.Typ[types.Invalid] && c.removableHop(base, first, second) {
+			if facts, position, ok := c.file(first.Pos()); ok {
+				facts.Embedded = append(facts.Embedded, positionFact{position.Line, position.Column})
+			}
+		}
+		next := c.info.ObjectOf(first)
+		if next == nil {
+			return
+		}
+		base = next.Type()
+	}
+}
+
+func (c *collector) removableHop(base types.Type, first, second *ast.Ident) bool {
+	leftObject, leftLeg, _ := types.LookupFieldOrMethod(base, true, c.pkg, first.Name)
+	field, ok := leftObject.(*types.Var)
+	if !ok || !field.Embedded() {
+		return false
+	}
+	directObject, directPath, _ := types.LookupFieldOrMethod(base, true, c.pkg, second.Name)
+	if directObject == nil || directObject != c.info.ObjectOf(second) {
+		return false
+	}
+	_, rightLeg, _ := types.LookupFieldOrMethod(field.Type(), true, c.pkg, second.Name)
+	if len(directPath) != len(leftLeg)+len(rightLeg) {
+		return false
+	}
+	for i := range directPath {
+		if i < len(leftLeg) {
+			if leftLeg[i] != directPath[i] {
+				return false
+			}
+		} else if rightLeg[i-len(leftLeg)] != directPath[i] {
+			return false
+		}
+	}
+	return true
 }

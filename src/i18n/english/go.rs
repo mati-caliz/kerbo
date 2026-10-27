@@ -38,6 +38,18 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "The -1 only means \"no limit\": the unlimited function says it in its name and leaves no magic number.",
         "strings.Replace(s, \"a\", \"b\", -1) becomes strings.ReplaceAll(s, \"a\", \"b\").",
     ),
+    RuleText::new(
+        "Embedded field that is not needed in a selector chain (staticcheck QF1008)",
+        "drop the embedded field: the selector reaches the same field or method without naming it",
+        "Naming the embedded field makes the expression longer without saying anything new and ties the code to how the type is built inside.",
+        "order.Base.ID becomes order.ID.",
+    ),
+    RuleText::new(
+        "Writing a separately built fmt.Sprintf into an io.Writer (staticcheck QF1012)",
+        "use fmt.Fprintf (or Fprint, Fprintln) on the destination",
+        "Fprintf writes straight into the destination; Sprintf builds an intermediate string that is thrown away right after.",
+        "w.Write([]byte(fmt.Sprintf(\"%d\", n))) becomes fmt.Fprintf(w, \"%d\", n).",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

@@ -38,6 +38,18 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "El -1 sólo quiere decir \"sin límite\": la función sin límite lo dice con el nombre y no deja un número mágico.",
         "strings.Replace(s, \"a\", \"b\", -1) se vuelve strings.ReplaceAll(s, \"a\", \"b\").",
     ),
+    RuleText::new(
+        "Campo embebido que sobra en una cadena de selectores (QF1008 de staticcheck)",
+        "sacá el campo embebido: el selector llega al mismo campo o método sin nombrarlo",
+        "Nombrar el campo embebido alarga la expresión sin decir nada nuevo y ata el código a cómo está armado el tipo por dentro.",
+        "pedido.Base.ID se vuelve pedido.ID.",
+    ),
+    RuleText::new(
+        "Escritura de un fmt.Sprintf armado aparte en un io.Writer (QF1012 de staticcheck)",
+        "usá fmt.Fprintf (o Fprint, Fprintln) sobre el destino",
+        "Fprintf escribe directo en el destino; con Sprintf se arma un texto intermedio que se tira enseguida.",
+        "w.Write([]byte(fmt.Sprintf(\"%d\", n))) se vuelve fmt.Fprintf(w, \"%d\", n).",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

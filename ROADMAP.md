@@ -2264,6 +2264,14 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   upstream pasa entero.
   - errcheck contra golangci-lint en los 12 repos: 10.699 avisos idénticos, ninguno de más; los 55
     que faltan son los symlinks de etcd. Las otras cuatro reglas siguen en 1.381 de 1.381.
+- staticcheck QF1008 y QF1012 (hecho, 2026-10-27), sobre el mismo helper de tipos: QF1008, el
+  campo embebido que se puede sacar de una cadena de selectores (`extractSelectors` y la
+  comparación de caminos de `LookupFieldOrMethod`, calcadas); QF1012, `x.Write([]byte(fmt.Sprintf
+  (...)))` y `x.WriteString(fmt.Sprint*(...))` cuando `x` (o `*x` si es un tipo con nombre) es un
+  io.Writer (y un io.StringWriter). Los candidatos son sintácticos (cada campo intermedio de una
+  cadena; cada `Write` o `WriteString` de un argumento) y se confirman al final del escaneo como
+  los de errcheck. Contra la corrida del conjunto por defecto en los 12 repos: 811 de 811 y 342 de
+  342, ninguno de más.
 - Pendientes de Go contra golangci-lint:
   - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
     eximen, como los tipos).
@@ -2271,8 +2279,10 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     pide los tipos. Probado sin ellos (sólo los literales y las conversiones): sobraban 9 de 34 en
     fzf y hugo, todos comparaciones de campos o resultados `float64`, y `!(a == 1.0)` con `a int`
     avisa en staticcheck. Queda con las que piden tipos.
-  - SA1019, QF1008, QF1012, QF1001, unused y govet: piden tipos; van sobre el mismo helper que
-    errcheck, sumándole los hechos que cada una necesita.
+  - Lo que queda del conjunto por defecto, por volumen en el corpus (14.755 avisos de golangci-lint,
+    el 91 % ya en kerbo): SA1019 (592, pide además los comentarios `Deprecated:` de las
+    dependencias, que no vienen en lo exportado), unused (249), QF1001 (136), govet `inline` (130) y
+    `stdmethods` (28), y una cola larga de staticcheck con menos de 30 cada una.
   - Los archivos que son symlinks no se recorren y golangci-lint sí los mira (55 avisos de errcheck
     en los `example_*_test.go` de etcd, que apuntan a `tests/integration`).
   - errcheck en el editor y en `kerbo fix`: el texto sin guardar no tiene tipos, así que ahí no se

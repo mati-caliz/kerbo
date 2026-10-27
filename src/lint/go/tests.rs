@@ -289,3 +289,43 @@ fn go_1_26_and_1_27_syntax_does_not_skip_the_file() {
     let source = "package a\n\ntype box struct{}\n\nfunc (b box) get[T any](value T) T { return value }\n\nfunc f() {\n\tsize := new(uint64(1))\n\tsize = new(uint64(2))\n\t_ = size\n\tcount := new(int)\n\t_ = count\n}\n";
     assert_eq!(rendered(&ineffassign(source)), ["8:2 size"]);
 }
+
+const TYPED_CANDIDATES_SOURCE: &str = r#"package a
+
+func f(order Order, w io.Writer) {
+	_ = order.Base.Inner.ID
+	_ = (order.Base).ID
+	_ = order.Items()[0].Base.ID
+	w.Write([]byte(fmt.Sprintf("%d", 1)))
+	(w.WriteString)(fmt.Sprint(1))
+	w.Write(a, b)
+	w.Flush(x)
+}
+"#;
+
+#[test]
+fn typed_rules_propose_candidates_where_staticcheck_looks() {
+    let found: Vec<String> = lints(TYPED_CANDIDATES_SOURCE)
+        .iter()
+        .filter(|finding| ["qf1008", "qf1012"].contains(&finding.kind.rule().as_str()))
+        .map(|finding| {
+            format!(
+                "{}:{} {} {}",
+                finding.line,
+                finding.column,
+                finding.kind.rule().as_str(),
+                finding.subject
+            )
+        })
+        .collect();
+    assert_eq!(
+        found,
+        [
+            "4:17 qf1008 Inner",
+            "4:12 qf1008 Base",
+            "6:23 qf1008 Base",
+            "7:2 qf1012 ",
+            "8:2 qf1012 ",
+        ]
+    );
+}

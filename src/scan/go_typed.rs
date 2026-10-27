@@ -50,11 +50,21 @@ const EXCLUDED_SYMBOLS: &[&str] = &[
     "(*hash/maphash.Hash).WriteString",
 ];
 
-const ERRCHECK: RuleId = RuleId::Go(GoRule::Errcheck);
+const TYPED_RULES: [GoRule; 3] = [GoRule::Errcheck, GoRule::Qf1008, GoRule::Qf1012];
 
-// Los candidatos de errcheck de cada archivo se confirman con los tipos de su módulo: quedan los
-// que de verdad tiran un `error` y no están excluidos, con el nombre que muestra golangci-lint.
-pub fn confirm_unchecked_errors(
+fn typed_rule(rule: RuleId) -> Option<GoRule> {
+    if let RuleId::Go(go_rule) = rule
+        && TYPED_RULES.contains(&go_rule)
+    {
+        return Some(go_rule);
+    }
+    None
+}
+
+// Los candidatos de las reglas que piden tipos se confirman con los de su módulo: quedan los que
+// los tipos sostienen (un `error` que de verdad se tira y no está excluido, un campo embebido que
+// se puede omitir, un io.Writer), con el nombre que muestra golangci-lint.
+pub fn confirm_typed_findings(
     diagnostics: &mut Vec<Diagnostic>,
     suppressed: &mut Vec<Suppressed>,
     platform: &GoPlatform,
@@ -62,7 +72,7 @@ pub fn confirm_unchecked_errors(
     let roots: HashMap<PathBuf, PathBuf> = diagnostics
         .iter()
         .chain(suppressed.iter().map(|entry| &entry.diagnostic))
-        .filter(|diagnostic| diagnostic.rule == ERRCHECK)
+        .filter(|diagnostic| typed_rule(diagnostic.rule).is_some())
         .filter_map(|diagnostic| {
             let root = module_root(&diagnostic.absolute_path)?;
             Some((diagnostic.absolute_path.clone(), root))
@@ -93,7 +103,7 @@ pub fn confirm_unchecked_errors(
 // Sin el módulo en disco (un texto del editor, un arreglo a medio aplicar) no hay tipos con qué
 // confirmar los candidatos.
 pub fn drop_unconfirmed(diagnostics: &mut Vec<Diagnostic>) {
-    diagnostics.retain(|diagnostic| diagnostic.rule != ERRCHECK);
+    diagnostics.retain(|diagnostic| typed_rule(diagnostic.rule).is_none());
 }
 
 fn keep_confirmed(
@@ -103,26 +113,58 @@ fn keep_confirmed(
     modules: &HashMap<&Path, ModuleFacts>,
 ) {
     let confirm = |diagnostic: &mut Diagnostic| -> bool {
-        if diagnostic.rule != ERRCHECK {
+        let Some(rule) = typed_rule(diagnostic.rule) else {
             return true;
-        }
+        };
         let facts = roots
             .get(&diagnostic.absolute_path)
             .and_then(|root| modules.get(root.as_path()))
             .and_then(|module| module.file(&diagnostic.absolute_path));
-        let Some(subject) =
-            facts.and_then(|facts| unchecked_subject(facts, diagnostic.line, diagnostic.column))
-        else {
+        let position = (diagnostic.line, diagnostic.column);
+        let confirmed = facts.and_then(|facts| match rule {
+            GoRule::Errcheck => unchecked_subject(facts, position.0, position.1),
+            GoRule::Qf1012 => fprint_replacement(facts, position),
+            GoRule::Qf1008 => removable_embedded_field(facts, position, &diagnostic.message),
+            GoRule::Ineffassign | GoRule::St1005 | GoRule::Qf1003 | GoRule::Qf1004 => None,
+        });
+        let Some(subject) = confirmed else {
             return false;
         };
         diagnostic.message = Message::Lint {
-            kind: LintKind::Go(GoRule::Errcheck),
+            kind: LintKind::Go(rule),
             subject,
         };
         true
     };
     diagnostics.retain_mut(|diagnostic| confirm(diagnostic));
     suppressed.retain_mut(|entry| confirm(&mut entry.diagnostic));
+}
+
+// QF1008: el campo que se puede sacar sigue siendo el sujeto del candidato.
+fn removable_embedded_field(
+    facts: &FileFacts,
+    position: (usize, usize),
+    message: &Message,
+) -> Option<String> {
+    let Message::Lint { subject, .. } = message else {
+        return None;
+    };
+    facts
+        .embedded
+        .iter()
+        .flatten()
+        .any(|fact| (fact.line, fact.column) == position)
+        .then(|| subject.clone())
+}
+
+// QF1012: la función de fmt que reemplaza a la escritura.
+fn fprint_replacement(facts: &FileFacts, position: (usize, usize)) -> Option<String> {
+    facts
+        .fprints
+        .iter()
+        .flatten()
+        .find(|fact| (fact.line, fact.column) == position)
+        .map(|fact| fact.replacement.clone())
 }
 
 // El nombre del aviso si en esa posición hay un error sin revisar; sin nombre, vacío.

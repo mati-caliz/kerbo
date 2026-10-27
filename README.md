@@ -622,8 +622,9 @@ está antes de `package`). Sin lista o con `all` silencia todas las reglas, y el
 
 Paridad, contra golangci-lint 2.15 en linux/amd64: cero diferencias por archivo, línea y columna
 en golang/tools, terraform, hugo, caddy, consul, prometheus, etcd, syncthing y otros (1.381
-avisos), y en errcheck 10.586 avisos idénticos y ninguno de más. govet, unused y lo demás de
-staticcheck siguen en golangci-lint.
+avisos), en errcheck 10.699 y en `qf1008` y `qf1012` 1.153, sin ninguno de más: el 91 % de lo
+que marca golangci-lint por defecto. govet, unused y lo demás de staticcheck siguen en
+golangci-lint.
 
 ### Secretos y dependencias vulnerables
 
