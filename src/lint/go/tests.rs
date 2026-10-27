@@ -283,3 +283,9 @@ fn errcheck_candidates_follow_the_statements_errcheck_looks_at() {
         ]
     );
 }
+
+#[test]
+fn go_1_26_and_1_27_syntax_does_not_skip_the_file() {
+    let source = "package a\n\ntype box struct{}\n\nfunc (b box) get[T any](value T) T { return value }\n\nfunc f() {\n\tsize := new(uint64(1))\n\tsize = new(uint64(2))\n\t_ = size\n\tcount := new(int)\n\t_ = count\n}\n";
+    assert_eq!(rendered(&ineffassign(source)), ["8:2 size"]);
+}

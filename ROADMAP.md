@@ -2252,7 +2252,18 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     punta a punta.
   - Paridad contra golangci-lint v2.15.0 (sólo errcheck) en los 12 repos: **10.586 avisos idénticos
     por archivo, línea y columna, ninguno de más** y 168 de menos, todos explicados abajo (symlinks
-    y la gramática de tree-sitter-go).
+    y la gramática de tree-sitter-go, resuelta después).
+- La sintaxis de Go 1.26 y 1.27 (hecho, 2026-10-27): tree-sitter-go 0.25.0, la última publicada,
+  no parsea `new(expresión)` ni los métodos con parámetros de tipo, y kerbo salteaba las reglas de
+  Go en esos archivos (113 avisos de errcheck en etcd y golang/tools). kerbo lleva su copia en
+  `grammars/tree-sitter-go`, publicada como `kerbo-tree-sitter-go` (el release la sube antes que
+  kerbo; no puede vivir en el crate de kerbo porque el binding pide `unsafe`). Los dos cambios de
+  `grammar.js`: una alternativa `new(expresión)` con precedencia dinámica menor que `new(Tipo)`,
+  para que lo que ya parseaba como tipo no cambie de forma, y `type_parameters` en
+  `method_declaration`. Se regenera con `tree-sitter-cli` 0.25.8, como upstream; el corpus de
+  upstream pasa entero.
+  - errcheck contra golangci-lint en los 12 repos: 10.699 avisos idénticos, ninguno de más; los 55
+    que faltan son los symlinks de etcd. Las otras cuatro reglas siguen en 1.381 de 1.381.
 - Pendientes de Go contra golangci-lint:
   - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
     eximen, como los tipos).
@@ -2262,10 +2273,6 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     avisa en staticcheck. Queda con las que piden tipos.
   - SA1019, QF1008, QF1012, QF1001, unused y govet: piden tipos; van sobre el mismo helper que
     errcheck, sumándole los hechos que cada una necesita.
-  - tree-sitter-go 0.25 (la última) no parsea `new(expresión)` de Go 1.26 ni los métodos con
-    parámetros de tipo de Go 1.27: esos archivos quedan afuera de todas las reglas de Go (son 110 y
-    3 de los avisos de errcheck que faltan en etcd y golang/tools). Pide una gramática propia o
-    esperar la de arriba.
   - Los archivos que son symlinks no se recorren y golangci-lint sí los mira (55 avisos de errcheck
     en los `example_*_test.go` de etcd, que apuntan a `tests/integration`).
   - errcheck en el editor y en `kerbo fix`: el texto sin guardar no tiene tipos, así que ahí no se
