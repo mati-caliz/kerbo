@@ -56,6 +56,12 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "Lo deprecado sigue andando hasta que un día se va o deja de recibir arreglos; el comentario dice qué usar en su lugar.",
         "ioutil.ReadFile(ruta) se vuelve os.ReadFile(ruta).",
     ),
+    RuleText::new(
+        "Negación de una comparación entera que se lee mejor con la ley de De Morgan (QF1001 de staticcheck)",
+        "invertí cada comparación y cambiá && por || (o al revés) en vez de negar el paréntesis",
+        "Una negación sobre un paréntesis obliga a invertir todo de cabeza; las comparaciones ya invertidas se leen de una.",
+        "!(a == b && c > 0) se vuelve a != b || c <= 0.",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

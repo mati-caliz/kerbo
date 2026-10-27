@@ -56,6 +56,12 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "Deprecated things keep working until one day they are gone or stop getting fixes; the comment says what to use instead.",
         "ioutil.ReadFile(path) becomes os.ReadFile(path).",
     ),
+    RuleText::new(
+        "Negation of a whole comparison that reads better with De Morgan's law (staticcheck QF1001)",
+        "invert each comparison and swap && for || (or the other way around) instead of negating the parentheses",
+        "A negated parenthesis forces you to invert everything in your head; already inverted comparisons read at once.",
+        "!(a == b && c > 0) becomes a != b || c <= 0.",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

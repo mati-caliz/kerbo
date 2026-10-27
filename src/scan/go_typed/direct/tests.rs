@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use super::{DirectFile, direct_reports, wants_direct_reports};
+use super::{DIRECT_RULES, DirectFile, direct_reports, wants_direct_reports};
 use crate::go_types::ModuleFacts;
 use crate::language::Language;
 use crate::limits::Preset;
-use crate::rules::{FileIdentity, GoRule, RuleId};
+use crate::rules::{FileIdentity, RuleId};
 use crate::test_support::TempTree;
 
 const SOURCE: &str = "package a\n\nimport \"io/ioutil\"\n\nfunc f() {\n\tioutil.ReadFile(\"a\")\n\tioutil.ReadFile(\"b\") //nolint:staticcheck // todavía no\n}\n";
@@ -58,7 +58,9 @@ fn direct_reports_respect_limits_generated_files_and_nolint() {
         .collect();
     let strict = Preset::Strict.limits(Language::Go, false);
     assert!(wants_direct_reports(&strict));
-    let without = strict.with_rule(RuleId::Go(GoRule::Sa1019), None);
+    let without = DIRECT_RULES
+        .into_iter()
+        .fold(strict, |limits, rule| limits.with_rule(RuleId::Go(rule), None));
     assert!(!wants_direct_reports(&without));
     let files = [
         DirectFile {

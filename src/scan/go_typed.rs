@@ -131,7 +131,12 @@ fn keep_confirmed(
             GoRule::Errcheck => unchecked_subject(facts, position.0, position.1),
             GoRule::Qf1012 => fprint_replacement(facts, position),
             GoRule::Qf1008 => removable_embedded_field(facts, position, &diagnostic.message),
-            GoRule::Ineffassign | GoRule::St1005 | GoRule::Qf1003 | GoRule::Qf1004 | GoRule::Sa1019 => None,
+            GoRule::Ineffassign
+            | GoRule::St1005
+            | GoRule::Qf1003
+            | GoRule::Qf1004
+            | GoRule::Sa1019
+            | GoRule::Qf1001 => None,
         });
         let Some(subject) = confirmed else {
             return false;

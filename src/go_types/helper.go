@@ -269,6 +269,7 @@ func (c *collector) visit(node ast.Node) bool {
 			}
 		}
 	case *ast.UnaryExpr:
+		c.checkDeMorgan(expression)
 		if expression.Op == token.ARROW && c.receiveReturnsError(expression) {
 			if facts, position, ok := c.file(expression.OpPos); ok {
 				facts.Receives = append(facts.Receives, positionFact{position.Line, position.Column})

@@ -2285,16 +2285,17 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     código); el helper decide cada aviso y la pasada del escaneo lo convierte en aviso de los
     archivos escaneados, con sus límites, sin los generados y pasado por los `//nolint` del archivo.
   - Contra la corrida del conjunto por defecto en los 12 repos: 592 de 592, ninguno de más.
+- staticcheck QF1001 (hecho, 2026-10-27), la segunda regla directa: `!(a op b)` con la negación de
+  un binario (los paréntesis no cuentan), salvo que alguna subexpresión sea un float según
+  go/types o que haya una función literal o un tipo de función fuera de un struct o interfaz
+  (`astutil.CopyExpr` no los copia). Sin tipos sobraban 9 de 34; con ellos, 136 de 136 contra
+  golangci-lint en los 12 repos, ninguno de más.
 - Pendientes de Go contra golangci-lint:
   - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
     eximen, como los tipos).
-  - QF1001 (De Morgan): staticcheck no avisa si algo de adentro de la negación es un float, y eso
-    pide los tipos. Probado sin ellos (sólo los literales y las conversiones): sobraban 9 de 34 en
-    fzf y hugo, todos comparaciones de campos o resultados `float64`, y `!(a == 1.0)` con `a int`
-    avisa en staticcheck. Queda con las que piden tipos.
   - Lo que queda del conjunto por defecto, por volumen en el corpus (14.755 avisos de golangci-lint,
-    el 95 % ya en kerbo): unused (249), QF1001 (136), govet `inline` (130) y `stdmethods` (28), y
-    una cola larga de staticcheck con menos de 30 cada una.
+    el 96 % ya en kerbo): unused (249), govet `inline` (130) y `stdmethods` (28), y una cola larga
+    de staticcheck con menos de 30 cada una.
   - Los archivos que son symlinks no se recorren y golangci-lint sí los mira (55 avisos de errcheck
     en los `example_*_test.go` de etcd, que apuntan a `tests/integration`).
   - errcheck en el editor y en `kerbo fix`: el texto sin guardar no tiene tipos, así que ahí no se
