@@ -62,6 +62,12 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "A negated parenthesis forces you to invert everything in your head; already inverted comparisons read at once.",
         "!(a == b && c > 0) becomes a != b || c <= 0.",
     ),
+    RuleText::new(
+        "Method with the name of a well-known interface but another signature (govet stdmethods)",
+        "give it the signature of the standard library interface or rename it",
+        "With that name, readers (and fmt, encoding/json or io) expect the known interface; with another signature it does not implement it and nobody notices.",
+        "func (t T) Seek(off int64) int64 becomes func (t T) Seek(off int64, whence int) (int64, error).",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

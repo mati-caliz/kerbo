@@ -217,6 +217,7 @@ func checkPackage(listed listedPackage, exports map[string]string, index depreca
 		ast.Inspect(file, collector.visit)
 		collector.collectEmbedded(file)
 		collector.collectDeprecatedUses(file, index)
+		collector.collectCanonicalMethods(file)
 	}
 	var facts []fileFacts
 	for _, file := range byFile {

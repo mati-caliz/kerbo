@@ -62,6 +62,12 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "Una negación sobre un paréntesis obliga a invertir todo de cabeza; las comparaciones ya invertidas se leen de una.",
         "!(a == b && c > 0) se vuelve a != b || c <= 0.",
     ),
+    RuleText::new(
+        "Método con el nombre de una interfaz conocida pero otra firma (stdmethods de govet)",
+        "dale la firma de la interfaz de la biblioteca estándar o cambiale el nombre",
+        "Con ese nombre, quien lo lee (y fmt, encoding/json o io) espera la interfaz conocida; con otra firma no la implementa y nadie se entera.",
+        "func (t T) Seek(off int64) int64 se vuelve func (t T) Seek(off int64, whence int) (int64, error).",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

@@ -10,14 +10,17 @@ rule_family!(GoRule {
     Qf1012 => "qf1012",
     Sa1019 => "sa1019",
     Qf1001 => "qf1001",
+    Stdmethods => "stdmethods",
 });
 
 const STATICCHECK: &str = "staticcheck";
+const GOVET: &str = "govet";
 
 impl GoRule {
     // El linter de golangci-lint que la reporta: es el nombre que silencia un `//nolint`.
     pub const fn linter(self) -> &'static str {
         match self {
+            Self::Stdmethods => GOVET,
             Self::Ineffassign | Self::Errcheck => self.as_str(),
             Self::St1005
             | Self::Qf1003
