@@ -20,6 +20,18 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "Los errores se encadenan: fmt.Errorf(\"guardar: %w\", err) arma una sola oración, y una mayúscula o un punto en el medio la cortan.",
         "errors.New(\"No se encontró el pedido.\") se vuelve errors.New(\"no se encontró el pedido\").",
     ),
+    RuleText::new(
+        "Cadena de if y else if que compara siempre lo mismo con == (QF1003 de staticcheck)",
+        "pasala a un switch sobre lo que se compara",
+        "Un switch dice de entrada que todas las ramas miran el mismo valor; la cadena de if obliga a leer cada condición para darse cuenta.",
+        "if x == 1 { a() } else if x == 2 { b() } se vuelve switch x { case 1: a(); case 2: b() }.",
+    ),
+    RuleText::new(
+        "strings.Replace, strings.SplitN o sus pares de bytes con -1 como límite (QF1004 de staticcheck)",
+        "usá strings.ReplaceAll, strings.Split o strings.SplitAfter sin el -1",
+        "El -1 sólo quiere decir \"sin límite\": la función sin límite lo dice con el nombre y no deja un número mágico.",
+        "strings.Replace(s, \"a\", \"b\", -1) se vuelve strings.ReplaceAll(s, \"a\", \"b\").",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

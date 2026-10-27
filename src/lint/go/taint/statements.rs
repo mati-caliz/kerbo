@@ -2,9 +2,9 @@ use tree_sitter::Node;
 
 use super::calls::sink_at;
 use super::expressions::literal_of;
-use super::imports::Imports;
 use super::tables;
 use super::types::{self, Types};
+use crate::lint::go::imports::Imports;
 use crate::lint::taint::folding::{same_label, truth};
 use crate::lint::taint::responses::lambda_html_body;
 use crate::lint::taint::{

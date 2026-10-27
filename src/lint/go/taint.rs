@@ -1,15 +1,14 @@
 mod calls;
 mod expressions;
-mod imports;
 mod statements;
 mod tables;
 mod types;
 
 use tree_sitter::Node;
 
+use crate::lint::go::imports::Imports;
 use crate::lint::taint::{Atom, Flow, State, TaintMethod, Value};
 use crate::syntax::descendants;
-use imports::Imports;
 use statements::Interpreter;
 use types::Types;
 

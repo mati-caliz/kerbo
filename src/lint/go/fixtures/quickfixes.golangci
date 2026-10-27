@@ -1,0 +1,12 @@
+13:2 qf1003 x
+57:3 qf1003 value
+63:3 qf1003 value
+99:3 qf1003 x
+118:6 qf1004 strings.ReplaceAll
+119:6 qf1004 strings.ReplaceAll
+121:6 qf1004 strings.Split
+122:6 qf1004 strings.SplitAfter
+123:6 qf1004 strings.ReplaceAll
+124:6 qf1004 bytes.ReplaceAll
+125:6 qf1004 bytes.Split
+126:6 qf1004 bytes.SplitAfter

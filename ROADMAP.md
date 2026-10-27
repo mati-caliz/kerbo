@@ -2176,11 +2176,26 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   `cyclop` y `gocyclo` silencian `cyclomatic-complexity`, `gocognit` `cognitive-complexity`, `funlen`
   `function-length`, `revive` `parameter-count` y `file-length`, `mnd` `magic-number`, `nestif`
   `nesting-depth` y `dupl` `duplicate-code`.
+- staticcheck QF1003 y QF1004 (hecho, 2026-10-27): `qf1003`, cadenas de `if`/`else if` (dos o más)
+  que comparan siempre lo mismo con `==` (también `x == a || x == b`), sin inicialización, sin
+  `break`, `continue` ni `fallthrough` en los cuerpos y sin llamadas, `&` ni `<-` en lo comparado; la
+  igualdad es por tokens, con los paréntesis contando como en `astutil.Equal`. `qf1004`,
+  `strings.Replace`, `SplitN` y `SplitAfterN` (y los de `bytes`, por la ruta del import) con `-1`
+  literal como último argumento. Las dos son sintácticas en staticcheck y `//nolint:staticcheck` las
+  silencia.
+  - Paridad contra golangci-lint v2.15.0 (staticcheck sólo con QF1001, QF1003 y QF1004, cada módulo
+    con sus dependencias) en chi, cobra, gin, fzf, caddy, hugo, golang/tools, prometheus, terraform,
+    syncthing, etcd y consul: los 100 avisos (67 de QF1004 y 33 de QF1003) idénticos por archivo,
+    línea y columna. Sobran 15, todos en archivos con `//go:build ignore`, `tools` o `integration`
+    (las restricciones de build de abajo).
 - Pendientes de Go contra golangci-lint:
   - ST1005 con el mensaje en una constante de otro archivo del paquete: pide guardar las constantes
     de texto de cada archivo y evaluar el mensaje en la pasada por paquete. Tampoco se verificó si las
     variables del paquete eximen (en el corpus no hubo caso; se eximen, como los tipos).
-  - Las de staticcheck que tampoco piden tipos: QF1004, QF1001 y QF1003.
+  - QF1001 (De Morgan): staticcheck no avisa si algo de adentro de la negación es un float, y eso
+    pide los tipos. Probado sin ellos (sólo los literales y las conversiones): sobraban 9 de 34 en
+    fzf y hugo, todos comparaciones de campos o resultados `float64`, y `!(a == 1.0)` con `a int`
+    avisa en staticcheck. Queda con las que piden tipos.
   - errcheck, SA1019, QF1008, QF1012, unused y govet: piden los tipos del compilador. Es el grueso
     del volumen (errcheck solo es el 75 %) y hay que decidir cómo traerlos sin reimplementar el
     chequeo de tipos de Go.

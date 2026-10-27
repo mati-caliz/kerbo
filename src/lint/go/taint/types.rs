@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use tree_sitter::Node;
 
-use super::imports::Imports;
+use crate::lint::go::imports::Imports;
 use crate::syntax::{children_with_fields, descendants, named_children};
 
 const PARAMETER: &str = "parameter_declaration";

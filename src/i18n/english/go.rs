@@ -20,6 +20,18 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "Errors get wrapped: fmt.Errorf(\"save: %w\", err) builds one sentence, and a capital letter or a period in the middle breaks it.",
         "errors.New(\"Order not found.\") becomes errors.New(\"order not found\").",
     ),
+    RuleText::new(
+        "if and else if chain that always compares the same thing with == (staticcheck QF1003)",
+        "turn it into a switch on the compared value",
+        "A switch says up front that every branch looks at the same value; the if chain makes you read each condition to notice.",
+        "if x == 1 { a() } else if x == 2 { b() } becomes switch x { case 1: a(); case 2: b() }.",
+    ),
+    RuleText::new(
+        "strings.Replace, strings.SplitN or their bytes twins with -1 as the limit (staticcheck QF1004)",
+        "use strings.ReplaceAll, strings.Split or strings.SplitAfter without the -1",
+        "The -1 only means \"no limit\": the unlimited function says it in its name and leaves no magic number.",
+        "strings.Replace(s, \"a\", \"b\", -1) becomes strings.ReplaceAll(s, \"a\", \"b\").",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {

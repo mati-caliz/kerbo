@@ -3,6 +3,8 @@ use super::{ComposeRule, DockerfileRule, EslintRule, MigrationRule, PythonRule, 
 rule_family!(GoRule {
     Ineffassign => "ineffassign",
     St1005 => "st1005",
+    Qf1003 => "qf1003",
+    Qf1004 => "qf1004",
 });
 
 const STATICCHECK: &str = "staticcheck";
@@ -12,7 +14,7 @@ impl GoRule {
     pub const fn linter(self) -> &'static str {
         match self {
             Self::Ineffassign => self.as_str(),
-            Self::St1005 => STATICCHECK,
+            Self::St1005 | Self::Qf1003 | Self::Qf1004 => STATICCHECK,
         }
     }
 }

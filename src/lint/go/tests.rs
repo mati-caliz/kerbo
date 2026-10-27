@@ -9,6 +9,9 @@ const INEFFASSIGN_SOURCE: &str = include_str!("fixtures/ineffassign.go");
 const INEFFASSIGN_EXPECTED: &str = include_str!("fixtures/ineffassign.golangci");
 const NOLINT_SOURCE: &str = include_str!("fixtures/nolint.go");
 const NOLINT_EXPECTED: &str = include_str!("fixtures/nolint.golangci");
+const QUICKFIXES_SOURCE: &str = include_str!("fixtures/quickfixes.go");
+const QUICKFIXES_EXPECTED: &str = include_str!("fixtures/quickfixes.golangci");
+const QUICKFIX_RULES: &[&str] = &["qf1003", "qf1004"];
 const LINTER: &str = "ineffassign";
 
 fn lints(source: &str) -> Vec<LintFinding> {
@@ -180,4 +183,25 @@ fn package_facts_keep_the_declared_names_and_the_capitalized_words() {
         .map(|found| found.word.as_str())
         .collect();
     assert_eq!(words, ["Missing", "Raw", "Not"]);
+}
+
+#[test]
+fn quickfixes_match_golangci_lint_on_the_fixture() {
+    let mut found: Vec<String> = lints(QUICKFIXES_SOURCE)
+        .iter()
+        .filter(|finding| QUICKFIX_RULES.contains(&finding.kind.rule().as_str()))
+        .map(|finding| {
+            format!(
+                "{}:{} {} {}",
+                finding.line,
+                finding.column,
+                finding.kind.rule().as_str(),
+                finding.subject
+            )
+        })
+        .collect();
+    let mut expected: Vec<String> = QUICKFIXES_EXPECTED.lines().map(str::to_owned).collect();
+    found.sort_unstable();
+    expected.sort_unstable();
+    assert_eq!(found, expected);
 }
