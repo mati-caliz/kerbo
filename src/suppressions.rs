@@ -13,6 +13,17 @@ const FIRST_LINE: usize = 1;
 const REPEATED_SHELL_DISABLE: &str = "disable=";
 const GO_EXTENSION: &str = ".go";
 const SQUAWK_NEXT_LINES: usize = 1;
+const GOLANGCI_LINTERS_OF_UNIVERSAL_RULES: [(&str, RuleId); 9] = [
+    ("cyclop", RuleId::CyclomaticComplexity),
+    ("gocyclo", RuleId::CyclomaticComplexity),
+    ("gocognit", RuleId::CognitiveComplexity),
+    ("funlen", RuleId::FunctionLength),
+    ("revive", RuleId::ParameterCount),
+    ("revive", RuleId::FileLength),
+    ("mnd", RuleId::MagicNumber),
+    ("nestif", RuleId::NestingDepth),
+    ("dupl", RuleId::DuplicateCode),
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -94,8 +105,7 @@ impl Directive {
                 || self.codes.iter().any(|code| {
                     diagnostic.rule.as_str().eq_ignore_ascii_case(code)
                         || (self.scope == Scope::ShellStatement && shell::disables(code, diagnostic.rule))
-                        || (self.scope == Scope::GoNolint
-                            && matches!(diagnostic.rule, RuleId::Go(rule) if rule.linter() == code))
+                        || (self.scope == Scope::GoNolint && go_linter_covers(code, diagnostic.rule))
                 }))
     }
 
@@ -267,6 +277,13 @@ pub fn split(source: &[u8], diagnostics: Vec<Diagnostic>) -> (Vec<Diagnostic>, V
         }
     }
     (kept, suppressed)
+}
+
+fn go_linter_covers(linter: &str, rule: RuleId) -> bool {
+    matches!(rule, RuleId::Go(go_rule) if go_rule.linter() == linter)
+        || GOLANGCI_LINTERS_OF_UNIVERSAL_RULES
+            .iter()
+            .any(|(name, universal)| name.eq_ignore_ascii_case(linter) && *universal == rule)
 }
 
 fn directive_syntax(line: &str) -> Option<(Syntax, &str)> {

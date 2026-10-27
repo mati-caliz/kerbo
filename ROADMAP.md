@@ -2172,6 +2172,10 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     terraform con el mensaje en una constante de otro archivo del paquete (`EnvInvalidName`,
     `errInitConfigError`). consul 840 de 840, hugo, golang/tools y fzf completos; caddy, chi, cobra,
     etcd, gin y prometheus sin avisos en los dos.
+- `//nolint` con los linters que kerbo cubre con sus reglas universales (hecho, 2026-10-27):
+  `cyclop` y `gocyclo` silencian `cyclomatic-complexity`, `gocognit` `cognitive-complexity`, `funlen`
+  `function-length`, `revive` `parameter-count` y `file-length`, `mnd` `magic-number`, `nestif`
+  `nesting-depth` y `dupl` `duplicate-code`.
 - Pendientes de Go contra golangci-lint:
   - ST1005 con el mensaje en una constante de otro archivo del paquete: pide guardar las constantes
     de texto de cada archivo y evaluar el mensaje en la pasada por paquete. Tampoco se verificó si las
@@ -2185,9 +2189,6 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     golangci-lint no ve.
   - `uniq-by-line` (prendido por defecto en golangci-lint) deja un solo aviso por línea y linter;
     kerbo muestra todos.
-  - `//nolint:funlen`, `//nolint:gocognit` y los demás linters que imitan las reglas universales
-    no silencian `function-length`, `cognitive-complexity` y compañía: hoy sólo coinciden los
-    nombres iguales.
   - El arnés de esta paridad (golangci-lint en JSON y `go list` contra kerbo en JSON) quedó fuera
     del repo, como los anteriores.
 - Código muerto entre archivos: exports que nadie importa y dependencias declaradas que nadie

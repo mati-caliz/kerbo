@@ -236,3 +236,21 @@ fn eslint_inline_configuration_turns_rules_off_in_the_whole_file() {
     );
     assert_eq!(kept, [(ANY, 5, 8)]);
 }
+
+#[test]
+fn go_nolint_names_the_universal_rules_like_golangci_lint() {
+    let source = "package a\n\n//nolint:funlen,gocognit // la tabla es larga\nfunc f(a, b, c, d, e int) {}\n";
+    let go = |rule| Diagnostic {
+        path: "a.go".to_owned(),
+        ..diagnostic(rule, 4)
+    };
+    let kept = kept_positions(
+        source,
+        vec![
+            go(RuleId::FunctionLength),
+            go(RuleId::CognitiveComplexity),
+            go(RuleId::ParameterCount),
+        ],
+    );
+    assert_eq!(kept, [(RuleId::ParameterCount, 4, 1)]);
+}
