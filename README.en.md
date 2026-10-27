@@ -240,6 +240,11 @@ target_os = "windows"             # by default, the machine kerbo runs on
 target_arch = "aarch64"
 features = ["std"]                # by default, all of them (like --all-features)
 cfg = ["fast_path"]               # the ones the build.rs turns on
+
+[go]                              # optional: which Go files count, like go/build
+goos = "linux"                    # by default, GOOS or the machine kerbo runs on
+goarch = "amd64"                  # by default, GOARCH or the machine
+build_tags = ["integration"]      # like golangci-lint's run.build-tags
 ```
 
 | Preset | File | Function | Cyclomatic | Cognitive | Parameters |
@@ -595,22 +600,30 @@ Files tree-sitter-bash cannot parse are skipped.
 
 ### Go against golangci-lint
 
-In Go, kerbo runs `ineffassign`, the rule from golangci-lint's default set that does not need the
-compiler's types, under the same name: `kerbo explain ineffassign`, `--max ineffassign=0` or
-`ineffassign = "off"` in `kerbo.toml`. It reports an assignment nobody reads before it is
-overwritten or the function ends, following branches, loops, `switch` with `fallthrough`,
-`select`, `goto` and labels; variables captured by a closure or whose address is taken do not
-count. Like golangci-lint, it skips generated files.
+In Go, kerbo runs the rules from golangci-lint's default set that do not need the compiler's
+types, under the same names: `kerbo explain st1005`, `--max ineffassign=0` or `qf1003 = "off"` in
+`kerbo.toml`. `ineffassign` reports an assignment nobody reads before it is overwritten or the
+function ends, following branches, loops, `switch` with `fallthrough`, `select`, `goto` and labels;
+variables captured by a closure or whose address is taken do not count. From staticcheck: `st1005`,
+error messages with a leading capital or trailing punctuation (with the whole package's constants
+and the same exemptions), `qf1003`, `if` chains that always compare the same thing and could be a
+`switch`, and `qf1004`, `strings.Replace` and friends with a `-1` limit.
+
+Like golangci-lint, it skips generated files, files that do not build on the platform (suffixes
+like `_windows.go`, `//go:build` and `// +build`) and whatever `./...` does not list from the
+`go.mod` (`testdata`, `vendor` and folders starting with `_` or `.`). The platform is the one in
+`GOOS` and `GOARCH` or the machine kerbo runs on; the `[go]` section of `kerbo.toml` pins it and
+adds build tags.
 
 `//nolint` works as in golangci-lint: at the end of a line, for that line; on its own line, for
 whatever starts right below at the same column (a function, an `if`, the whole file when it sits
 before `package`). Without a list or with `all` it silences every rule, and the reason in
 `//nolint:ineffassign // reason` shows up in the report.
 
-Parity, against golangci-lint 2.15: zero differences by file, line, column and variable in Go's
-standard library, golang/tools, terraform, hugo, caddy, consul, prometheus and others (103 reports
-in about 10,500 files). The rest of the default set (errcheck, govet, staticcheck and unused) needs the
-compiler's types and stays in golangci-lint.
+Parity, against golangci-lint 2.15 on linux/amd64: zero differences by file, line and column in
+golang/tools, terraform, hugo, caddy, consul, prometheus, etcd, syncthing and others (1,381
+reports). The rest of the default set (errcheck, govet, unused and the rest of staticcheck) needs
+the compiler's types and stays in golangci-lint.
 
 ### Secrets and vulnerable dependencies
 

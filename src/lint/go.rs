@@ -7,6 +7,7 @@ mod ineffassign;
 mod module_pattern;
 mod nolint;
 mod parentheses;
+pub mod platform;
 mod replace_all;
 mod resolver;
 mod tagged_switch;
@@ -19,6 +20,7 @@ use std::path::Path;
 use tree_sitter::Node;
 
 use super::{LintFinding, LintKind, finding_at};
+use crate::analysis::SourceUnit;
 use crate::language::Language;
 use crate::limits::Limits;
 use crate::rules::{GoRule, RuleId};
@@ -26,6 +28,7 @@ use crate::rules::{GoRule, RuleId};
 pub use error_strings::{CapitalizedError, GoPackageFacts, MessagePiece, PendingMessage, message_problems};
 use error_strings::{ErrorStringProblem, error_strings};
 pub use nolint::ranges as nolint_ranges;
+use platform::GoPlatform;
 
 type GoCheck = fn(Node<'_>, &[u8]) -> Vec<LintFinding>;
 
@@ -36,27 +39,33 @@ const CHECKS: [(GoRule, GoCheck); 4] = [
     (GoRule::Qf1004, unlimited_call_findings),
 ];
 
-// Lo que el resultado toma del archivo además del contenido: si el nombre lo deja fuera de la
-// plataforma por defecto.
-pub fn analysis_context(language: Language, path: &Path) -> Option<u64> {
+// Lo que el resultado toma del archivo además del contenido: la plataforma y si el nombre o la
+// carpeta lo dejan afuera.
+pub fn analysis_context(language: Language, path: &Path, platform: &GoPlatform) -> Option<u64> {
     (language == Language::Go).then(|| {
         let mut hasher = DefaultHasher::new();
-        analyzed_path(path).hash(&mut hasher);
+        platform.hash(&mut hasher);
+        analyzed_path(path, platform).hash(&mut hasher);
         hasher.finish()
     })
 }
 
-// Si golangci-lint mira el archivo: `./...` lo lista y la plataforma por defecto lo compila.
-fn analyzed(path: Option<&Path>, source: &[u8]) -> bool {
-    path.is_none_or(analyzed_path) && build_constraints::header_builds(source)
+// Si golangci-lint mira el archivo: `./...` lo lista y la plataforma lo compila. Sin plataforma
+// (los tests), linux/amd64.
+fn analyzed(unit: SourceUnit<'_>) -> bool {
+    let default_platform = GoPlatform::default();
+    let platform = unit.go_platform.unwrap_or(&default_platform);
+    unit.path.is_none_or(|path| analyzed_path(path, platform))
+        && build_constraints::header_builds(unit.source, platform)
 }
 
-fn analyzed_path(path: &Path) -> bool {
-    build_constraints::file_name_builds(path) && module_pattern::listed_by_module_pattern(path)
+fn analyzed_path(path: &Path, platform: &GoPlatform) -> bool {
+    build_constraints::file_name_builds(path, platform) && module_pattern::listed_by_module_pattern(path)
 }
 
-pub fn findings(root: Node<'_>, source: &[u8], limits: &Limits, path: Option<&Path>) -> Vec<LintFinding> {
-    if root.has_error() || generated::is_generated(root, source) || !analyzed(path, source) {
+pub fn findings(root: Node<'_>, unit: SourceUnit<'_>, limits: &Limits) -> Vec<LintFinding> {
+    let source = unit.source;
+    if root.has_error() || generated::is_generated(root, source) || !analyzed(unit) {
         return Vec::new();
     }
     CHECKS
@@ -131,13 +140,9 @@ fn unlimited_call_findings(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
 
 // Lo que el archivo aporta a ST1005 en su paquete: los mensajes con mayúscula y lo que declara. Un
 // archivo generado no avisa pero sus nombres cuentan, como en golangci-lint.
-pub fn package_facts(
-    root: Node<'_>,
-    source: &[u8],
-    limits: &Limits,
-    path: Option<&Path>,
-) -> Option<GoPackageFacts> {
-    if limits.get(RuleId::Go(GoRule::St1005)).is_none() || root.has_error() || !analyzed(path, source) {
+pub fn package_facts(root: Node<'_>, unit: SourceUnit<'_>, limits: &Limits) -> Option<GoPackageFacts> {
+    let source = unit.source;
+    if limits.get(RuleId::Go(GoRule::St1005)).is_none() || root.has_error() || !analyzed(unit) {
         return None;
     }
     let mut facts = error_strings(root, source).1;

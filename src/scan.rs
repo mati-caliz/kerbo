@@ -12,7 +12,8 @@ use crate::config::Config;
 use crate::duplicates::{PooledFile, find_duplicates};
 use crate::i18n::Problem;
 use crate::language::{Language, Stack};
-use crate::limits::LimitOverride;
+use crate::limits::{LimitOverride, Limits};
+use crate::lint::go::platform::GoPlatform;
 use crate::lint::{go_analysis_context, python_analysis_context};
 use crate::macro_rules::MacroIndex;
 use crate::rules::{Diagnostic, FileIdentity, evaluate};
@@ -181,11 +182,13 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
     let mut parser = parser_for(language).ok()?;
     let crate_macros =
         MacroIndex::shared().crate_with(language, &file.identity.absolute, config.rust_target());
+    let go_platform = GoPlatform::of(config.go_target());
     let unit = SourceUnit {
         language,
         source,
         path: Some(&file.identity.absolute),
         crate_macros: crate_macros.as_ref(),
+        go_platform: Some(&go_platform),
     };
     let mut analysis = analyze_unit(&mut parser, unit, &limits).ok()?;
     let pooled = pooling::pooled_file(&file.identity, &mut analysis, &limits);
@@ -276,6 +279,19 @@ fn portable(path: &Path) -> String {
     parts.join(PATH_SEPARATOR)
 }
 
+// Los límites del archivo: los de la configuración con los `--max` de la línea de comandos encima.
+fn file_limits(file: &SourceFile, language: Language, request: &ScanRequest<'_>) -> Limits {
+    let configured = request
+        .config
+        .limits_for(Path::new(&file.identity.relative), language, file.is_test);
+    request
+        .overrides
+        .iter()
+        .fold(configured, |limits, &limit_override| {
+            limits.with_override(limit_override)
+        })
+}
+
 fn check_file(
     pool: &mut ParserPool,
     file: &SourceFile,
@@ -302,22 +318,15 @@ fn check_file(
     };
     let source = fs::read(&file.identity.absolute).map_err(|error| failure(error.to_string()))?;
     let parser = pool.parser(language).map_err(failure)?;
-    let configured = request
-        .config
-        .limits_for(Path::new(&file.identity.relative), language, file.is_test);
-    let limits = request
-        .overrides
-        .iter()
-        .fold(configured, |limits, &limit_override| {
-            limits.with_override(limit_override)
-        });
+    let limits = file_limits(file, language, request);
+    let go_platform = GoPlatform::of(request.config.go_target());
     let crate_macros = macros.crate_with(language, &file.identity.absolute, request.config.rust_target());
     let context = crate_macros
         .as_ref()
         .map(|crate_macros| crate_macros.analysis_context(&file.identity.absolute))
         .or_else(|| shell::analysis_context(language, &file.identity.absolute))
         .or_else(|| python_analysis_context(language, &file.identity.absolute))
-        .or_else(|| go_analysis_context(language, &file.identity.absolute));
+        .or_else(|| go_analysis_context(language, &file.identity.absolute, &go_platform));
     let subject = AnalysisSubject {
         language,
         source: &source,
@@ -331,6 +340,7 @@ fn check_file(
         source: &source,
         path: Some(&file.identity.absolute),
         crate_macros: crate_macros.as_ref(),
+        go_platform: Some(&go_platform),
     };
     let mut analysis =
         cached_or_fresh(cached, || analyze_unit(parser, unit, &limits)).map_err(|ParseFailed| {

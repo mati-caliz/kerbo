@@ -9,8 +9,10 @@ use crate::language::{Language, Stack};
 use crate::limits::{Limits, Preset, REPORT_EVERY_OCCURRENCE};
 use crate::rules::RuleId;
 
+mod go_target;
 mod rust_target;
 
+pub use go_target::GoTarget;
 pub use rust_target::RustTarget;
 
 pub const CONFIG_FILE: &str = "kerbo.toml";
@@ -31,6 +33,8 @@ struct RawConfig {
     cache: RawCache,
     #[serde(default)]
     rust: RustTarget,
+    #[serde(default)]
+    go: GoTarget,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -89,6 +93,7 @@ pub struct Config {
     lang: Option<Lang>,
     cache_max_megabytes: Option<usize>,
     rust: RustTarget,
+    go: GoTarget,
 }
 
 impl Config {
@@ -121,6 +126,7 @@ impl Config {
             lang: None,
             cache_max_megabytes: None,
             rust: RustTarget::default(),
+            go: GoTarget::default(),
         }
     }
 
@@ -160,6 +166,7 @@ impl Config {
             lang: raw.lang,
             cache_max_megabytes: raw.cache.max_megabytes,
             rust: raw.rust,
+            go: raw.go,
             root,
         })
     }
@@ -170,6 +177,10 @@ impl Config {
 
     pub const fn rust_target(&self) -> &RustTarget {
         &self.rust
+    }
+
+    pub const fn go_target(&self) -> &GoTarget {
+        &self.go
     }
 
     pub const fn cache_max_megabytes(&self) -> Option<usize> {

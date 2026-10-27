@@ -33,6 +33,7 @@ pub fn lints(language: Language, source: &str, limits: &Limits) -> Vec<LintFindi
         source: source.as_bytes(),
         path: None,
         crate_macros: None,
+        go_platform: None,
     };
     find_lints(tree.root_node(), unit, LintStyle::Eslint, limits)
 }

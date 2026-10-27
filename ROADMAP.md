@@ -2224,6 +2224,13 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Con el binario anterior eran 199 avisos de Go en esas carpetas del corpus (187 de ineffassign,
     casi todos en los `testdata` de golang/tools) que el script de paridad filtraba. Sin el filtro:
     las mismas 1.381 coincidencias, ninguna de más ni de menos.
+- La plataforma de Go configurable (hecho, 2026-10-27): `[go]` en `kerbo.toml` con `goos`, `goarch`
+  y `build_tags` (como `run.build-tags` de golangci-lint). Sin nada, `GOOS` y `GOARCH` del entorno
+  o la máquina donde corre kerbo, como golangci-lint (y como `[rust]`). cgo va prendido salvo que
+  se apunte a otra plataforma o `CGO_ENABLED` lo apague; `unix`, android como linux, illumos como
+  solaris e ios como darwin, como `matchTag`. Las configuraciones de golangci-lint no se leen: kerbo
+  lo reemplaza y su configuración es la propia. La plataforma entra al contexto de la caché.
+  - El README dejó de decir que en Go sólo está `ineffassign`.
 - Pendientes de Go contra golangci-lint:
   - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
     eximen, como los tipos).
@@ -2234,8 +2241,8 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - errcheck, SA1019, QF1008, QF1012, unused y govet: piden los tipos del compilador. Es el grueso
     del volumen (errcheck solo es el 75 %) y hay que decidir cómo traerlos sin reimplementar el
     chequeo de tipos de Go.
-  - La plataforma es fija: falta leer `GOOS`, `GOARCH` y `run.build-tags` de la configuración de
-    golangci-lint del repo.
+  - Los tags de versión de arquitectura sólo están para amd64 (`amd64.v1`); `arm64.v8.0` y los
+    demás no cumplen. Los `goexperiment` son los fijos de Go 1.27.
   - `uniq-by-line` (prendido por defecto en golangci-lint) deja un solo aviso por línea y linter;
     kerbo muestra todos.
   - El arnés de esta paridad (golangci-lint en JSON y `go list` contra kerbo en JSON) quedó fuera

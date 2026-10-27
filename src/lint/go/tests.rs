@@ -1,6 +1,7 @@
 use tree_sitter::Parser;
 
 use super::{findings, nolint_ranges};
+use crate::analysis::SourceUnit;
 use crate::language::Language;
 use crate::limits::Preset;
 use crate::lint::LintFinding;
@@ -14,6 +15,16 @@ const QUICKFIXES_EXPECTED: &str = include_str!("fixtures/quickfixes.golangci");
 const QUICKFIX_RULES: &[&str] = &["qf1003", "qf1004"];
 const LINTER: &str = "ineffassign";
 
+const fn unit(source: &str) -> SourceUnit<'_> {
+    SourceUnit {
+        language: Language::Go,
+        source: source.as_bytes(),
+        path: None,
+        crate_macros: None,
+        go_platform: None,
+    }
+}
+
 fn lints(source: &str) -> Vec<LintFinding> {
     let mut parser = Parser::new();
     parser
@@ -22,9 +33,8 @@ fn lints(source: &str) -> Vec<LintFinding> {
     let tree = parser.parse(source, None).expect("el archivo se parsea");
     findings(
         tree.root_node(),
-        source.as_bytes(),
+        unit(source),
         &Preset::Strict.limits(Language::Go, false),
-        None,
     )
 }
 
@@ -172,9 +182,8 @@ fn package_facts_keep_the_declared_names_and_the_capitalized_words() {
     let tree = parser.parse(ERROR_STRINGS, None).expect("el archivo se parsea");
     let facts = super::package_facts(
         tree.root_node(),
-        ERROR_STRINGS.as_bytes(),
+        unit(ERROR_STRINGS),
         &Preset::Strict.limits(Language::Go, false),
-        None,
     )
     .expect("ST1005 está prendida");
     assert_eq!(facts.package, "store");

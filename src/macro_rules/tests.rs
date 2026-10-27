@@ -195,6 +195,7 @@ fn measure(path: &Path, source: &str, macros: Option<&Arc<CrateMacros>>) -> Vec<
         source: source.as_bytes(),
         path: Some(path),
         crate_macros: macros,
+        go_platform: None,
     };
     analyze_unit(&mut parser, unit, &Limits::default())
         .expect("el archivo se parsea")

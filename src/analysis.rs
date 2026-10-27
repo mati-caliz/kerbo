@@ -10,6 +10,7 @@ use crate::language::Language;
 use crate::limits::Limits;
 use crate::lines::LineMap;
 use crate::lint::ecmascript::taint::ecmascript_taints;
+use crate::lint::go::platform::GoPlatform;
 use crate::lint::go::taint::go_taints;
 use crate::lint::go::{GoPackageFacts, package_facts};
 use crate::lint::python::taint::python_taints;
@@ -86,6 +87,7 @@ pub struct SourceUnit<'unit> {
     pub source: &'unit [u8],
     pub path: Option<&'unit Path>,
     pub crate_macros: Option<&'unit Arc<CrateMacros>>,
+    pub go_platform: Option<&'unit GoPlatform>,
 }
 
 #[cfg(test)]
@@ -100,6 +102,7 @@ pub fn analyze(
         source,
         path: None,
         crate_macros: None,
+        go_platform: None,
     };
     analyze_unit(parser, unit, limits)
 }
@@ -178,7 +181,7 @@ pub fn analyze_unit(
             .then(|| taints_of(language, root, source))
             .flatten(),
         go_package: (language == Language::Go)
-            .then(|| package_facts(root, source, limits, unit.path))
+            .then(|| package_facts(root, unit, limits))
             .flatten(),
     })
 }

@@ -122,3 +122,14 @@ fn explicit_path_wins_and_unreadable_files_fail() {
     assert_eq!(limits.get(RuleId::CyclomaticComplexity), Some(25));
     assert!(Config::load(Some(&tree.path().join("missing.toml")), tree.path()).is_err());
 }
+
+#[test]
+fn reads_the_go_platform_and_build_tags() {
+    let config = load("[go]\ngoos = \"windows\"\ngoarch = \"arm64\"\nbuild_tags = [\"integration\"]\n")
+        .expect("la configuración es válida");
+    let target = config.go_target();
+    assert_eq!(target.goos.as_deref(), Some("windows"));
+    assert_eq!(target.goarch.as_deref(), Some("arm64"));
+    assert_eq!(target.build_tags, ["integration"]);
+    assert!(load("[go]\ntags = []\n").is_err());
+}

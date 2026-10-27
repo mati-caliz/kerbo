@@ -102,6 +102,7 @@ fn code_under_a_false_cfg_is_not_measured() {
             source: source.as_bytes(),
             path: Some(&tree.path().join(path)),
             crate_macros: macros.as_ref(),
+            go_platform: None,
         };
         analyze_unit(&mut parser, unit, &Limits::default())
             .expect("se parsea")

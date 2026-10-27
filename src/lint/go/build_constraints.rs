@@ -2,6 +2,7 @@ mod expression;
 
 use std::path::Path;
 
+use super::platform::GoPlatform;
 use expression::{go_build_expression, plus_build_expression};
 
 const GO_BUILD_PREFIX: &str = "//go:build";
@@ -59,33 +60,14 @@ const KNOWN_ARCH: &[&str] = &[
     "sparc64",
     "wasm",
 ];
-// Lo que `go/build` da por cierto en linux/amd64 con cgo y el compilador gc del Go 1.27 de
-// golangci-lint v2.15.0, con sus experimentos prendidos por defecto.
-const PLATFORM_TAGS: &[&str] = &[
-    "linux",
-    "amd64",
-    "unix",
-    "cgo",
-    "gc",
-    "amd64.v1",
-    "goexperiment.regabiwrappers",
-    "goexperiment.regabiargs",
-    "goexperiment.dwarf5",
-    "goexperiment.jsonv2",
-    "goexperiment.greenteagc",
-    "goexperiment.randomizedheapbase64",
-    "goexperiment.sizespecializedmalloc",
-];
-const RELEASE_TAG_PREFIX: &str = "go1.";
-const LATEST_GO_MINOR: u32 = 27;
 
-pub fn file_name_builds(path: &Path) -> bool {
+pub fn file_name_builds(path: &Path, platform: &GoPlatform) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
-        .is_none_or(name_builds)
+        .is_none_or(|name| name_builds(name, platform))
 }
 
-fn name_builds(name: &str) -> bool {
+fn name_builds(name: &str, platform: &GoPlatform) -> bool {
     if name.starts_with(IGNORED_NAME_PREFIXES) {
         return false;
     }
@@ -103,25 +85,17 @@ fn name_builds(name: &str) -> bool {
     }
     match parts.as_slice() {
         [.., os, arch] if KNOWN_OS.contains(os) && KNOWN_ARCH.contains(arch) => {
-            matches_tag(os) && matches_tag(arch)
+            platform.matches(os) && platform.matches(arch)
         }
-        [.., last] if KNOWN_OS.contains(last) || KNOWN_ARCH.contains(last) => matches_tag(last),
+        [.., last] if KNOWN_OS.contains(last) || KNOWN_ARCH.contains(last) => platform.matches(last),
         _ => true,
     }
 }
 
-fn matches_tag(tag: &str) -> bool {
-    PLATFORM_TAGS.contains(&tag)
-        || tag.strip_prefix(RELEASE_TAG_PREFIX).is_some_and(|minor| {
-            minor
-                .parse::<u32>()
-                .is_ok_and(|number| number.to_string() == minor && (1..=LATEST_GO_MINOR).contains(&number))
-        })
-}
-
 // `shouldBuild` de `go/build`: manda el `//go:build`; sin él, las líneas `// +build` de la cabecera
 // se combinan con `&&`. Una restricción que no se entiende no descarta el archivo.
-pub fn header_builds(source: &[u8]) -> bool {
+pub fn header_builds(source: &[u8], platform: &GoPlatform) -> bool {
+    let matches = |tag: &str| platform.matches(tag);
     let text = String::from_utf8_lossy(source);
     let header = file_header(&text);
     if header.go_build_lines > 1 {
@@ -129,14 +103,14 @@ pub fn header_builds(source: &[u8]) -> bool {
     }
     if let Some(line) = header.go_build {
         return go_build_expression(line.get(GO_BUILD_PREFIX.len()..).unwrap_or_default())
-            .is_none_or(|expression| expression.evaluate(&matches_tag));
+            .is_none_or(|expression| expression.evaluate(&matches));
     }
     header
         .trimmed
         .lines()
         .filter_map(plus_build_text)
         .map(plus_build_expression)
-        .all(|expression| expression.evaluate(&matches_tag))
+        .all(|expression| expression.evaluate(&matches))
 }
 
 fn plus_build_text(line: &str) -> Option<&str> {

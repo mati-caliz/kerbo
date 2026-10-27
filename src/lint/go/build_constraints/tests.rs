@@ -2,6 +2,8 @@ use std::path::Path;
 
 use super::expression::{Expression, go_build_expression};
 use super::{file_name_builds, header_builds};
+use crate::config::GoTarget;
+use crate::lint::go::platform::GoPlatform;
 
 const PACKAGE: &str = "package bc\n";
 
@@ -61,11 +63,13 @@ const VERDICTS: &[(&str, &str, bool)] = &[
 
 #[test]
 fn file_names_and_headers_build_like_go_list_on_linux_amd64() {
+    let linux = GoPlatform::default();
     let wrong: Vec<&str> = VERDICTS
         .iter()
         .filter(|(name, header, expected)| {
             let source = format!("{header}{PACKAGE}");
-            (file_name_builds(Path::new(name)) && header_builds(source.as_bytes())) != *expected
+            (file_name_builds(Path::new(name), &linux) && header_builds(source.as_bytes(), &linux))
+                != *expected
         })
         .map(|(name, _, _)| *name)
         .collect();
@@ -80,7 +84,10 @@ fn constraints_that_do_not_parse_keep_the_file() {
         "//go:build a\n//go:build b\n\n",
     ] {
         let source = format!("{header}{PACKAGE}");
-        assert!(header_builds(source.as_bytes()), "{header}");
+        assert!(
+            header_builds(source.as_bytes(), &GoPlatform::default()),
+            "{header}"
+        );
     }
 }
 
@@ -97,4 +104,39 @@ fn go_build_expressions_keep_precedence_and_parentheses() {
     assert_eq!(go_build_expression("(a"), None);
     assert_eq!(go_build_expression("a & b"), None);
     assert_eq!(go_build_expression("a b"), None);
+}
+
+#[test]
+fn the_configured_platform_and_build_tags_decide_like_go_list() {
+    let target = GoTarget {
+        goos: Some("windows".to_owned()),
+        goarch: Some("arm64".to_owned()),
+        build_tags: vec!["integration".to_owned()],
+    };
+    let windows = GoPlatform::of(&target);
+    let verdict = |name: &str, header: &str| {
+        let source = format!("{header}{PACKAGE}");
+        file_name_builds(Path::new(name), &windows) && header_builds(source.as_bytes(), &windows)
+    };
+    assert!(verdict("x_windows_arm64.go", ""));
+    assert!(!verdict("x_linux.go", ""));
+    assert!(!verdict("x_amd64.go", ""));
+    assert!(verdict(
+        "tagged.go",
+        "//go:build integration && !unix
+
+"
+    ));
+    assert!(!verdict(
+        "cgo.go",
+        "//go:build cgo
+
+"
+    ));
+    assert!(!verdict(
+        "level.go",
+        "//go:build amd64.v1
+
+"
+    ));
 }

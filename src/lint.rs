@@ -130,7 +130,7 @@ pub fn find_lints(
         LintStyle::Unmeasured => Vec::new(),
         LintStyle::Checkstyle => java_lints(root, unit.source, limits),
         LintStyle::Ruff => python::findings(root, unit.source, limits, unit.path),
-        LintStyle::GolangciLint => go::findings(root, unit.source, limits, unit.path),
+        LintStyle::GolangciLint => go::findings(root, unit, limits),
         LintStyle::Eslint => {
             let file = ecmascript::SourceFile {
                 source: unit.source,

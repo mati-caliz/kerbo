@@ -86,6 +86,7 @@ fn unit(source: &str) -> SourceUnit<'_> {
         source: source.as_bytes(),
         path: None,
         crate_macros: None,
+        go_platform: None,
     }
 }
 

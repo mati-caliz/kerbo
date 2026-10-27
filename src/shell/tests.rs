@@ -24,6 +24,7 @@ fn found_in(script: &str, file: &str) -> Vec<(String, usize, usize)> {
         source: script.as_bytes(),
         path: Some(Path::new(file)),
         crate_macros: None,
+        go_platform: None,
     };
     analyze(&mut parser, unit)
         .expect("es shell")
