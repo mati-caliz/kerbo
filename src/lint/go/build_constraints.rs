@@ -79,12 +79,6 @@ const PLATFORM_TAGS: &[&str] = &[
 const RELEASE_TAG_PREFIX: &str = "go1.";
 const LATEST_GO_MINOR: u32 = 27;
 
-// Si golangci-lint analiza el archivo con su plataforma por defecto: el nombre (`_windows.go`,
-// `_arm64_test.go`, los que empiezan con `_` o `.`) y la restricción de la cabecera.
-pub fn builds_on_default_platform(path: Option<&Path>, source: &[u8]) -> bool {
-    path.is_none_or(file_name_builds) && header_builds(source)
-}
-
 pub fn file_name_builds(path: &Path) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
@@ -127,7 +121,7 @@ fn matches_tag(tag: &str) -> bool {
 
 // `shouldBuild` de `go/build`: manda el `//go:build`; sin él, las líneas `// +build` de la cabecera
 // se combinan con `&&`. Una restricción que no se entiende no descarta el archivo.
-fn header_builds(source: &[u8]) -> bool {
+pub fn header_builds(source: &[u8]) -> bool {
     let text = String::from_utf8_lossy(source);
     let header = file_header(&text);
     if header.go_build_lines > 1 {

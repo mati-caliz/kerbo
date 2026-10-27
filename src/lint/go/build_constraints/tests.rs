@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use super::builds_on_default_platform;
 use super::expression::{Expression, go_build_expression};
+use super::{file_name_builds, header_builds};
 
 const PACKAGE: &str = "package bc\n";
 
@@ -65,7 +65,7 @@ fn file_names_and_headers_build_like_go_list_on_linux_amd64() {
         .iter()
         .filter(|(name, header, expected)| {
             let source = format!("{header}{PACKAGE}");
-            builds_on_default_platform(Some(Path::new(name)), source.as_bytes()) != *expected
+            (file_name_builds(Path::new(name)) && header_builds(source.as_bytes())) != *expected
         })
         .map(|(name, _, _)| *name)
         .collect();
@@ -80,7 +80,7 @@ fn constraints_that_do_not_parse_keep_the_file() {
         "//go:build a\n//go:build b\n\n",
     ] {
         let source = format!("{header}{PACKAGE}");
-        assert!(builds_on_default_platform(None, source.as_bytes()), "{header}");
+        assert!(header_builds(source.as_bytes()), "{header}");
     }
 }
 

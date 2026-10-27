@@ -2216,6 +2216,14 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Paridad de las cuatro reglas de Go contra golangci-lint v2.15.0 en los 12 repos: **1.381 avisos
     idénticos por archivo, línea y columna, ninguno de más ni de menos** (1.252 de ST1005, 67 de
     QF1004, 33 de QF1003 y 29 de ineffassign).
+- Los directorios que `./...` saltea (hecho, 2026-10-27): las reglas de golangci-lint no miran lo
+  que queda debajo de `testdata`, `vendor` o una carpeta que empieza con `_` o `.`, contando desde el
+  `go.mod` más cercano (un `_examples` con su propio `go.mod` es un módulo y se mira, como cuando
+  golangci-lint corre en él). Sin `go.mod` no se descarta nada. Entra al contexto de la caché junto
+  con el nombre del archivo.
+  - Con el binario anterior eran 199 avisos de Go en esas carpetas del corpus (187 de ineffassign,
+    casi todos en los `testdata` de golang/tools) que el script de paridad filtraba. Sin el filtro:
+    las mismas 1.381 coincidencias, ninguna de más ni de menos.
 - Pendientes de Go contra golangci-lint:
   - ST1005: no se verificó si las variables del paquete eximen (en el corpus no hubo caso; se
     eximen, como los tipos).
@@ -2227,8 +2235,7 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     del volumen (errcheck solo es el 75 %) y hay que decidir cómo traerlos sin reimplementar el
     chequeo de tipos de Go.
   - La plataforma es fija: falta leer `GOOS`, `GOARCH` y `run.build-tags` de la configuración de
-    golangci-lint del repo. Tampoco se descartan los directorios que `./...` saltea (`testdata`,
-    `vendor`, los que empiezan con `_` o `.`); la paridad los filtró del lado de kerbo.
+    golangci-lint del repo.
   - `uniq-by-line` (prendido por defecto en golangci-lint) deja un solo aviso por línea y linter;
     kerbo muestra todos.
   - El arnés de esta paridad (golangci-lint en JSON y `go list` contra kerbo en JSON) quedó fuera

@@ -4,6 +4,7 @@ mod error_strings;
 mod generated;
 mod imports;
 mod ineffassign;
+mod module_pattern;
 mod nolint;
 mod parentheses;
 mod replace_all;
@@ -40,16 +41,22 @@ const CHECKS: [(GoRule, GoCheck); 4] = [
 pub fn analysis_context(language: Language, path: &Path) -> Option<u64> {
     (language == Language::Go).then(|| {
         let mut hasher = DefaultHasher::new();
-        build_constraints::file_name_builds(path).hash(&mut hasher);
+        analyzed_path(path).hash(&mut hasher);
         hasher.finish()
     })
 }
 
+// Si golangci-lint mira el archivo: `./...` lo lista y la plataforma por defecto lo compila.
+fn analyzed(path: Option<&Path>, source: &[u8]) -> bool {
+    path.is_none_or(analyzed_path) && build_constraints::header_builds(source)
+}
+
+fn analyzed_path(path: &Path) -> bool {
+    build_constraints::file_name_builds(path) && module_pattern::listed_by_module_pattern(path)
+}
+
 pub fn findings(root: Node<'_>, source: &[u8], limits: &Limits, path: Option<&Path>) -> Vec<LintFinding> {
-    if root.has_error()
-        || generated::is_generated(root, source)
-        || !build_constraints::builds_on_default_platform(path, source)
-    {
+    if root.has_error() || generated::is_generated(root, source) || !analyzed(path, source) {
         return Vec::new();
     }
     CHECKS
@@ -130,10 +137,7 @@ pub fn package_facts(
     limits: &Limits,
     path: Option<&Path>,
 ) -> Option<GoPackageFacts> {
-    if limits.get(RuleId::Go(GoRule::St1005)).is_none()
-        || root.has_error()
-        || !build_constraints::builds_on_default_platform(path, source)
-    {
+    if limits.get(RuleId::Go(GoRule::St1005)).is_none() || root.has_error() || !analyzed(path, source) {
         return None;
     }
     let mut facts = error_strings(root, source).1;
