@@ -9,6 +9,7 @@
 46:5 constructor-super
 52:5 constructor-super
 58:5 constructor-super
+62:25 no-undef
 76:5 no-this-before-super
 77:5 no-this-before-super
 84:3 constructor-super

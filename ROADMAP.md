@@ -2009,6 +2009,20 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   paréntesis como lo llamado es un error de tree-sitter, que no ve el punto y coma automático), y
   los `#miembros` que la clase sólo escribe, incrementa como sentencia o desestructura. Paridad: 2
   de 2 y 3 de 3. Los casos quedaron en `fixtures/multiline.js`.
+- `no-undef` (hecho, 2026-10-27): las referencias que no resuelven en ningún alcance, salvo
+  `typeof x`, los nombres de `/* global a, b: writable */` (comas o espacios, `: off` no declara) y
+  los globales conocidos. Como kerbo no lee la configuración de ESLint, los globales son la unión de
+  los entornos que suele declarar un repo: ES, navegador, Node, CommonJS, workers y Jest, Mocha,
+  Jasmine y Vitest (`src/lint/ecmascript/globals.txt`, del paquete `globals` que usa ESLint). Un
+  `window` en código de Node no se avisa; a cambio no hay falsos positivos por el entorno. Las
+  referencias de tipo también cuentan (en un `.js` con anotaciones), con la lib `esnext` que
+  typescript-eslint declara en el alcance global (`typescript_lib.txt`). Se apaga en TypeScript.
+  - Paridad contra ESLint 10.13 con esos mismos globales y los comentarios activos, en express, VS
+    Code, juice-shop, react y zod: unos 6.000 avisos, 27 de menos y 22 de más, todos en react: `.js`
+    con anotaciones que TypeScript lee como comparaciones en modo JavaScript
+    (`useState<boolean>(false)`) o con sintaxis de Flow, y `using`/`await using`, que tree-sitter no
+    parsea. Los casos quedaron en `fixtures/undefined.js`, y los goldens de los demás fixtures de
+    JavaScript suman los `no-undef` de ESLint.
 - `constructor-super` y `no-this-before-super` (hecho, 2026-10-27), sobre el análisis de caminos:
   el analizador lleva, en el camino del constructor de una clase con `extends`, lo mismo que los
   listeners de ESLint (por segmento, si `super()` se llamó en algún camino o en todos, las llamadas
@@ -2038,10 +2052,9 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
   - `no-misleading-character-class` (290, casi todo en código compilado),
     `no-irregular-whitespace` (10) y las que no aparecieron en el corpus.
-  - `no-undef`: pide las variables globales de cada entorno (navegador, Node, Jest).
   - `no-useless-escape` no mira las expresiones regulares con el flag `v`.
   - Los `.js` con argumentos de tipo en llamadas y los huecos de la gramática de arriba.
-  - Los `/* global x */` y `/* globals */` no se leen: con los comentarios activos ESLint avisa
+  - Los `/* global x */` sólo los lee `no-undef`: con los comentarios activos ESLint avisa también
     `no-unused-vars` en los globales declarados ahí que no se usan (3 en react).
   - Un `/* eslint-enable regla */` adentro de un `/* eslint-disable */` de todas no la vuelve a
     prender (ESLint sí, sólo a ella).

@@ -17,7 +17,7 @@ pub type ReferenceId = usize;
 
 pub use model::{Access, Definition, DefinitionKind, Reference, Target, Variable};
 
-const GLOBAL: ScopeId = 0;
+pub const GLOBAL: ScopeId = 0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScopeKind {

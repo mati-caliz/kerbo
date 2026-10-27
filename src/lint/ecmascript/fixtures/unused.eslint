@@ -35,8 +35,11 @@
 61:10 no-unused-vars
 61:17 no-empty
 64:9 no-empty
+66:19 no-undef
 69:12 no-unused-vars
+69:20 no-undef
 69:26 no-empty
+71:21 no-undef
 74:41 no-empty
 84:3 prefer-const
 89:9 no-unused-vars
@@ -50,5 +53,6 @@
 112:1 no-var
 112:5 no-redeclare
 112:5 no-unused-vars
+113:10 no-undef
 113:24 no-unused-vars
 114:1 no-unused-expressions

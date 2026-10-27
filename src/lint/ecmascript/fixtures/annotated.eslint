@@ -1,3 +1,4 @@
 1:26 no-explicit-any
 2:3 no-debugger
 5:16 no-unused-vars
+5:37 no-undef

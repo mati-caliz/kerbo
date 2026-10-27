@@ -1,8 +1,11 @@
 1:10 no-unused-vars
 2:7 no-useless-assignment
+3:11 no-undef
 7:10 no-unused-vars
 9:3 no-unused-vars
 13:10 no-unused-vars
+15:3 no-undef
+17:3 no-undef
 20:10 no-unused-vars
 28:10 no-unused-vars
 29:7 no-useless-assignment
@@ -11,6 +14,7 @@
 53:10 no-unused-vars
 59:10 no-unused-vars
 66:10 no-unused-vars
+69:13 no-undef
 76:10 no-unused-vars
 77:9 no-useless-assignment
 77:12 no-useless-assignment
@@ -19,10 +23,14 @@
 88:10 no-unused-vars
 91:3 no-unreachable
 101:5 no-useless-assignment
+103:1 no-undef
 105:10 no-unused-vars
 113:10 no-unused-vars
 115:3 no-useless-assignment
 120:10 no-unused-vars
 121:7 no-useless-assignment
+122:11 no-undef
 126:10 no-unused-vars
 127:7 no-useless-assignment
+127:20 no-undef
+128:16 no-undef

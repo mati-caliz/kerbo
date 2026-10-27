@@ -42,6 +42,7 @@ mod token_index;
 mod tokens;
 mod triple_slash;
 mod typescript;
+mod undefined_names;
 mod unreachable;
 mod unused;
 mod useless_assignment;
@@ -141,6 +142,7 @@ const CHECKS: &[(EslintRule, Check)] = &[
     (EslintRule::NoControlRegex, regexes::control_characters_in_regexes),
     (EslintRule::ConstructorSuper, super_calls::constructor_supers),
     (EslintRule::NoThisBeforeSuper, super_calls::this_before_supers),
+    (EslintRule::NoUndef, undefined_names::undefined_names),
     (
         EslintRule::NoUnsafeOptionalChaining,
         optional_chains::unsafe_optional_chains,

@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 33] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 34] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -299,6 +299,15 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 33] = [
             "call super() before touching this or super",
             "In a derived class this does not exist until super() runs: using it earlier throws a ReferenceError.",
             "constructor() { this.x = 1; super(); } becomes constructor() { super(); this.x = 1; }.",
+        ),
+    ),
+    (
+        EslintRule::NoUndef,
+        RuleText::new(
+            "A name that is not declared anywhere",
+            "declare it, import it or fix the name",
+            "Reading it throws a ReferenceError, and assigning it creates an accidental global: it is almost always a typo or a missing import.",
+            "total = compute(itmes); becomes const total = compute(items);.",
         ),
     ),
 ];

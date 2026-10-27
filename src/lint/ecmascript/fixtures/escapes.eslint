@@ -11,6 +11,7 @@
 11:17 no-useless-escape
 12:15 no-useless-escape
 12:28 no-useless-escape
+13:3 no-undef
 16:4 no-useless-escape
 16:12 no-useless-escape
 16:14 no-useless-escape
@@ -32,7 +33,9 @@
 45:3 no-unused-expressions
 48:3 no-unused-expressions
 49:3 no-unused-expressions
+50:3 no-undef
 50:3 no-unused-expressions
+51:7 no-undef
 55:3 no-unused-expressions
 58:3 no-unused-expressions
 59:3 no-unused-expressions

@@ -63,6 +63,7 @@ rule_family!(EslintRule {
     NoUnusedPrivateClassMembers => "no-unused-private-class-members",
     ConstructorSuper => "constructor-super",
     NoThisBeforeSuper => "no-this-before-super",
+    NoUndef => "no-undef",
 });
 
 pub const fn wrap_eslint<'slots>(slots: &'slots mut [RuleId], rules: &[EslintRule]) -> &'slots mut [RuleId] {

@@ -42,4 +42,5 @@
 29:7 no-unused-vars
 29:36 no-control-regex
 30:7 no-unused-vars
+30:29 no-undef
 31:7 no-unused-vars
