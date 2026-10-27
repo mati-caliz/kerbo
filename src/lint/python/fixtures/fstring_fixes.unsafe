@@ -1,0 +1,53 @@
+name = "mundo"
+items = [1, 2]
+mapping = {"key": 1}
+number = 3
+
+
+def builder():
+    return f"{name}"
+
+
+accessed_sum = f"{(number + 1).real}"
+accessed_integer = f"{(12).real}"
+accessed_separated = f"{(1_000).real}"
+accessed_float = f"{1.5.real}"
+accessed_parenthesized = f"{(number + 1).real}"
+bare_sum = f"{number + 1}"
+bare_generator = f"{(x for x in items)}"
+bare_set = f"{({1, 2})}"
+bare_named = f"{(value := 1)}"
+subscript_of_dict = f"{({1: 2}[1])}"
+attribute_of_set = f"{({1}.pop)}"
+negated = f"{(-number).real}"
+conditional = f"{(number if number else 0).real}"
+string_index_double = f"{mapping['key']}"
+string_index_single = f'{mapping["key"]}'
+string_index_triple = f"""{mapping["key"]}"""
+numeric_index = f"{items[1]}"
+attribute_chain = f"{number.real.imag}"
+conversion = f"{name!r:>10}"
+specified = "{:>{}}".format(name, 10)
+keyword = "{greeting}, {target}".format(greeting="hola", target=name) if False else None
+keyword_plain = f"{name}"
+raw = rf"\d{name}"
+raw_upper = rf"\d{name}"
+unicode = f"{name}"
+escaped = f"{{literal}} {name}"
+named_escape = f"\N{BULLET} {name}"
+concatenated = f"a {name} " f"b {number}"
+with_literal = "plain " f"{name}"
+empty_first = "" f"{name}"
+empty_middle = f"{name}" f"{number}"
+parenthesized = (f"{name}")
+split = (f"first {name} "
+         f"second {number}")
+commented = "{}".format(
+    name,  # comentario
+)
+repeated_effect = "{0} {0}".format(builder())
+repeated_plain = f"{name} {name}"
+starred = "{}".format(*items)
+quoted_argument = "{}".format("texto")
+multiline_argument = f"{name}"
+method = f"{name}".upper()

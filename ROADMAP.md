@@ -1784,10 +1784,24 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
     un nivel no arreglan si hay un string de varias líneas o sangría mezclada (ruff usa libcst);
     UP014 no mira los nombres dunder ni los `*` de los campos al detectar; RUF033 asume `\n` como
     fin de línea.
+  - Tanda 15 (UP031 y UP032, unos 16.000 arreglos del corpus; idénticos a ruff en todos los
+    fixtures, con `printf_fixes.py` y `fstring_fixes.py` para los bordes): UP031 pasa `%` a
+    `.format(...)` con el `percent_to_format` de ruff (flags, ancho, precisión, `{{` y `\N{…}`, los
+    paréntesis entre el string y el `%`, tuplas de un elemento y diccionarios en una o varias líneas),
+    y UP032 pasa `.format(...)` a f-string con el `try_convert` de ruff (prefijos `u` y `r`, partes
+    vacías o sólo literales, paréntesis según el contexto, índices con la otra comilla y el espacio
+    detrás de `return`). UP032 pierde el empate con F52x, UP030, FLY002 y SIM905 en la misma llamada,
+    como en el orden de avisos de ruff. `scripts/parity/reverting_lines.py` encuentra las líneas por
+    las que ruff revierte un archivo entero.
+  - Pendientes de esa tanda: ruff deja f-strings inválidas en `"{}".format(lambda: x)`,
+    `"{0!x}".format(1)` y `"{}".format({…}.get(1))`, ve el error de sintaxis y revierte todos los
+    arreglos del archivo; kerbo no ofrece esos arreglos y sí aplica el resto (`reverted_formats.py`
+    tiene los casos donde los dos coinciden). Para calcar a ruff, `kerbo fix` tendría que descartar
+    el archivo entero cuando una vuelta rompe la sintaxis, y hoy descarta sólo esa vuelta. UP031
+    con `(("…")) % x` repite los paréntesis como ruff y también rompe la sintaxis.
   - Lo que falta de arreglos (medido el 2026-10-26 con `../kerbo-parity/scripts/pending_by_frequency.txt`):
-    en el corpus quedan UP031 y UP032 (unos 16.000, pasar `%` y `.format` a f-string), TC004 (sacar
-    imports del `if TYPE_CHECKING`, que se cruza con I001) y PYI034/PYI019 (análisis de `Self`);
-    PLW1510 no va (el arreglo de ruff es sólo para mostrar).
+    en el corpus quedan TC004 (sacar imports del `if TYPE_CHECKING`, que se cruza con I001) y
+    PYI034/PYI019 (análisis de `Self`); PLW1510 no va (el arreglo de ruff es sólo para mostrar).
   - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
     gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece

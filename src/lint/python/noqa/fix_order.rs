@@ -7,6 +7,20 @@ const IMPORTS_STAGE: u8 = 2;
 const DIRECTIVES_STAGE: u8 = 3;
 // Ruff aplica los arreglos de F811 antes que todos los demás, sin importar dónde empiezan.
 const FIRST_RANK: usize = 0;
+// Los puestos van de a dos para que UP032 pueda quedar justo detrás de otro.
+const RANK_STEP: usize = 2;
+// En una llamada `"…".format(…)` ruff genera estos avisos antes que UP032, y sus arreglos empiezan
+// donde empieza la llamada: a igualdad gana el de ellos.
+const BEFORE_FSTRING: [PythonRule; 8] = [
+    PythonRule::FLY002,
+    PythonRule::SIM905,
+    PythonRule::F521,
+    PythonRule::F522,
+    PythonRule::F523,
+    PythonRule::F524,
+    PythonRule::F525,
+    PythonRule::UP030,
+];
 
 // El puesto de cada arreglo en la lista de avisos que ruff le pasa a `apply_fixes`, que desempata dos
 // arreglos que empiezan en el mismo lugar: primero los del árbol, después los de los alcances
@@ -34,11 +48,36 @@ pub fn rank_fixes_like_ruff(reports: &mut [Report], silenced: &[bool]) {
             let rank = if report.rule == PythonRule::F811 {
                 FIRST_RANK
             } else {
-                position.saturating_add(1)
+                position.saturating_add(1).saturating_mul(RANK_STEP)
             };
             if let Some(fix) = report.fix.as_mut() {
                 fix.rank = rank;
             }
+        }
+    }
+    rank_fstrings_after_format_checks(reports);
+}
+
+fn rank_fstrings_after_format_checks(reports: &mut [Report]) {
+    let preceding: Vec<(tree_sitter::Point, usize)> = reports
+        .iter()
+        .filter(|report| BEFORE_FSTRING.contains(&report.rule))
+        .filter_map(|report| report.fix.as_ref().map(|fix| (report.start, fix.rank)))
+        .collect();
+    for report in reports
+        .iter_mut()
+        .filter(|report| report.rule == PythonRule::UP032)
+    {
+        let start = report.start;
+        let latest = preceding
+            .iter()
+            .filter(|(other_start, _)| *other_start == start)
+            .map(|(_, rank)| *rank)
+            .max();
+        if let (Some(latest), Some(fix)) = (latest, report.fix.as_mut())
+            && fix.rank < latest
+        {
+            fix.rank = latest.saturating_add(1);
         }
     }
 }

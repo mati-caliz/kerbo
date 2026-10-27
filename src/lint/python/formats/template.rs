@@ -8,10 +8,27 @@ const INDEX_CLOSING: char = ']';
 const BACKSLASH: char = '\\';
 const NAMED_ESCAPE: &str = "N{";
 
-// Un reemplazo `{…}` del formato, sin la conversión ni el especificador, que UP032 no mira.
+// Un reemplazo `{…}` del formato: el nombre del campo, la conversión (`!r`) y el especificador.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Replacement {
     pub field_name: String,
+    pub conversion: Option<char>,
+    pub format_spec: String,
+}
+
+// Un pedazo del formato: texto literal (con `{{` y `}}` ya resueltos) o un reemplazo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Piece {
+    Literal(String),
+    Field(Replacement),
+}
+
+// Lo que sigue al argumento en el nombre del campo: `.atributo`, `[0]` o `[clave]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FieldPart {
+    Attribute(String),
+    Index(usize),
+    StringIndex(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,14 +41,27 @@ pub enum FieldType {
 // `FormatString::from_str` (o `from_raw_str`) de `ruff_python_literal`, sobre el texto del string
 // tal como está en el fuente, sin las comillas. Devuelve sólo los reemplazos: lo literal no cuenta.
 pub fn replacements(contents: &str, raw: bool) -> Option<Vec<Replacement>> {
+    Some(
+        pieces(contents, raw)?
+            .into_iter()
+            .filter_map(|piece| match piece {
+                Piece::Field(replacement) => Some(replacement),
+                Piece::Literal(_) => None,
+            })
+            .collect(),
+    )
+}
+
+pub fn pieces(contents: &str, raw: bool) -> Option<Vec<Piece>> {
     let mut found = Vec::new();
     let mut rest = contents;
     while !rest.is_empty() {
-        rest = if let Some(after) = literal(rest, raw) {
+        rest = if let Some((value, after)) = literal(rest, raw) {
+            found.push(Piece::Literal(value));
             after
         } else {
             let (replacement, after) = bracketed(rest)?;
-            found.push(replacement);
+            found.push(Piece::Field(replacement));
             after
         };
     }
@@ -39,8 +69,9 @@ pub fn replacements(contents: &str, raw: bool) -> Option<Vec<Replacement>> {
 }
 
 // `parse_literal`: avanza mientras haya texto literal; `None` si no pudo avanzar nada.
-fn literal(text: &str, raw: bool) -> Option<&str> {
+fn literal(text: &str, raw: bool) -> Option<(String, &str)> {
     let mut rest = text;
+    let mut value = String::new();
     let mut pending_escape = false;
     let mut consumed = false;
     while let Some(first) = rest.chars().next() {
@@ -48,6 +79,7 @@ fn literal(text: &str, raw: bool) -> Option<&str> {
             && !raw
             && let Some(after) = named_escape_end(rest)
         {
+            value.push_str(rest.get(..rest.len().saturating_sub(after.len()))?);
             rest = after;
             pending_escape = false;
             consumed = true;
@@ -55,17 +87,19 @@ fn literal(text: &str, raw: bool) -> Option<&str> {
         }
         if matches!(first, OPENING | CLOSING) {
             if rest.chars().nth(1) != Some(first) {
-                return consumed.then_some(rest);
+                return consumed.then_some((value, rest));
             }
+            value.push(first);
             rest = rest.get(first.len_utf8().saturating_mul(2)..)?;
             pending_escape = false;
         } else {
+            value.push(first);
             rest = rest.get(first.len_utf8()..)?;
             pending_escape = first == BACKSLASH && !pending_escape;
         }
         consumed = true;
     }
-    Some(rest)
+    Some((value, rest))
 }
 
 // `parse_escaped_unicode_string`: un `\N{NOMBRE}` no abre un reemplazo.
@@ -99,8 +133,10 @@ fn bracketed(text: &str) -> Option<(Replacement, &str)> {
 fn replacement(inside: &str) -> Option<Replacement> {
     let mut argument = String::new();
     let mut characters = inside.chars().peekable();
+    let mut format_spec = String::new();
     while let Some(character) = characters.next() {
         if character == SPEC_SEPARATOR {
+            format_spec = characters.collect();
             break;
         }
         argument.push(character);
@@ -115,13 +151,15 @@ fn replacement(inside: &str) -> Option<Replacement> {
             characters.peek()?;
         }
     }
-    let field_name = match argument.split_once(CONVERSION_SEPARATOR) {
-        Some((name, conversion)) if conversion.chars().count() == 1 => name,
+    let (field_name, conversion) = match argument.split_once(CONVERSION_SEPARATOR) {
+        Some((name, conversion)) if conversion.chars().count() == 1 => (name, conversion.chars().next()),
         Some(_) => return None,
-        None => argument.as_str(),
+        None => (argument.as_str(), None),
     };
     Some(Replacement {
         field_name: field_name.to_owned(),
+        conversion,
+        format_spec,
     })
 }
 
@@ -148,11 +186,44 @@ pub fn field_type(field_name: &str) -> Option<FieldType> {
         (end > 0).then_some(())?;
         rest = after.get(skipped..)?;
     }
-    Some(if first.is_empty() {
+    Some(field_head(first))
+}
+
+// Los accesos del nombre del campo, en orden, como el `FieldName::parse` de ruff.
+pub fn field_parts(field_name: &str) -> Vec<FieldPart> {
+    let split = field_name
+        .find([ATTRIBUTE, INDEX_OPENING])
+        .unwrap_or(field_name.len());
+    let mut rest = field_name.get(split..).unwrap_or_default();
+    let mut parts = Vec::new();
+    while let Some(marker) = rest.chars().next() {
+        let after = rest.get(marker.len_utf8()..).unwrap_or_default();
+        if marker == ATTRIBUTE {
+            let end = after.find([ATTRIBUTE, INDEX_OPENING]).unwrap_or(after.len());
+            parts.push(FieldPart::Attribute(
+                after.get(..end).unwrap_or_default().to_owned(),
+            ));
+            rest = after.get(end..).unwrap_or_default();
+        } else {
+            let end = after.find(INDEX_CLOSING).unwrap_or(after.len());
+            let inside = after.get(..end).unwrap_or_default();
+            parts.push(
+                inside
+                    .parse::<usize>()
+                    .map_or_else(|_| FieldPart::StringIndex(inside.to_owned()), FieldPart::Index),
+            );
+            rest = after.get(end.saturating_add(1)..).unwrap_or_default();
+        }
+    }
+    parts
+}
+
+fn field_head(first: &str) -> FieldType {
+    if first.is_empty() {
         FieldType::Auto
     } else if let Ok(index) = first.parse::<usize>() {
         FieldType::Index(index)
     } else {
         FieldType::Keyword(first.to_owned())
-    })
+    }
 }

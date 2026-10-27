@@ -1,0 +1,49 @@
+value = 1
+values = (1, 2)
+mapping = {"a": 1}
+
+
+class Holder:
+    items = [1, 2]
+
+    def get(self):
+        return values
+
+
+holder = Holder()
+
+flags = f"{1.0:<5f} {2.0:+f} {3:#x} {4.0: f} {5.0:+f} {6.0:05.2f} {7.0:<5f}"
+precisions = f"{1:03x} {2.0:.2e} {3.0:.0f} {4.0:10.4g}"
+conversions = f"{value!r} {value!a} {value} {8:o} {255:X} {1.0:E} {2.0:G} %"
+braces = f"{{literal}} {value} {{}}"
+named_escape = f"\N{BULLET} {{x}} {value}"
+single_tuple = f"{value}"
+single_tuple_spaced = f"{value}"
+parenthesized = ("{} and {}").format(*values)
+concatenated = f"first {1} " f"second {2}"
+split = (f"first {1} "
+         f"second {2}")
+name_many = "{} {}".format(*values)
+attribute_many = "{} {}".format(*holder.items)
+call_many = "{} {}".format(*holder.get())
+subscript_one = f"{values[0]}"
+keyword_name = "{a}".format(**mapping)
+keyword_dictionary = f"{1} {2!r}"
+splat_dictionary = "{a} {b}".format(a=1, **mapping)
+multiline_dictionary = f"{1} {2}"
+literal_right = "{}".format("text")
+number_right = f"{3}"
+none_right = f"{None}"
+prefixed = rf"{value}\d"
+unicode_prefixed = f"{value}"
+single_quotes = f'{value} "quoted"'
+triple = f"""{value}
+line"""
+nested_key = "%((a))s" % {"(a)": 1}
+length_modifier = "%ld %lf" % (1, 2.0)
+commented = (f"{value}"  # comment
+             )
+
+
+def inside():
+    return f"{1} {2}"

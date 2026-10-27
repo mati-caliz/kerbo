@@ -5,6 +5,7 @@ use super::model::Model;
 use super::qualified::qualified_name;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{BLOCK, CALL, FUNCTION_FIELD, MODULE};
+use crate::lint::python::formats::fstring_fix::fstring_fix;
 use crate::lint::python::formats::is_convertible_format_call;
 use crate::rules::PythonRule;
 
@@ -22,7 +23,7 @@ pub fn format_call_report(model: &Model<'_>, source: &[u8], call: Node<'_>) -> O
     let has_effect = |node: Node<'_>| contains_effect(node, source, &never_builtin);
     let convertible = is_convertible_format_call(call, source, &has_effect);
     (convertible && !is_inside_translation(model, source, call))
-        .then(|| Report::at(PythonRule::UP032, call, ""))
+        .then(|| Report::at(PythonRule::UP032, call, "").with_fix(fstring_fix(call, source)))
 }
 
 // `current_expressions` de ruff: las expresiones que contienen a la llamada, hasta la sentencia.

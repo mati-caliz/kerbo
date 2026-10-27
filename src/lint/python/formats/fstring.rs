@@ -21,13 +21,13 @@ const RAW_PREFIXES: [char; 2] = ['r', 'R'];
 const TEMPLATE_PREFIXES: [char; 2] = ['t', 'T'];
 
 #[derive(Debug, Default)]
-struct Arguments<'tree, 'source> {
+pub struct Arguments<'tree, 'source> {
     positional: Vec<Node<'tree>>,
     keywords: Vec<(&'source str, Node<'tree>)>,
 }
 
 impl<'tree> Arguments<'tree, '_> {
-    fn find(&self, field: &FieldType, next_auto: &mut usize) -> Option<(Specifier, Node<'tree>)> {
+    pub fn find(&self, field: &FieldType, next_auto: &mut usize) -> Option<(Specifier, Node<'tree>)> {
         match field {
             FieldType::Auto => {
                 let index = *next_auto;
@@ -46,7 +46,7 @@ impl<'tree> Arguments<'tree, '_> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Specifier {
+pub enum Specifier {
     Index(usize),
     Keyword(String),
 }
@@ -69,7 +69,7 @@ pub fn is_convertible_format_call(
     if has_nested_parts {
         return false;
     }
-    let Some(arguments) = arguments(call, source) else {
+    let Some(arguments) = format_arguments(call, source) else {
         return false;
     };
     let segments = if object.kind() == STRING {
@@ -86,7 +86,7 @@ pub fn is_convertible_format_call(
         .all(|segment| is_convertible_segment(text(*segment, source), &arguments, &mut next_auto, has_effect))
 }
 
-fn format_object<'tree>(call: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
+pub fn format_object<'tree>(call: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
     let function = call
         .child_by_field_name(FUNCTION_FIELD)
         .filter(|function| function.kind() == ATTRIBUTE)?;
@@ -111,7 +111,10 @@ fn is_template(object: Node<'_>, source: &[u8]) -> bool {
 }
 
 // `FormatSummaryValues::try_from_call`.
-fn arguments<'tree, 'source>(call: Node<'tree>, source: &'source [u8]) -> Option<Arguments<'tree, 'source>> {
+pub fn format_arguments<'tree, 'source>(
+    call: Node<'tree>,
+    source: &'source [u8],
+) -> Option<Arguments<'tree, 'source>> {
     let list = call.child_by_field_name(ARGUMENTS_FIELD)?;
     let items = if list.kind() == GENERATOR {
         vec![list]

@@ -104,16 +104,16 @@ def literals():
 
 def formats(first, second, values):
     return [
-        "{0} {1}".format(first, second),
-        "{1} {0}".format(first, second),
+        f"{first} {second}",
+        f"{second} {first}",
         "{1} {0}".format(first),
         "{1} {0}".format(*values),
-        "{0} {0}".format(first),
-        "{} {}".format(first, second),
-        "{0} {name}".format(first, name=second),
+        f"{first} {first}",
+        f"{first} {second}",
+        f"{first} {second}",
         "{0:{1}}".format(first, second),
-        "{0}".format(first, ),
-        "{0.real} {1[0]}".format(first, second),
+        f"{first}",
+        f"{first.real} {second[0]}",
     ]
 
 

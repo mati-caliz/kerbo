@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::percent::{Quantity, Specifier, specifiers};
+use super::printf_fix::printf_fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ATTRIBUTE, CALL, CONCATENATED_STRING, IDENTIFIER, STRING, STRING_START, TUPLE, is_identifier, named,
@@ -58,8 +59,9 @@ pub fn printf_formatting(
     if is_dictionary && !has_clean_keys(right, source) {
         return Some(Report::at(PythonRule::UP031, left, ""));
     }
-    (LITERALS.contains(&right.kind()) || VALUES.contains(&right.kind()))
-        .then(|| Report::at(PythonRule::UP031, operation, ""))
+    (LITERALS.contains(&right.kind()) || VALUES.contains(&right.kind())).then(|| {
+        Report::at(PythonRule::UP031, operation, "").with_fix(printf_fix(operation, left, right, source))
+    })
 }
 
 fn string_parts(string: Node<'_>) -> Vec<Node<'_>> {

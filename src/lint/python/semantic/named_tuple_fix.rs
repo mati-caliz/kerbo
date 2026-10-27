@@ -8,14 +8,11 @@ use crate::lint::python::ast::{
 };
 use crate::lint::python::codegen;
 use crate::lint::python::escapes::text_value;
-use crate::lint::python::fix_edits::has_comment_within;
+use crate::lint::python::fix_edits::{has_comment_within, indentation_unit};
 
 const LIST: &str = "list";
-const BLOCK: &str = "block";
 const PASS: &str = "pass";
-const DEFAULT_INDENTATION: &str = "    ";
 const DUNDER: &str = "__";
-const LINE_FEED: u8 = b'\n';
 
 // El `convert_to_class` de ruff: `Point = NamedTuple("Point", [("x", int)])` pasa a una clase con un
 // campo anotado por elemento, impresa con el generador de ruff. Sólo si la sentencia empieza en la
@@ -101,30 +98,4 @@ fn without_comments(node: Node<'_>) -> Vec<Node<'_>> {
         .into_iter()
         .filter(|child| child.kind() != COMMENT)
         .collect()
-}
-
-// La sangría del `Stylist` de ruff: la del primer bloque del archivo que empieza en su propia línea.
-fn indentation_unit(node: Node<'_>, source: &[u8]) -> String {
-    let root = std::iter::successors(Some(node), Node::parent)
-        .last()
-        .unwrap_or(node);
-    let mut pending = vec![root];
-    while let Some(current) = pending.pop() {
-        if current.kind() == BLOCK
-            && current
-                .parent()
-                .is_some_and(|parent| parent.start_position().row < current.start_position().row)
-        {
-            let start = current.start_byte();
-            let line_start = source
-                .get(..start)
-                .and_then(|before| before.iter().rposition(|byte| *byte == LINE_FEED))
-                .map_or(0, |position| position.saturating_add(1));
-            return String::from_utf8_lossy(source.get(line_start..start).unwrap_or_default()).into_owned();
-        }
-        let mut children = named(current);
-        children.reverse();
-        pending.extend(children);
-    }
-    DEFAULT_INDENTATION.to_owned()
 }

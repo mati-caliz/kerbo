@@ -1,11 +1,13 @@
 use tree_sitter::{Node, Point};
 
-use super::ast::COMMENT;
+use super::ast::{COMMENT, named};
 use crate::fix::{Fix, TextEdit, TextPoint};
 
 const COMMA: &str = ",";
 const EMPTY_ARGUMENTS: &str = "()";
 const LINE_FEED: u8 = b'\n';
+const INDENTED_BLOCK: &str = "block";
+const DEFAULT_INDENTATION: &str = "    ";
 const CARRIAGE_RETURN: u8 = b'\r';
 const HASH: u8 = b'#';
 const WHITESPACE: &[u8] = b" \t\x0c";
@@ -225,4 +227,30 @@ fn trimmed_start(bytes: &[u8]) -> &[u8] {
         .position(|byte| !WHITESPACE.contains(byte))
         .unwrap_or(bytes.len());
     bytes.get(skipped..).unwrap_or_default()
+}
+
+// La sangría del `Stylist` de ruff: la del primer bloque del archivo que empieza en su propia línea.
+pub fn indentation_unit(node: Node<'_>, source: &[u8]) -> String {
+    let root = std::iter::successors(Some(node), Node::parent)
+        .last()
+        .unwrap_or(node);
+    let mut pending = vec![root];
+    while let Some(current) = pending.pop() {
+        if current.kind() == INDENTED_BLOCK
+            && current
+                .parent()
+                .is_some_and(|parent| parent.start_position().row < current.start_position().row)
+        {
+            let start = current.start_byte();
+            let line_start = source
+                .get(..start)
+                .and_then(|before| before.iter().rposition(|byte| *byte == LINE_FEED))
+                .map_or(0, |position| position.saturating_add(1));
+            return String::from_utf8_lossy(source.get(line_start..start).unwrap_or_default()).into_owned();
+        }
+        let mut children = named(current);
+        children.reverse();
+        pending.extend(children);
+    }
+    DEFAULT_INDENTATION.to_owned()
 }

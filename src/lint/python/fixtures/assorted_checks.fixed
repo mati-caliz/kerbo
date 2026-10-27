@@ -132,12 +132,12 @@ async def async_writes(lines):
 
 def format_characters(value, number):
     print("%z" % value)
-    print("{:z}".format(value))
-    print("{:,}".format(value))
-    print("{:_d}".format(value))
+    print(f"{value:z}")
+    print(f"{value:,}")
+    print(f"{value:_d}")
     print("{:{}z}".format(value, number))
     print("{:{}}".format(value, number))
-    print("{:y}{:z}".format(value, number))
+    print(f"{value:y}{number:z}")
     print("%d" % "1")
     print("%d" % 1)
     print("%s %d" % ("a", "b"))
@@ -374,9 +374,9 @@ def counters(items):
 
 
 def gettext_calls(name):
-    _("Hello, {}!".format(name))
+    _(f"Hello, {name}!")
     _("Hello, %s!" % name)
-    ngettext("one {}".format(name), "many {}".format(name), 2)
+    ngettext(f"one {name}", f"many {name}", 2)
     _(f"Hello {name}")
     return _("Hello")
 

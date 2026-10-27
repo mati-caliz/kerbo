@@ -2,8 +2,11 @@ mod argument_types;
 mod braces;
 mod explicit_positions;
 mod fstring;
+pub mod fstring_fix;
 pub mod percent;
 mod printf;
+mod printf_fix;
+mod printf_format;
 mod template;
 mod unused_arguments;
 

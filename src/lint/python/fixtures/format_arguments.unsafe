@@ -5,33 +5,28 @@ def compute():
     return 1
 
 
-"%(a)s" % {"a": 1,  }
-"%(a)s" % {"a": 1,  }
-"%(a)s" % { "a": 1 }
-"%(a)s" % {"a": 1, }
-"%(a)s" % {"a": compute(), }
+f"{1}"
+f"{1}"
+f"{1}"
+f"{1}"
+f"{compute()}"
 "%(a)s" % {"a": 1, 2: 3, }
-"{a}".format(a=1, )
-"{a}".format(a=1, )
-"{a}".format( a=1)
-"{a}".format(a=1)
-"{a}".format(a=1, )
-"{a}".format(a=compute(), )
-"{}".format(1, )
-"{}".format(1, )
-"{}".format(1, )
+f"{1}"
+f"{1}"
+f"{1}"
+f"{1}"
+f"{1}"
+f"{compute()}"
+f"{1}"
+f"{1}"
+f"{1}"
 "{}".format(1,  # comentario
              )
 "hola"
 "hola" "chau"
 "{{}}".format()
-"{}".format(1, )
-"{a}".format(a=2)
-"{0}{2}".format(1, 2, 3)
-"{}".format(
-    1,
-    )
-"%(a)s" % {
-    "a": 1,
-    
-}
+f"{1}"
+f"{2}"
+f"{1}{3}"
+f"{1}"
+f"{1}"
