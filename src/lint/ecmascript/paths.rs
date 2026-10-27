@@ -7,9 +7,12 @@ mod roles;
 mod segments;
 mod shapes;
 mod state;
+mod supers;
+mod traversal;
 
 pub use reachability::{Flow, PathRecord};
 pub use shapes::case_statements;
+pub use supers::{DerivedConstructor, SuperProblem};
 
 use tree_sitter::Node;
 

@@ -12,6 +12,8 @@ const CHECKED_BY_TYPESCRIPT: &[EslintRule] = &[
     EslintRule::NoSetterReturn,
     EslintRule::NoUnreachable,
     EslintRule::GetterReturn,
+    EslintRule::ConstructorSuper,
+    EslintRule::NoThisBeforeSuper,
 ];
 const STRICT_ONLY: &[EslintRule] = &[EslintRule::NoNonNullAssertion];
 const SUGGESTIONS: &[EslintRule] = &[

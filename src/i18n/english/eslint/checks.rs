@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 31] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 33] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -281,6 +281,24 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 31] = [
             "delete it or use it",
             "Nobody outside can read a private member: if the class does not read it either, it is dead.",
             "class Order { #total = 0; } becomes class Order {}.",
+        ),
+    ),
+    (
+        EslintRule::ConstructorSuper,
+        RuleText::new(
+            "A derived class constructor that does not call super() properly",
+            "call super() once on every path before the constructor ends",
+            "Without super() the instance is never initialized and using this throws a ReferenceError; calling it twice throws too.",
+            "class B extends A { constructor() { if (x) super(); } } becomes class B extends A { constructor() { super(); } }.",
+        ),
+    ),
+    (
+        EslintRule::NoThisBeforeSuper,
+        RuleText::new(
+            "this or super used before calling super()",
+            "call super() before touching this or super",
+            "In a derived class this does not exist until super() runs: using it earlier throws a ReferenceError.",
+            "constructor() { this.x = 1; super(); } becomes constructor() { super(); this.x = 1; }.",
         ),
     ),
 ];

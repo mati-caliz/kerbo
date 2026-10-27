@@ -39,11 +39,35 @@ enum Creation {
 pub struct Graph {
     segments: Vec<Segment>,
     forks: Vec<Fork>,
+    loops: Vec<(SegmentId, SegmentId)>,
 }
 
 impl Graph {
     pub fn is_reachable(&self, segment: SegmentId) -> bool {
         self.segments.get(segment).is_some_and(|found| found.reachable)
+    }
+
+    pub fn previous(&self, segment: SegmentId) -> &[SegmentId] {
+        self.segments
+            .get(segment)
+            .map_or(&[], |found| found.previous.as_slice())
+    }
+
+    pub fn next(&self, segment: SegmentId) -> &[SegmentId] {
+        self.segments
+            .get(segment)
+            .map_or(&[], |found| found.next.as_slice())
+    }
+
+    pub fn is_looped_previous(&self, segment: SegmentId, previous: SegmentId) -> bool {
+        self.segments
+            .get(segment)
+            .is_some_and(|found| found.looped_previous.contains(&previous))
+    }
+
+    // Los `onCodePathSegmentLoop` pendientes: las vueltas entre dos segmentos alcanzables.
+    pub fn take_loops(&mut self) -> Vec<(SegmentId, SegmentId)> {
+        std::mem::take(&mut self.loops)
     }
 
     pub fn any_reachable(&self, segments: &[SegmentId]) -> bool {
@@ -150,6 +174,9 @@ impl Graph {
         found.all_previous.push(source);
         if found.all_previous.len() >= LEAVING_PATH_FACTOR {
             found.looped_previous.push(source);
+        }
+        if source_reachable && target_reachable {
+            self.loops.push((source, target));
         }
     }
 

@@ -2009,6 +2009,16 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   paréntesis como lo llamado es un error de tree-sitter, que no ve el punto y coma automático), y
   los `#miembros` que la clase sólo escribe, incrementa como sentencia o desestructura. Paridad: 2
   de 2 y 3 de 3. Los casos quedaron en `fixtures/multiline.js`.
+- `constructor-super` y `no-this-before-super` (hecho, 2026-10-27), sobre el análisis de caminos:
+  el analizador lleva, en el camino del constructor de una clase con `extends`, lo mismo que los
+  listeners de ESLint (por segmento, si `super()` se llamó en algún camino o en todos, las llamadas
+  válidas y los `this`/`super.x` de antes), con los eventos de vuelta de un loop y el
+  `traverseSegments` de ESLint (`paths/traversal.rs`). `isPossibleConstructor` decide si lo que se
+  extiende puede ser un constructor y `extends null` no pide `super()` para `this`. Las dos se
+  apagan en TypeScript, como en typescript-eslint. En el corpus no aparecen fuera del código
+  compilado de next.js; contra los 145 casos de los tests de ESLint 10.13
+  (`tests/lib/rules/*.js`, un archivo por caso): 65 de 65 y 25 de 25, sin avisos de más. Los
+  casos quedaron en `fixtures/constructors.js`.
 - `eslint-disable` en el registro de supresiones de `src/suppressions.rs` (hecho, 2026-10-27), así lo
   silenciado aparece como suprimido con su motivo (lo de después de ` -- `) y entra en la
   antitrampa: `eslint-disable-line` y `eslint-disable-next-line` en cualquier comentario,
@@ -2026,7 +2036,6 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - El arnés quedó en `../kerbo-parity/eslint/` (config con todo `recommended` de los dos limitado a
     las reglas de kerbo, `INLINE=1` para leer los comentarios, y `compare.py`).
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
-  - Sobre el análisis de caminos que ya está: `no-this-before-super` (9) y `constructor-super` (7).
   - `no-misleading-character-class` (290, casi todo en código compilado),
     `no-irregular-whitespace` (10) y las que no aparecieron en el corpus.
   - `no-undef`: pide las variables globales de cada entorno (navegador, Node, Jest).

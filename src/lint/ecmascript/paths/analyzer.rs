@@ -15,7 +15,9 @@ use super::shapes::{
     labeled_body_is_breakable, preprocess_loop,
 };
 use super::state::{ChoiceKind, State};
+use super::supers::DerivedConstructor;
 use crate::lint::ecmascript::nodes::{CALL, COMMENT, MEMBER, PROGRAM, SUBSCRIPT, text};
+use super_events::is_for_update;
 
 const IF: &str = "if_statement";
 const TERNARY: &str = "ternary_expression";
@@ -42,6 +44,9 @@ const ALTERNATIVE_FIELD: &str = "alternative";
 const HANDLER_FIELD: &str = "handler";
 const FINALIZER_FIELD: &str = "finalizer";
 
+mod methods;
+mod super_events;
+
 type Children<'tree> = Vec<(Node<'tree>, Option<&'tree str>)>;
 
 // El `CodePathAnalyzer` de ESLint sobre el árbol de tree-sitter. Lleva la pila de ancestros con el
@@ -53,6 +58,7 @@ pub struct Analyzer<'tree, 'source> {
     records: Vec<PathRecord<'tree>>,
     flow: Flow<'tree>,
     ancestors: Vec<(Node<'tree>, Option<&'tree str>)>,
+    in_for_update: bool,
 }
 
 impl<'tree, 'source> Analyzer<'tree, 'source> {
@@ -64,6 +70,7 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
             records: Vec::new(),
             flow: Flow::default(),
             ancestors: Vec::new(),
+            in_for_update: false,
         };
         analyzer.visit(root, None);
         analyzer.flow.successors = analyzer.graph.successor_lists();
@@ -100,11 +107,12 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
             return;
         }
         if node.kind() == METHOD {
-            self.visit_method(node, field);
+            methods::visit_method(self, node, field);
             return;
         }
         let place = self.place(field);
         let chain = is_chain_root(node, place);
+        self.in_for_update = is_for_update(place);
         self.preprocess(node, place);
         if chain {
             if let Some((state, _)) = self.state() {
@@ -117,12 +125,15 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
         if let Some(record) = self.records.last_mut() {
             record.observe_enter(node);
         }
+        super_events::observe_super_enter(self, node, place);
         self.visit_children(node, field, children_with_fields(node));
+        self.in_for_update = is_for_update(place);
         self.exit(node, place);
         self.flow.at_exit.insert(node.id(), self.reachable());
         if let Some(record) = self.records.last_mut() {
             record.observe_exit(node);
         }
+        super_events::observe_super_call(self, node);
         self.postprocess(node, place);
         if chain {
             if let Some((state, graph)) = self.state() {
@@ -132,53 +143,36 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
         }
     }
 
-    // Un método es dos nodos de ESTree: la clave va en el camino de afuera y la función en uno propio.
-    fn visit_method(&mut self, method: Node<'tree>, field: Option<&'tree str>) {
-        self.preprocess(method, self.place(field));
-        self.forward();
-        self.flow.at_enter.insert(method.id(), self.reachable());
-        let (key, function): (Children<'tree>, Children<'tree>) = children_with_fields(method)
-            .into_iter()
-            .partition(|(child, child_field)| child.kind() == DECORATOR || *child_field == Some(NAME_FIELD));
-        self.visit_children(method, field, key);
-        if function
-            .iter()
-            .any(|(_, child_field)| *child_field == Some(BODY_FIELD))
-        {
-            self.start_path(method);
-            self.forward();
-            self.visit_children(method, field, function);
-            self.forward();
-            self.flow.at_exit.insert(method.id(), self.reachable());
-            self.end_path();
-            self.forward();
-            return;
-        }
-        self.visit_children(method, field, function);
-        self.forward();
-        self.flow.at_exit.insert(method.id(), self.reachable());
-    }
-
     fn start_path(&mut self, start: Node<'tree>) {
         if !self.paths.is_empty() {
             self.forward();
         }
         let state = State::new(&mut self.graph);
+        let mut record = PathRecord::new(start);
+        record.initial = self.graph.head(state.fork).first().copied();
+        record.derived = DerivedConstructor::of(start, self.source);
         self.paths.push(state);
-        self.records.push(PathRecord::new(start));
+        self.records.push(record);
     }
 
     fn end_path(&mut self) {
-        if let Some(mut state) = self.paths.pop() {
+        super_events::notify_loops(self);
+        let returned = self.paths.pop().map(|mut state| {
             state.make_final(&self.graph);
-        }
-        if let Some(record) = self.records.pop() {
+            state.returned
+        });
+        if let Some(mut record) = self.records.pop() {
+            let initial = record.initial;
+            if let Some(derived) = record.derived.as_mut() {
+                derived.finish(&returned.unwrap_or_default(), initial, &self.graph);
+            }
             self.flow.paths.push(record);
         }
     }
 
     // `forwardCurrentToHead`: los segmentos actuales pasan a ser la cabeza del contexto.
     fn forward(&mut self) {
+        super_events::notify_loops(self);
         let Some(state) = self.paths.last_mut() else {
             return;
         };
@@ -199,6 +193,9 @@ impl<'tree, 'source> Analyzer<'tree, 'source> {
             .filter(|segment| self.graph.is_reachable(*segment))
         {
             record.start_segment(segment);
+            if let Some(derived) = record.derived.as_mut() {
+                derived.segment_start(segment, &self.graph, self.in_for_update);
+            }
         }
     }
 

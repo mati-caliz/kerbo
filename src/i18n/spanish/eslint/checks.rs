@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const CHECK_TEXTS: [(EslintRule, RuleText); 31] = [
+pub const CHECK_TEXTS: [(EslintRule, RuleText); 33] = [
     (
         EslintRule::NoConstAssign,
         RuleText::new(
@@ -281,6 +281,24 @@ pub const CHECK_TEXTS: [(EslintRule, RuleText); 31] = [
             "borralo o usalo",
             "Nadie de afuera puede leer un miembro privado: si la clase tampoco lo lee, sobra.",
             "class Pedido { #total = 0; } se vuelve class Pedido {}.",
+        ),
+    ),
+    (
+        EslintRule::ConstructorSuper,
+        RuleText::new(
+            "Un constructor de una clase derivada que no llama bien a super()",
+            "llamá a super() una vez en cada camino, antes de terminar el constructor",
+            "Sin super() la instancia no se inicializa y usar this tira un ReferenceError; llamarlo dos veces también tira.",
+            "class B extends A { constructor() { if (x) super(); } } se vuelve class B extends A { constructor() { super(); } }.",
+        ),
+    ),
+    (
+        EslintRule::NoThisBeforeSuper,
+        RuleText::new(
+            "this o super usados antes de llamar a super()",
+            "llamá a super() antes de tocar this o super",
+            "En una clase derivada this no existe hasta que corre super(): usarlo antes tira un ReferenceError.",
+            "constructor() { this.x = 1; super(); } se vuelve constructor() { super(); this.x = 1; }.",
         ),
     ),
 ];

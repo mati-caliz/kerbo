@@ -36,6 +36,7 @@ mod self_assign;
 mod spread;
 mod statements;
 mod strings;
+mod super_calls;
 pub mod taint;
 mod token_index;
 mod tokens;
@@ -138,6 +139,8 @@ const CHECKS: &[(EslintRule, Check)] = &[
         private_members::unused_private_members,
     ),
     (EslintRule::NoControlRegex, regexes::control_characters_in_regexes),
+    (EslintRule::ConstructorSuper, super_calls::constructor_supers),
+    (EslintRule::NoThisBeforeSuper, super_calls::this_before_supers),
     (
         EslintRule::NoUnsafeOptionalChaining,
         optional_chains::unsafe_optional_chains,

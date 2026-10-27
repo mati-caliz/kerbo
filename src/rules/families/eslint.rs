@@ -61,6 +61,8 @@ rule_family!(EslintRule {
     NoControlRegex => "no-control-regex",
     NoUnexpectedMultiline => "no-unexpected-multiline",
     NoUnusedPrivateClassMembers => "no-unused-private-class-members",
+    ConstructorSuper => "constructor-super",
+    NoThisBeforeSuper => "no-this-before-super",
 });
 
 pub const fn wrap_eslint<'slots>(slots: &'slots mut [RuleId], rules: &[EslintRule]) -> &'slots mut [RuleId] {

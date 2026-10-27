@@ -36,6 +36,7 @@
 144:5 no-fallthrough
 150:7 no-unused-vars
 151:3 no-unreachable
+153:3 constructor-super
 157:7 no-unused-vars
 164:7 no-unused-vars
 166:3 no-unreachable

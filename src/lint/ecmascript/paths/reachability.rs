@@ -4,6 +4,7 @@ use tree_sitter::Node;
 
 use super::roles::is_identifier;
 use super::segments::SegmentId;
+use super::supers::DerivedConstructor;
 
 const TRY: &str = "try_statement";
 const BODY_FIELD: &str = "body";
@@ -38,6 +39,8 @@ pub struct PathRecord<'tree> {
     pub current: Vec<SegmentId>,
     pub try_blocks: Vec<Node<'tree>>,
     pub assignments: Vec<Assignment<'tree>>,
+    pub initial: Option<SegmentId>,
+    pub derived: Option<DerivedConstructor<'tree>>,
 }
 
 impl<'tree> PathRecord<'tree> {
@@ -48,6 +51,8 @@ impl<'tree> PathRecord<'tree> {
             current: Vec::new(),
             try_blocks: Vec::new(),
             assignments: Vec::new(),
+            initial: None,
+            derived: None,
         }
     }
 
