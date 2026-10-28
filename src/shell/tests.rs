@@ -2,7 +2,7 @@ use std::path::Path;
 
 use tree_sitter::Parser;
 
-use super::{Coverage, analyze, detect, directive_coverage, disables};
+use super::{Coverage, analyze, detect, directive_coverage, disables, repair};
 use crate::analysis::SourceUnit;
 use crate::language::Language;
 use crate::rules::{RuleId, ShellRule};
@@ -67,6 +67,16 @@ fn repairs_expansions_glued_after_a_separator_before_reading_them() {
     );
     let swallowed_lines = "#!/bin/bash\nfoo \\\n  # comment\n  $x\n";
     assert_eq!(found(swallowed_lines), NO_FINDINGS);
+}
+
+#[test]
+fn reads_case_patterns_with_a_single_quoted_string_before_a_glob() {
+    let script = "#!/bin/bash\ncase \"$1\" in\n  --*' '*) echo $x ;;\nesac\n";
+    assert_eq!(found(script), [("sc2086".to_owned(), 3, 17)]);
+    assert!(repair::double_quote_globbed_strings(b"x=a'$y'*\n").is_none());
+    let requoted = repair::double_quote_globbed_strings(b"echo \"a'b'*\" # c'd'*\nx=a' '*\n")
+        .expect("hay un string para cambiar");
+    assert_eq!(requoted.source, b"echo \"a'b'*\" # c'd'*\nx=a\" \"*\n");
 }
 
 #[test]

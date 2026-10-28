@@ -20,6 +20,8 @@ const LINE_FEED: u8 = b'\n';
 const UNDERSCORE: u8 = b'_';
 const WORD_ENDS: &[u8] = b";|&()<>";
 const DANGLING_DOLLAR: &str = "$";
+const GLOB_CHARACTERS: &[u8] = b"*?[";
+const EXPANDED_IN_DOUBLE_QUOTES: &[u8] = b"$`\\\"!\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Context {
@@ -90,6 +92,50 @@ pub fn brace_mid_word_expansions(source: &[u8]) -> Repaired {
         source: repaired,
         origin,
     }
+}
+
+pub fn double_quote_globbed_strings(source: &[u8]) -> Option<Repaired> {
+    let mut requoted = source.to_vec();
+    let mut changed = false;
+    let mut stack = vec![Context::Code { depth: 0 }];
+    let mut index = 0;
+    while let Some(&byte) = source.get(index) {
+        let in_code = matches!(stack.last(), Some(Context::Code { .. }));
+        if in_code && byte == SINGLE_QUOTE {
+            let length = skip_until(source, index, SINGLE_QUOTE);
+            let closing = index.saturating_add(length).saturating_sub(1);
+            if is_requotable(source, index, closing) {
+                double_quote(&mut requoted, index);
+                double_quote(&mut requoted, closing);
+                changed = true;
+            }
+            index = index.saturating_add(length.max(1));
+            continue;
+        }
+        index = index.saturating_add(step(source, index, &mut stack).max(1));
+    }
+    changed.then(|| Repaired {
+        origin: (0..=source.len()).collect(),
+        source: requoted,
+    })
+}
+
+fn double_quote(requoted: &mut [u8], position: usize) {
+    let Some(quote) = requoted.get_mut(position) else {
+        return;
+    };
+    *quote = DOUBLE_QUOTE;
+}
+
+fn is_requotable(source: &[u8], opening: usize, closing: usize) -> bool {
+    closing > opening
+        && source.get(closing) == Some(&SINGLE_QUOTE)
+        && source
+            .get(closing.saturating_add(1))
+            .is_some_and(|next| GLOB_CHARACTERS.contains(next))
+        && source
+            .get(opening.saturating_add(1)..closing)
+            .is_some_and(|inside| !inside.iter().any(|byte| EXPANDED_IN_DOUBLE_QUOTES.contains(byte)))
 }
 
 fn push(repaired: &mut Vec<u8>, origin: &mut Vec<usize>, byte: u8, from: usize) {

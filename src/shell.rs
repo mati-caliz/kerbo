@@ -72,27 +72,50 @@ pub fn analyze(parser: &mut Parser, unit: SourceUnit<'_>) -> Option<Result<Vec<V
         let fallback = unit.path.and_then(fallback_dialect);
         let source = unit.source;
         let tree = parser.parse(source, None).ok_or(ParseFailed)?;
-        let root = tree.root_node();
-        if root.has_error() || repair::has_swallowed_lines(root) {
+        if !tree.root_node().has_error() {
+            return parsed_violations(parser, tree.root_node(), source, fallback);
+        }
+        let Some(requoted) = repair::double_quote_globbed_strings(source) else {
+            return Ok(Vec::new());
+        };
+        let requoted_tree = parser.parse(&requoted.source, None).ok_or(ParseFailed)?;
+        if requoted_tree.root_node().has_error() {
             return Ok(Vec::new());
         }
-        if !repair::has_dangling_dollar(root, source) {
-            return Ok(violations(root, source, fallback));
-        }
-        let repaired = repair::brace_mid_word_expansions(source);
-        let repaired_tree = parser.parse(&repaired.source, None).ok_or(ParseFailed)?;
-        let repaired_root = repaired_tree.root_node();
-        if repaired_root.has_error()
-            || repair::has_swallowed_lines(repaired_root)
-            || repair::has_dangling_dollar(repaired_root, &repaired.source)
-        {
-            return Ok(Vec::new());
-        }
-        Ok(violations(repaired_root, &repaired.source, fallback)
-            .into_iter()
-            .map(|violation| repair::restore(violation, &repaired, source))
-            .collect())
+        Ok(
+            parsed_violations(parser, requoted_tree.root_node(), &requoted.source, fallback)?
+                .into_iter()
+                .map(|violation| repair::restore(violation, &requoted, source))
+                .collect(),
+        )
     })
+}
+
+fn parsed_violations(
+    parser: &mut Parser,
+    root: Node<'_>,
+    source: &[u8],
+    fallback: Option<Dialect>,
+) -> Result<Vec<Violation>, ParseFailed> {
+    if repair::has_swallowed_lines(root) {
+        return Ok(Vec::new());
+    }
+    if !repair::has_dangling_dollar(root, source) {
+        return Ok(violations(root, source, fallback));
+    }
+    let repaired = repair::brace_mid_word_expansions(source);
+    let repaired_tree = parser.parse(&repaired.source, None).ok_or(ParseFailed)?;
+    let repaired_root = repaired_tree.root_node();
+    if repaired_root.has_error()
+        || repair::has_swallowed_lines(repaired_root)
+        || repair::has_dangling_dollar(repaired_root, &repaired.source)
+    {
+        return Ok(Vec::new());
+    }
+    Ok(violations(repaired_root, &repaired.source, fallback)
+        .into_iter()
+        .map(|violation| repair::restore(violation, &repaired, source))
+        .collect())
 }
 
 pub fn analysis_context(language: Language, path: &Path) -> Option<u64> {
