@@ -2365,8 +2365,9 @@ Por capas, cada una sirve a las reglas de arriba y se puede publicar sola:
   - Go: `go test` ya compila y guarda resultados en caché; sólo la selección de tests.
 - Procesos vivos con tope de memoria y servicios de los tests (bases en contenedores) reusados en
   vez de levantados de cero.
-- Los chequeos de tipos en caliente, sin reimplementarlos: `tsc` incremental y sólo en los
-  paquetes del monorepo que toca el cambio, y el demonio de mypy (`dmypy`) vivo entre corridas.
+- Los chequeos de tipos en caliente, sin reimplementarlos: `tsc` (o `tsrs`, su port a Rust, que
+  chequea lo mismo con un tercio de la memoria) incremental y sólo en los paquetes del monorepo
+  que toca el cambio, y el demonio de mypy (`dmypy`) vivo entre corridas.
 - **Mutation testing sólo sobre lo cambiado**: con el mapa de qué test ejecuta qué código, mutar
   las líneas del cambio y correr sólo los tests que las cubren. Marca el test que pasa sin
   verificar nada, que es la trampa típica de un agente.
