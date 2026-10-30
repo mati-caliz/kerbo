@@ -1,8 +1,15 @@
+mod bashism_commands;
+mod bashisms;
+
 use crate::i18n::catalog::RuleText;
 use crate::rules::ShellRule;
+use bashism_commands::BASHISM_COMMANDS_TEXTS;
+use bashisms::BASHISMS_TEXTS;
 
 const SPLITTING_WHY: &str = "Unquoted, the shell splits the value on every space and expands globs: a file name with a space or an asterisk turns into several arguments.";
 const USELESS_ECHO_WHY: &str = "The echo only repeats what you already have: it adds a process and, unquoted, splits and globs the text.";
+
+const BASHISM_WHY: &str = "A script that starts with #!/bin/sh may run under dash, busybox or another POSIX shell, where this bash feature fails or does something else.";
 
 const UNKNOWN: RuleText = RuleText::new(
     "ShellCheck rule",
@@ -10,7 +17,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "ShellCheck reports it by default.",
     "See the ShellCheck wiki.",
 );
-const TEXTS: [RuleText; ShellRule::ALL.len()] = [
+const TEXTS: [RuleText; 22] = [
     RuleText::new(
         "Needless $ or ${} on a variable inside an arithmetic expression",
         "drop the $: inside $(( )) variables are read by name",
@@ -146,5 +153,11 @@ const TEXTS: [RuleText; ShellRule::ALL.len()] = [
 ];
 
 pub fn shell(rule: ShellRule) -> RuleText {
-    TEXTS.get(rule.position()).copied().unwrap_or(UNKNOWN)
+    TEXTS.get(rule.position()).copied().unwrap_or_else(|| {
+        BASHISMS_TEXTS
+            .iter()
+            .chain(BASHISM_COMMANDS_TEXTS.iter())
+            .find(|(candidate, _)| *candidate == rule)
+            .map_or(UNKNOWN, |(_, text)| *text)
+    })
 }

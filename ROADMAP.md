@@ -948,7 +948,39 @@ acá.
       textos vuelven al original.
     - Un comentario entre líneas continuadas con `\` se come el resto del comando ("líneas
       tragadas"). Esos archivos se saltean enteros, como los que tienen nodos de error.
+- Lo de bash en un script de sh (hecho, 2026-10-30): las 64 reglas de `checkBashisms` de
+  ShellCheck 0.11.0 (`sc3001` a `sc3067`, sin SC3013 ni SC3027, que no existen, ni SC3051, que sólo
+  sale cuando ShellCheck sigue el `source`), en `src/shell/rules/bashisms/`, para `sh`, `dash` y
+  busybox con sus excepciones (busybox tiene `[[ ]]`, `$'…'`, `&>`, `source` y los recortes de
+  `${…}`; dash tiene `local`, `echo -n` y los nombres de señal en minúscula). Se calca el orden de
+  las cláusulas de un comando simple: `echo` con opciones, `exec -x`, `let` y `set` cortan antes de
+  la general, así `let` no es también SC3044 ni `exec -a` es SC3045; `echo`, `let` y `set` valen
+  también con ruta (`/bin/echo`), como `isCommand`. Las expansiones `${…}` se miran con las mismas
+  expresiones regulares de ShellCheck, las variables de bash (SC3028) salvo que el script las
+  asigne, y en `let` se buscan `++`, `--` y `**` en el texto, porque tree-sitter no lo lee como
+  aritmética. tree-sitter-bash lee `{fd}>` como un argumento pegado a la redirección y `$"…"` como
+  `$` y un string: los dos se reconocen así. En dash ShellCheck las marca como error y kerbo como
+  advertencia: el preset las muestra igual.
+  - Paridad: las 137 pruebas de `checkBashisms` del fuente de ShellCheck
+    (`scripts/parity/shell/extract_props.py`) y 20 scripts propios con lo que más aparece: 226
+    avisos idénticos, ninguno de más; faltan 4, todos en líneas que tree-sitter-bash no parsea
+    (`!(*.hs)`, `10#$y`, `[ a \< b ]`). Quedan como fixtures en `src/shell/fixtures/bashisms*.sh`
+    con la salida de ShellCheck al lado (150 avisos). En el corpus: 96 de 145, ninguno de más; de
+    los 49 que faltan, 46 están en archivos que se saltean y 3 son lecturas de tree-sitter
+    (abajo).
+  - El arnés de shell volvió al repo (`scripts/parity/shell/`): clonar el corpus, correr ShellCheck
+    con y sin directivas (`--norc`, porque kerbo no lee `.shellcheckrc`), kerbo en release,
+    comparar, probes con fixtures y `register.py` para sumar reglas. El corpus vive en
+    `kerbo-parity/shell-corpus` y el fuente de ShellCheck en `kerbo-parity/shellcheck-src`.
 - Pendientes de Shell contra ShellCheck:
+  - tree-sitter-bash pone las palabras que siguen a una redirección como destinos extra de ella
+    (`/bin/echo >&2 -e "…"`): kerbo no las ve como argumentos (2 SC3037 en moby), y lo mismo
+    afecta a cualquier regla que mire argumentos.
+  - El `nvm.sh` actual tiene nodos de error desde la línea 2006 y no se saltea: el `{` de la línea
+    11 no queda como bloque y su `# shellcheck disable=SC2016` no cubre el archivo (87 de más con
+    directivas). Un archivo con errores de parseo que kerbo no saltea, a revisar.
+  - `${x:=valor}` asigna `x` para el flujo de ShellCheck (después no hay SC2086 sobre `x`) y
+    `{fd}>archivo` asigna `fd` (SC2034); kerbo no lo modela todavía.
   - 55 archivos del corpus (260 avisos de ShellCheck, 375 sin directivas) quedan afuera porque
     tree-sitter-bash no los parsea o se traga líneas; entre ellos el `acme.sh` principal.
   - Sin directivas faltan 5 avisos: 3 SC2034 en `dnsapi/dns_ali.sh`, `deploy/ali_cdn.sh` y
@@ -961,8 +993,6 @@ acá.
   - `.shellcheckrc` no se lee.
   - Las columnas cuentan bytes, como el resto de las reglas; ShellCheck cuenta caracteres (la
     medición convierte).
-  - El arnés de esta paridad (ShellCheck en `json1` contra kerbo en JSON) quedó fuera del repo, como
-    los anteriores.
 - Go contra golangci-lint (empezada, 2026-10-21): `ineffassign`, la única regla del conjunto por
   defecto de golangci-lint 2 (`standard`: errcheck, govet, ineffassign, staticcheck y unused) que no
   pide los tipos del compilador, con el nombre del linter, en una familia propia (`GoRule`).

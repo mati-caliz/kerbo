@@ -1,9 +1,16 @@
+mod bashism_commands;
+mod bashisms;
+
 use crate::i18n::catalog::RuleText;
 use crate::rules::ShellRule;
+use bashism_commands::BASHISM_COMMANDS_TEXTS;
+use bashisms::BASHISMS_TEXTS;
 
 const SPLITTING_WHY: &str = "Sin comillas, el shell parte el valor en cada espacio y expande los comodines: un nombre de archivo con un espacio o un asterisco se vuelve varios argumentos.";
 const USELESS_ECHO_WHY: &str =
     "El echo sólo repite lo que ya tenés: suma un proceso y, sin comillas, parte y expande el texto.";
+
+const BASHISM_WHY: &str = "Un script que empieza con #!/bin/sh puede correr en dash, busybox u otro shell POSIX, donde esto de bash falla o hace otra cosa.";
 
 const UNKNOWN: RuleText = RuleText::new(
     "Regla de ShellCheck",
@@ -11,7 +18,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "ShellCheck la marca por defecto.",
     "Ver la wiki de ShellCheck.",
 );
-const TEXTS: [RuleText; ShellRule::ALL.len()] = [
+const TEXTS: [RuleText; 22] = [
     RuleText::new(
         "$ o ${} de más en una variable dentro de una expresión aritmética",
         "sacá el $: dentro de $(( )) las variables se leen por nombre",
@@ -147,5 +154,11 @@ const TEXTS: [RuleText; ShellRule::ALL.len()] = [
 ];
 
 pub fn shell(rule: ShellRule) -> RuleText {
-    TEXTS.get(rule.position()).copied().unwrap_or(UNKNOWN)
+    TEXTS.get(rule.position()).copied().unwrap_or_else(|| {
+        BASHISMS_TEXTS
+            .iter()
+            .chain(BASHISM_COMMANDS_TEXTS.iter())
+            .find(|(candidate, _)| *candidate == rule)
+            .map_or(UNKNOWN, |(_, text)| *text)
+    })
 }

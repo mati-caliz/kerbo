@@ -1,4 +1,5 @@
 mod arithmetic;
+mod bashisms;
 mod builtins;
 mod conditions;
 mod expansions;
@@ -14,7 +15,11 @@ use super::variables;
 pub fn check(context: &Context<'_, '_>) -> Vec<Finding> {
     let mut findings = Findings::default();
     shebang::check(context, &mut findings);
+    let bashisms = bashisms::Bashisms::new(context);
     for node in descendants(context.root) {
+        if let Some(bashisms) = &bashisms {
+            bashisms.check(node, context, &mut findings);
+        }
         expansions::check(node, context, &mut findings);
         builtins::check(node, context, &mut findings);
         conditions::check(node, context, &mut findings);

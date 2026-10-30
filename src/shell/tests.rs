@@ -58,6 +58,44 @@ fn follows_values_through_commands_loops_branches_and_functions_like_shellcheck(
     assert_eq!(actual, expected);
 }
 
+const BASHISM_PREFIX: &str = "sc30";
+
+#[test]
+fn reports_bash_features_in_sh_dash_and_busybox_like_shellcheck() {
+    let fixtures = [
+        (
+            include_str!("fixtures/bashisms.sh"),
+            include_str!("fixtures/bashisms.shellcheck"),
+        ),
+        (
+            include_str!("fixtures/bashisms_dash.sh"),
+            include_str!("fixtures/bashisms_dash.shellcheck"),
+        ),
+        (
+            include_str!("fixtures/bashisms_busybox.sh"),
+            include_str!("fixtures/bashisms_busybox.shellcheck"),
+        ),
+    ];
+    for (script, shellcheck) in fixtures {
+        let expected: Vec<String> = shellcheck.lines().map(str::to_owned).collect();
+        let mut actual: Vec<String> = found(script)
+            .into_iter()
+            .filter(|(code, _, _)| code.starts_with(BASHISM_PREFIX))
+            .map(|(code, line, column)| format!("{line}:{column} {code}"))
+            .collect();
+        actual.sort_by_key(|entry| {
+            let (position, code) = entry.split_once(' ').unwrap_or_default();
+            let (line, column) = position.split_once(':').unwrap_or_default();
+            (
+                line.parse::<usize>().unwrap_or_default(),
+                column.parse::<usize>().unwrap_or_default(),
+                code.to_owned(),
+            )
+        });
+        assert_eq!(actual, expected);
+    }
+}
+
 #[test]
 fn repairs_expansions_glued_after_a_separator_before_reading_them() {
     let script = "#!/bin/bash\ncp $source/$name.txt /tmp\n";

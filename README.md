@@ -573,7 +573,7 @@ llamadas, que TypeScript lee como comparaciones.
 Los `.sh`, los `.bash` y los archivos sin extensión con shebang de `sh`, `bash`, `dash` o busybox
 se revisan contra [ShellCheck](https://www.shellcheck.net/), con su código como nombre y en
 minúscula: `kerbo explain SC2086`, `--max sc2086=0` o `sc2034 = "off"` en `kerbo.toml`. Son las 22
-reglas que más aparecen; la severidad es la de ShellCheck, `recommended` apaga las de estilo y
+reglas que más aparecen y las 64 de lo que bash agrega en un script de sh (`sc3001` a `sc3067`); la severidad es la de ShellCheck, `recommended` apaga las de estilo y
 `minimal`, también las informativas. Las reglas universales de la tabla de arriba no corren en
 shell, salvo la antitrampa.
 
@@ -588,13 +588,17 @@ shell, salvo la antitrampa.
 | `sc2004`, `sc2181`, `sc2015`, `sc2166` | `$` de más en aritmética, `[ $? -ne 0 ]`, `a && b \|\| c` y `-a`/`-o` en `[ ]` |
 | `sc2016`, `sc2059`, `sc2064`, `sc2069`, `sc2223` | expansiones entre comillas simples, variables en el formato de `printf`, `trap` con comillas dobles, redirecciones al revés y `: ${x:=…}` sin comillas |
 | `sc2148` | un script sin shebang ni `# shellcheck shell=` |
+| `sc3001` a `sc3067` | en un script de `sh`, `dash` o busybox, lo que sólo tiene bash: `[[ ]]`, `local`, arreglos, `${x/a/b}`, `echo -n`, `&>`, `source`, `set -o pipefail` y el resto de `checkBashisms` de ShellCheck, con las excepciones de dash y busybox |
 
 `# shellcheck disable=` vale como en ShellCheck: antes del primer comando, para el archivo entero;
 antes de un comando compuesto, para todo el bloque; acepta rangos (`SC2000-SC2099`) y `all`.
 
 Paridad, contra ShellCheck 0.11: cero diferencias por archivo, línea, columna y regla en 1.752
 scripts de kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku y otros (1.680 avisos).
-Los archivos que tree-sitter-bash no parsea se saltean.
+Con esos repos actualizados (2026-10-30, 1.834 scripts): 1.859 avisos idénticos y 87 de más, todos
+`sc2016` de un `nvm.sh` nuevo que tree-sitter-bash lee mal; sin las directivas `# shellcheck`,
+3.409 idénticos (96 de `sc3*`) y ninguno de más. Los archivos que tree-sitter-bash no parsea se
+saltean.
 
 ### Go contra golangci-lint
 
