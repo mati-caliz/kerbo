@@ -1,5 +1,8 @@
+mod staticcheck;
+
 use crate::i18n::catalog::RuleText;
 use crate::rules::GoRule;
+use staticcheck::STATICCHECK_TEXTS;
 
 const UNKNOWN: RuleText = RuleText::new(
     "Regla de golangci-lint",
@@ -7,7 +10,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "golangci-lint la marca por defecto.",
     "Ver la documentación de golangci-lint.",
 );
-const TEXTS: [RuleText; GoRule::ALL.len()] = [
+const TEXTS: [RuleText; 30] = [
     RuleText::new(
         "Asignación que nadie lee antes de que se pise o termine la función",
         "borrá la asignación o usá el valor antes de volver a asignar",
@@ -182,8 +185,19 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "Con switch v := x.(type) cada case ya tiene el valor del tipo; repetir x.(T) es ruido.",
         "switch x.(type) { case int: f(x.(int)) } se vuelve switch v := x.(type) { case int: f(v) }.",
     ),
+    RuleText::new(
+        "Llamada redundante a net/http.CanonicalHeaderKey en un método de http.Header (S1035 de staticcheck)",
+        "pasa el nombre del header directo a Add, Del, Get o Set",
+        "Los métodos de http.Header ya normalizan el nombre del header; llamar antes a CanonicalHeaderKey no cambia nada.",
+        "h.Set(http.CanonicalHeaderKey(nombre), valor) se vuelve h.Set(nombre, valor).",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {
-    TEXTS.get(rule.position()).copied().unwrap_or(UNKNOWN)
+    TEXTS.get(rule.position()).copied().unwrap_or_else(|| {
+        STATICCHECK_TEXTS
+            .iter()
+            .find(|(candidate, _)| *candidate == rule)
+            .map_or(UNKNOWN, |(_, text)| *text)
+    })
 }

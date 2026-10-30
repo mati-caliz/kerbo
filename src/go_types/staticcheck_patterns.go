@@ -414,7 +414,7 @@ func (c *collector) checkBoolComparison(expression *ast.BinaryExpr) {
 	default:
 		return
 	}
-	if allTermsBool(c.info.TypeOf(other)) {
+	if allTerms(c.info.TypeOf(other), isBool) {
 		c.addReport("s1002", expression.Pos(), "")
 	}
 }
@@ -430,31 +430,6 @@ func (c *collector) isBoolConst(expression ast.Expr) bool {
 	}
 	basic, ok := value.Type().(*types.Basic)
 	return ok && (basic.Kind() == types.UntypedBool || basic.Kind() == types.Bool)
-}
-
-// `typeutil.All` con un `bool` como término: un parámetro de tipo pide que todos sus términos lo sean.
-func allTermsBool(typ types.Type) bool {
-	if typ == nil {
-		return false
-	}
-	parameter, ok := typ.(*types.TypeParam)
-	if !ok {
-		return isBool(typ)
-	}
-	constraint, ok := parameter.Constraint().Underlying().(*types.Interface)
-	if !ok || constraint.NumEmbeddeds() != 1 {
-		return false
-	}
-	union, ok := constraint.EmbeddedType(0).(*types.Union)
-	if !ok {
-		return isBool(constraint.EmbeddedType(0))
-	}
-	for i := 0; i < union.Len(); i++ {
-		if !isBool(union.Term(i).Type()) {
-			return false
-		}
-	}
-	return union.Len() > 0
 }
 
 func isBool(typ types.Type) bool {

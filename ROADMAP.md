@@ -1157,6 +1157,21 @@ acá.
 - S1034 de staticcheck (hecho, 2026-10-27), en el mismo archivo: `switch x.(type)` sin asignar con
   case que vuelven a hacer `x.(T)` del tipo del case (salvo que haya otra aserción en el case);
   marca el switch y cada aserción, como golangci-lint con la "related information". 24 de 24.
+- 42 reglas más de staticcheck (hecho, 2026-10-30), directas, calcadas de v0.8.2 sobre go/ast y
+  go/types en `src/go_types/staticcheck_simple.go`, `staticcheck_checks.go` y
+  `staticcheck_shapes.go`: S1004, S1006, S1009, S1010, S1011, S1012, S1017, S1023, S1024, S1028,
+  S1029, S1030, S1032, S1033, S1035, S1037, S1038, S1039, S1040, SA1006, SA1012, SA1013, SA2000,
+  SA2001, SA3001, SA4001, SA4004, SA4011, SA4013, SA4016, SA4021, SA4022, SA4024, SA4028, SA5002,
+  SA6002, SA6003, SA6005, SA6006, SA9009, ST1008 y QF1007. Las variables repetidas de los patrones
+  de staticcheck se comparan como su matcher (campo por campo, sin posiciones ni paréntesis), y
+  las de IR (S1029, SA6003, SA6002, ST1008) se resuelven sobre la sintaxis: la conversión
+  `[]rune(s)` escrita en el `range`, el tipo del argumento antes de pasar a interfaz y las firmas
+  de funciones y literales. Contra golangci-lint v2.15.0 en un módulo con casos positivos y
+  negativos de cada una (`scripts/parity/go/testdata/staticcheck`): 120 avisos idénticos, ninguno
+  de más.
+  - Pendientes: S1029 y SA6003 no siguen la conversión guardada en una variable (`rs :=
+    []rune(s)`), que staticcheck ve por IR. SA6006 asume Go 1.18 o más. S1011 no usa el análisis
+    de pureza de staticcheck: una llamada a una función pura en el slice cuenta como efecto.
 - unused (hecho, 2026-10-27), regla directa: el grafo de usos de staticcheck v0.8.2 copiado entero
   (`src/go_types/unused_graph.go`, `unused_implements.go` y `unused_unify.go`, MIT y BSD) con las
   opciones por defecto de golangci-lint, un paquete por vez, y lo que golangci-lint agrega encima:
@@ -1190,7 +1205,9 @@ acá.
   - `uniq-by-line` (prendido por defecto en golangci-lint) deja un solo aviso por línea y linter;
     kerbo muestra todos.
   - El arnés de esta paridad (golangci-lint en JSON y `go list` contra kerbo en JSON) quedó fuera
-    del repo, como los anteriores.
+    del repo, como los anteriores; desde la tanda de 42 reglas de staticcheck, la parte del helper
+    está en `scripts/parity/go/` (compilar, módulo de prueba, corpus y `register.py`). Falta pasar
+    ahí la corrida de golangci-lint sobre el corpus y la comparación de kerbo entero.
 - Código muerto entre archivos: exports que nadie importa y dependencias declaradas que nadie
   usa, con paridad contra knip, vulture y depcheck donde las haya.
 

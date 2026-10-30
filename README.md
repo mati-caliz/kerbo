@@ -626,8 +626,10 @@ avisos), en errcheck 10.754, en `qf1008` y `qf1012` 1.153 y en `sa1019` (uso de 
 592, `qf1001` 136, `stdmethods` de govet 28 y la cola chica de staticcheck (`st1012`, `qf1011`,
 `st1023`, `qf1002`, `s1005`, `sa9003`, `qf1006`, `st1019`, `sa1029`, `sa9004`, `qf1009`, `st1013`,
 `s1000`, `st1017`, `st1006`, `s1008`, `s1002` y `s1034`) 204 y en `unused` (código que nadie usa) 249, sin
-ninguno de más: el 99 % de lo que marca golangci-lint por defecto. Lo demás de govet y de
-staticcheck sigue en golangci-lint.
+ninguno de más: el 99 % de lo que marca golangci-lint por defecto. Suma otras 42 reglas chicas de
+staticcheck (`s1009`, `s1011`, `s1017`, `s1038`, `sa1006`, `sa2001`, `sa4004`, `sa4016`, `sa6002`,
+`st1008`, `qf1007` y más) que dan lo mismo que golangci-lint en sus casos de prueba. Lo demás de
+govet y de staticcheck sigue en golangci-lint.
 
 ### Secretos y dependencias vulnerables
 

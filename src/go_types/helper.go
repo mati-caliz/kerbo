@@ -216,6 +216,7 @@ func checkPackage(listed listedPackage, exports map[string]string, index depreca
 	checked, _ := config.Check(strings.Fields(listed.ImportPath)[0], fset, files, info)
 	byFile := map[string]*fileFacts{}
 	collector := &collector{info: info, fset: fset, directory: filepath.Clean(listed.Dir), byFile: byFile, pkg: checked}
+	collector.indexIotaConstants(files)
 	for _, file := range files {
 		ast.Inspect(file, collector.visit)
 		collector.collectEmbedded(file)
@@ -223,6 +224,9 @@ func checkPackage(listed listedPackage, exports map[string]string, index depreca
 		collector.collectCanonicalMethods(file)
 		collector.collectStaticcheckTail(file, fset.File(file.Pos()).Name())
 		collector.collectStaticcheckPatterns(file, fset.File(file.Pos()).Name())
+		collector.collectStaticcheckSimple(file)
+		collector.collectStaticcheckChecks(file)
+		collector.collectStaticcheckShapes(file)
 	}
 	collector.collectUnused(files)
 	var facts []fileFacts
@@ -245,6 +249,8 @@ type collector struct {
 	fset      *token.FileSet
 	directory string
 	byFile    map[string]*fileFacts
+
+	iotaZeroConstants map[*types.Const]bool
 }
 
 func (c *collector) file(pos token.Pos) (*fileFacts, token.Position, bool) {
@@ -647,20 +653,7 @@ func (c *collector) fprintReplacement(call *ast.CallExpr) (string, bool) {
 
 // El nombre completo de lo que se llama, como `Symbol` en los patrones de staticcheck.
 func (c *collector) symbolName(function ast.Expr) string {
-	switch index := function.(type) {
-	case *ast.IndexExpr:
-		function = index.X
-	case *ast.IndexListExpr:
-		function = index.X
-	}
-	var object types.Object
-	switch inner := ast.Unparen(function).(type) {
-	case *ast.Ident:
-		object = c.info.ObjectOf(inner)
-	case *ast.SelectorExpr:
-		object = c.info.ObjectOf(inner.Sel)
-	}
-	if called, ok := object.(*types.Func); ok {
+	if called, ok := c.calledFunction(function); ok {
 		return called.FullName()
 	}
 	return ""

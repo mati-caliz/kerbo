@@ -127,37 +127,7 @@ fn keep_confirmed(
             .and_then(|root| modules.get(root.as_path()))
             .and_then(|module| module.file(&diagnostic.absolute_path));
         let position = (diagnostic.line, diagnostic.column);
-        let confirmed = facts.and_then(|facts| match rule {
-            GoRule::Errcheck => unchecked_subject(facts, position.0, position.1),
-            GoRule::Qf1012 => fprint_replacement(facts, position),
-            GoRule::Qf1008 => removable_embedded_field(facts, position, &diagnostic.message),
-            GoRule::Ineffassign
-            | GoRule::St1005
-            | GoRule::Qf1003
-            | GoRule::Qf1004
-            | GoRule::Sa1019
-            | GoRule::Qf1001
-            | GoRule::Stdmethods
-            | GoRule::St1012
-            | GoRule::Qf1011
-            | GoRule::St1023
-            | GoRule::Qf1002
-            | GoRule::S1005
-            | GoRule::Sa9003
-            | GoRule::Qf1006
-            | GoRule::St1019
-            | GoRule::Sa1029
-            | GoRule::Sa9004
-            | GoRule::Qf1009
-            | GoRule::St1013
-            | GoRule::S1000
-            | GoRule::St1017
-            | GoRule::St1006
-            | GoRule::S1008
-            | GoRule::S1002
-            | GoRule::Unused
-            | GoRule::S1034 => None,
-        });
+        let confirmed = facts.and_then(|facts| confirmed_subject(rule, facts, position, &diagnostic.message));
         let Some(subject) = confirmed else {
             return false;
         };
@@ -169,6 +139,25 @@ fn keep_confirmed(
     };
     diagnostics.retain_mut(|diagnostic| confirm(diagnostic));
     suppressed.retain_mut(|entry| confirm(&mut entry.diagnostic));
+}
+
+// Sólo errcheck, QF1012 y QF1008 tienen candidatos por archivo; las demás reglas de tipos son directas.
+fn confirmed_subject(
+    rule: GoRule,
+    facts: &FileFacts,
+    position: (usize, usize),
+    message: &Message,
+) -> Option<String> {
+    if rule == GoRule::Errcheck {
+        return unchecked_subject(facts, position.0, position.1);
+    }
+    if rule == GoRule::Qf1012 {
+        return fprint_replacement(facts, position);
+    }
+    if rule == GoRule::Qf1008 {
+        return removable_embedded_field(facts, position, message);
+    }
+    None
 }
 
 // QF1008: el campo que se puede sacar sigue siendo el sujeto del candidato.

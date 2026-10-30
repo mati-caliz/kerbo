@@ -1,5 +1,8 @@
+mod staticcheck;
+
 use crate::i18n::catalog::RuleText;
 use crate::rules::GoRule;
+use staticcheck::STATICCHECK_TEXTS;
 
 const UNKNOWN: RuleText = RuleText::new(
     "golangci-lint rule",
@@ -7,7 +10,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "golangci-lint reports it by default.",
     "See the golangci-lint documentation.",
 );
-const TEXTS: [RuleText; GoRule::ALL.len()] = [
+const TEXTS: [RuleText; 30] = [
     RuleText::new(
         "Assignment nobody reads before it is overwritten or the function ends",
         "drop the assignment or use the value before assigning again",
@@ -182,8 +185,19 @@ const TEXTS: [RuleText; GoRule::ALL.len()] = [
         "With switch v := x.(type) each case already has the typed value; repeating x.(T) is noise.",
         "switch x.(type) { case int: f(x.(int)) } becomes switch v := x.(type) { case int: f(v) }.",
     ),
+    RuleText::new(
+        "Redundant net/http.CanonicalHeaderKey call on an HTTP header method (staticcheck S1035)",
+        "pass the header name directly to Add, Del, Get or Set",
+        "HTTP header methods already canonicalize header names, so calling CanonicalHeaderKey first adds no behavior.",
+        "h.Set(http.CanonicalHeaderKey(name), value) becomes h.Set(name, value).",
+    ),
 ];
 
 pub fn go(rule: GoRule) -> RuleText {
-    TEXTS.get(rule.position()).copied().unwrap_or(UNKNOWN)
+    TEXTS.get(rule.position()).copied().unwrap_or_else(|| {
+        STATICCHECK_TEXTS
+            .iter()
+            .find(|(candidate, _)| *candidate == rule)
+            .map_or(UNKNOWN, |(_, text)| *text)
+    })
 }

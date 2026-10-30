@@ -7,12 +7,15 @@ use crate::lint::go::platform::GoPlatform;
 
 pub const SOURCE: &str = include_str!("helper.go");
 // Los demás archivos del paquete `main` del helper, con el nombre con que se escriben.
-const OTHER_SOURCES: [(&str, &str); 10] = [
+const OTHER_SOURCES: [(&str, &str); 13] = [
     ("deprecated.go", include_str!("deprecated.go")),
     ("de_morgan.go", include_str!("de_morgan.go")),
     ("stdmethods.go", include_str!("stdmethods.go")),
     ("staticcheck_tail.go", include_str!("staticcheck_tail.go")),
     ("staticcheck_patterns.go", include_str!("staticcheck_patterns.go")),
+    ("staticcheck_simple.go", include_str!("staticcheck_simple.go")),
+    ("staticcheck_checks.go", include_str!("staticcheck_checks.go")),
+    ("staticcheck_shapes.go", include_str!("staticcheck_shapes.go")),
     ("unused.go", include_str!("unused.go")),
     ("unused_graph.go", include_str!("unused_graph.go")),
     ("unused_implements.go", include_str!("unused_implements.go")),
