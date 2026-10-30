@@ -57,7 +57,8 @@ def register_severity(rules):
         if rule['severity'] in SEVERITY_LISTS:
             start = text.index(f'const {SEVERITY_LISTS[rule["severity"]]}: &[ShellRule] = &[')
             end = text.index('];', start)
-            text = text[:end] + f'    ShellRule::{variant(rule["code"])},\n' + text[end:]
+            separator = '' if text[:end].endswith('\n') else ',\n'
+            text = text[:end] + separator + f'    ShellRule::{variant(rule["code"])},\n' + text[end:]
     write(path, text)
 
 
@@ -65,12 +66,14 @@ def register_texts(data, catalog, language, key):
     path = f'src/i18n/{language}/shell/{catalog}.rs'
     full = os.path.join(ROOT, path)
     constant = f'{catalog.upper()}_TEXTS'
-    why = data.get('why_constant', 'WHY')
+    why = data.get('why_constant')
     if os.path.exists(full):
         text = read(path)
     else:
-        text = (f'use super::{why};\nuse crate::i18n::catalog::RuleText;\nuse crate::rules::ShellRule;\n\n'
-                f'// {COMMENTS[language]}\n'
+        shared = f'use super::{why};\n' if why else ''
+        comment = data.get('comment', {}).get(language, COMMENTS[language])
+        text = (f'{shared}use crate::i18n::catalog::RuleText;\nuse crate::rules::ShellRule;\n\n'
+                f'// {comment}\n'
                 f'pub const {constant}: [(ShellRule, RuleText); 0] = [\n];\n')
     count = int(re.search(r'\[\(ShellRule, RuleText\); (\d+)\]', text).group(1))
     text = text.replace(f'[(ShellRule, RuleText); {count}]', f'[(ShellRule, RuleText); {count + len(data["rules"])}]')

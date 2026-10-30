@@ -1,0 +1,2 @@
+#!/bin/bash
+tempfile=$(mktemp)

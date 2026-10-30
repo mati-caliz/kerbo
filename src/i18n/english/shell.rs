@@ -1,10 +1,14 @@
 mod bashism_commands;
 mod bashisms;
+mod shell_builtins;
+mod tools;
 
 use crate::i18n::catalog::RuleText;
 use crate::rules::ShellRule;
 use bashism_commands::BASHISM_COMMANDS_TEXTS;
 use bashisms::BASHISMS_TEXTS;
+use shell_builtins::SHELL_BUILTINS_TEXTS;
+use tools::TOOLS_TEXTS;
 
 const SPLITTING_WHY: &str = "Unquoted, the shell splits the value on every space and expands globs: a file name with a space or an asterisk turns into several arguments.";
 const USELESS_ECHO_WHY: &str = "The echo only repeats what you already have: it adds a process and, unquoted, splits and globs the text.";
@@ -157,6 +161,8 @@ pub fn shell(rule: ShellRule) -> RuleText {
         BASHISMS_TEXTS
             .iter()
             .chain(BASHISM_COMMANDS_TEXTS.iter())
+            .chain(TOOLS_TEXTS.iter())
+            .chain(SHELL_BUILTINS_TEXTS.iter())
             .find(|(candidate, _)| *candidate == rule)
             .map_or(UNKNOWN, |(_, text)| *text)
     })

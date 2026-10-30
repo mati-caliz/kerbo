@@ -1,6 +1,7 @@
 mod arithmetic;
 mod bashisms;
 mod builtins;
+mod command_checks;
 mod conditions;
 mod expansions;
 mod quoting;
@@ -22,6 +23,7 @@ pub fn check(context: &Context<'_, '_>) -> Vec<Finding> {
         }
         expansions::check(node, context, &mut findings);
         builtins::check(node, context, &mut findings);
+        command_checks::check(node, context, &mut findings);
         conditions::check(node, context, &mut findings);
         redirects::check(node, context, &mut findings);
         arithmetic::check(node, context, &mut findings);

@@ -87,15 +87,76 @@ rule_family!(ShellRule {
     Sc3065 => "sc3065",
     Sc3066 => "sc3066",
     Sc3067 => "sc3067",
+    Sc2003 => "sc2003",
+    Sc2018 => "sc2018",
+    Sc2019 => "sc2019",
+    Sc2020 => "sc2020",
+    Sc2021 => "sc2021",
+    Sc2022 => "sc2022",
+    Sc2023 => "sc2023",
+    Sc2024 => "sc2024",
+    Sc2028 => "sc2028",
+    Sc2029 => "sc2029",
+    Sc2060 => "sc2060",
+    Sc2061 => "sc2061",
+    Sc2062 => "sc2062",
+    Sc2063 => "sc2063",
+    Sc2114 => "sc2114",
+    Sc2115 => "sc2115",
+    Sc2117 => "sc2117",
+    Sc2146 => "sc2146",
+    Sc2150 => "sc2150",
+    Sc2156 => "sc2156",
+    Sc2174 => "sc2174",
+    Sc2185 => "sc2185",
+    Sc2186 => "sc2186",
+    Sc2196 => "sc2196",
+    Sc2197 => "sc2197",
+    Sc2224 => "sc2224",
+    Sc2225 => "sc2225",
+    Sc2226 => "sc2226",
+    Sc2227 => "sc2227",
+    Sc2232 => "sc2232",
+    Sc2253 => "sc2253",
+    Sc2267 => "sc2267",
+    Sc2304 => "sc2304",
+    Sc2305 => "sc2305",
+    Sc2306 => "sc2306",
+    Sc2307 => "sc2307",
+    Sc2308 => "sc2308",
+    Sc2121 => "sc2121",
+    Sc2139 => "sc2139",
+    Sc2142 => "sc2142",
+    Sc2151 => "sc2151",
+    Sc2152 => "sc2152",
+    Sc2163 => "sc2163",
+    Sc2168 => "sc2168",
+    Sc2172 => "sc2172",
+    Sc2173 => "sc2173",
+    Sc2184 => "sc2184",
+    Sc2219 => "sc2219",
+    Sc2229 => "sc2229",
+    Sc2240 => "sc2240",
+    Sc2241 => "sc2241",
+    Sc2242 => "sc2242",
+    Sc2293 => "sc2293",
+    Sc2294 => "sc2294",
+    Sc2313 => "sc2313",
 });
 
-pub const fn wrap_shell<'slots>(slots: &'slots mut [RuleId], rules: &[ShellRule]) -> &'slots mut [RuleId] {
-    match (slots, rules) {
-        ([slot, free @ ..], [rule, others @ ..]) => {
-            *slot = RuleId::Shell(*rule);
-            wrap_shell(free, others)
+pub const fn wrap_shell<'slots>(
+    mut slots: &'slots mut [RuleId],
+    mut rules: &[ShellRule],
+) -> &'slots mut [RuleId] {
+    loop {
+        match (slots, rules) {
+            ([slot, free @ ..], [rule, others @ ..]) => {
+                *slot = RuleId::Shell(*rule);
+                slots = free;
+                rules = others;
+            }
+            (free, _) => return free,
         }
-        (free, _) => free,
     }
 }
 

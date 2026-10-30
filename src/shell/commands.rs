@@ -26,6 +26,7 @@ pub struct Command<'tree> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Opt<'tree> {
+    pub flag: Node<'tree>,
     pub value: Node<'tree>,
 }
 
@@ -119,28 +120,34 @@ impl<'tree> Command<'tree> {
     }
 
     pub fn flags(&self, source: &[u8]) -> Vec<(Node<'tree>, String)> {
-        let mut flags = Vec::new();
-        let mut finished = false;
-        for &argument in self.arguments() {
-            let simplified = oversimplify(argument, source);
-            finished |= simplified == END_OF_FLAGS;
-            if finished {
-                flags.push((argument, String::new()));
-            } else if let Some(long) = simplified.strip_prefix(LONG_FLAG_PREFIX) {
-                let name = long.split(LONG_FLAG_VALUE).next().unwrap_or_default();
-                flags.push((argument, name.to_owned()));
-            } else if let Some(short) = simplified.strip_prefix(FLAG_PREFIX) {
-                flags.extend(short.chars().map(|flag| (argument, flag.to_string())));
-            } else {
-                flags.push((argument, String::new()));
-            }
-        }
-        flags
+        flags_of(self.arguments(), source)
     }
 
     pub fn has_flag(&self, flag: &str, source: &[u8]) -> bool {
         self.flags(source).iter().any(|(_, name)| name == flag)
     }
+}
+
+// `getAllFlags` de ShellCheck: cada letra de `-abc`, el nombre de `--largo=valor` y "" para lo que
+// no es opción o viene después de `--`.
+pub fn flags_of<'tree>(arguments: &[Node<'tree>], source: &[u8]) -> Vec<(Node<'tree>, String)> {
+    let mut flags = Vec::new();
+    let mut finished = false;
+    for &argument in arguments {
+        let simplified = oversimplify(argument, source);
+        finished |= simplified == END_OF_FLAGS;
+        if finished {
+            flags.push((argument, String::new()));
+        } else if let Some(long) = simplified.strip_prefix(LONG_FLAG_PREFIX) {
+            let name = long.split(LONG_FLAG_VALUE).next().unwrap_or_default();
+            flags.push((argument, name.to_owned()));
+        } else if let Some(short) = simplified.strip_prefix(FLAG_PREFIX) {
+            flags.extend(short.chars().map(|flag| (argument, flag.to_string())));
+        } else {
+            flags.push((argument, String::new()));
+        }
+    }
+    flags
 }
 
 pub fn is_flag(word: Node<'_>, source: &[u8]) -> bool {
@@ -195,7 +202,13 @@ fn options<'tree>(
                 parsed.extend(rest(arguments.get(index.saturating_sub(1)..).unwrap_or_default()));
                 return Some(parsed);
             }
-            parsed.push((String::new(), Opt { value: token }));
+            parsed.push((
+                String::new(),
+                Opt {
+                    flag: token,
+                    value: token,
+                },
+            ));
             continue;
         };
         let mut letters = short.chars().peekable();
@@ -207,7 +220,7 @@ fn options<'tree>(
             } else {
                 token
             };
-            parsed.push((letter.to_string(), Opt { value }));
+            parsed.push((letter.to_string(), Opt { flag: token, value }));
             if takes_argument(letter)? {
                 break;
             }
@@ -217,7 +230,9 @@ fn options<'tree>(
 }
 
 fn rest<'tree, 'list>(arguments: &'list [Node<'tree>]) -> impl Iterator<Item = (String, Opt<'tree>)> + 'list {
-    arguments.iter().map(|&value| (String::new(), Opt { value }))
+    arguments
+        .iter()
+        .map(|&value| (String::new(), Opt { flag: value, value }))
 }
 
 pub fn generic_options<'tree>(arguments: &[Node<'tree>], source: &[u8]) -> Vec<(String, Opt<'tree>)> {
@@ -235,15 +250,27 @@ pub fn generic_options<'tree>(arguments: &[Node<'tree>], source: &[u8]) -> Vec<(
                 .chars()
                 .take_while(|letter| ![NUL, LONG_FLAG_VALUE].contains(letter))
                 .collect();
-            parsed.push((name, Opt { value: token }));
+            parsed.push((
+                name,
+                Opt {
+                    flag: token,
+                    value: token,
+                },
+            ));
             continue;
         }
         let Some(short) = text.strip_prefix(FLAG_PREFIX) else {
-            parsed.push((String::new(), Opt { value: token }));
+            parsed.push((
+                String::new(),
+                Opt {
+                    flag: token,
+                    value: token,
+                },
+            ));
             continue;
         };
         let letters: Vec<char> = short.chars().take_while(|letter| *letter != NUL).collect();
-        let flag_of = |letter: &char, value| (letter.to_string(), Opt { value });
+        let flag_of = |letter: &char, value| (letter.to_string(), Opt { flag: token, value });
         match arguments.get(index).copied() {
             Some(next) if !literal_or(next, source, NOT_LITERAL).starts_with(FLAG_PREFIX) => {
                 index = index.saturating_add(1);

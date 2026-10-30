@@ -972,7 +972,32 @@ acá.
     con y sin directivas (`--norc`, porque kerbo no lee `.shellcheckrc`), kerbo en release,
     comparar, probes con fixtures y `register.py` para sumar reglas. El corpus vive en
     `kerbo-parity/shell-corpus` y el fuente de ShellCheck en `kerbo-parity/shellcheck-src`.
+- Los chequeos de comandos de ShellCheck (hecho, 2026-10-30): 55 reglas de `Checks/Commands.hs` en
+  `src/shell/rules/command_checks/`: `tr` (SC2018 a SC2021, SC2060), `grep` (SC2022, SC2062,
+  SC2063), `expr` (SC2003, SC2304 a SC2308), `find` (SC2061, SC2146, SC2150, SC2156, SC2185,
+  SC2227), `return` y `exit` (SC2151, SC2152, SC2241, SC2242), `trap` (SC2172, SC2173), `set`
+  (SC2121), `export` y `read` con `$` (SC2163, SC2229, SC2313), `alias` (SC2139, SC2142), `unset`
+  (SC2184), `local` fuera de función (SC2168), `let` (SC2219), `eval` de arreglos (SC2293, SC2294),
+  `.` con argumentos (SC2240), `time -f` (SC2023), `echo` con escapes (SC2028), `mkdir -p -m`
+  (SC2174), `su` (SC2117), `ssh` (SC2029), `tempfile`, `egrep` y `fgrep` (SC2186, SC2196, SC2197),
+  `rm -r` de directorios del sistema con la expansión de llaves (SC2114, SC2115), `mv`, `cp` y `ln`
+  sin destino (SC2224 a SC2226), `sudo` (SC2024, SC2232), `chmod -r` (SC2253) y `xargs -i`
+  (SC2267). Se calca `checkCommand`: con ruta sólo valen los chequeos por nombre de archivo y con
+  `builtin` los exactos del comando que sigue. `Opt` de las opciones guarda ahora también la
+  palabra de la opción.
+  - Paridad: las 220 pruebas de esas funciones del fuente de ShellCheck: 148 idénticas, 2 de más y
+    las demás de reglas que no son de la tanda o líneas que tree-sitter-bash lee mal (`$1/$2`, el
+    `>=` de `expr` que toma como redirección, backticks anidados con escapes, extglob). Quedan
+    como fixtures en `src/shell/fixtures/commands*.sh` (113 avisos). En el corpus, 51 avisos más
+    sin directivas y 25 con ellas, ninguno de más.
+  - tree-sitter-bash pega a veces la línea siguiente al comando cuando empieza con `\.`, como una
+    palabra que empieza con el salto de línea (17 SC2240 de más en los tests de nvm): los
+    chequeos de comandos cortan los argumentos ahí. Saltear esos archivos perdía 300 avisos que
+    coinciden.
 - Pendientes de Shell contra ShellCheck:
+  - De `Checks/Commands.hs` quedan `getopts` con su `case` (SC2213, SC2214, SC2220), `time` en un
+    pipeline (SC2176, SC2177), la cantidad de argumentos de `printf` (SC2182, SC2183), los espacios
+    repetidos de `echo` (SC2291) y los opcionales.
   - tree-sitter-bash pone las palabras que siguen a una redirección como destinos extra de ella
     (`/bin/echo >&2 -e "…"`): kerbo no las ve como argumentos (2 SC3037 en moby), y lo mismo
     afecta a cualquier regla que mire argumentos.

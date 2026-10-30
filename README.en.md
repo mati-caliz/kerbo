@@ -575,7 +575,8 @@ calls, which TypeScript reads as comparisons.
 `.sh` and `.bash` files and extensionless files with an `sh`, `bash`, `dash` or busybox shebang
 are checked against [ShellCheck](https://www.shellcheck.net/), with its code as the rule name,
 lowercase: `kerbo explain SC2086`, `--max sc2086=0` or `sc2034 = "off"` in `kerbo.toml`. These are
-the 22 rules that show up most and the 64 for what bash adds in an sh script (`sc3001` to `sc3067`); severity is ShellCheck's, `recommended` turns off the style ones
+the 22 rules that show up most the 64 for what bash adds in an sh script (`sc3001` to `sc3067`) and 55 command checks (`tr`, `grep`,
+`expr`, `find`, `rm`, `sudo`, `return`, `alias`, `read` and others); severity is ShellCheck's, `recommended` turns off the style ones
 and `minimal` the informational ones too. The universal rules in the table above do not run on
 shell, except for the anti-cheat.
 
@@ -590,6 +591,7 @@ shell, except for the anti-cheat.
 | `sc2004`, `sc2181`, `sc2015`, `sc2166` | needless `$` in arithmetic, `[ $? -ne 0 ]`, `a && b \|\| c` and `-a`/`-o` inside `[ ]` |
 | `sc2016`, `sc2059`, `sc2064`, `sc2069`, `sc2223` | expansions in single quotes, variables in a `printf` format, `trap` with double quotes, redirections in the wrong order and unquoted `: ${x:=…}` |
 | `sc2148` | a script with no shebang and no `# shellcheck shell=` |
+| `sc2003`, `sc2018` to `sc2029`, `sc2060` to `sc2063`, `sc2114` to `sc2313` | ShellCheck's `Checks/Commands.hs`: `tr a-z`, unquoted globs in `find -name`, `grep` and `unset`, `expr`, `rm -rf "$dir/"`, `sudo` with redirections, `return`/`exit` outside 0-255, `export $x`, `alias` with `$1`, `egrep`, `mv` without a destination and the rest |
 | `sc3001` to `sc3067` | in an `sh`, `dash` or busybox script, what only bash has: `[[ ]]`, `local`, arrays, `${x/a/b}`, `echo -n`, `&>`, `source`, `set -o pipefail` and the rest of ShellCheck's `checkBashisms`, with the dash and busybox exceptions |
 
 `# shellcheck disable=` works as in ShellCheck: before the first command, for the whole file;
@@ -597,9 +599,9 @@ before a compound command, for the whole block; it accepts ranges (`SC2000-SC209
 
 Parity, against ShellCheck 0.11: zero differences by file, line, column and rule on 1,752 scripts
 from kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku and others (1,680 findings).
-With those repos updated (2026-10-30, 1,834 scripts): 1,859 identical findings and 87 extra, all
+With those repos updated (2026-10-30, 1,834 scripts): 1,884 identical findings and 87 extra, all
 `sc2016` in a newer `nvm.sh` that tree-sitter-bash misreads; without the `# shellcheck` directives,
-3,409 identical (96 of them `sc3*`) and none extra. Files tree-sitter-bash cannot parse are
+3,460 identical (96 of them `sc3*` and 51 from the command checks) and none extra. Files tree-sitter-bash cannot parse are
 skipped.
 
 ### Go against golangci-lint

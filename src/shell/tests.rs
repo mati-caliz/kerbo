@@ -96,6 +96,47 @@ fn reports_bash_features_in_sh_dash_and_busybox_like_shellcheck() {
     }
 }
 
+// Las reglas de shell de antes de las de `Checks/Commands.hs`, que tienen sus propios fixtures.
+const EARLIER_RULES: &[&str] = &[
+    "sc2004", "sc2005", "sc2006", "sc2015", "sc2016", "sc2034", "sc2046", "sc2059", "sc2064", "sc2068",
+    "sc2069", "sc2086", "sc2116", "sc2148", "sc2155", "sc2162", "sc2164", "sc2166", "sc2181", "sc2206",
+    "sc2207", "sc2223",
+];
+
+#[test]
+fn checks_commands_like_shellcheck() {
+    let fixtures = [
+        (
+            include_str!("fixtures/commands.sh"),
+            include_str!("fixtures/commands.shellcheck"),
+        ),
+        (
+            include_str!("fixtures/commands_sh.sh"),
+            include_str!("fixtures/commands_sh.shellcheck"),
+        ),
+    ];
+    for (script, shellcheck) in fixtures {
+        let expected: Vec<String> = shellcheck.lines().map(str::to_owned).collect();
+        let mut actual: Vec<String> = found(script)
+            .into_iter()
+            .filter(|(code, _, _)| {
+                !code.starts_with(BASHISM_PREFIX) && !EARLIER_RULES.contains(&code.as_str())
+            })
+            .map(|(code, line, column)| format!("{line}:{column} {code}"))
+            .collect();
+        actual.sort_by_key(|entry| {
+            let (position, code) = entry.split_once(' ').unwrap_or_default();
+            let (line, column) = position.split_once(':').unwrap_or_default();
+            (
+                line.parse::<usize>().unwrap_or_default(),
+                column.parse::<usize>().unwrap_or_default(),
+                code.to_owned(),
+            )
+        });
+        assert_eq!(actual, expected);
+    }
+}
+
 #[test]
 fn repairs_expansions_glued_after_a_separator_before_reading_them() {
     let script = "#!/bin/bash\ncp $source/$name.txt /tmp\n";
