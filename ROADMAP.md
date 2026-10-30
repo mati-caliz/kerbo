@@ -1168,7 +1168,10 @@ acá.
   `[]rune(s)` escrita en el `range`, el tipo del argumento antes de pasar a interfaz y las firmas
   de funciones y literales. Contra golangci-lint v2.15.0 en un módulo con casos positivos y
   negativos de cada una (`scripts/parity/go/testdata/staticcheck`): 120 avisos idénticos, ninguno
-  de más.
+  de más. En los 12 repos del corpus (`scripts/parity/go/corpus-helper.sh` y `compare_corpus.py`,
+  contra la corrida guardada del conjunto por defecto): los 26 avisos que dan, idénticos; lo que el
+  helper marca de más son líneas con `//nolint:staticcheck` y archivos generados (los mocks de
+  mockery de consul), que kerbo descarta después.
   - Pendientes: S1029 y SA6003 no siguen la conversión guardada en una variable (`rs :=
     []rune(s)`), que staticcheck ve por IR. SA6006 asume Go 1.18 o más. S1011 no usa el análisis
     de pureza de staticcheck: una llamada a una función pura en el slice cuenta como efecto.

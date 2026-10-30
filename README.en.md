@@ -630,7 +630,7 @@ APIs) 592, `qf1001` 136, govet's `stdmethods` 28 and the small staticcheck tail 
 `s1000`, `st1017`, `st1006`, `s1008`, `s1002` and `s1034`) 204 and in `unused` (code nothing uses) 249, with
 none extra: 99 % of what golangci-lint reports by default. It adds 42 more small staticcheck rules
 (`s1009`, `s1011`, `s1017`, `s1038`, `sa1006`, `sa2001`, `sa4004`, `sa4016`, `sa6002`, `st1008`,
-`qf1007` and more) that match golangci-lint on their test cases. The rest of govet and staticcheck
+`qf1007` and more) that match golangci-lint on their test cases and on the 26 reports in the corpus. The rest of govet and staticcheck
 stays in golangci-lint.
 
 ### Secrets and vulnerable dependencies
