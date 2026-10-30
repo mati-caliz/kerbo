@@ -96,7 +96,8 @@ fn reports_bash_features_in_sh_dash_and_busybox_like_shellcheck() {
     }
 }
 
-// Las reglas de shell de antes de las de `Checks/Commands.hs`, que tienen sus propios fixtures.
+// Las reglas de shell de antes de las de `Checks/Commands.hs` y `Analytics.hs`, que tienen sus
+// propios fixtures.
 const EARLIER_RULES: &[&str] = &[
     "sc2004", "sc2005", "sc2006", "sc2015", "sc2016", "sc2034", "sc2046", "sc2059", "sc2064", "sc2068",
     "sc2069", "sc2086", "sc2116", "sc2148", "sc2155", "sc2162", "sc2164", "sc2166", "sc2181", "sc2206",
@@ -104,7 +105,7 @@ const EARLIER_RULES: &[&str] = &[
 ];
 
 #[test]
-fn checks_commands_like_shellcheck() {
+fn checks_commands_words_and_sources_like_shellcheck() {
     let fixtures = [
         (
             include_str!("fixtures/commands.sh"),
@@ -135,6 +136,58 @@ fn checks_commands_like_shellcheck() {
         });
         assert_eq!(actual, expected);
     }
+}
+
+fn found_of(script: &str, codes: &[&str]) -> Vec<(String, usize, usize)> {
+    found(script)
+        .into_iter()
+        .filter(|(code, _, _)| codes.contains(&code.as_str()))
+        .collect()
+}
+
+#[test]
+fn warns_about_functions_that_read_arguments_nobody_passes() {
+    let script = "#!/bin/bash
+foo() { echo \"$1\"; }
+foo
+bar() { echo \"${1:-x}\"; }
+bar
+baz() { set -- a; echo \"$1\"; }
+baz
+qux() { echo \"$@\"; }
+qux a
+qux
+# shellcheck disable=SC2120
+quux() { echo \"$#\"; }
+quux
+";
+    assert_eq!(
+        found_of(script, &["sc2119", "sc2120"]),
+        [("sc2120".to_owned(), 2, 1), ("sc2119".to_owned(), 3, 1)]
+    );
+}
+
+#[test]
+fn warns_about_quotes_that_unquote_like_shellcheck() {
+    let script = "#!/bin/bash
+echo \"a\"$x\"b\"
+echo \"a\"b\"c\"
+echo 'it'is'x'
+echo \"$a\"_\"$b\"
+echo \"a\"/*\"b\"
+echo {\"a\",\"b\"}
+echo \"a\"$(date)\"b\"
+echo \"a\":\"b\"
+";
+    assert_eq!(
+        found_of(script, &["sc2026", "sc2027", "sc2140"]),
+        [
+            ("sc2027".to_owned(), 2, 9),
+            ("sc2140".to_owned(), 3, 9),
+            ("sc2026".to_owned(), 4, 10),
+            ("sc2027".to_owned(), 8, 9),
+        ]
+    );
 }
 
 #[test]

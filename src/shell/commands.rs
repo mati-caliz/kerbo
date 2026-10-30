@@ -16,6 +16,7 @@ const TAKES_ARGUMENT: char = ':';
 const FIRST_ARGUMENT_COMMANDS: &[&str] = &["busybox", "builtin", "command", "run"];
 const EXEC: &str = "exec";
 const EXEC_OPTIONS: &str = "cla:";
+const LINE_FEED: u8 = b'\n';
 
 #[derive(Debug, Clone)]
 pub struct Command<'tree> {
@@ -126,6 +127,24 @@ impl<'tree> Command<'tree> {
     pub fn has_flag(&self, flag: &str, source: &[u8]) -> bool {
         self.flags(source).iter().any(|(_, name)| name == flag)
     }
+}
+
+// tree-sitter-bash pega a veces el comando de la línea siguiente (un `\.` al principio) como una
+// palabra que empieza con el salto de línea: cada tramo es uno de los comandos que ve ShellCheck.
+pub fn merged_commands<'words, 'tree>(
+    words: &'words [Node<'tree>],
+    source: &[u8],
+) -> Vec<&'words [Node<'tree>]> {
+    let mut segments = Vec::new();
+    let mut start = 0;
+    for (index, word) in words.iter().enumerate().skip(1) {
+        if source.get(word.start_byte()) == Some(&LINE_FEED) {
+            segments.push(words.get(start..index).unwrap_or_default());
+            start = index;
+        }
+    }
+    segments.push(words.get(start..).unwrap_or_default());
+    segments
 }
 
 // `getAllFlags` de ShellCheck: cada letra de `-abc`, el nombre de `--largo=valor` y "" para lo que

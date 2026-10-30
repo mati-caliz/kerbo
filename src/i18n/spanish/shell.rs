@@ -1,3 +1,4 @@
+mod analytics;
 mod bashism_commands;
 mod bashisms;
 mod shell_builtins;
@@ -5,6 +6,7 @@ mod tools;
 
 use crate::i18n::catalog::RuleText;
 use crate::rules::ShellRule;
+use analytics::ANALYTICS_TEXTS;
 use bashism_commands::BASHISM_COMMANDS_TEXTS;
 use bashisms::BASHISMS_TEXTS;
 use shell_builtins::SHELL_BUILTINS_TEXTS;
@@ -164,6 +166,7 @@ pub fn shell(rule: ShellRule) -> RuleText {
             .chain(BASHISM_COMMANDS_TEXTS.iter())
             .chain(TOOLS_TEXTS.iter())
             .chain(SHELL_BUILTINS_TEXTS.iter())
+            .chain(ANALYTICS_TEXTS.iter())
             .find(|(candidate, _)| *candidate == rule)
             .map_or(UNKNOWN, |(_, text)| *text)
     })

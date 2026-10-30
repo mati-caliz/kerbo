@@ -2,17 +2,16 @@ mod builtins;
 mod find;
 mod system;
 mod text_tools;
-mod word_shapes;
+pub(super) mod word_shapes;
 
 use tree_sitter::Node;
 
-use crate::shell::commands::Command;
+use crate::shell::commands::{Command, merged_commands};
 use crate::shell::context::{Context, Findings};
 use crate::shell::words::{literal, literal_or};
 
 const BUILTIN: &str = "builtin";
 const PATH_SEPARATOR: char = '/';
-const LINE_FEED: u8 = b'\n';
 
 // Un comando visto como lo ve `checkCommand` de ShellCheck (`Checks/Commands.hs`): con ruta sólo
 // valen los chequeos por nombre de archivo (`Basename`); con `builtin`, los exactos del comando que
@@ -60,17 +59,6 @@ pub fn check(node: Node<'_>, context: &Context<'_, '_>, findings: &mut Findings)
     system::check(&invocation, context, findings);
 }
 
-// tree-sitter-bash pega a veces el comando de la línea siguiente (un `\.` al principio) como una
-// palabra que empieza con el salto de línea: los argumentos terminan antes.
-fn own_words<'command, 'tree>(command: &'command Command<'tree>, source: &[u8]) -> &'command [Node<'tree>] {
-    let words = command.words.as_slice();
-    let end = words
-        .iter()
-        .position(|word| source.get(word.start_byte()) == Some(&LINE_FEED))
-        .unwrap_or(words.len());
-    words.get(..end).unwrap_or(words)
-}
-
 fn invocation<'command, 'tree>(
     command: &'command Command<'tree>,
     source: &[u8],
@@ -81,7 +69,10 @@ fn invocation<'command, 'tree>(
     } else {
         crate::shell::syntax::text(first, source).to_owned()
     };
-    let words = own_words(command, source);
+    let words = merged_commands(&command.words, source)
+        .first()
+        .copied()
+        .unwrap_or_default();
     if name.contains(PATH_SEPARATOR) {
         let basename = name.rsplit(PATH_SEPARATOR).next().unwrap_or_default().to_owned();
         return Some(Invocation {

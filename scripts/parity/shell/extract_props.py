@@ -20,7 +20,7 @@ sources = []
 for root, _, files in os.walk(source_root):
     sources += [open(os.path.join(root, name), encoding='utf-8').read() for name in files if name.endswith('.hs')]
 for function in functions:
-    pattern = re.compile(r'^prop_' + function + r'(\w*) = (?:verify|verifyNot) ' + function + ' ' + QUOTED, re.M)
+    pattern = re.compile(r'^prop_' + function + r'(\w*) = (?:verify|verifyNot|verifyTree|verifyNotTree) ' + function + ' ' + QUOTED, re.M)
     for text in sources:
         for suffix, literal in pattern.findall(text):
             script = ast.literal_eval(literal)

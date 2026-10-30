@@ -1,0 +1,2 @@
+#!/bin/bash
+if [ -n $foo ]; then echo cow; fi

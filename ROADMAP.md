@@ -994,7 +994,28 @@ acá.
     palabra que empieza con el salto de línea (17 SC2240 de más en los tests de nvm): los
     chequeos de comandos cortan los argumentos ahí. Saltear esos archivos perdía 300 avisos que
     coinciden.
+- `source`, pipelines y palabras (hecho, 2026-10-30): 24 reglas en `src/shell/rules/analytics/`.
+  SC1091 y SC1090 son del parser de ShellCheck: sin `-x` no sigue ningún `source`, así que cada
+  `source` o `.` sin comillas con un archivo que puede nombrar avisa SC1091 (salvo `/dev/null` o
+  `# shellcheck source=/dev/null`), y SC1090 si no puede (`"$1"`, `~/x`, sin argumento); `$dir/x`
+  se sigue como `./x`. Del resto de `Analytics.hs`: `checkPipePitfalls` (SC2009 a SC2012, SC2038,
+  SC2126), `checkForInCat` (SC2013), `checkDollarStar` (SC2048), `checkConcatenatedDollarAt`
+  (SC2145), `checkArrayAsString` (SC2124, SC2125), `checkUnquotedN` (SC2070),
+  `checkInexplicablyUnquoted` (SC2026, SC2027, SC2140), `checkTildeInQuotes` (SC2088),
+  `checkSpuriousExpansion` (SC2084, SC2091, SC2092), `checkDollarBrackets` (SC2007) y
+  `checkUnpassedInFunctions` (SC2119, SC2120, con `set --` y los valores por defecto que la
+  exceptúan, y `disable=SC2120` en la función que apaga también las llamadas). Las directivas se
+  leen sobre el nodo: los comentarios justo antes de él o de lo que lo contiene, y los del
+  principio del archivo.
+  - Paridad: las 93 pruebas de esas funciones del fuente de ShellCheck y 6 scripts de `source`:
+    79 de 79 en estas reglas. En el corpus suman 1.500 avisos idénticos sin directivas (4.960) y
+    1.408 con ellas (3.292), ninguno de más. Para no sobrar hubo que calcar dos lecturas de
+    ShellCheck: `"a"/*"b"` son dos tokens (no avisa SC2140) y `{"a","b"}` es una expansión de llaves.
+  - El corte de los comandos que tree-sitter pega por un `\.` al principio de la línea pasó a
+    `shell::commands::merged_commands`: el `source` de la línea pegada también se ve.
 - Pendientes de Shell contra ShellCheck:
+  - SC2329 (función que nunca se llama) y SC2317 (código inalcanzable) piden el grafo de control
+    de ShellCheck (`CFG.hs`): una función cuenta como llamada si su cuerpo es alcanzable.
   - De `Checks/Commands.hs` quedan `getopts` con su `case` (SC2213, SC2214, SC2220), `time` en un
     pipeline (SC2176, SC2177), la cantidad de argumentos de `printf` (SC2182, SC2183), los espacios
     repetidos de `echo` (SC2291) y los opcionales.

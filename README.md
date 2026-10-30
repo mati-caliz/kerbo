@@ -573,8 +573,9 @@ llamadas, que TypeScript lee como comparaciones.
 Los `.sh`, los `.bash` y los archivos sin extensión con shebang de `sh`, `bash`, `dash` o busybox
 se revisan contra [ShellCheck](https://www.shellcheck.net/), con su código como nombre y en
 minúscula: `kerbo explain SC2086`, `--max sc2086=0` o `sc2034 = "off"` en `kerbo.toml`. Son las 22
-reglas que más aparecen, las 64 de lo que bash agrega en un script de sh (`sc3001` a `sc3067`) y 55
-chequeos de comandos (`tr`, `grep`, `expr`, `find`, `rm`, `sudo`, `return`, `alias`, `read` y otros); la severidad es la de ShellCheck, `recommended` apaga las de estilo y
+reglas que más aparecen, las 64 de lo que bash agrega en un script de sh (`sc3001` a `sc3067`) , 55
+chequeos de comandos (`tr`, `grep`, `expr`, `find`, `rm`, `sudo`, `return`, `alias`, `read` y otros) y
+24 de `source`, pipelines y palabras (`ls | grep`, `"x$@"`, `$*`, comillas que descomillan y otras); la severidad es la de ShellCheck, `recommended` apaga las de estilo y
 `minimal`, también las informativas. Las reglas universales de la tabla de arriba no corren en
 shell, salvo la antitrampa.
 
@@ -590,6 +591,7 @@ shell, salvo la antitrampa.
 | `sc2016`, `sc2059`, `sc2064`, `sc2069`, `sc2223` | expansiones entre comillas simples, variables en el formato de `printf`, `trap` con comillas dobles, redirecciones al revés y `: ${x:=…}` sin comillas |
 | `sc2148` | un script sin shebang ni `# shellcheck shell=` |
 | `sc2003`, `sc2018` a `sc2029`, `sc2060` a `sc2063`, `sc2114` a `sc2313` | lo de `Checks/Commands.hs` de ShellCheck: `tr a-z`, globs sin comillas en `find -name`, `grep` y `unset`, `expr`, `rm -rf "$dir/"`, `sudo` con redirecciones, `return`/`exit` fuera de 0-255, `export $x`, `alias` con `$1`, `egrep`, `mv` sin destino y el resto |
+| `sc1090`, `sc1091`, `sc2007` a `sc2013`, `sc2026`, `sc2027`, `sc2038`, `sc2048`, `sc2070`, `sc2084`, `sc2088`, `sc2091`, `sc2092`, `sc2119`, `sc2120`, `sc2124` a `sc2126`, `sc2140`, `sc2145` | los `source` que no se siguen, `ps \| grep`, `ls \| grep`, `find \| xargs` sin `-0`, `for x in $(cat f)`, `$*` sin comillas, `"texto $@"`, arreglos y globs asignados a una variable, `[ -n $x ]`, `"a"$x"b"`, `~` entre comillas, `$(cmd)` como comando y funciones que leen `$1` sin que nadie se los pase |
 | `sc3001` a `sc3067` | en un script de `sh`, `dash` o busybox, lo que sólo tiene bash: `[[ ]]`, `local`, arreglos, `${x/a/b}`, `echo -n`, `&>`, `source`, `set -o pipefail` y el resto de `checkBashisms` de ShellCheck, con las excepciones de dash y busybox |
 
 `# shellcheck disable=` vale como en ShellCheck: antes del primer comando, para el archivo entero;
@@ -597,9 +599,9 @@ antes de un comando compuesto, para todo el bloque; acepta rangos (`SC2000-SC209
 
 Paridad, contra ShellCheck 0.11: cero diferencias por archivo, línea, columna y regla en 1.752
 scripts de kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku y otros (1.680 avisos).
-Con esos repos actualizados (2026-10-30, 1.834 scripts): 1.884 avisos idénticos y 87 de más, todos
+Con esos repos actualizados (2026-10-30, 1.834 scripts): 3.292 avisos idénticos y 87 de más, todos
 `sc2016` de un `nvm.sh` nuevo que tree-sitter-bash lee mal; sin las directivas `# shellcheck`,
-3.460 idénticos (96 de `sc3*` y 51 de los chequeos de comandos) y ninguno de más. Los archivos que tree-sitter-bash no parsea se
+4.960 idénticos y ninguno de más. Los archivos que tree-sitter-bash no parsea se
 saltean.
 
 ### Go contra golangci-lint
