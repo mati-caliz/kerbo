@@ -51,10 +51,10 @@ pub struct Bashisms {
 impl Bashisms {
     pub fn new(context: &Context<'_, '_>) -> Option<Self> {
         let shell = Posix::of(context.dialect)?;
-        let assigned = flow(context.root, context.source, context.associative.clone())
+        let assigned = flow(context)
             .events
             .into_iter()
-            .filter(|event| event.kind == EventKind::Assignment)
+            .filter(|event| matches!(event.kind, EventKind::Assignment | EventKind::Checked))
             .map(|event| event.name)
             .collect();
         Some(Self { shell, assigned })

@@ -1,8 +1,9 @@
-use tree_sitter::{Node, Point};
+use tree_sitter::Node;
 
 use super::Found;
 use crate::rules::ShellRule;
-use crate::shell::context::{Context, Position};
+use crate::shell::context::Context;
+use crate::shell::named_descriptor::named_descriptor;
 use crate::shell::syntax::{DESCRIPTOR_FIELD, DESTINATION_FIELD, FILE_REDIRECT, WORD, children, text};
 use crate::shell::words::{literal, literal_or, parts};
 
@@ -13,10 +14,6 @@ const NETWORK_DEVICES: &[&str] = &["/dev/tcp", "/dev/udp"];
 const GLOB_CHARACTERS: &[char] = &['*', '?'];
 const OPEN_CLASS: char = '[';
 const CLOSE_CLASS: char = ']';
-const OPEN_NAME: u8 = b'{';
-const CLOSE_NAME: u8 = b'}';
-const NAME_UNDERSCORE: u8 = b'_';
-const BRACES_WIDTH: usize = 2;
 
 pub fn check(node: Node<'_>, context: &Context<'_, '_>, found: &mut Found<'_>) {
     if node.kind() != FILE_REDIRECT {
@@ -74,36 +71,10 @@ fn check_duplicate_to_file(
     }
 }
 
-// tree-sitter-bash lee `{fd}>archivo` como un argumento `{fd}` pegado a la redirección.
 fn check_named_descriptor(node: Node<'_>, source: &[u8], found: &mut Found<'_>) {
-    let end = node.start_byte();
-    if end == 0 || source.get(end.saturating_sub(1)) != Some(&CLOSE_NAME) {
-        return;
+    if let Some((_, position)) = named_descriptor(node, source) {
+        found.report_at(ShellRule::Sc3022, position, "{fd}");
     }
-    let before = source.get(..end.saturating_sub(1)).unwrap_or_default();
-    let name_length = before
-        .iter()
-        .rev()
-        .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == NAME_UNDERSCORE)
-        .count();
-    let open = end.saturating_sub(name_length).saturating_sub(BRACES_WIDTH);
-    let starts_word = open == 0
-        || source
-            .get(open.saturating_sub(1))
-            .is_some_and(u8::is_ascii_whitespace);
-    if name_length == 0 || source.get(open) != Some(&OPEN_NAME) || !starts_word {
-        return;
-    }
-    let width = end.saturating_sub(open);
-    let point = node.start_position();
-    let position = Position {
-        byte: open,
-        point: Point {
-            row: point.row,
-            column: point.column.saturating_sub(width),
-        },
-    };
-    found.report_at(ShellRule::Sc3022, position, "{fd}");
 }
 
 fn is_glob(destination: Node<'_>, source: &[u8]) -> bool {

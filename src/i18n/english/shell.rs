@@ -5,6 +5,7 @@ mod shell_builtins;
 mod structure;
 mod test_operands;
 mod tools;
+mod variable_flow;
 
 use crate::i18n::catalog::RuleText;
 use crate::rules::ShellRule;
@@ -15,6 +16,7 @@ use shell_builtins::SHELL_BUILTINS_TEXTS;
 use structure::STRUCTURE_TEXTS;
 use test_operands::TEST_OPERANDS_TEXTS;
 use tools::TOOLS_TEXTS;
+use variable_flow::VARIABLE_FLOW_TEXTS;
 
 const SPLITTING_WHY: &str = "Unquoted, the shell splits the value on every space and expands globs: a file name with a space or an asterisk turns into several arguments.";
 const USELESS_ECHO_WHY: &str = "The echo only repeats what you already have: it adds a process and, unquoted, splits and globs the text.";
@@ -172,6 +174,7 @@ pub fn shell(rule: ShellRule) -> RuleText {
             .chain(ANALYTICS_TEXTS.iter())
             .chain(STRUCTURE_TEXTS.iter())
             .chain(TEST_OPERANDS_TEXTS.iter())
+            .chain(VARIABLE_FLOW_TEXTS.iter())
             .find(|(candidate, _)| *candidate == rule)
             .map_or(UNKNOWN, |(_, text)| *text)
     })

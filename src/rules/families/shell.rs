@@ -212,6 +212,10 @@ rule_family!(ShellRule {
     Sc2321 => "sc2321",
     Sc2327 => "sc2327",
     Sc2328 => "sc2328",
+    Sc2030 => "sc2030",
+    Sc2031 => "sc2031",
+    Sc2153 => "sc2153",
+    Sc2154 => "sc2154",
 });
 
 pub const fn wrap_shell<'slots>(

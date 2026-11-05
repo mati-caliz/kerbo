@@ -10,11 +10,22 @@ use crate::rules::{RuleId, ShellRule};
 const NO_CODES: [String; 0] = [];
 const NO_FINDINGS: [(String, usize, usize); 0] = [];
 
+// Las reglas que miran todo el archivo: tienen su propio fixture, y en los demás casi cualquier
+// script de prueba lee variables que no asigna.
+const VARIABLE_FLOW_RULES: &[&str] = &["sc2030", "sc2031", "sc2153", "sc2154"];
+
 fn found(script: &str) -> Vec<(String, usize, usize)> {
     found_in(script, "script.sh")
 }
 
 fn found_in(script: &str, file: &str) -> Vec<(String, usize, usize)> {
+    found_with_flow(script, file)
+        .into_iter()
+        .filter(|(code, _, _)| !VARIABLE_FLOW_RULES.contains(&code.as_str()))
+        .collect()
+}
+
+fn found_with_flow(script: &str, file: &str) -> Vec<(String, usize, usize)> {
     let mut parser = Parser::new();
     parser
         .set_language(&tree_sitter_bash::LANGUAGE.into())
@@ -165,6 +176,42 @@ fn reads_a_long_flag_after_an_assignment_as_shellcheck_does() {
 A=ls --sort=$foo
 ";
     assert_eq!(found_of(script, &["sc2037"]), [("sc2037".to_owned(), 2, 1)]);
+}
+
+#[test]
+fn follows_variables_through_the_whole_file_and_its_subshells_like_shellcheck() {
+    let fixtures = [
+        (
+            include_str!("fixtures/variable_flow.sh"),
+            include_str!("fixtures/variable_flow.shellcheck"),
+        ),
+        (
+            include_str!("fixtures/variable_flow_lastpipe.sh"),
+            include_str!("fixtures/variable_flow_lastpipe.shellcheck"),
+        ),
+        (
+            include_str!("fixtures/variable_flow_ksh.sh"),
+            include_str!("fixtures/variable_flow_ksh.shellcheck"),
+        ),
+        (
+            include_str!("fixtures/variable_flow_sh.sh"),
+            include_str!("fixtures/variable_flow_sh.shellcheck"),
+        ),
+    ];
+    for (script, shellcheck) in fixtures {
+        let expected: Vec<String> = shellcheck.lines().map(str::to_owned).collect();
+        let mut actual: Vec<(usize, usize, String)> = found_with_flow(script, "script.sh")
+            .into_iter()
+            .filter(|(code, _, _)| VARIABLE_FLOW_RULES.contains(&code.as_str()))
+            .map(|(code, line, column)| (line, column, code))
+            .collect();
+        actual.sort();
+        let actual: Vec<String> = actual
+            .into_iter()
+            .map(|(line, column, code)| format!("{line}:{column} {code}"))
+            .collect();
+        assert_eq!(actual, expected);
+    }
 }
 
 #[test]

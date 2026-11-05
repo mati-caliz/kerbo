@@ -160,7 +160,7 @@ impl<'tree, 'context, 'source> Interpreter<'tree, 'context, 'source> {
     }
 }
 
-fn has_lastpipe(context: &Context<'_, '_>) -> bool {
+pub fn has_lastpipe(context: &Context<'_, '_>) -> bool {
     match context.dialect {
         Dialect::Ksh => true,
         Dialect::Sh | Dialect::Dash | Dialect::Busybox => false,

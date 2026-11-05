@@ -576,7 +576,7 @@ minúscula: `kerbo explain SC2086`, `--max sc2086=0` o `sc2034 = "off"` en `kerb
 reglas que más aparecen, las 64 de lo que bash agrega en un script de sh (`sc3001` a `sc3067`), 55
 chequeos de comandos (`tr`, `grep`, `expr`, `find`, `rm`, `sudo`, `return`, `alias`, `read` y otros),
 24 de `source`, pipelines y palabras (`ls | grep`, `"x$@"`, `$*`, comillas que descomillan y otras) y
-46 de condiciones, `case`, subshells, redirecciones y asignaciones; la severidad es la de ShellCheck, `recommended` apaga las de estilo y
+46 de condiciones, `case`, subshells, redirecciones y asignaciones, y 4 sobre el flujo de variables; la severidad es la de ShellCheck, `recommended` apaga las de estilo y
 `minimal`, también las informativas. Las reglas universales de la tabla de arriba no corren en
 shell, salvo la antitrampa.
 
@@ -595,6 +595,7 @@ shell, salvo la antitrampa.
 | `sc1090`, `sc1091`, `sc2007` a `sc2013`, `sc2026`, `sc2027`, `sc2038`, `sc2048`, `sc2070`, `sc2084`, `sc2088`, `sc2091`, `sc2092`, `sc2119`, `sc2120`, `sc2124` a `sc2126`, `sc2140`, `sc2145` | los `source` que no se siguen, `ps \| grep`, `ls \| grep`, `find \| xargs` sin `-0`, `for x in $(cat f)`, `$*` sin comillas, `"texto $@"`, arreglos y globs asignados a una variable, `[ -n $x ]`, `"a"$x"b"`, `~` entre comillas, `$(cmd)` como comando y funciones que leen `$1` sin que nadie se los pase |
 | `sc2050`, `sc2076` a `sc2078`, `sc2143`, `sc2144`, `sc2157` a `sc2161`, `sc2193`, `sc2198` a `sc2203`, `sc2208`, `sc2245`, `sc2255`, `sc2268` | condiciones que no deciden nada o no hacen lo que parece: `[ n -le 4 ]`, `[ $a=3 ]`, `[ false ]`, `[ -n "$a " ]`, globs, llaves y arreglos como operandos, `=~ "x.*"`, `[ -n "$(grep x)" ]` y el prefijo `x` |
 | `sc2001`, `sc2035`, `sc2037`, `sc2044`, `sc2045`, `sc2079`, `sc2094`, `sc2103`, `sc2129`, `sc2141`, `sc2194`, `sc2195`, `sc2209`, `sc2221`, `sc2222`, `sc2231`, `sc2233` a `sc2235`, `sc2269`, `sc2295`, `sc2321`, `sc2327`, `sc2328` | `echo "$x" \| sed`, `rm *`, `A=ls -l`, `for` sobre `ls` o `find`, leer y escribir el mismo archivo, `cd` de vuelta, varios `>>` seguidos, `IFS="\n"`, patrones de `case` inalcanzables, `( [ a ] )`, `x=$x`, `${a%$b}`, `a[$((i))]=` y `$(cmd > f)` |
+| `sc2030`, `sc2031`, `sc2153`, `sc2154` | lo que se asigna adentro de un subshell y se lee afuera, y variables que nada asigna en el archivo (las de mayúsculas, sólo si hay una parecida) |
 | `sc3001` a `sc3067` | en un script de `sh`, `dash` o busybox, lo que sólo tiene bash: `[[ ]]`, `local`, arreglos, `${x/a/b}`, `echo -n`, `&>`, `source`, `set -o pipefail` y el resto de `checkBashisms` de ShellCheck, con las excepciones de dash y busybox |
 
 `# shellcheck disable=` vale como en ShellCheck: antes del primer comando, para el archivo entero;
@@ -602,9 +603,9 @@ antes de un comando compuesto, para todo el bloque; acepta rangos (`SC2000-SC209
 
 Paridad, contra ShellCheck 0.11: cero diferencias por archivo, línea, columna y regla en 1.752
 scripts de kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku y otros (1.680 avisos).
-Con esos repos actualizados (2026-10-30, 1.834 scripts): 3.330 avisos idénticos y 87 de más, todos
+Con esos repos actualizados (2026-10-30, 1.834 scripts): 3.368 avisos idénticos y 87 de más, todos
 `sc2016` de un `nvm.sh` nuevo que tree-sitter-bash lee mal; sin las directivas `# shellcheck`,
-5.008 idénticos y ninguno de más. Los archivos que tree-sitter-bash no parsea se
+5.072 idénticos y ninguno de más. Los archivos que tree-sitter-bash no parsea se
 saltean.
 
 ### Go contra golangci-lint

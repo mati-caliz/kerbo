@@ -4,6 +4,7 @@ mod dialect;
 mod directives;
 mod environment;
 mod flow;
+mod named_descriptor;
 mod parameters;
 mod pattern_scan;
 mod pseudo_glob;

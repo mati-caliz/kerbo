@@ -3,7 +3,7 @@ escribe al lado la salida de ShellCheck 0.11.0 en las reglas que kerbo tiene con
 como `línea:columna código`, igual que flow.shellcheck.
 
 Uso: MSYS_NO_PATHCONV=1 python fixture.py nombre sc30 '#!/bin/sh' bashisms-more/local.sh ...
-El prefijo puede ser `!sc2004,sc2005,...`: todas las reglas de kerbo menos ésas y las que empiezan con
+Se pueden dar varios prefijos separados por comas, o `!sc2004,sc2005,...`: todas las reglas de kerbo menos ésas y las que empiezan con
 lo que se liste con `!` y termine en `*` (por ejemplo `!sc30*`). Sin scripts conserva el fixture y
 sólo vuelve a sacar la salida de ShellCheck."""
 import json
@@ -40,7 +40,7 @@ lines = body.split('\n')
 
 def selected(code):
     if not prefix.startswith('!'):
-        return code.startswith(prefix)
+        return code.startswith(tuple(prefix.split(',')))
     excluded = prefix[1:].split(',')
     return not any(code.startswith(item[:-1]) if item.endswith('*') else code == item for item in excluded)
 

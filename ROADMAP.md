@@ -1041,7 +1041,23 @@ acá.
   - El arnés sumó `freq.py` (lo que falta por frecuencia), `pending_checks.py` (qué funciones de
     ShellCheck emiten códigos que kerbo no tiene), `show_checks.py` (el fuente de una función),
     `parseable.py` (qué scripts sirven para un fixture) y `split_shapes.py`.
+- El flujo de variables de todo el archivo (hecho, 2026-11-05): `checkUnassignedReferences` (SC2154,
+  y SC2153 para los nombres en mayúsculas que se parecen a uno asignado, con la misma distancia) y
+  `findSubshelled` (SC2030, SC2031), en `src/shell/variables/`. Los eventos de `variables.rs` son el
+  `getVariableFlow` de ShellCheck y sumaron lo que faltaba: lo que `[ -n "$x" ]`, `[ -z "$x" ]`,
+  `[ "$x" ]` y `[ -v x ]` miran (cuenta como asignado sólo para no avisar), `${x:=v}`, `{fd}>` y
+  `{fd}>&-`, `export`, `builtin export x=1`, `let ++n`, `declare x` sin valor (no revive una variable
+  muerta), los scopes de subshell (`$(…)`, `` `…` ``, `(…)`, `&` y cada comando de un pipeline, salvo
+  el último con `lastpipe` o en ksh) y las expansiones adentro de una hoja `regex`, ahora con su
+  posición. El índice de un arreglo asociativo dejó de contar como lectura, también para SC2034.
+  - Paridad: las 72 pruebas de esas funciones del fuente de ShellCheck, salvo las de bats abajo.
+    Quedan como fixtures en `src/shell/fixtures/variable_flow*.sh` (29 avisos). En el corpus, 64
+    avisos más sin directivas (5.072) y 38 con ellas (3.368), ninguno de más; todo lo que falta de
+    estas reglas está en archivos sin analizar (`classify.py`).
 - Pendientes de Shell contra ShellCheck:
+  - `@test` de bats: se asignan y leen `lines`, `status` y `output`, pero tree-sitter deja el cuerpo
+    como comandos sueltos y no se abre el subshell de cada prueba (faltan SC2030 y SC2031 entre dos
+    `@test`).
   - Los `${…}` mal formados (SC2082, SC2296 a SC2301) quedaron afuera: tree-sitter da nodos de error
     y el archivo se saltea entero, así que la regla no llegaría a correr. Tendría que leerlos un
     pase sobre el texto, antes de decidir saltear. También SC2079 en `((3.14*c))`, SC2255 en
@@ -1053,9 +1069,8 @@ acá.
   - Dos avisos sin explicar: SC2327 y SC2328 en la línea 766 de `kubernetes/test/cmd/core.sh`; la
     misma línea suelta en un script aparte sí avisa.
   - Sin medir contra pruebas ni corpus, por la frecuencia baja: los otros chequeos de `Analytics.hs`
-    que lista `pending_checks.py`. Lo que más falta en el corpus (sin directivas): SC2329 236 y SC2317
-    9 (`CFG.hs`), SC2031 46 y SC2030 22 (variables en subshells), SC2154 39 y SC2153 14 (referencias
-    sin asignar), SC1007 27, SC1003 5, SC2178 5, SC2128 5 y SC2218 5.
+    que lista `pending_checks.py`. Lo que más falta en el corpus (sin directivas): SC2329 235 y SC2317
+    9 (`CFG.hs`), SC1007 27, SC2218 5, SC1003 4 y SC2128 4.
   - SC2329 (función que nunca se llama) y SC2317 (código inalcanzable) piden el grafo de control
     de ShellCheck (`CFG.hs`): una función cuenta como llamada si su cuerpo es alcanzable.
   - De `Checks/Commands.hs` quedan `getopts` con su `case` (SC2213, SC2214, SC2220), `time` en un
@@ -1067,8 +1082,8 @@ acá.
   - El `nvm.sh` actual tiene nodos de error desde la línea 2006 y no se saltea: el `{` de la línea
     11 no queda como bloque y su `# shellcheck disable=SC2016` no cubre el archivo (87 de más con
     directivas). Un archivo con errores de parseo que kerbo no saltea, a revisar.
-  - `${x:=valor}` asigna `x` para el flujo de ShellCheck (después no hay SC2086 sobre `x`) y
-    `{fd}>archivo` asigna `fd` (SC2034); kerbo no lo modela todavía.
+  - `${x:=valor}` asigna `x` para el flujo de ShellCheck (después no hay SC2086 sobre `x`); el
+    seguimiento de valores de SC2086 (`shell/flow/`) no lo modela todavía.
   - 55 archivos del corpus (260 avisos de ShellCheck, 375 sin directivas) quedan afuera porque
     tree-sitter-bash no los parsea o se traga líneas; entre ellos el `acme.sh` principal.
   - Sin directivas faltan 5 avisos: 3 SC2034 en `dnsapi/dns_ali.sh`, `deploy/ali_cdn.sh` y

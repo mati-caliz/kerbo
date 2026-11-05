@@ -73,6 +73,9 @@ const INFOS: &[ShellRule] = &[
     ShellRule::Sc2231,
     ShellRule::Sc2269,
     ShellRule::Sc2295,
+    ShellRule::Sc2030,
+    ShellRule::Sc2031,
+    ShellRule::Sc2153,
 ];
 const STYLES: &[ShellRule] = &[
     ShellRule::Sc2004,

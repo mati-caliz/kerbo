@@ -20,7 +20,9 @@ const UNDERSCORE: char = '_';
 pub fn references(node: Node<'_>, source: &[u8], flow: &mut Flow) {
     match node.kind() {
         VARIABLE_NAME | WORD
-            if is_arithmetic_operand(node, source) && !is_plain_assignment_target(node, source) =>
+            if is_arithmetic_operand(node, source)
+                && !is_plain_assignment_target(node, source)
+                && !is_associative_index(node, source, flow) =>
         {
             for name in variable_names(text(node, source)) {
                 flow.refer(name, Position::of(node));
@@ -29,6 +31,16 @@ pub fn references(node: Node<'_>, source: &[u8], flow: &mut Flow) {
         SUBSCRIPT => subscript_references(node, source, flow),
         _ => {}
     }
+}
+
+// ShellCheck no lee como aritmética el índice de un arreglo asociativo: es un texto.
+fn is_associative_index(node: Node<'_>, source: &[u8], flow: &Flow) -> bool {
+    node.parent().is_some_and(|parent| {
+        parent.kind() == SUBSCRIPT
+            && parent
+                .child_by_field_name(NAME_FIELD)
+                .is_some_and(|name| flow.associative.contains(text(name, source)))
+    })
 }
 
 fn subscript_references(subscript: Node<'_>, source: &[u8], flow: &mut Flow) {
@@ -48,7 +60,7 @@ fn subscript_references(subscript: Node<'_>, source: &[u8], flow: &mut Flow) {
         .is_some_and(|name| flow.associative.contains(text(name, source)));
     if let Some(index) = subscript.child_by_field_name(INDEX_FIELD)
         && [WORD, VARIABLE_NAME].contains(&index.kind())
-        && !(assigned && associative)
+        && !associative
     {
         for name in variable_names(text(index, source)) {
             flow.refer(name, Position::of(index));
@@ -205,14 +217,17 @@ pub fn let_assignments(raw: &str) -> Vec<String> {
 pub fn let_events(argument: Node<'_>, source: &[u8], flow: &mut Flow) {
     let base = Position::of(argument);
     for term in let_terms(text(argument, source)) {
-        match term.assignment {
-            Some((operator_offset, operator)) => {
-                flow.assign(term.name.clone(), base.shifted(operator_offset));
-                if operator != PLAIN_ASSIGNMENT {
-                    flow.refer(term.name, base.shifted(term.offset));
-                }
+        let position = base.shifted(term.offset);
+        let Some((operator_offset, operator)) = term.assignment else {
+            flow.refer(term.name.clone(), position);
+            if term.stepped {
+                flow.assign(term.name, position);
             }
-            None => flow.refer(term.name, base.shifted(term.offset)),
+            continue;
+        };
+        flow.assign(term.name.clone(), base.shifted(operator_offset));
+        if operator != PLAIN_ASSIGNMENT {
+            flow.refer(term.name, position);
         }
     }
 }

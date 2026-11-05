@@ -34,6 +34,10 @@ const EXPORTING_FLAGS: &[&str] = &["x", "p"];
 const PRINT_FLAG: &str = "p";
 const EXPORT_FLAG: &str = "x";
 const FUNCTION_FLAG: &str = "f";
+const VALUE_SEPARATOR: char = '=';
+const BATS_TEST: &str = "@test";
+const BATS_READ: &[&str] = &["lines", "status", "output"];
+const BATS_WRITTEN: &[&str] = &["lines", "status", "output", "stderr", "stderr_lines"];
 
 pub fn references(node: Node<'_>, source: &[u8], flow: &mut Flow) {
     match node.kind() {
@@ -111,6 +115,11 @@ fn command_references(command: &Command<'_>, source: &[u8], flow: &mut Flow) {
         }
     }
     match name.as_str() {
+        BATS_TEST => {
+            for variable in BATS_READ {
+                flow.refer(*variable, Position::of(command.node));
+            }
+        }
         "trap" => {
             if let Some(first) = command.arguments().first() {
                 for referenced in variables_in_literal(&literal_or(*first, source, NOT_LITERAL_SPACE)) {
@@ -160,6 +169,11 @@ pub fn modifications(command: &Command<'_>, source: &[u8], flow: &mut Flow) {
                 modifications(&rest, source, flow);
             }
         }
+        BATS_TEST => {
+            for variable in BATS_WRITTEN {
+                flow.assign(*variable, Position::of(command.node));
+            }
+        }
         "read" => read_modifications(arguments, source, flow),
         "getopts" => {
             if let [_, variable, ..] = arguments {
@@ -172,6 +186,7 @@ pub fn modifications(command: &Command<'_>, source: &[u8], flow: &mut Flow) {
             }
         }
         "local" => declared_modifications(arguments, source, flow),
+        "export" if !has(&[FUNCTION_FLAG]) => declared_modifications(arguments, source, flow),
         "declare" | "typeset" if !has(FUNCTION_FLAGS) && !has(&[PRINT_FLAG]) => {
             declared_modifications(arguments, source, flow);
         }
@@ -245,7 +260,11 @@ fn declared_modifications(arguments: &[Node<'_>], source: &[u8], flow: &mut Flow
             literal(*argument, source)
         };
         if let Some(name) = name.filter(|name| is_variable_name(name)) {
-            flow.assign(name, Position::of(*argument));
+            flow.declare(name, Position::of(*argument));
+        } else if let Some((assigned, _)) = text(*argument, source).split_once(VALUE_SEPARATOR)
+            && is_variable_name(assigned)
+        {
+            flow.assign(assigned, Position::of(*argument));
         }
     }
 }
