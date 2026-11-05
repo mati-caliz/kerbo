@@ -1013,7 +1013,49 @@ acá.
     ShellCheck: `"a"/*"b"` son dos tokens (no avisa SC2140) y `{"a","b"}` es una expansión de llaves.
   - El corte de los comandos que tree-sitter pega por un `\.` al principio de la línea pasó a
     `shell::commands::merged_commands`: el `source` de la línea pegada también se ve.
+- Condiciones, `case`, subshells, redirecciones y asignaciones (hecho, 2026-11-05): 46 reglas de
+  `Analytics.hs` en `src/shell/rules/structure/`. Los operandos de `[ ]` y `[[ ]]`: `checkConstantIfs`
+  (SC2050, SC2193), `checkConstantNullary` (SC2078, SC2158 a SC2161), `checkLiteralBreakingTest`
+  (SC2077, SC2157), `checkTestArgumentSplitting` (SC2144, SC2198 a SC2203, SC2208, SC2245, SC2255),
+  `checkQuotedCondRegex` (SC2076), `checkComparisonWithLeadingX` (SC2268) y `checkShouldUseGrepQ`
+  (SC2143). El resto: `checkUnmatchableCases` (SC2194, SC2195, SC2221, SC2222),
+  `checkSubshelledTests` (SC2233 a SC2235), `checkCdAndBack` (SC2103), `checkMultipleAppends`
+  (SC2129), `checkExpansionWithRedirection` (SC2327, SC2328), `checkRedirectToSame` (SC2094),
+  `checkAssignAteCommand` (SC2037, SC2209), `checkSuspiciousIFS` (SC2141), `checkAssignToSelf`
+  (SC2269), `checkUnnecessaryArithmeticExpansionIndex` (SC2321), `checkForDecimals` (SC2079),
+  `checkForInLs` (SC2044, SC2045), `checkForLoopGlobVariables` (SC2231), `checkGlobsAsOptions`
+  (SC2035), `checkEchoSed` (SC2001) y `checkUnquotedParameterExpansionPattern` (SC2295).
+  `shell/word_pieces.rs` y `shell/word_scan.rs` parten una palabra en los `T_Literal`, `T_Glob` y
+  `T_BraceExpansion` de ShellCheck (tree-sitter deja `*.png` como una hoja y `f{a,b}` como cuatro),
+  y `shell/pseudo_glob.rs` es su `PseudoGlob`. Lo que tree-sitter lee distinto de ShellCheck: el lado
+  derecho de `=` en `[[ ]]` y el patrón de `${x%…}` son una hoja `regex` con comillas y expansiones
+  adentro (`shell/pattern_scan.rs`); `*"a"*` en un `case` son varios `value` seguidos; en `a && b < f`
+  la redirección cuelga de la lista entera; el espacio antes de las comillas que cierran está en
+  ese token (y `SC2157` apunta a él, así que no se corre al siguiente), y `A=ls --sort=$x` son dos
+  asignaciones.
+  - Paridad: las 157 pruebas de esas funciones del fuente de ShellCheck y 121 scripts propios
+    (`testdata/structure`, `testdata/structure-more`): sin avisos de más, y lo que falta está anotado
+    abajo. Quedan como fixtures en `src/shell/fixtures/structure*.sh` (194 avisos). En el corpus, 48
+    avisos más sin directivas y 38 con ellas, ninguno de más; de los que faltan (30 y 26), 28 y 24
+    están en archivos que no se analizan (no parsean o son ocultos).
+  - El arnés sumó `freq.py` (lo que falta por frecuencia), `pending_checks.py` (qué funciones de
+    ShellCheck emiten códigos que kerbo no tiene), `show_checks.py` (el fuente de una función),
+    `parseable.py` (qué scripts sirven para un fixture) y `split_shapes.py`.
 - Pendientes de Shell contra ShellCheck:
+  - Los `${…}` mal formados (SC2082, SC2296 a SC2301) quedaron afuera: tree-sitter da nodos de error
+    y el archivo se saltea entero, así que la regla no llegaría a correr. Tendría que leerlos un
+    pase sobre el texto, antes de decidir saltear. También SC2079 en `((3.14*c))`, SC2255 en
+    `[ var[x] -eq 2 ]` y SC2327 en `${ cmd > f; }`, por lo mismo.
+  - `[[ ~/a == /b ]]`: tree-sitter lee `~` como un operador unario y no se ve la palabra (falta un
+    SC2193). `[ a '<' b ]`: el operador entre comillas no se reconoce y la condición no se analiza
+    (falta un SC2050). `A=ls --sort=$x` seguido de otra asignación en la línea siguiente se lee como
+    un solo comando (falta SC2037).
+  - Dos avisos sin explicar: SC2327 y SC2328 en la línea 766 de `kubernetes/test/cmd/core.sh`; la
+    misma línea suelta en un script aparte sí avisa.
+  - Sin medir contra pruebas ni corpus, por la frecuencia baja: los otros chequeos de `Analytics.hs`
+    que lista `pending_checks.py`. Lo que más falta en el corpus (sin directivas): SC2329 236 y SC2317
+    9 (`CFG.hs`), SC2031 46 y SC2030 22 (variables en subshells), SC2154 39 y SC2153 14 (referencias
+    sin asignar), SC1007 27, SC1003 5, SC2178 5, SC2128 5 y SC2218 5.
   - SC2329 (función que nunca se llama) y SC2317 (código inalcanzable) piden el grafo de control
     de ShellCheck (`CFG.hs`): una función cuenta como llamada si su cuerpo es alcanzable.
   - De `Checks/Commands.hs` quedan `getopts` con su `case` (SC2213, SC2214, SC2220), `time` en un
@@ -1033,8 +1075,6 @@ acá.
     `deploy/ali_dcdn.sh` de acme.sh (el `$` suelto que la reparación no alcanza, y el archivo se
     saltea), y 2 SC2086 en `nvm.sh` (líneas 5037 y 5202, `EXIT_CODE=$?; return $EXIT_CODE`) sin
     explicar todavía.
-  - El resto de las reglas de ShellCheck: SC1090/SC1091 (`source`, que tampoco se sigue), SC2154,
-    SC2329, SC2031, los SC3xxx de `sh` y las demás, sin medir todavía la frecuencia.
   - ShellCheck sobre el shell de cada `RUN` de los Dockerfile.
   - `.shellcheckrc` no se lee.
   - Las columnas cuentan bytes, como el resto de las reglas; ShellCheck cuenta caracteres (la

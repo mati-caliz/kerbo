@@ -1,0 +1,2 @@
+#!/bin/ksh
+[ -e foo* ]

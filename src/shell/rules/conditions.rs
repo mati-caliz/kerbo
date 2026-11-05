@@ -60,8 +60,8 @@ fn check_test(node: Node<'_>, context: &Context<'_, '_>, findings: &mut Findings
         | Condition::Binary(..)
         | Condition::Not(_)
         | Condition::Group(_)
-        | Condition::Unary
-        | Condition::Nullary => {}
+        | Condition::Unary(..)
+        | Condition::Nullary(_) => {}
     });
 }
 

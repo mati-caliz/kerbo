@@ -4,7 +4,8 @@ como `línea:columna código`, igual que flow.shellcheck.
 
 Uso: MSYS_NO_PATHCONV=1 python fixture.py nombre sc30 '#!/bin/sh' bashisms-more/local.sh ...
 El prefijo puede ser `!sc2004,sc2005,...`: todas las reglas de kerbo menos ésas y las que empiezan con
-lo que se liste con `!` y termine en `*` (por ejemplo `!sc30*`)."""
+lo que se liste con `!` y termine en `*` (por ejemplo `!sc30*`). Sin scripts conserva el fixture y
+sólo vuelve a sacar la salida de ShellCheck."""
 import json
 import os
 import re
@@ -17,14 +18,17 @@ families = open(os.path.join(here, '..', '..', '..', 'src', 'rules', 'families',
 known = set(re.findall(r'"sc(\d+)"', families))
 DIRECTIVE = re.compile(r'^\s*#\s*shellcheck\s')
 name, prefix, shebang, sources = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:]
-body = shebang + '\n'
-for source in sources:
-    text = open(os.path.join(here, 'testdata', source), encoding='utf-8').read()
-    text = text.split('\n', 1)[1] if text.startswith('#!') else text
-    body += ''.join(line for line in text.splitlines(keepends=True) if not DIRECTIVE.match(line))
 script_path = os.path.join(fixtures, f'{name}.sh')
-with open(script_path, 'w', encoding='utf-8', newline='\n') as handle:
-    handle.write(body)
+if sources:
+    body = shebang + '\n'
+    for source in sources:
+        text = open(os.path.join(here, 'testdata', source), encoding='utf-8').read()
+        text = text.split('\n', 1)[1] if text.startswith('#!') else text
+        body += ''.join(line for line in text.splitlines(keepends=True) if not DIRECTIVE.match(line))
+    with open(script_path, 'w', encoding='utf-8', newline='\n') as handle:
+        handle.write(body)
+else:
+    body = open(script_path, encoding='utf-8', newline='').read()
 folder = subprocess.run(['cygpath', '-w', os.path.abspath(fixtures)], capture_output=True, text=True).stdout.strip()
 output = subprocess.run(
     ['docker', 'run', '--rm', '-v', f'{folder}:/f:ro', 'koalaman/shellcheck-alpine:v0.11.0',

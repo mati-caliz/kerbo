@@ -575,9 +575,10 @@ calls, which TypeScript reads as comparisons.
 `.sh` and `.bash` files and extensionless files with an `sh`, `bash`, `dash` or busybox shebang
 are checked against [ShellCheck](https://www.shellcheck.net/), with its code as the rule name,
 lowercase: `kerbo explain SC2086`, `--max sc2086=0` or `sc2034 = "off"` in `kerbo.toml`. These are
-the 22 rules that show up most the 64 for what bash adds in an sh script (`sc3001` to `sc3067`) , 55 command checks (`tr`, `grep`,
-`expr`, `find`, `rm`, `sudo`, `return`, `alias`, `read` and others) and 24 on `source`, pipelines and
-words (`ls | grep`, `"x$@"`, `$*`, quotes that unquote and others); severity is ShellCheck's, `recommended` turns off the style ones
+the 22 rules that show up most, the 64 for what bash adds in an sh script (`sc3001` to `sc3067`), 55 command checks (`tr`, `grep`,
+`expr`, `find`, `rm`, `sudo`, `return`, `alias`, `read` and others), 24 on `source`, pipelines and
+words (`ls | grep`, `"x$@"`, `$*`, quotes that unquote and others) and 46 on conditions, `case`,
+subshells, redirections and assignments; severity is ShellCheck's, `recommended` turns off the style ones
 and `minimal` the informational ones too. The universal rules in the table above do not run on
 shell, except for the anti-cheat.
 
@@ -594,6 +595,8 @@ shell, except for the anti-cheat.
 | `sc2148` | a script with no shebang and no `# shellcheck shell=` |
 | `sc2003`, `sc2018` to `sc2029`, `sc2060` to `sc2063`, `sc2114` to `sc2313` | ShellCheck's `Checks/Commands.hs`: `tr a-z`, unquoted globs in `find -name`, `grep` and `unset`, `expr`, `rm -rf "$dir/"`, `sudo` with redirections, `return`/`exit` outside 0-255, `export $x`, `alias` with `$1`, `egrep`, `mv` without a destination and the rest |
 | `sc1090`, `sc1091`, `sc2007` to `sc2013`, `sc2026`, `sc2027`, `sc2038`, `sc2048`, `sc2070`, `sc2084`, `sc2088`, `sc2091`, `sc2092`, `sc2119`, `sc2120`, `sc2124` to `sc2126`, `sc2140`, `sc2145` | `source` commands that are not followed, `ps \| grep`, `ls \| grep`, `find \| xargs` without `-0`, `for x in $(cat f)`, unquoted `$*`, `"text $@"`, arrays and globs assigned to a variable, `[ -n $x ]`, `"a"$x"b"`, `~` in quotes, `$(cmd)` as a command and functions that read `$1` nobody passes |
+| `sc2050`, `sc2076` to `sc2078`, `sc2143`, `sc2144`, `sc2157` to `sc2161`, `sc2193`, `sc2198` to `sc2203`, `sc2208`, `sc2245`, `sc2255`, `sc2268` | conditions that decide nothing or do not do what they seem to: `[ n -le 4 ]`, `[ $a=3 ]`, `[ false ]`, `[ -n "$a " ]`, globs, braces and arrays as operands, `=~ "x.*"`, `[ -n "$(grep x)" ]` and the `x` prefix |
+| `sc2001`, `sc2035`, `sc2037`, `sc2044`, `sc2045`, `sc2079`, `sc2094`, `sc2103`, `sc2129`, `sc2141`, `sc2194`, `sc2195`, `sc2209`, `sc2221`, `sc2222`, `sc2231`, `sc2233` to `sc2235`, `sc2269`, `sc2295`, `sc2321`, `sc2327`, `sc2328` | `echo "$x" \| sed`, `rm *`, `A=ls -l`, `for` over `ls` or `find`, reading and writing the same file, `cd` back, several `>>` in a row, `IFS="\n"`, unreachable `case` patterns, `( [ a ] )`, `x=$x`, `${a%$b}`, `a[$((i))]=` and `$(cmd > f)` |
 | `sc3001` to `sc3067` | in an `sh`, `dash` or busybox script, what only bash has: `[[ ]]`, `local`, arrays, `${x/a/b}`, `echo -n`, `&>`, `source`, `set -o pipefail` and the rest of ShellCheck's `checkBashisms`, with the dash and busybox exceptions |
 
 `# shellcheck disable=` works as in ShellCheck: before the first command, for the whole file;
@@ -601,9 +604,9 @@ before a compound command, for the whole block; it accepts ranges (`SC2000-SC209
 
 Parity, against ShellCheck 0.11: zero differences by file, line, column and rule on 1,752 scripts
 from kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku and others (1,680 findings).
-With those repos updated (2026-10-30, 1,834 scripts): 3,292 identical findings and 87 extra, all
+With those repos updated (2026-10-30, 1,834 scripts): 3,330 identical findings and 87 extra, all
 `sc2016` in a newer `nvm.sh` that tree-sitter-bash misreads; without the `# shellcheck` directives,
-4,960 identical and none extra. Files tree-sitter-bash cannot parse are
+5,008 identical and none extra. Files tree-sitter-bash cannot parse are
 skipped.
 
 ### Go against golangci-lint

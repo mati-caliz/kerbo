@@ -115,6 +115,18 @@ fn checks_commands_words_and_sources_like_shellcheck() {
             include_str!("fixtures/commands_sh.sh"),
             include_str!("fixtures/commands_sh.shellcheck"),
         ),
+        (
+            include_str!("fixtures/structure.sh"),
+            include_str!("fixtures/structure.shellcheck"),
+        ),
+        (
+            include_str!("fixtures/structure_ksh.sh"),
+            include_str!("fixtures/structure_ksh.shellcheck"),
+        ),
+        (
+            include_str!("fixtures/structure_sh.sh"),
+            include_str!("fixtures/structure_sh.shellcheck"),
+        ),
     ];
     for (script, shellcheck) in fixtures {
         let expected: Vec<String> = shellcheck.lines().map(str::to_owned).collect();
@@ -143,6 +155,16 @@ fn found_of(script: &str, codes: &[&str]) -> Vec<(String, usize, usize)> {
         .into_iter()
         .filter(|(code, _, _)| codes.contains(&code.as_str()))
         .collect()
+}
+
+// tree-sitter lee la opción como otra asignación, y con otra asignación en la línea siguiente junta
+// las dos líneas en un solo comando: por eso no entra en el fixture.
+#[test]
+fn reads_a_long_flag_after_an_assignment_as_shellcheck_does() {
+    let script = "#!/bin/bash
+A=ls --sort=$foo
+";
+    assert_eq!(found_of(script, &["sc2037"]), [("sc2037".to_owned(), 2, 1)]);
 }
 
 #[test]

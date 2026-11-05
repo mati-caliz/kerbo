@@ -35,9 +35,9 @@ pub enum Condition<'tree> {
     Or(Node<'tree>, Box<Self>, Box<Self>),
     Not(Box<Self>),
     Group(Box<Self>),
-    Unary,
+    Unary(Node<'tree>, Node<'tree>),
     Binary(Node<'tree>, Node<'tree>, Node<'tree>),
-    Nullary,
+    Nullary(Node<'tree>),
 }
 
 struct Reader<'tree, 'source> {
@@ -129,9 +129,9 @@ impl<'tree> Reader<'tree, '_> {
             return Some(Condition::Group(Box::new(inner)));
         }
         if is_flag_operator(self.peek_text()) {
-            self.advance()?;
-            self.advance()?;
-            return Some(Condition::Unary);
+            let operator = self.advance()?;
+            let operand = self.advance()?;
+            return Some(Condition::Unary(operator, operand));
         }
         let left = self.advance()?;
         if self.is_binary_operator() {
@@ -139,7 +139,7 @@ impl<'tree> Reader<'tree, '_> {
             let right = self.advance()?;
             return Some(Condition::Binary(operator, left, right));
         }
-        Some(Condition::Nullary)
+        Some(Condition::Nullary(left))
     }
 
     fn is_binary_operator(&self) -> bool {
@@ -166,7 +166,7 @@ impl Condition<'_> {
                 right.visit(false, visitor);
             }
             Self::Not(inner) | Self::Group(inner) => inner.visit(only_test, visitor),
-            Self::Unary | Self::Binary(..) | Self::Nullary => {}
+            Self::Unary(..) | Self::Binary(..) | Self::Nullary(_) => {}
         }
     }
 }

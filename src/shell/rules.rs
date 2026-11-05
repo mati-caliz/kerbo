@@ -9,6 +9,7 @@ mod quoting;
 mod redirects;
 mod shebang;
 mod single_quotes;
+mod structure;
 
 use super::context::{Context, Finding, Findings};
 use super::syntax::descendants;
@@ -26,6 +27,7 @@ pub fn check(context: &Context<'_, '_>) -> Vec<Finding> {
         builtins::check(node, context, &mut findings);
         command_checks::check(node, context, &mut findings);
         analytics::check(node, context, &mut findings);
+        structure::check(node, context, &mut findings);
         conditions::check(node, context, &mut findings);
         redirects::check(node, context, &mut findings);
         arithmetic::check(node, context, &mut findings);

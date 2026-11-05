@@ -5,6 +5,8 @@ mod directives;
 mod environment;
 mod flow;
 mod parameters;
+mod pattern_scan;
+mod pseudo_glob;
 mod quoting;
 mod repair;
 mod rules;
@@ -12,6 +14,8 @@ mod severity;
 mod syntax;
 mod test_expression;
 mod variables;
+mod word_pieces;
+mod word_scan;
 mod words;
 
 use std::collections::HashMap;
@@ -178,8 +182,11 @@ fn context<'tree, 'source>(
     Some(Context::new(root, source, &origin))
 }
 
+// SC2157 apunta al texto literal de la palabra, que puede empezar con un espacio.
+const AT_LITERAL_START: &[ShellRule] = &[ShellRule::Sc2148, ShellRule::Sc2157];
+
 fn at_token(finding: Finding, source: &[u8]) -> Finding {
-    if finding.rule == ShellRule::Sc2148 {
+    if AT_LITERAL_START.contains(&finding.rule) {
         return finding;
     }
     let (byte, point) = syntax::token_start(finding.byte, finding.point, source);
