@@ -27,4 +27,4 @@ MSYS_NO_PATHCONV=1 docker run --rm -m 16g --cpus=8 -v "$repo:/src:ro" -w /src -v
     cargo build --release --locked --bin kerbo 2>&1 | tail -1
     cd /c && /cache/target/kerbo-dev/release/kerbo check --format json --no-cache '"${CORPUS_REPOS[*]}"' > /o/kerbo.json 2> /o/kerbo_err.txt || true
     tail -1 /o/kerbo_err.txt'
-python rule_compare.py out_rules.json "$rules" 15
+python "$here/compare_rules.py" "$rules" 15

@@ -23,6 +23,7 @@
 18:5 no-useless-escape
 19:6 no-useless-escape
 22:6 no-useless-escape
+23:3 no-useless-backreference
 27:5 no-useless-escape
 30:7 no-useless-escape
 30:13 no-useless-escape

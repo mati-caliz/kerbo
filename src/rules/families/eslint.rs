@@ -1,6 +1,11 @@
 use super::{ComposeRule, DockerfileRule, MigrationRule, PythonRule, RuleId};
 
 rule_family!(EslintRule {
+    NoInvalidRegexp => "no-invalid-regexp",
+    NoEmptyCharacterClass => "no-empty-character-class",
+    NoRegexSpaces => "no-regex-spaces",
+    NoUselessBackreference => "no-useless-backreference",
+    NoIrregularWhitespace => "no-irregular-whitespace",
     ForDirection => "for-direction",
     NoDeleteVar => "no-delete-var",
     NoDupeArgs => "no-dupe-args",

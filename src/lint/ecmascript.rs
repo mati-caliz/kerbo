@@ -18,6 +18,7 @@ mod expressions;
 mod fallthrough;
 mod finally;
 mod for_direction;
+mod irregular_whitespace;
 mod members;
 mod modules;
 mod multiline;
@@ -30,6 +31,8 @@ mod prefer_const;
 mod presets;
 mod private_members;
 mod redeclare;
+mod regex_rules;
+mod regex_syntax;
 mod regexes;
 mod repair;
 mod restricted;
@@ -163,6 +166,20 @@ const CHECKS: &[(EslintRule, Check)] = &[
     (
         EslintRule::NoUselessAssignment,
         useless_assignment::useless_assignments,
+    ),
+    (EslintRule::NoInvalidRegexp, regex_rules::invalid_regexes),
+    (
+        EslintRule::NoEmptyCharacterClass,
+        regex_rules::empty_character_classes,
+    ),
+    (EslintRule::NoRegexSpaces, regex_rules::repeated_regex_spaces),
+    (
+        EslintRule::NoUselessBackreference,
+        regex_rules::useless_backreferences,
+    ),
+    (
+        EslintRule::NoIrregularWhitespace,
+        irregular_whitespace::irregular_whitespace,
     ),
     (EslintRule::ForDirection, for_direction::wrong_for_directions),
     (EslintRule::NoDeleteVar, core_recommended::deleted_variables),

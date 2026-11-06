@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 19] = [
+pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 24] = [
     (
         EslintRule::ForDirection,
         RuleText::new(
@@ -171,6 +171,51 @@ pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 19] = [
             "usá namespace",
             "module es el nombre viejo, y se confunde con la declaración de un módulo externo.",
             "module A {} se vuelve namespace A {}.",
+        ),
+    ),
+    (
+        EslintRule::NoInvalidRegexp,
+        RuleText::new(
+            "Expresión regular inválida en RegExp()",
+            "corregí el patrón o las flags",
+            "Tira un SyntaxError cuando corre esa línea.",
+            "new RegExp(\"[\") se vuelve new RegExp(\"\\\\[\").",
+        ),
+    ),
+    (
+        EslintRule::NoEmptyCharacterClass,
+        RuleText::new(
+            "Clase de caracteres vacía en una expresión regular",
+            "agregá los caracteres, o escapá el corchete",
+            "[] no coincide con nada, así que la expresión entera nunca coincide.",
+            "/a[]/ se vuelve /a\\\\[\\\\]/.",
+        ),
+    ),
+    (
+        EslintRule::NoRegexSpaces,
+        RuleText::new(
+            "Varios espacios seguidos en una expresión regular",
+            "usá un cuantificador",
+            "Cuesta contar cuántos espacios espera.",
+            "/a  b/ se vuelve /a {2}b/.",
+        ),
+    ),
+    (
+        EslintRule::NoUselessBackreference,
+        RuleText::new(
+            "Referencia hacia atrás que siempre coincide con nada",
+            "movela después de su grupo, o sacala",
+            "El grupo todavía no coincidió o no puede coincidir por ese camino, así que no agrega nada.",
+            "/\\\\1(a)/ se vuelve /(a)\\\\1/.",
+        ),
+    ),
+    (
+        EslintRule::NoIrregularWhitespace,
+        RuleText::new(
+            "Espacio irregular",
+            "cambialo por un espacio normal",
+            "Parece un espacio, pero algunos parsers lo tratan distinto y rompe las búsquedas.",
+            "Un espacio de no separación se vuelve un espacio común.",
         ),
     ),
 ];

@@ -44,3 +44,4 @@
 30:7 no-unused-vars
 30:29 no-undef
 31:7 no-unused-vars
+31:26 no-invalid-regexp

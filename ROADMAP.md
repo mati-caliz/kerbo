@@ -910,11 +910,20 @@ acá.
   - Pendientes: `no-obj-calls` no sigue los alias (`const m = Math; m()`) y `for-direction` sólo lee
     literales como paso (ESLint también constantes con `getStaticValue`). ESLint arregla
     `no-extra-non-null-assertion` y `prefer-namespace-keyword`, y kerbo todavía no.
+- Expresiones regulares y espacios (hecho, 2026-11-06): `no-invalid-regexp`,
+  `no-empty-character-class`, `no-regex-spaces`, `no-useless-backreference` y
+  `no-irregular-whitespace`, sobre un parser propio de expresiones regulares
+  (`src/lint/ecmascript/regex_syntax/`, el equivalente a `regexpp`), con el modo laxo del anexo B, `u` y
+  `v`. Paridad contra ESLint en `fixtures/regexes_recommended.js` e `irregular_whitespace.js`. En el
+  corpus actual sólo aparece `no-irregular-whitespace`: 5 de 5, más 2 que kerbo silencia a propósito porque
+  tienen un `eslint-disable` arriba y la medición de ESLint corre con los comentarios apagados.
+  - `compare_rules.py` reemplaza a `rule_compare.py`, que sólo miraba los archivos donde kerbo ya había
+    avisado y escondía lo que le faltaba.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
-  - Las que miran expresiones regulares: `no-empty-character-class`, `no-invalid-regexp`,
-    `no-regex-spaces` y `no-useless-backreference`.
-  - `no-misleading-character-class` (290, casi todo en código compilado),
-    `no-irregular-whitespace` (10) y las que no aparecieron en el corpus.
+  - `no-misleading-character-class` (290 en la medición vieja, casi todo en código compilado): pide las
+    tablas de Unicode de marcas combinantes y emojis.
+  - El parser de expresiones regulares no valida los nombres de `\p{…}` ni el contenido de las clases
+    con `--` y `&&` en modo `v`: `no-invalid-regexp` puede dejar pasar esos casos.
   - `no-useless-escape` no mira las expresiones regulares con el flag `v`.
   - Los `.js` con argumentos de tipo en llamadas y los huecos de la gramática de arriba.
   - Los `/* global x */` sólo los lee `no-undef`: con los comentarios activos ESLint avisa también

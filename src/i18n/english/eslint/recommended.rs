@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 19] = [
+pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 24] = [
     (
         EslintRule::ForDirection,
         RuleText::new(
@@ -171,6 +171,51 @@ pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 19] = [
             "use namespace",
             "module is the old name, and looks like an external module declaration.",
             "module A {} becomes namespace A {}.",
+        ),
+    ),
+    (
+        EslintRule::NoInvalidRegexp,
+        RuleText::new(
+            "Invalid regular expression in RegExp()",
+            "fix the pattern or the flags",
+            "It throws a SyntaxError when that line runs.",
+            "new RegExp(\"[\") becomes new RegExp(\"\\\\[\").",
+        ),
+    ),
+    (
+        EslintRule::NoEmptyCharacterClass,
+        RuleText::new(
+            "Empty character class in a regular expression",
+            "add the characters, or escape the bracket",
+            "[] matches nothing, so the whole expression never matches.",
+            "/a[]/ becomes /a\\\\[\\\\]/.",
+        ),
+    ),
+    (
+        EslintRule::NoRegexSpaces,
+        RuleText::new(
+            "Several spaces in a row in a regular expression",
+            "use a quantifier",
+            "It is hard to count how many spaces it expects.",
+            "/a  b/ becomes /a {2}b/.",
+        ),
+    ),
+    (
+        EslintRule::NoUselessBackreference,
+        RuleText::new(
+            "Backreference that always matches empty",
+            "move it after its group, or remove it",
+            "The group has not matched yet or cannot match on that path, so it matches nothing.",
+            "/\\\\1(a)/ becomes /(a)\\\\1/.",
+        ),
+    ),
+    (
+        EslintRule::NoIrregularWhitespace,
+        RuleText::new(
+            "Irregular whitespace",
+            "replace it with a normal space",
+            "It looks like a space, but some parsers treat it differently and it breaks searches.",
+            "A no-break space becomes a normal space.",
         ),
     ),
 ];

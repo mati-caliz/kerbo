@@ -541,7 +541,7 @@ que es un error de lectura y no una regla.
 ### TypeScript y JavaScript contra ESLint
 
 En TypeScript y JavaScript, kerbo hace las reglas de `@eslint/js` recommended y de
-`typescript-eslint` recommended que no piden tipos (faltan seis sobre expresiones regulares y espacios), con el nombre de ESLint sin el prefijo del
+`typescript-eslint` recommended que no piden tipos (falta `no-misleading-character-class`), con el nombre de ESLint sin el prefijo del
 plugin: `kerbo explain no-unused-vars`, `--max no-explicit-any=0` o `no-var = "off"`. Corren en los
 dos lenguajes como en un `eslint.config.js` con `js.configs.recommended` y
 `tseslint.configs.recommended`; en los `.ts` no corre `no-dupe-keys`, que ya revisa el compilador.

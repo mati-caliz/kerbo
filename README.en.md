@@ -543,8 +543,8 @@ rather than a rule.
 ### TypeScript and JavaScript against ESLint
 
 In TypeScript and JavaScript, kerbo runs the rules of `@eslint/js` recommended and of
-`typescript-eslint` recommended that need no type information (six on regular expressions and
-whitespace are missing), with the ESLint name without the
+`typescript-eslint` recommended that need no type information (`no-misleading-character-class` is
+missing), with the ESLint name without the
 plugin prefix: `kerbo explain no-unused-vars`, `--max no-explicit-any=0` or `no-var = "off"`. They
 run in both languages as in an `eslint.config.js` with `js.configs.recommended` and
 `tseslint.configs.recommended`; in `.ts` files `no-dupe-keys` does not run, since the compiler
