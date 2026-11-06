@@ -94,6 +94,7 @@ const ERRORS: &[ShellRule] = &[
     ShellRule::Sc2325,
     ShellRule::Sc2326,
     ShellRule::Sc2332,
+    ShellRule::Sc2218,
 ];
 const INFOS: &[ShellRule] = &[
     ShellRule::Sc2015,
@@ -138,6 +139,8 @@ const INFOS: &[ShellRule] = &[
     ShellRule::Sc2263,
     ShellRule::Sc2025,
     ShellRule::Sc2291,
+    ShellRule::Sc2317,
+    ShellRule::Sc2329,
 ];
 const STYLES: &[ShellRule] = &[
     ShellRule::Sc2004,

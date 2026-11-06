@@ -1117,7 +1117,32 @@ acá.
   (SC2332) y `checkArrayValueUsedAsIndex` (SC2302, SC2303).
   - Paridad contra ShellCheck 0.11.0 en las pruebas `prop_` de esas funciones (`testdata/details`), sin
     avisos de más. Quedan como fixtures en `src/shell/fixtures/command_details*.sh`.
+- Código inalcanzable y el tipo de cada variable (hecho, 2026-11-06): 10 reglas, en
+  `src/shell/rules/reachability.rs` y `variable_kinds.rs`. `checkCommandIsUnreachable` (SC2317, SC2329)
+  sale del mismo recorrido que el valor de las variables: una función está alcanzada si algo vivo la
+  llama, o si el final del script es alcanzable (el script podría estar cargado con `source`), y una
+  sentencia está muerta si ningún recorrido llega vivo. `checkArrayWithoutIndex` (SC2128, SC2178,
+  SC2179) y `checkQuotesInLiterals` (SC2089, SC2090) recorren los eventos en orden. `checkUseBeforeDefinition`
+  (SC2218) y `checkOverwrittenExitCode` (SC2319, SC2320) son una aproximación sobre el árbol: ShellCheck
+  usa la post-dominancia del grafo de control, y kerbo no arma ese grafo.
+  - Errores del motor de flujo que aparecieron y se arreglaron: `*"x"*` contaba como un `*)` y dejaba
+    muerto lo de después del `case`, y un marco de subshell guardaba el byte de su primera sentencia
+    como entrada, así que una función que era lo primero del subshell (o del archivo) parecía estar
+    llamándose a sí misma y no se ejecutaba.
+  - SC2320: ShellCheck le atribuye el código de `printf` y de lo que va detrás de `command` a una
+    palabra, así que de los comandos que imprimen sólo reconoce un `echo` directo. Se calcó.
+  - Paridad contra ShellCheck 0.11.0 en las pruebas `prop_` (`testdata/reach`) y scripts propios
+    (`testdata/reach-more`), sin avisos de más. En el corpus: 234 de 236 SC2329, y en total 5.335
+    avisos idénticos sin directivas y 3.621 con ellas, sin nada de más salvo los 87 SC2016 de `nvm.sh`
+    ya anotados; `scripts/parity/shell/show_diffs.py` muestra el código de cada diferencia. Quedan como
+    fixtures en `src/shell/fixtures/reachability.sh`.
 - Pendientes de Shell contra ShellCheck:
+  - SC2218 en `:` antes de `:(){ :|:& };:` en un mismo archivo: kerbo avisa y ShellCheck no, sin explicar
+    todavía (un caso armado juntando pruebas; quedó afuera del fixture).
+  - SC2218 con un `exit` indirecto: si entre el uso y la definición hay una llamada a una función que
+    tiene un `exit`, kerbo no avisa, y ShellCheck a veces sí (faltan 4 en tests de nvm).
+  - SC2329 de `nix-user-pkgs` en neofetch (2): funciones definidas adentro de otra función que sí corre,
+    sin explicar todavía. SC2128 en `coproc`: tree-sitter no tiene ese nodo.
   - SC2180 en `foo[a][b]=3` y `${foo[bar][baz]}`: tree-sitter da un error y el archivo se saltea.
   - SC2314 y SC2315 (`!` en una prueba de bats): tree-sitter no reconoce `@test` como bloque, igual que
     en SC2030 y SC2031.
@@ -1148,13 +1173,11 @@ acá.
   - Dos avisos sin explicar: SC2327 y SC2328 en la línea 766 de `kubernetes/test/cmd/core.sh`; la
     misma línea suelta en un script aparte sí avisa.
   - Sin medir contra pruebas ni corpus, por la frecuencia baja: los otros chequeos de `Analytics.hs`
-    que lista `pending_checks.py`. Lo que más falta en el corpus (sin directivas): SC2329 235 y SC2317
-    9 (`CFG.hs`), SC1007 27, SC2218 5, SC1003 4 y SC2128 4.
-  - SC2329 (función que nunca se llama) y SC2317 (código inalcanzable) piden el grafo de control
-    de ShellCheck (`CFG.hs`): una función cuenta como llamada si su cuerpo es alcanzable.
-  - De `Checks/Commands.hs` quedan `getopts` con su `case` (SC2213, SC2214, SC2220), `time` en un
-    pipeline (SC2176, SC2177), la cantidad de argumentos de `printf` (SC2182, SC2183), los espacios
-    repetidos de `echo` (SC2291) y los opcionales.
+    que lista `pending_checks.py`. Lo que más falta en el corpus (sin directivas) son los avisos del
+    parser (SC1007 27, SC1003 5, SC1071 4 y otros).
+  - Los chequeos opcionales de ShellCheck (`--enable`): SC2002, SC2236, SC2237, SC2243, SC2244, SC2248 a
+    SC2250, SC2292, SC2310 a SC2312 y SC2335. ShellCheck no los corre por defecto, así que no entran en
+    esta paridad.
   - tree-sitter-bash pone las palabras que siguen a una redirección como destinos extra de ella
     (`/bin/echo >&2 -e "…"`): kerbo no las ve como argumentos (2 SC3037 en moby), y lo mismo
     afecta a cualquier regla que mire argumentos.

@@ -24,6 +24,9 @@ use frames::{Dependency, Frame, Stack};
 use state::{Reach, Scope, State, Target, Variable};
 
 const LASTPIPE: &str = "lastpipe";
+// La entrada de un marco que no es de una función: si fuera un byte del archivo, una función que empieza
+// donde empieza el marco parecería estar llamándose a sí misma.
+const NOT_A_FUNCTION: usize = usize::MAX;
 const SET: &str = "set";
 const SHOPT: &str = "shopt";
 const SET_OPTION_FLAG: &str = "o";
@@ -40,6 +43,52 @@ pub fn numeric_expansions(context: &Context<'_, '_>, candidates: &[Node<'_>]) ->
     expansions_where(context, candidates, |variable| variable.numeric)
 }
 
+// Lo que el recorrido dejó sin alcanzar: las funciones que nada llama y las sentencias de después de un
+// `exit` o un `return`, salvo que por otro camino sí se ejecuten.
+#[derive(Debug, Default)]
+pub struct Reachability<'tree> {
+    invoked: HashSet<usize>,
+    dead: Vec<Node<'tree>>,
+    dead_starts: HashSet<usize>,
+}
+
+impl<'tree> Reachability<'tree> {
+    pub fn is_invoked(&self, function: Node<'_>) -> bool {
+        self.invoked.contains(&function.start_byte())
+    }
+
+    pub fn is_dead(&self, statement: Node<'_>) -> bool {
+        self.dead_starts.contains(&statement.start_byte())
+    }
+
+    pub fn dead_statements(&self) -> &[Node<'tree>] {
+        &self.dead
+    }
+}
+
+pub fn reachability<'tree>(context: &Context<'tree, '_>) -> Reachability<'tree> {
+    let mut interpreter = Interpreter::new(context, &[]);
+    let environment = environment();
+    interpreter
+        .stack
+        .frames
+        .push(Frame::new(environment.clone(), false, NOT_A_FUNCTION));
+    let exit = interpreter.run_frame(context.root, State::default());
+    interpreter.stack.frames.clear();
+    interpreter.run_stragglers(&environment, &exit);
+    let live = std::mem::take(&mut interpreter.live_statements);
+    let mut dead: Vec<Node<'tree>> = std::mem::take(&mut interpreter.dead_statements)
+        .into_values()
+        .filter(|statement| !live.contains(&statement.start_byte()))
+        .collect();
+    dead.sort_by_key(Node::start_byte);
+    Reachability {
+        invoked: interpreter.invoked,
+        dead_starts: dead.iter().map(Node::start_byte).collect(),
+        dead,
+    }
+}
+
 fn expansions_where(
     context: &Context<'_, '_>,
     candidates: &[Node<'_>],
@@ -50,7 +99,7 @@ fn expansions_where(
     interpreter
         .stack
         .frames
-        .push(Frame::new(environment.clone(), false, context.root.start_byte()));
+        .push(Frame::new(environment.clone(), false, NOT_A_FUNCTION));
     let exit = interpreter.run_frame(context.root, State::default());
     interpreter.stack.frames.clear();
     interpreter.run_stragglers(&environment, &exit);
@@ -81,6 +130,8 @@ pub struct Interpreter<'tree, 'context, 'source> {
     stack: Stack,
     wanted: HashMap<usize, String>,
     records: HashMap<usize, Variable>,
+    live_statements: HashSet<usize>,
+    dead_statements: HashMap<usize, Node<'tree>>,
     functions: HashMap<usize, Node<'tree>>,
     invoked: HashSet<usize>,
     returns: Vec<Vec<State>>,
@@ -114,6 +165,8 @@ impl<'tree, 'context, 'source> Interpreter<'tree, 'context, 'source> {
             stack: Stack::default(),
             wanted,
             records: HashMap::new(),
+            live_statements: HashSet::new(),
+            dead_statements: HashMap::new(),
             functions,
             invoked: HashSet::new(),
             returns: Vec::new(),
@@ -150,19 +203,30 @@ impl<'tree, 'context, 'source> Interpreter<'tree, 'context, 'source> {
     }
 
     pub fn subshell(&mut self, body: &[Node<'tree>], state: &State) {
-        self.enter_subshell(body.first().map_or(0, Node::start_byte), state);
-        self.statements(body, State::default());
+        self.enter_subshell(state);
+        self.statements(body, Self::subshell_start(state));
         self.leave_subshell();
     }
 
     pub fn isolated(&mut self, statement: Node<'tree>, state: &State) {
-        self.enter_subshell(statement.start_byte(), state);
-        self.statement(statement, State::default());
+        self.enter_subshell(state);
+        self.statement(statement, Self::subshell_start(state));
         self.leave_subshell();
     }
 
-    fn enter_subshell(&mut self, entry: usize, state: &State) {
-        self.stack.frames.push(Frame::new(state.clone(), false, entry));
+    // Un subshell arranca con un estado propio, y si lo de afuera no se alcanza, lo de adentro tampoco.
+    fn subshell_start(outer: &State) -> State {
+        if outer.is_live() {
+            State::default()
+        } else {
+            State::empty(Reach::Unreachable)
+        }
+    }
+
+    fn enter_subshell(&mut self, state: &State) {
+        self.stack
+            .frames
+            .push(Frame::new(state.clone(), false, NOT_A_FUNCTION));
         self.returns.push(Vec::new());
     }
 

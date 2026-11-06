@@ -10,10 +10,12 @@ mod conditions;
 mod control;
 mod expansions;
 mod quoting;
+mod reachability;
 mod redirects;
 mod shebang;
 mod single_quotes;
 pub mod structure;
+mod variable_kinds;
 
 use super::context::{Context, Finding, Findings};
 use super::syntax::descendants;
@@ -47,5 +49,7 @@ pub fn check(context: &Context<'_, '_>) -> Vec<Finding> {
     command_shapes::check_script(context, &mut findings);
     quoting::check(context, &mut findings);
     variables::check(context, &mut findings);
+    variable_kinds::check(context, &mut findings);
+    reachability::check(context, &mut findings);
     findings.found
 }

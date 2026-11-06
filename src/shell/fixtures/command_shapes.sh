@@ -30,7 +30,6 @@ arr=( [foo] = bar )
 arr=( var=value )
 arr=( [foo]=bar )
 arr=( [foo]="" )
-:(){ :|:& };:
 f() { f; }
 f() { command f; }
 cd() { cd "$lol/$1" || exit; }

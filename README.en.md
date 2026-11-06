@@ -578,7 +578,7 @@ lowercase: `kerbo explain SC2086`, `--max sc2086=0` or `sc2034 = "off"` in `kerb
 the 22 rules that show up most, the 64 for what bash adds in an sh script (`sc3001` to `sc3067`), 55 command checks (`tr`, `grep`,
 `expr`, `find`, `rm`, `sudo`, `return`, `alias`, `read` and others), 24 on `source`, pipelines and
 words (`ls | grep`, `"x$@"`, `$*`, quotes that unquote and others) and 46 on conditions, `case`,
-subshells, redirections and assignments, 4 on the variable flow, 44 on comparisons and arithmetic, 35 on `for`, `find -exec`, `exec`, `break`, functions and the shebang, 38 on command names, pipes, redirections and arrays and 19 on the details of `printf`, `getopts`, `time` and declarations; severity is ShellCheck's, `recommended` turns off the style ones
+subshells, redirections and assignments, 4 on the variable flow, 44 on comparisons and arithmetic, 35 on `for`, `find -exec`, `exec`, `break`, functions and the shebang, 38 on command names, pipes, redirections and arrays, 19 on the details of `printf`, `getopts`, `time` and declarations and 10 on unreachable code and the kind of each variable; severity is ShellCheck's, `recommended` turns off the style ones
 and `minimal` the informational ones too. The universal rules in the table above do not run on
 shell, except for the anti-cheat.
 
@@ -601,6 +601,7 @@ shell, except for the anti-cheat.
 | `sc2000`, `sc2014`, `sc2032`, `sc2033`, `sc2036`, `sc2041` to `sc2043`, `sc2066`, `sc2067`, `sc2083`, `sc2087`, `sc2093`, `sc2095` to `sc2098`, `sc2101`, `sc2102`, `sc2104` to `sc2106`, `sc2111` to `sc2113`, `sc2118`, `sc2123`, `sc2127`, `sc2147`, `sc2165`, `sc2167`, `sc2187`, `sc2239`, `sc2246`, `sc2258` | the script's flow: a `for` that runs once, unfinished `find -exec`, code after `exec`, `break` outside a loop or in a subshell, `sudo` with a function, `ssh` in a `while read`, `a=1 echo $a`, `[:digit:]`, `PATH=/x`, `function` in sh, the shebang |
 | `sc2188` to `sc2192`, `sc2210`, `sc2211`, `sc2215` to `sc2217`, `sc2238`, `sc2247`, `sc2256`, `sc2259` to `sc2264`, `sc2270` to `sc2282`, `sc2286` to `sc2289` | the shape of the command: a lone `> file`, `< f \| cmd`, `foo \| rm`, `a > f \| b`, `a > f > g`, `foo > 2`, `foo > grep`, `*.sh` or `-e` as a command, `$a=1`, `1=a`, `=====`, `foo/`, `ls() { ls; }`, aliases used in their own unit, `$"(ls)"` and `a=(1=b)` |
 | `sc2025`, `sc2051`, `sc2175` to `sc2177`, `sc2180`, `sc2182`, `sc2183`, `sc2213`, `sc2214`, `sc2220`, `sc2290`, `sc2291`, `sc2302`, `sc2303`, `sc2318`, `sc2325`, `sc2326`, `sc2332` | the details of a command: `printf` formats with a different number of arguments, the `getopts` `case`, `export a =b`, `declare a=1 b=$a`, `{1..$n}`, `time a \| b` in sh, `echo a    b`, `for i in "${a[@]}"` with `${a[$i]}`, `a \| ! b` and `[ ! -a f ]` |
+| `sc2089`, `sc2090`, `sc2128`, `sc2178`, `sc2179`, `sc2218`, `sc2317`, `sc2319`, `sc2320`, `sc2329` | what comes from the flow: functions never called or called before being defined, code after an `exit`, arrays used as text, quotes stored in a variable and a `$?` that is no longer the code of the command meant to be checked |
 | `sc2030`, `sc2031`, `sc2153`, `sc2154` | what is assigned inside a subshell and read outside it, and variables nothing in the file assigns (uppercase ones only if a similar one exists) |
 | `sc3001` to `sc3067` | in an `sh`, `dash` or busybox script, what only bash has: `[[ ]]`, `local`, arrays, `${x/a/b}`, `echo -n`, `&>`, `source`, `set -o pipefail` and the rest of ShellCheck's `checkBashisms`, with the dash and busybox exceptions |
 
@@ -609,9 +610,9 @@ before a compound command, for the whole block; it accepts ranges (`SC2000-SC209
 
 Parity, against ShellCheck 0.11: zero differences by file, line, column and rule on 1,752 scripts
 from kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku and others (1,680 findings).
-With those repos updated (1,834 scripts): 3,371 identical findings and 87 extra, all
+With those repos updated (1,834 scripts): 3,621 identical findings and 87 extra, all
 `sc2016` in a newer `nvm.sh` that tree-sitter-bash misreads; without the `# shellcheck` directives,
-5,075 identical and none extra. Files tree-sitter-bash cannot parse are
+5,335 identical and none extra. Files tree-sitter-bash cannot parse are
 skipped.
 
 ### Go against golangci-lint

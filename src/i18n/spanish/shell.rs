@@ -5,6 +5,7 @@ mod command_details;
 mod command_shapes;
 mod comparisons;
 mod control;
+mod flow_kinds;
 mod shell_builtins;
 mod structure;
 mod test_operands;
@@ -20,6 +21,7 @@ use command_details::COMMAND_DETAILS_TEXTS;
 use command_shapes::COMMAND_SHAPES_TEXTS;
 use comparisons::COMPARISONS_TEXTS;
 use control::CONTROL_TEXTS;
+use flow_kinds::FLOW_KINDS_TEXTS;
 use shell_builtins::SHELL_BUILTINS_TEXTS;
 use structure::STRUCTURE_TEXTS;
 use test_operands::TEST_OPERANDS_TEXTS;
@@ -181,6 +183,7 @@ pub fn shell(rule: ShellRule) -> RuleText {
             .chain(TOOLS_TEXTS.iter())
             .chain(SHELL_BUILTINS_TEXTS.iter())
             .chain(ANALYTICS_TEXTS.iter())
+            .chain(FLOW_KINDS_TEXTS.iter())
             .chain(COMMAND_DETAILS_TEXTS.iter())
             .chain(COMMAND_SHAPES_TEXTS.iter())
             .chain(CONTROL_TEXTS.iter())

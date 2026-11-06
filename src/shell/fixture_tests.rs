@@ -10,67 +10,36 @@ const EARLIER_RULES: &[&str] = &[
     "sc2207", "sc2223",
 ];
 
+macro_rules! fixture {
+    ($name:literal) => {
+        (
+            include_str!(concat!("fixtures/", $name, ".sh")),
+            include_str!(concat!("fixtures/", $name, ".shellcheck")),
+        )
+    };
+}
+
+const FIXTURES: &[(&str, &str)] = &[
+    fixture!("commands"),
+    fixture!("commands_sh"),
+    fixture!("structure"),
+    fixture!("structure_ksh"),
+    fixture!("structure_sh"),
+    fixture!("comparisons"),
+    fixture!("control"),
+    fixture!("command_shapes"),
+    fixture!("equals"),
+    fixture!("equals_sh"),
+    fixture!("equals_dash"),
+    fixture!("equals_ksh"),
+    fixture!("command_details"),
+    fixture!("command_details_sh"),
+    fixture!("reachability"),
+];
+
 #[test]
 fn checks_commands_words_and_sources_like_shellcheck() {
-    let fixtures = [
-        (
-            include_str!("fixtures/commands.sh"),
-            include_str!("fixtures/commands.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/commands_sh.sh"),
-            include_str!("fixtures/commands_sh.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/structure.sh"),
-            include_str!("fixtures/structure.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/structure_ksh.sh"),
-            include_str!("fixtures/structure_ksh.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/structure_sh.sh"),
-            include_str!("fixtures/structure_sh.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/comparisons.sh"),
-            include_str!("fixtures/comparisons.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/control.sh"),
-            include_str!("fixtures/control.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/command_shapes.sh"),
-            include_str!("fixtures/command_shapes.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/equals.sh"),
-            include_str!("fixtures/equals.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/equals_sh.sh"),
-            include_str!("fixtures/equals_sh.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/equals_dash.sh"),
-            include_str!("fixtures/equals_dash.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/equals_ksh.sh"),
-            include_str!("fixtures/equals_ksh.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/command_details.sh"),
-            include_str!("fixtures/command_details.shellcheck"),
-        ),
-        (
-            include_str!("fixtures/command_details_sh.sh"),
-            include_str!("fixtures/command_details_sh.shellcheck"),
-        ),
-    ];
-    for (script, shellcheck) in fixtures {
+    for (script, shellcheck) in FIXTURES {
         let expected: Vec<String> = shellcheck.lines().map(str::to_owned).collect();
         let mut actual: Vec<String> = found(script)
             .into_iter()

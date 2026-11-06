@@ -31,12 +31,32 @@ pub trait Control<'tree> {
     fn case_statement(&mut self, node: Node<'tree>, state: State) -> State;
 }
 
+// tree-sitter deja `*"a"*` como varios `value` seguidos: ese `*` no es un patrón que coincida con todo.
+fn is_glued_to_neighbor(patterns: &[Node<'_>], index: usize) -> bool {
+    let Some(pattern) = patterns.get(index) else {
+        return false;
+    };
+    let glued_before = index
+        .checked_sub(1)
+        .and_then(|previous| patterns.get(previous))
+        .is_some_and(|previous| previous.end_byte() == pattern.start_byte());
+    let glued_after = patterns
+        .get(index.saturating_add(1))
+        .is_some_and(|next| next.start_byte() == pattern.end_byte());
+    glued_before || glued_after
+}
+
 impl<'tree> Control<'tree> for Interpreter<'tree, '_, '_> {
     fn statements(&mut self, nodes: &[Node<'tree>], state: State) -> State {
         let mut state = state;
         for node in nodes {
             if node.kind() == COMMENT || !node.is_named() {
                 continue;
+            }
+            if state.is_live() {
+                self.live_statements.insert(node.start_byte());
+            } else {
+                self.dead_statements.insert(node.start_byte(), *node);
             }
             if is_backgrounded(*node, self.source()) {
                 self.isolated(*node, &state);
@@ -231,9 +251,9 @@ impl<'tree> Control<'tree> for Interpreter<'tree, '_, '_> {
         let last = items.last().copied();
         for item in items {
             let patterns = field_children(item, VALUE_FIELD);
-            has_catch_all |= patterns
-                .iter()
-                .any(|pattern| is_catch_all(*pattern, self.source()));
+            has_catch_all |= patterns.iter().enumerate().any(|(index, pattern)| {
+                is_catch_all(*pattern, self.source()) && !is_glued_to_neighbor(&patterns, index)
+            });
             let tested = self.expand_all(&patterns, next_condition.clone());
             next_condition = tested.clone();
             let entry = match carried.take() {

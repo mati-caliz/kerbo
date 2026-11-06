@@ -49,6 +49,9 @@ impl Calls for Interpreter<'_, '_, '_> {
     }
 
     fn invoke(&mut self, entry: usize, caller: &State) -> State {
+        if caller.is_live() {
+            self.invoked.insert(entry);
+        }
         if let Some(cached) = self.cached(entry, caller) {
             return cached;
         }
@@ -59,7 +62,6 @@ impl Calls for Interpreter<'_, '_, '_> {
         else {
             return State::default();
         };
-        self.invoked.insert(entry);
         self.stack.frames.push(Frame::new(caller.clone(), true, entry));
         let was_in_function = std::mem::replace(&mut self.in_function, true);
         let mut exit = self.run_frame(body, State::default());
