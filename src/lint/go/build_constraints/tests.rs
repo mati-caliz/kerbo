@@ -112,6 +112,7 @@ fn the_configured_platform_and_build_tags_decide_like_go_list() {
         goos: Some("windows".to_owned()),
         goarch: Some("arm64".to_owned()),
         build_tags: vec!["integration".to_owned()],
+        errcheck_exclude_functions: Vec::new(),
     };
     let windows = GoPlatform::of(&target);
     let verdict = |name: &str, header: &str| {
@@ -119,6 +120,8 @@ fn the_configured_platform_and_build_tags_decide_like_go_list() {
         file_name_builds(Path::new(name), &windows) && header_builds(source.as_bytes(), &windows)
     };
     assert!(verdict("x_windows_arm64.go", ""));
+    assert!(verdict("arm_level.go", "//go:build arm64.v8.0\n\n"));
+    assert!(!verdict("amd_level.go", "//go:build amd64.v1\n\n"));
     assert!(!verdict("x_linux.go", ""));
     assert!(!verdict("x_amd64.go", ""));
     assert!(verdict(

@@ -9,4 +9,7 @@ pub struct GoTarget {
     pub goarch: Option<String>,
     #[serde(default)]
     pub build_tags: Vec<String>,
+    // `linters.settings.errcheck.exclude-functions`: se suman a las exclusiones de fábrica de errcheck.
+    #[serde(default)]
+    pub errcheck_exclude_functions: Vec<String>,
 }

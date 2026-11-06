@@ -45,6 +45,7 @@ fn the_fingerprint_follows_the_go_files_the_module_and_the_platform() {
         goos: Some("windows".to_owned()),
         goarch: Some("amd64".to_owned()),
         build_tags: Vec::new(),
+        errcheck_exclude_functions: Vec::new(),
     });
     let first = fingerprint(tree.path(), &linux);
     assert_eq!(fingerprint(tree.path(), &linux), first);

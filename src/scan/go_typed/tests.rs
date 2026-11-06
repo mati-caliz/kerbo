@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use super::keep_confirmed;
+use super::{Confirmation, excluded, keep_confirmed};
 use crate::go_types::ModuleFacts;
 use crate::i18n::Message;
 use crate::lint::{LintFinding, LintKind};
@@ -45,6 +45,17 @@ fn typed_candidates(
         })
         .collect();
     finding_diagnostics(identity, &found).collect()
+}
+
+#[test]
+fn the_configured_functions_join_the_exclusions_of_errcheck() {
+    let call: crate::go_types::CallFact = serde_json::from_str(
+        r#"{"line":1,"column":1,"names":["os.Remove"],"argument":"","errors_as_type":false,"function":"os.Remove","selector":""}"#,
+    )
+    .expect("el hecho se lee");
+    assert!(!excluded(&call, &[]));
+    assert!(excluded(&call, &["os.Remove".to_owned()]));
+    assert!(!excluded(&call, &["os.Rename".to_owned()]));
 }
 
 fn subjects(diagnostics: &[Diagnostic]) -> Vec<String> {
@@ -108,7 +119,12 @@ fn candidates_stay_only_where_the_types_say_an_error_is_dropped() {
             reason: String::new(),
         })
         .collect();
-    keep_confirmed(&mut diagnostics, &mut suppressed, &roots, &modules);
+    let confirmation = Confirmation {
+        roots: &roots,
+        modules: &modules,
+        extra_excluded: &[],
+    };
+    keep_confirmed(&mut diagnostics, &mut suppressed, &confirmation);
     assert_eq!(
         subjects(&diagnostics),
         [

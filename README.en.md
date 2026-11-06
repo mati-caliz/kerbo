@@ -245,6 +245,7 @@ cfg = ["fast_path"]               # the ones the build.rs turns on
 goos = "linux"                    # by default, GOOS or the machine kerbo runs on
 goarch = "amd64"                  # by default, GOARCH or the machine
 build_tags = ["integration"]      # like golangci-lint's run.build-tags
+errcheck_exclude_functions = ["os.Remove"]  # like exclude-functions of errcheck
 ```
 
 | Preset | File | Function | Cyclomatic | Cognitive | Parameters |

@@ -99,7 +99,12 @@ pub fn confirm_typed_findings(
             }
         })
         .collect();
-    keep_confirmed(diagnostics, suppressed, &roots, &modules);
+    let confirmation = Confirmation {
+        roots: &roots,
+        modules: &modules,
+        extra_excluded: platform.errcheck_exclude_functions(),
+    };
+    keep_confirmed(diagnostics, suppressed, &confirmation);
     let (direct, direct_suppressed) = direct::direct_reports(direct_files, &roots, &modules);
     diagnostics.extend(direct);
     suppressed.extend(direct_suppressed);
@@ -112,22 +117,35 @@ pub fn drop_unconfirmed(diagnostics: &mut Vec<Diagnostic>) {
     diagnostics.retain(|diagnostic| typed_rule(diagnostic.rule).is_none());
 }
 
+struct Confirmation<'run> {
+    roots: &'run HashMap<PathBuf, PathBuf>,
+    modules: &'run HashMap<&'run Path, ModuleFacts>,
+    extra_excluded: &'run [String],
+}
+
 fn keep_confirmed(
     diagnostics: &mut Vec<Diagnostic>,
     suppressed: &mut Vec<Suppressed>,
-    roots: &HashMap<PathBuf, PathBuf>,
-    modules: &HashMap<&Path, ModuleFacts>,
+    confirmation: &Confirmation<'_>,
 ) {
     let confirm = |diagnostic: &mut Diagnostic| -> bool {
         let Some(rule) = typed_rule(diagnostic.rule) else {
             return true;
         };
-        let facts = roots
+        let facts = confirmation
+            .roots
             .get(&diagnostic.absolute_path)
-            .and_then(|root| modules.get(root.as_path()))
+            .and_then(|root| confirmation.modules.get(root.as_path()))
             .and_then(|module| module.file(&diagnostic.absolute_path));
         let position = (diagnostic.line, diagnostic.column);
-        let confirmed = facts.and_then(|facts| confirmed_subject(rule, facts, position, &diagnostic.message));
+        let confirmed = facts.and_then(|facts| {
+            confirmed_subject(
+                (rule, &diagnostic.message),
+                facts,
+                position,
+                confirmation.extra_excluded,
+            )
+        });
         let Some(subject) = confirmed else {
             return false;
         };
@@ -143,13 +161,13 @@ fn keep_confirmed(
 
 // Sólo errcheck, QF1012 y QF1008 tienen candidatos por archivo; las demás reglas de tipos son directas.
 fn confirmed_subject(
-    rule: GoRule,
+    (rule, message): (GoRule, &Message),
     facts: &FileFacts,
     position: (usize, usize),
-    message: &Message,
+    extra_excluded: &[String],
 ) -> Option<String> {
     if rule == GoRule::Errcheck {
-        return unchecked_subject(facts, position.0, position.1);
+        return unchecked_subject(facts, position, extra_excluded);
     }
     if rule == GoRule::Qf1012 {
         return fprint_replacement(facts, position);
@@ -188,15 +206,19 @@ fn fprint_replacement(facts: &FileFacts, position: (usize, usize)) -> Option<Str
 }
 
 // El nombre del aviso si en esa posición hay un error sin revisar; sin nombre, vacío.
-fn unchecked_subject(facts: &FileFacts, line: usize, column: usize) -> Option<String> {
-    let at = |fact_line: usize, fact_column: usize| (fact_line, fact_column) == (line, column);
+fn unchecked_subject(
+    facts: &FileFacts,
+    position: (usize, usize),
+    extra_excluded: &[String],
+) -> Option<String> {
+    let at = |fact_line: usize, fact_column: usize| (fact_line, fact_column) == position;
     if let Some(call) = facts
         .calls
         .iter()
         .flatten()
         .find(|call| at(call.line, call.column))
     {
-        return (!excluded(call)).then(|| code(call));
+        return (!excluded(call, extra_excluded)).then(|| code(call));
     }
     if facts
         .receives
@@ -213,7 +235,7 @@ fn unchecked_subject(facts: &FileFacts, line: usize, column: usize) -> Option<St
         .find(|range| at(range.line, range.column))?;
     range.call.as_ref().map_or_else(
         || Some(String::new()),
-        |call| (!excluded(call)).then(|| code(call)),
+        |call| (!excluded(call, extra_excluded)).then(|| code(call)),
     )
 }
 
@@ -229,20 +251,22 @@ fn code(call: &CallFact) -> String {
 }
 
 // `excludeCall` e `isErrorsAsType` de errcheck.
-fn excluded(call: &CallFact) -> bool {
+fn excluded(call: &CallFact, extra_excluded: &[String]) -> bool {
+    let is_excluded = |symbol: &str| {
+        EXCLUDED_SYMBOLS.contains(&symbol) || extra_excluded.iter().any(|extra| extra == symbol)
+    };
     call.errors_as_type
         || call.names.iter().flatten().any(|name| {
-            EXCLUDED_SYMBOLS.contains(&name.as_str())
+            is_excluded(name)
                 || (!call.argument.is_empty()
-                    && EXCLUDED_SYMBOLS.contains(
+                    && is_excluded(
                         &[
                             name.as_str(),
                             ARGUMENT_OPEN,
                             call.argument.as_str(),
                             ARGUMENT_CLOSE,
                         ]
-                        .concat()
-                        .as_str(),
+                        .concat(),
                     ))
         })
 }

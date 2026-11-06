@@ -12,7 +12,19 @@ const DEFAULT_ARCH: &str = "amd64";
 const CGO_TAG: &str = "cgo";
 const UNIX_TAG: &str = "unix";
 const COMPILER_TAG: &str = "gc";
-const AMD64_LEVEL_TAG: &str = "amd64.v1";
+const ARCHITECTURE_TAGS: &[(&str, &[&str])] = &[
+    ("386", &["386.sse2"]),
+    ("amd64", &["amd64.v1"]),
+    ("arm", &["arm.v5", "arm.v6", "arm.v7"]),
+    ("arm64", &["arm64.v8.0"]),
+    ("mips", &["mips.hardfloat"]),
+    ("mipsle", &["mipsle.hardfloat"]),
+    ("mips64", &["mips64.hardfloat"]),
+    ("mips64le", &["mips64le.hardfloat"]),
+    ("ppc64", &["ppc64.power8"]),
+    ("ppc64le", &["ppc64le.power8"]),
+    ("riscv64", &["riscv64.rva20u64"]),
+];
 const RELEASE_TAG_PREFIX: &str = "go1.";
 const LATEST_GO_MINOR: u32 = 27;
 const UNIX_OS: &[&str] = &[
@@ -59,6 +71,7 @@ pub struct GoPlatform {
     arch: String,
     cgo: bool,
     build_tags: Vec<String>,
+    errcheck_exclude_functions: Vec<String>,
 }
 
 impl Default for GoPlatform {
@@ -68,6 +81,7 @@ impl Default for GoPlatform {
             arch: DEFAULT_ARCH.to_owned(),
             cgo: true,
             build_tags: Vec::new(),
+            errcheck_exclude_functions: Vec::new(),
         }
     }
 }
@@ -100,6 +114,7 @@ impl GoPlatform {
             arch,
             cgo,
             build_tags: target.build_tags.clone(),
+            errcheck_exclude_functions: target.errcheck_exclude_functions.clone(),
         }
     }
 
@@ -119,6 +134,10 @@ impl GoPlatform {
         &self.build_tags
     }
 
+    pub fn errcheck_exclude_functions(&self) -> &[String] {
+        &self.errcheck_exclude_functions
+    }
+
     // `matchTag` de `go/build`.
     pub fn matches(&self, tag: &str) -> bool {
         tag == self.os
@@ -129,11 +148,19 @@ impl GoPlatform {
             || IMPLIED_OS
                 .iter()
                 .any(|(os, implied)| self.os == *os && tag == *implied)
-            || (self.arch == DEFAULT_ARCH && tag == AMD64_LEVEL_TAG)
+            || default_architecture_tags(&self.arch).contains(&tag)
             || EXPERIMENT_TAGS.contains(&tag)
             || self.build_tags.iter().any(|build_tag| build_tag == tag)
             || is_release_tag(tag)
     }
+}
+
+// `gogoarchTags` de `internal/buildcfg` con los valores de fábrica de `GOAMD64`, `GOARM` y los demás.
+fn default_architecture_tags(arch: &str) -> &'static [&'static str] {
+    ARCHITECTURE_TAGS
+        .iter()
+        .find(|(name, _)| *name == arch)
+        .map_or(&[], |(_, tags)| tags)
 }
 
 fn is_release_tag(tag: &str) -> bool {

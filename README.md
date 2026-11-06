@@ -241,6 +241,7 @@ cfg = ["fast_path"]               # los que enciende el build.rs
 goos = "linux"                    # de fábrica, GOOS o la máquina donde corre kerbo
 goarch = "amd64"                  # de fábrica, GOARCH o la máquina
 build_tags = ["integration"]      # como run.build-tags de golangci-lint
+errcheck_exclude_functions = ["os.Remove"]  # como exclude-functions de errcheck
 ```
 
 | Preset | Archivo | Función | Ciclomática | Cognitiva | Parámetros |

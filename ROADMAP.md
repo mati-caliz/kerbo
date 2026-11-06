@@ -1471,12 +1471,14 @@ acá.
     "cannot inline", que salen de correr el inliner de x/tools (versión de Go del archivo,
     inferencia de tipos genéricos y otros casos): calcarlo es reimplementar un motor de refactor.
   - errcheck en el editor y en `kerbo fix`: el texto sin guardar no tiene tipos, así que ahí no se
-    muestra. Y los `exclude-functions`, `check-blank` y `check-type-assertions` de errcheck no se
-    configuran todavía.
-  - Los tags de versión de arquitectura sólo están para amd64 (`amd64.v1`); `arm64.v8.0` y los
-    demás no cumplen. Los `goexperiment` son los fijos de Go 1.27.
-  - `uniq-by-line` (prendido por defecto en golangci-lint) deja un solo aviso por línea y linter;
-    kerbo muestra todos.
+    muestra. `exclude-functions` se configura con `errcheck_exclude_functions` en `[go]` (hecho,
+    2026-11-06); `check-blank` y `check-type-assertions` todavía no.
+  - Los tags de versión de arquitectura (`arm64.v8.0`, `arm.v7`, `386.sse2` y los demás) cumplen con los
+    valores de fábrica de Go (hecho, 2026-11-06); `GOAMD64`, `GOARM` y compañía en el entorno no se leen.
+    Los `goexperiment` son los fijos de Go 1.27.
+  - `uniq-by-line` (prendido por defecto en golangci-lint) deja un solo aviso por línea y linter. kerbo
+    muestra todos a propósito: es la misma información pero sin esconder un segundo problema de la línea,
+    y la paridad se mide con `uniq-by-line: false`. Decidido, no pendiente.
   - El arnés de esta paridad (golangci-lint en JSON y `go list` contra kerbo en JSON) quedó fuera
     del repo, como los anteriores; desde la tanda de 42 reglas de staticcheck, la parte del helper
     está en `scripts/parity/go/` (compilar, módulo de prueba, corpus y `register.py`). Falta pasar
