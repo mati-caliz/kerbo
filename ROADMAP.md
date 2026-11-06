@@ -893,7 +893,26 @@ acá.
     typescript-eslint (ESLint no; son 16 avisos en tests de react, que usa la del núcleo).
   - El arnés quedó en `../kerbo-parity/eslint/` (config con todo `recommended` de los dos limitado a
     las reglas de kerbo, `INLINE=1` para leer los comentarios, y `compare.py`).
+- 19 reglas más de `recommended` (hecho, 2026-11-06), en `src/lint/ecmascript/core_recommended.rs` y
+  `typescript_recommended.rs`: `for-direction`, `no-delete-var`, `no-dupe-args`,
+  `no-dupe-class-members`, `no-empty-static-block`, `no-ex-assign`, `no-new-native-nonconstructor`,
+  `no-nonoctal-decimal-escape`, `no-obj-calls`, `no-octal`, `no-unsafe-negation`, `no-with`,
+  `no-duplicate-enum-values`, `no-extra-non-null-assertion`, `no-misused-new`,
+  `no-unnecessary-type-constraint`, `no-unsafe-declaration-merging`, `prefer-as-const` y
+  `prefer-namespace-keyword`. Como en `eslint-recommended`, seis se apagan en TypeScript.
+  - Paridad contra ESLint 10.13 y typescript-eslint 8.72 en `fixtures/recommended*`. `no-octal`, `no-with`
+    y `no-dupe-args` se miden con el parser de ESLint en modo script (`*_sloppy.js`), porque el de
+    typescript-eslint los rechaza. En el corpus actual (express, zod, react, vscode y juice-shop) estas
+    reglas no aparecen: ni ESLint ni kerbo avisan.
+  - El arnés pasó al repo: `scripts/parity/ecmascript/fixture.py` (salida de ESLint de un fixture) y
+    `corpus.sh` (ESLint con las reglas pedidas contra kerbo). `next.js` ya no está en
+    `kerbo-parity/corpus`, y se reemplazó por juice-shop.
+  - Pendientes: `no-obj-calls` no sigue los alias (`const m = Math; m()`) y `for-direction` sólo lee
+    literales como paso (ESLint también constantes con `getStaticValue`). ESLint arregla
+    `no-extra-non-null-assertion` y `prefer-namespace-keyword`, y kerbo todavía no.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
+  - Las que miran expresiones regulares: `no-empty-character-class`, `no-invalid-regexp`,
+    `no-regex-spaces` y `no-useless-backreference`.
   - `no-misleading-character-class` (290, casi todo en código compilado),
     `no-irregular-whitespace` (10) y las que no aparecieron en el corpus.
   - `no-useless-escape` no mira las expresiones regulares con el flag `v`.

@@ -8,6 +8,7 @@ mod comparisons;
 mod constant_binary;
 mod constant_condition;
 mod constants;
+mod core_recommended;
 mod disable_directives;
 pub use disable_directives::{DisabledRange, disabled_ranges};
 mod duplicates;
@@ -16,6 +17,7 @@ mod escapes;
 mod expressions;
 mod fallthrough;
 mod finally;
+mod for_direction;
 mod members;
 mod modules;
 mod multiline;
@@ -42,6 +44,7 @@ mod token_index;
 mod tokens;
 mod triple_slash;
 mod typescript;
+mod typescript_recommended;
 mod undefined_names;
 mod unreachable;
 mod unused;
@@ -160,6 +163,55 @@ const CHECKS: &[(EslintRule, Check)] = &[
     (
         EslintRule::NoUselessAssignment,
         useless_assignment::useless_assignments,
+    ),
+    (EslintRule::ForDirection, for_direction::wrong_for_directions),
+    (EslintRule::NoDeleteVar, core_recommended::deleted_variables),
+    (EslintRule::NoDupeArgs, core_recommended::duplicate_arguments),
+    (
+        EslintRule::NoDupeClassMembers,
+        core_recommended::duplicate_class_members,
+    ),
+    (
+        EslintRule::NoEmptyStaticBlock,
+        core_recommended::empty_static_blocks,
+    ),
+    (EslintRule::NoExAssign, assignments::caught_error_assignments),
+    (
+        EslintRule::NoNewNativeNonconstructor,
+        core_recommended::new_native_nonconstructors,
+    ),
+    (
+        EslintRule::NoNonoctalDecimalEscape,
+        core_recommended::nonoctal_escapes,
+    ),
+    (EslintRule::NoObjCalls, core_recommended::object_calls),
+    (EslintRule::NoOctal, core_recommended::octal_literals),
+    (EslintRule::NoUnsafeNegation, core_recommended::unsafe_negations),
+    (EslintRule::NoWith, core_recommended::with_statements),
+    (
+        EslintRule::NoDuplicateEnumValues,
+        typescript_recommended::duplicate_enum_values,
+    ),
+    (
+        EslintRule::NoExtraNonNullAssertion,
+        typescript_recommended::extra_non_null_assertions,
+    ),
+    (EslintRule::NoMisusedNew, typescript_recommended::misused_new),
+    (
+        EslintRule::NoUnnecessaryTypeConstraint,
+        typescript_recommended::unnecessary_type_constraints,
+    ),
+    (
+        EslintRule::NoUnsafeDeclarationMerging,
+        typescript_recommended::unsafe_declaration_merging,
+    ),
+    (
+        EslintRule::PreferAsConst,
+        typescript_recommended::literal_type_repetitions,
+    ),
+    (
+        EslintRule::PreferNamespaceKeyword,
+        typescript_recommended::module_keywords,
     ),
 ];
 

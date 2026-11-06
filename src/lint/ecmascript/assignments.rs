@@ -153,6 +153,16 @@ fn modifying_references_of(
         .collect()
 }
 
+// `no-ex-assign`.
+pub fn caught_error_assignments(context: &Context<'_, '_>) -> Vec<LintFinding> {
+    modifying_references_of(context, EslintRule::NoExAssign, |variable, _| {
+        variable
+            .definitions
+            .iter()
+            .any(|definition| matches!(definition.kind, DefinitionKind::CatchClause))
+    })
+}
+
 // `getModifyingReferences`: las escrituras que no inicializan, una por identificador.
 fn modifying_references<'scope, 'tree>(
     tree: &'scope ScopeTree<'tree>,

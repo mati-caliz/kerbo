@@ -6,6 +6,7 @@
 10:18 no-empty
 15:3 no-unused-labels
 15:10 no-empty
+19:12 no-empty-static-block
 22:3 no-debugger
 23:14 no-debugger
 30:7 no-case-declarations

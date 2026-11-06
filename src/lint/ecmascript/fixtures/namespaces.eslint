@@ -5,6 +5,7 @@
 5:1 no-namespace
 5:19 no-unused-vars
 6:1 no-namespace
+6:1 prefer-namespace-keyword
 6:8 no-unused-vars
 9:13 no-empty-object-type
 11:8 no-namespace

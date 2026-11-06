@@ -1,8 +1,10 @@
 mod checks;
+mod recommended;
 
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 use checks::CHECK_TEXTS;
+use recommended::RECOMMENDED_TEXTS;
 
 const DEAD_BRANCH_WHY: &str =
     "Una rama que nunca corre es un error esperando: o la condición está mal o el código quedó de más.";
@@ -281,6 +283,7 @@ pub fn eslint(rule: EslintRule) -> RuleText {
     TEXTS
         .iter()
         .chain(CHECK_TEXTS.iter())
+        .chain(RECOMMENDED_TEXTS.iter())
         .find(|(candidate, _)| *candidate == rule)
         .map_or(UNKNOWN, |(_, text)| *text)
 }

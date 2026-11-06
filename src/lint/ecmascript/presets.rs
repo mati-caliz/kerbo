@@ -15,6 +15,12 @@ const CHECKED_BY_TYPESCRIPT: &[EslintRule] = &[
     EslintRule::ConstructorSuper,
     EslintRule::NoThisBeforeSuper,
     EslintRule::NoUndef,
+    EslintRule::NoDupeArgs,
+    EslintRule::NoDupeClassMembers,
+    EslintRule::NoNewNativeNonconstructor,
+    EslintRule::NoObjCalls,
+    EslintRule::NoUnsafeNegation,
+    EslintRule::NoWith,
 ];
 const STRICT_ONLY: &[EslintRule] = &[EslintRule::NoNonNullAssertion];
 const SUGGESTIONS: &[EslintRule] = &[

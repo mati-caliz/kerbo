@@ -194,7 +194,7 @@ fn finding(kind: LintKind, position: Node<'_>, subject: &str, fix: Option<Fix>) 
     finding_at(kind, position.start_position(), subject, fix)
 }
 
-fn finding_at(kind: LintKind, start: Point, subject: &str, fix: Option<Fix>) -> LintFinding {
+pub fn finding_at(kind: LintKind, start: Point, subject: &str, fix: Option<Fix>) -> LintFinding {
     LintFinding {
         kind,
         line: one_based(start.row),

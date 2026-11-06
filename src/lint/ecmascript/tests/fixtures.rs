@@ -1,6 +1,24 @@
 use crate::language::Language;
 
-pub const FIXTURES: [(&str, Language, &str, &str); 34] = [
+pub const FIXTURES: [(&str, Language, &str, &str); 37] = [
+    (
+        "recommended_sloppy",
+        Language::JavaScript,
+        include_str!("../fixtures/recommended_sloppy.js"),
+        include_str!("../fixtures/recommended_sloppy.eslint"),
+    ),
+    (
+        "recommended",
+        Language::JavaScript,
+        include_str!("../fixtures/recommended.js"),
+        include_str!("../fixtures/recommended.eslint"),
+    ),
+    (
+        "recommended_typescript",
+        Language::TypeScript,
+        include_str!("../fixtures/recommended_ts.ts"),
+        include_str!("../fixtures/recommended_ts.eslint"),
+    ),
     (
         "hashbang",
         Language::JavaScript,
