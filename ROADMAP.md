@@ -456,6 +456,11 @@ acá.
   - La caché de Python no tenía en cuenta la ruta del archivo: dos archivos con el mismo contenido en
     lugares distintos compartían el resultado, aunque N999, PLW0406 y los stubs dependen de la ruta.
     Ahora la clave suma la ruta y el permiso de ejecución, como Shell suma su dialecto.
+- Builtins tapados en los arreglos (hecho, 2026-11-06, `shadowed_fixes.rs`): SIM103, SIM208, SIM210,
+  FURB136 y PLR1730 no arreglan si el arreglo llamaría a un `bool`, `min` o `max` redefinido, y PIE807 con
+  `list` o `dict` tapados escribe `builtins.list` y agrega el `import builtins`, como ruff. Se mira si el
+  nombre está ligado en todo el archivo y no en el alcance del arreglo: un nombre tapado en otra función
+  también deja afuera el arreglo, que es el lado seguro.
 - Pendientes de Python contra ruff:
   - Hecha B031 (2026-10-25), el grupo de `itertools.groupby` usado más de una vez, con el
     `GroupNameFinder` de ruff traducido al árbol de tree-sitter: cuenta por rama en `if` y `match`,
@@ -497,8 +502,7 @@ acá.
     ahora chocan, como en ruff (`a = b = 1` sin usar se borra en dos vueltas). De paso, una anotación
     entre comillas que termina en un comentario daba F722: el envoltorio que la parsea cerraba el
     paréntesis adentro del comentario.
-  - Pendientes de esa tanda: PIE807 no mira si `list` o `dict` están tapados (ruff usa
-    `builtins.list`); B009 marca inseguro cualquier nombre no ASCII, y ruff sólo los que cambia NFKC.
+  - Pendientes de esa tanda: B009 marca inseguro cualquier nombre no ASCII, y ruff sólo los que cambia NFKC.
   - Tanda 2 (15 arreglos, idénticos a ruff en 56 fixtures; `fixtures/import_fixes.py` junta los casos
     del importer): UP006 (también adentro de una anotación entre comillas simple), UP017, UP024, UP033,
     UP041, FURB167, LOG002, LOG009, LOG014, G010, PT025, PT026 y EXE004. El importer quedó completo
@@ -519,8 +523,6 @@ acá.
   - B010 no arregla `(setattr(x, "a", v))`: quedaría `(x.a = v)`, que no es Python. Ruff lo arregla
     igual, ve el error de sintaxis y revierte todos los arreglos del archivo; ese caso quedó solo en
     `fixtures/parenthesized_setattr.py`.
-  - Pendientes de esa tanda: SIM208 en una expresión que no es una condición pone `bool(x)` sin mirar
-    si `bool` está tapado (ruff entonces no arregla).
   - Tanda 4 (11 arreglos de comprehensions, idénticos a ruff en 57 fixtures; todos inseguros, como
     en ruff): C400, C401, C402, C403, C404, C405, C409, C410, C411, C418 y C419, en
     `semantic/comprehension_fixes.rs`. Las de ruff que cambian llaves o corchetes trabajan sobre
@@ -574,8 +576,7 @@ acá.
     `loop_lookups` pasó antes que `literal_checks` en el orden de los avisos: ruff genera PLR1733
     antes que PERF102 y el empate entre los dos se decide por ese orden.
   - Pendientes de esa tanda: F601 y F602 no tienen arreglo (no hay casos en los fixtures para
-    medirlo); RUF020 en `Union[...]` y PYI016 con un `Optional` adentro no se arreglan; SIM210 no
-    mira si `bool` está tapado; UP028 no mira `global`/`nonlocal`; FURB192 avisa aunque `reverse` no
+    medirlo); RUF020 en `Union[...]` y PYI016 con un `Optional` adentro no se arreglan; UP028 no mira `global`/`nonlocal`; FURB192 avisa aunque `reverse` no
     sea un literal (ruff no); SIM222/SIM223 cortan en el primer par sin decidir y ruff sigue mirando;
     RUF010 no le pone paréntesis a un generador sin paréntesis; RUF019 no distingue los efectos
     "quizás" de ruff (los trata como seguros).
@@ -588,8 +589,8 @@ acá.
     cambios de orden para desempatar como ruff: los avisos del recorrido semántico van antes que los
     de los alcances diferidos (F401 y compañía), y los arreglos de F811 se aplican antes que todos.
   - Pendientes de esa tanda: E731, SIM905, SIM114, B006 y PYI025 quedan para la próxima (piden
-    reescribir sentencias enteras o renombrar en todo el archivo). FURB136, PLR1730, SIM103 y
-    FURB192 no miran si `min`, `max` o `bool` están tapados; RUF046 y RUF057 tratan como inseguro
+    reescribir sentencias enteras o renombrar en todo el archivo). FURB192 no mira si `min` o `max` están
+    tapados; RUF046 y RUF057 tratan como inseguro
     todo `round` de algo que no está escrito (ruff mira el tipo); PYI061 y RUF013 asumen Python 3.10
     o más (`X | None` y nunca `Optional`); FLY002 no arregla cuando habría que escapar algo más que
     las llaves; PLW0120 desindenta línea por línea (un string de varias líneas en el `else` se

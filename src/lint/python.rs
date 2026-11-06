@@ -50,6 +50,7 @@ mod redundancies;
 mod rewrites;
 mod semantic;
 mod set_literals;
+mod shadowed_fixes;
 mod simplify;
 mod slots;
 mod special_methods;
@@ -180,6 +181,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: &Limits, path: Option<&Pa
         found
     };
     reports.extend(syntax_reports(root, &nodes, source, path));
+    shadowed_fixes::drop_fixes_with_shadowed_builtins(&mut reports, &nodes, source);
     let mut found: Vec<LintFinding> = suppressed(root, source, reports, &enabled)
         .into_iter()
         .map(|report| {

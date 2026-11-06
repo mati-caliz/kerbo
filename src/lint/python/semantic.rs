@@ -36,7 +36,7 @@ mod handlers;
 mod idioms;
 mod if_blocks;
 mod implicit_optional;
-mod importer;
+pub mod importer;
 mod imports;
 mod integer_calls;
 mod isinstance_calls;

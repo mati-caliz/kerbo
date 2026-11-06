@@ -1,3 +1,6 @@
+use super::semantic::importer::add_import;
+use super::shadowed_fixes::bound_names;
+use crate::syntax::descendants;
 use tree_sitter::Node;
 
 use super::Report;
@@ -11,6 +14,8 @@ use super::statement_removal::delete_statement_only;
 use crate::fix::Fix;
 use crate::rules::PythonRule;
 
+const BUILTINS_MODULE: &str = "builtins";
+const IMPORT_BUILTINS: &str = "import builtins";
 const UNARY: &str = "unary_operator";
 const OPERATOR_FIELD: &str = "operator";
 const ARGUMENT_FIELD: &str = "argument";
@@ -233,6 +238,20 @@ fn reads_name(node: Node<'_>, name: &str, source: &[u8]) -> bool {
         .any(|child| reads_name(child, name, source))
 }
 
+// Si el nombre está tapado, ruff escribe `builtins.list` y agrega el import.
+fn builtin_reference_fix(lambda: Node<'_>, builtin: &str, source: &[u8]) -> Fix {
+    let Some(root) = std::iter::successors(Some(lambda), Node::parent).last() else {
+        return Fix::replace(lambda, builtin, source);
+    };
+    if !bound_names(&descendants(root), source).contains(builtin) {
+        return Fix::replace(lambda, builtin, source);
+    }
+    let qualified = format!("{BUILTINS_MODULE}.{builtin}");
+    let mut edits = Fix::replace(lambda, &qualified, source).edits;
+    edits.push(add_import(source, root, lambda, IMPORT_BUILTINS));
+    Fix::from_edits(source, edits)
+}
+
 // PIE807: `lambda: []` o `lambda: {}`, que es `list` o `dict`.
 fn empty_container_lambda(lambda: Node<'_>, source: &[u8]) -> Option<Report> {
     if lambda.child_by_field_name(PARAMETERS_FIELD).is_some() {
@@ -247,7 +266,8 @@ fn empty_container_lambda(lambda: Node<'_>, source: &[u8]) -> Option<Report> {
         DICT_BUILTIN
     };
     is_empty_container.then(|| {
-        Report::at(PythonRule::PIE807, lambda, "").with_fix(Some(Fix::replace(lambda, builtin, source)))
+        Report::at(PythonRule::PIE807, lambda, "")
+            .with_fix(Some(builtin_reference_fix(lambda, builtin, source)))
     })
 }
 
