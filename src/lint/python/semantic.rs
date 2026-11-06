@@ -47,6 +47,7 @@ mod logging_calls;
 mod map_fix;
 mod misc_calls;
 mod model;
+mod module_identity;
 mod mutability;
 mod named_tuple_fix;
 mod outdated_versions;
@@ -82,6 +83,7 @@ mod timeouts;
 mod type_hint_fixes;
 mod type_hints;
 mod type_names;
+mod type_parameters;
 mod type_unions;
 mod type_variable_fix;
 mod typecheck;
@@ -95,13 +97,14 @@ use crate::lint::python::semantic::checks::Exports;
 use crate::lint::python::semantic::definitions::Definitions;
 use crate::lint::python::semantic::expressions::Expressions;
 use crate::lint::python::semantic::statements::Statements;
+use std::path::Path;
 use tree_sitter::{Node, Point};
 
 use super::{FileKind, Report};
 pub use checks::is_dummy;
 pub use comprehension_fixes::preferred_quote;
 pub use effects::contains_effect;
-use model::{BranchId, Model, ScopeId};
+use model::{BranchId, Model, ModuleIdentity, ScopeId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -154,9 +157,11 @@ pub struct Visitor<'tree> {
     pub type_variables: Vec<type_variable_fix::SelfTypeVariable<'tree>>,
 }
 
-pub fn reports(root: Node<'_>, source: &[u8], file: FileKind) -> Vec<Report> {
+pub fn reports(root: Node<'_>, source: &[u8], file: FileKind, path: Option<&Path>) -> Vec<Report> {
+    let mut model = Model::new();
+    model.module = ModuleIdentity::of(path);
     let mut visitor = Visitor {
-        model: Model::new(),
+        model,
         source,
         file,
         reports: Vec::new(),

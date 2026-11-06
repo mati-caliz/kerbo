@@ -26,7 +26,8 @@ use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     ATTRIBUTE, CALL, COMMENT, COMPARISON, CONCATENATED_STRING, IDENTIFIER, INTERPOLATION, KEYWORD_ARGUMENT,
-    LAMBDA, NAME_FIELD, OBJECT_FIELD, OPERATORS_FIELD, STRING, SUBSCRIPT, VALUE_FIELD, fields, named, text,
+    LAMBDA, NAME_FIELD, OBJECT_FIELD, OPERATORS_FIELD, STRING, SUBSCRIPT, VALUE_FIELD, fields,
+    is_interpolated_string, named, text,
 };
 use crate::lint::python::semantic::annotations::Annotations;
 use crate::lint::python::semantic::annotations::typing::TypingCalls;
@@ -189,15 +190,18 @@ impl<'tree> Expressions<'tree> for Visitor<'tree> {
     }
 
     fn string(&mut self, node: Node<'tree>, mode: Mode) {
-        if mode.defines_types() {
-            self.deferred.strings.push(self.snapshot(node));
-            return;
-        }
         let parts = if node.kind() == STRING {
             vec![node]
         } else {
             named(node)
         };
+        let interpolated = parts
+            .iter()
+            .any(|part| is_interpolated_string(*part, self.source));
+        if mode.defines_types() && !interpolated {
+            self.deferred.strings.push(self.snapshot(node));
+            return;
+        }
         self.reports
             .extend(conversion_reports(&self.model, self.source, &parts));
         for interpolation in parts

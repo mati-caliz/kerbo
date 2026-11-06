@@ -117,6 +117,8 @@ pub struct Unresolved {
     pub handled: u8,
 }
 
+pub use super::module_identity::ModuleIdentity;
+
 #[derive(Debug)]
 pub struct Model<'tree> {
     pub scopes: Vec<Scope>,
@@ -128,11 +130,13 @@ pub struct Model<'tree> {
     pub handled: Vec<u8>,
     pub forward_reference: bool,
     pub branches: Vec<Option<BranchId>>,
+    pub module: ModuleIdentity,
 }
 
 impl<'tree> Model<'tree> {
     pub fn new() -> Self {
         Self {
+            module: ModuleIdentity::default(),
             scopes: vec![new_scope(ScopeKind::Module, None)],
             bindings: Vec::new(),
             cross_shadowed: HashMap::new(),

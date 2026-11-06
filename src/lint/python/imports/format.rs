@@ -14,9 +14,14 @@ const COLON_PRAGMAS: [&str; 8] = [
     "isort", "type", "pyright", "pyrefly", "pylint", "flake8", "ruff", "ty",
 ];
 
+const LAZY_PREFIX: &str = "lazy ";
+
 // `format_import`: `import x` o `import x as y`, con sus comentarios.
 pub fn format_straight(import: &Straight<'_>, is_first: bool) -> String {
     let mut output = atop_lines(&import.atop, is_first);
+    if import.alias.lazy {
+        output.push_str(LAZY_PREFIX);
+    }
     output.push_str("import ");
     output.push_str(&alias_text(import.alias));
     for comment in &import.inline {
@@ -48,6 +53,10 @@ pub fn format_from(statement: &FromStatement<'_>, is_first: bool, indentation: &
     multi_line(statement, is_first)
 }
 
+const fn lazy_prefix(statement: &FromStatement<'_>) -> &'static str {
+    if statement.module.lazy { LAZY_PREFIX } else { "" }
+}
+
 fn atop_lines(atop: &[&str], is_first: bool) -> String {
     let mut output = String::new();
     if !is_first && !atop.is_empty() {
@@ -75,7 +84,12 @@ fn single_line(statement: &FromStatement<'_>, is_first: bool) -> (String, usize)
         .iter()
         .map(|(alias, _)| alias_text(*alias))
         .collect();
-    let mut line = format!("from {} import {}", statement.module.name(), names.join(", "));
+    let mut line = format!(
+        "{}from {} import {}",
+        lazy_prefix(statement),
+        statement.module.name(),
+        names.join(", ")
+    );
     let mut width = display_width(&line, 0);
     let alias_comments = statement
         .aliases
@@ -115,6 +129,7 @@ fn push_indented_line(output: &mut String, text: &str) {
 
 fn multi_line(statement: &FromStatement<'_>, is_first: bool) -> String {
     let mut output = atop_lines(&statement.comments.atop, is_first);
+    output.push_str(lazy_prefix(statement));
     output.push_str("from ");
     output.push_str(&statement.module.name());
     output.push_str(" import (");

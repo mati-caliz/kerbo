@@ -6,6 +6,34 @@ use ignore::{DirEntry, Walk, WalkBuilder};
 use crate::language::Language;
 
 const ANALYZED_HIDDEN_DIRECTORIES: [&str; 2] = [".github", ".devcontainer"];
+// `DEFAULT_EXCLUDES` de ruff: en Python se recorre todo lo demás, también lo oculto.
+const RUFF_EXCLUDED: [&str; 25] = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+];
 const GIT_DIRECTORY: &str = ".git";
 const HIDDEN_PREFIX: char = '.';
 const PATH_SEPARATOR: &str = "/";
@@ -46,10 +74,15 @@ pub fn portable(path: &Path) -> String {
     parts.join(PATH_SEPARATOR)
 }
 
-pub fn is_analyzed(walk_root: &Path, path: &Path) -> bool {
+pub fn is_analyzed(walk_root: &Path, path: &Path, language: Option<Language>) -> bool {
     let Ok(relative) = path.strip_prefix(walk_root) else {
         return true;
     };
+    if language == Some(Language::Python) {
+        return !relative.components().any(|component| {
+            matches!(component, Component::Normal(name) if name.to_str().is_some_and(|name| RUFF_EXCLUDED.contains(&name)))
+        });
+    }
     let mut components = relative.components().peekable();
     while let Some(component) = components.next() {
         let Component::Normal(name) = component else {
@@ -66,3 +99,6 @@ pub fn is_analyzed(walk_root: &Path, path: &Path) -> bool {
     }
     true
 }
+
+#[cfg(test)]
+mod tests;

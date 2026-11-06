@@ -61,8 +61,8 @@ fn walks_the_listed_hidden_folders_and_skips_the_rest() {
         "def f(a, b, c, d, e, f, g):\n    pass\n",
     );
     tree.write(".venv/lib/site.py", "def f(a, b, c, d, e, f, g):\n    pass\n");
-    tree.write(".github/.hidden.py", "def f(a, b, c, d, e, f, g):\n    pass\n");
-    tree.write(".hidden.py", "def f(a, b, c, d, e, f, g):\n    pass\n");
+    tree.write(".github/.hidden.go", "package hidden\n");
+    tree.write(".hidden.go", "package hidden\n");
     let outcome = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
     assert_eq!(outcome.files, 3);
     assert!(
@@ -166,7 +166,7 @@ fn finds_committed_secrets_in_every_file_also_hidden_ones() {
     tree.write(".env", &format!("AWS_ACCESS_KEY_ID={key}\n"));
     tree.write("src/config.py", &format!("KEY = \"{key}\"\n"));
     tree.write(
-        ".idea/scripts/deploy.py",
+        ".tox/scripts/deploy.py",
         "def deploy(a, b, c, d, e, f, g):\n    pass\n",
     );
     tree.write("image.png", &key);

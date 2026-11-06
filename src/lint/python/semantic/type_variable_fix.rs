@@ -1,10 +1,10 @@
 use tree_sitter::{Node, Point};
 
-use super::definitions::type_parameter_parts;
 use super::importer::{ImportRequest, ImportStyle, get_or_import_member};
 use super::model::{BindingId, BindingKind, Model};
 use super::parameters::annotation;
 use super::type_hints::unwrapped;
+use super::type_parameters::type_parameter_parts;
 use crate::fix::{Fix, TextEdit};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{COMMENT, DECORATED, NAME_FIELD, named, text};

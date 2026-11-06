@@ -9,8 +9,18 @@ use crate::lint::python::fix_edits::{rewrite_names, safe_unless_commented};
 use crate::lint::python::statement_removal::{delete_statement, delete_statement_only, isolation_group};
 
 // UP009 borra la línea entera del comentario.
+const BYTE_ORDER_MARK: &[u8] = b"\xef\xbb\xbf";
+
 pub fn line_deletion(row: usize, source: &[u8]) -> Fix {
-    let start = Point { row, column: 0 };
+    let mark_length = if row == 0 && source.starts_with(BYTE_ORDER_MARK) {
+        BYTE_ORDER_MARK.len()
+    } else {
+        0
+    };
+    let start = Point {
+        row,
+        column: mark_length,
+    };
     let end = Point {
         row: row.saturating_add(1),
         column: 0,

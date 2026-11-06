@@ -44,7 +44,6 @@ pub enum Known {
     Dict,
     List,
     Set,
-    Tuple,
     String,
     Bytes,
 }
@@ -55,7 +54,6 @@ impl Known {
             Self::Dict => ["dictionary", "dictionary_comprehension"],
             Self::List => ["list", "list_comprehension"],
             Self::Set => ["set", "set_comprehension"],
-            Self::Tuple => ["tuple", "tuple"],
             Self::String | Self::Bytes => [STRING, CONCATENATED_STRING],
         }
     }
@@ -65,7 +63,6 @@ impl Known {
             Self::Dict => ["dict", "Dict"],
             Self::List => ["list", "List"],
             Self::Set => ["set", "Set"],
-            Self::Tuple => ["tuple", "Tuple"],
             Self::String => ["str", "str"],
             Self::Bytes => ["bytes", "bytes"],
         }
@@ -77,8 +74,25 @@ impl Known {
 // alcance del nombre cuentan las asignaciones anteriores (ruff lo mira al recorrer); si ahí no se
 // liga, el alcance que lo contiene.
 pub fn is_known(name: Node<'_>, kind: Known, source: &[u8]) -> bool {
+    only_binding(name, source).is_some_and(|binding| binds_known(binding, kind, source))
+}
+
+// `find_assigned_value` de ruff: lo que se le asigna a la única variable con ese nombre.
+pub fn assigned_value<'tree>(name: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
+    let binding = only_binding(name, source)?;
+    if let Some(value) = unpacked_value(binding) {
+        return Some(value);
+    }
+    let parent = binding.parent().filter(|parent| parent.kind() == ASSIGNMENT)?;
+    parent
+        .child_by_field_name(LEFT_FIELD)
+        .filter(|target| target.id() == binding.id())?;
+    parent.child_by_field_name(RIGHT_FIELD)
+}
+
+fn only_binding<'tree>(name: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
     if name.kind() != IDENTIFIER {
-        return false;
+        return None;
     }
     let wanted = text(name, source);
     for (depth, scope) in std::iter::successors(name.parent(), Node::parent)
@@ -91,11 +105,11 @@ pub fn is_known(name: Node<'_>, kind: Known, source: &[u8]) -> bool {
         }
         match bindings.as_slice() {
             [] => {}
-            [only] => return binds_known(*only, kind, source),
-            _ => return false,
+            [only] => return Some(*only),
+            _ => return None,
         }
     }
-    false
+    None
 }
 
 fn bindings_in<'tree>(scope: Node<'tree>, wanted: &str, source: &[u8]) -> Vec<Node<'tree>> {
@@ -186,7 +200,7 @@ fn is_known_value(value: Node<'_>, kind: Known, source: &[u8]) -> bool {
     let literal = match kind {
         Known::String => is_string(value) && !is_bytes(value, source),
         Known::Bytes => is_string(value) && is_bytes(value, source),
-        Known::Dict | Known::List | Known::Set | Known::Tuple => kind.literals().contains(&value.kind()),
+        Known::Dict | Known::List | Known::Set => kind.literals().contains(&value.kind()),
     };
     literal
         || (value.kind() == CALL

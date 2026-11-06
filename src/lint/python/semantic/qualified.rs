@@ -33,7 +33,9 @@ pub fn qualified_name_from(
             if binding.kind == BindingKind::SubmoduleImport {
                 head.to_owned()
             } else if binding.kind.is_import() {
-                binding.qualified.clone()
+                model.module.resolved_import(&binding.qualified)?
+            } else if matches!(binding.kind, BindingKind::Class | BindingKind::Function) {
+                model.module.member(head)?
             } else {
                 return None;
             }

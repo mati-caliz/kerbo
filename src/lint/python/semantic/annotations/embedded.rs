@@ -2,9 +2,10 @@ use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::fix_edits::pad;
 use crate::lint::python::semantic::call_fixes::builtin_available;
-use crate::lint::python::semantic::pep::{is_pep585_generic, is_pep646_unpack, pep604_rule};
+use crate::lint::python::semantic::pep::{UnionContext, is_pep585_generic, is_pep646_unpack, pep604_rule};
 use crate::lint::python::semantic::pep604_fixes::pep604_replacement;
 use crate::lint::python::semantic::reference_fixes::pep585_builtin;
+use crate::lint::python::semantic::type_hint_fixes::none_literal_replacement;
 use crate::rules::PythonRule;
 use tree_sitter::{Node, Point};
 
@@ -15,7 +16,7 @@ use super::super::{Mode, Visitor};
 use super::{ANNOTATED, LITERAL};
 use crate::lint::python::ast::{
     ATTRIBUTE, CONCATENATED_STRING, IDENTIFIER, KEYWORD_ARGUMENT, LAMBDA, OBJECT_FIELD, STRING, SUBSCRIPT,
-    SUBSCRIPT_FIELD, VALUE_FIELD, fields, is_bytes, is_f_string, named, string_prefix, text,
+    SUBSCRIPT_FIELD, VALUE_FIELD, fields, is_bytes, is_interpolated_string, named, string_prefix, text,
 };
 use crate::lint::python::escapes::decoded;
 use crate::syntax::{SnippetLanguage, parse_snippet};
@@ -26,6 +27,7 @@ const CLOSING: &str = "\n)";
 const QUOTES: [&str; 2] = ["\"", "'"];
 const PARAMETERS_FIELD: &str = "parameters";
 const BODY_FIELD: &str = "body";
+const NONE_LITERAL: &str = "none";
 
 #[derive(Debug, Clone, Copy)]
 pub struct Placement {
@@ -89,6 +91,7 @@ pub trait EmbeddedAnnotations {
     fn embedded_loads(&mut self, node: Node<'_>, context: &Embedded<'_>);
     fn embedded_subscript(&mut self, node: Node<'_>, context: &Embedded<'_>);
     fn embedded_pep585(&mut self, node: Node<'_>, context: &Embedded<'_>);
+    fn embedded_none_literals(&mut self, literal: Node<'_>, slices: &[Node<'_>], context: &Embedded<'_>);
     fn embedded_lambda(&mut self, lambda: Node<'_>, context: &Embedded<'_>);
     fn nested_annotation(&mut self, string: Node<'_>, context: &Embedded<'_>);
 }
@@ -175,9 +178,14 @@ impl EmbeddedAnnotations for Visitor<'_> {
         let name = value.and_then(|value| qualified_name(&self.model, value, context.source));
         let slices = fields(node, SUBSCRIPT_FIELD);
         let qualify = |inner: Node<'_>| qualified_name(&self.model, inner, context.source);
+        let union_context = UnionContext {
+            qualify: &qualify,
+            typing_context: true,
+            source: context.source,
+        };
         if let Some(rule) = name
             .as_deref()
-            .and_then(|name| pep604_rule(name, &slices, &qualify, true))
+            .and_then(|name| pep604_rule(name, &slices, &union_context))
         {
             let start = context.placement.map(node.start_position());
             let fix = context
@@ -213,10 +221,37 @@ impl EmbeddedAnnotations for Visitor<'_> {
                 .push(Report::at_point(PythonRule::UP044, start, "").with_fix(fix));
         }
         let is_literal = context.literal || name.as_deref().is_some_and(|name| is_typing(name, LITERAL));
+        if !context.literal && name.as_deref().is_some_and(|name| is_typing(name, LITERAL)) {
+            self.embedded_none_literals(node, &slices, context);
+        }
         let is_annotated = name.as_deref().is_some_and(|name| is_typing(name, ANNOTATED));
         for (index, slice) in fields(node, SUBSCRIPT_FIELD).into_iter().enumerate() {
             let inner = context.literal(is_literal || (is_annotated && index > 0));
             self.embedded_loads(slice, &inner);
+        }
+    }
+
+    // PYI061 adentro de una anotación entre comillas, con el mismo arreglo que afuera.
+    fn embedded_none_literals(&mut self, literal: Node<'_>, slices: &[Node<'_>], context: &Embedded<'_>) {
+        for slice in slices.iter().filter(|slice| slice.kind() == NONE_LITERAL) {
+            let replacement = context
+                .placement
+                .simple
+                .then(|| none_literal_replacement(literal, slices, context.source))
+                .flatten();
+            let fix = replacement.map(|replacement| {
+                let start = context.placement.map(literal.start_position());
+                let end = context.placement.map(literal.end_position());
+                Fix::replace_range(start, end, &replacement, self.source)
+            });
+            let fix = if self.file.stub {
+                fix
+            } else {
+                fix.map(Fix::marked_unsafe)
+            };
+            let start = context.placement.map(slice.start_position());
+            self.reports
+                .push(Report::at_point(PythonRule::PYI061, start, "").with_fix(fix));
         }
     }
 
@@ -247,7 +282,7 @@ impl EmbeddedAnnotations for Visitor<'_> {
         };
         if parts
             .iter()
-            .any(|part| is_f_string(*part, source) || is_bytes(*part, source))
+            .any(|part| is_interpolated_string(*part, source) || is_bytes(*part, source))
         {
             return;
         }

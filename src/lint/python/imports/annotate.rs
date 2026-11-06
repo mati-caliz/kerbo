@@ -16,6 +16,7 @@ const CLOSING: &str = ")";
 const COMMA: &str = ",";
 const FUTURE: &str = "__future__";
 const FUTURE_IMPORT: &str = "future_import_statement";
+const LAZY: &str = "lazy";
 
 // `annotate_imports` de ruff: cada import con los comentarios que le tocan, en el orden en que
 // aparecen. `comments` va de la primera sentencia del bloque al final de la línea de la última.
@@ -44,9 +45,13 @@ fn annotate_import<'source>(
 ) -> Annotated<'source> {
     let atop = pending.take_while_start_before(import.start_byte());
     let inline = pending.take_while_end_at_most(text_source.line_end(import.end_byte()));
+    let lazy = is_lazy(import);
     let names = named_children(import, NAME_FIELD)
         .into_iter()
-        .map(|name| alias(name, text_source.bytes))
+        .map(|name| Alias {
+            lazy,
+            ..alias(name, text_source.bytes)
+        })
         .collect();
     Annotated::Import { names, atop, inline }
 }
@@ -80,6 +85,7 @@ fn annotate_from<'source>(
                     Alias {
                         name: STAR,
                         asname: None,
+                        lazy: false,
                     }
                 } else {
                     alias(*name, text_source.bytes)
@@ -108,6 +114,10 @@ fn annotate_from<'source>(
     })
 }
 
+fn is_lazy(import: Node<'_>) -> bool {
+    import.child(0).is_some_and(|first| first.kind() == LAZY)
+}
+
 fn alias<'source>(name: Node<'_>, source: &'source [u8]) -> Alias<'source> {
     if name.kind() == ALIASED_IMPORT {
         Alias {
@@ -117,11 +127,13 @@ fn alias<'source>(name: Node<'_>, source: &'source [u8]) -> Alias<'source> {
             asname: name
                 .child_by_field_name(ALIAS_FIELD)
                 .map(|alias| text(alias, source)),
+            lazy: false,
         }
     } else {
         Alias {
             name: text(name, source),
             asname: None,
+            lazy: false,
         }
     }
 }
@@ -131,18 +143,22 @@ fn from_module<'source>(import: Node<'_>, source: &'source [u8]) -> FromModule<'
         return FromModule {
             module: Some(FUTURE),
             level: 0,
+            lazy: false,
         };
     }
+    let lazy = is_lazy(import);
     let Some(module) = import.child_by_field_name(MODULE_NAME_FIELD) else {
         return FromModule {
             module: None,
             level: 0,
+            lazy,
         };
     };
     if module.kind() != RELATIVE_IMPORT {
         return FromModule {
             module: Some(text(module, source)),
             level: 0,
+            lazy,
         };
     }
     let parts = crate::lint::python::ast::named(module);
@@ -159,7 +175,11 @@ fn from_module<'source>(import: Node<'_>, source: &'source [u8]) -> FromModule<'
         .iter()
         .find(|part| part.kind() != IMPORT_PREFIX)
         .map(|name| text(*name, source));
-    FromModule { module: name, level }
+    FromModule {
+        module: name,
+        level,
+        lazy,
+    }
 }
 
 // `trailing_comma`: el último token antes del `)` que cierra la lista es una coma.

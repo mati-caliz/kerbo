@@ -60,12 +60,14 @@ impl<'source> SourceText<'source> {
 pub struct Alias<'source> {
     pub name: &'source str,
     pub asname: Option<&'source str>,
+    pub lazy: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FromModule<'source> {
     pub module: Option<&'source str>,
     pub level: usize,
+    pub lazy: bool,
 }
 
 impl FromModule<'_> {

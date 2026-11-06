@@ -62,7 +62,8 @@ kerbo explain cognitive-complexity  # por qué existe una regla y cómo se arreg
 
 Respeta `.gitignore` y saltea los archivos y carpetas ocultos, salvo `.github/` y `.devcontainer/`,
 que suelen tener Dockerfile, compose y scripts propios del repo; los demás ocultos (`.env`,
-`.npmrc`) sólo se revisan buscando secretos. Sale con `0` si no hay problemas, `1` si los hay y
+`.npmrc`) sólo se revisan buscando secretos. Python recorre como ruff: también lo oculto, salvo sus
+exclusiones por defecto (`.venv`, `venv`, `dist`, `site-packages` y compañía). Sale con `0` si no hay problemas, `1` si los hay y
 `2` si algo no se pudo leer o la configuración es inválida.
 
 `kerbo check`, `kerbo baseline` y el servidor MCP guardan lo que miden de cada archivo en una

@@ -6,7 +6,7 @@ use super::ast::{
     RIGHT_FIELD, SUBSCRIPT, TUPLE, VALUE_FIELD, named, text, unparenthesized,
 };
 use super::fix_edits::{commented_unsafe, pad};
-use super::known_types::{Known, is_binding, is_known};
+use super::known_types::{assigned_value, is_binding};
 use super::loop_variable_reads::is_load;
 use crate::fix::{Fix, TextEdit, TextPoint};
 use crate::rules::PythonRule;
@@ -23,6 +23,12 @@ const ASYNC: &str = "async";
 const ITEMS: &str = "items";
 const ENUMERATE: &str = "enumerate";
 const LIST: &str = "list";
+const MUTATING_METHODS: [&str; 8] = [
+    "append", "insert", "extend", "remove", "pop", "clear", "reverse", "sort",
+];
+const AUGMENTED_ASSIGNMENT: &str = "augmented_assignment";
+const DELETE_STATEMENT: &str = "delete_statement";
+const PATTERN_LIST: &str = "pattern_list";
 const SEQUENCE_LITERALS: [&str; 3] = ["list", TUPLE, "set"];
 const PAIR_TARGETS: [&str; 3] = ["pattern_list", "tuple_pattern", TUPLE];
 const SCOPES: [&str; 3] = [FUNCTION, CLASS, LAMBDA];
@@ -295,10 +301,9 @@ fn unnecessary_list_cast(statement: Node<'_>, source: &[u8]) -> Option<Report> {
     let iterable = unparenthesized(*iterable);
     let iterable_ok = SEQUENCE_LITERALS.contains(&iterable.kind())
         || (iterable.kind() == IDENTIFIER
-            && [Known::List, Known::Tuple, Known::Set]
-                .into_iter()
-                .any(|kind| is_known(iterable, kind, source))
-            && !mentions(
+            && assigned_value(iterable, source)
+                .is_some_and(|value| SEQUENCE_LITERALS.contains(&value.kind()))
+            && !is_mutated(
                 statement.child_by_field_name(BODY_FIELD),
                 text(iterable, source),
                 source,
@@ -309,12 +314,48 @@ fn unnecessary_list_cast(statement: Node<'_>, source: &[u8]) -> Option<Report> {
         Report::at(PythonRule::PERF101, call, "").with_fix(Some(fix))
     })
 }
-fn mentions(body: Option<Node<'_>>, wanted: &str, source: &[u8]) -> bool {
+// `MutationVisitor` de ruff: `y.append(x)` y compañía, `y[0] = x`, `y += x` o `del y[0]`.
+fn is_mutated(body: Option<Node<'_>>, wanted: &str, source: &[u8]) -> bool {
     let mut nodes = Vec::new();
     collect_in_order(body, &mut nodes);
-    nodes
-        .into_iter()
-        .any(|node| node.kind() == IDENTIFIER && text(node, source) == wanted)
+    nodes.into_iter().any(|node| mutates(node, wanted, source))
+}
+
+fn mutates(statement: Node<'_>, wanted: &str, source: &[u8]) -> bool {
+    let is_wanted = |node: Node<'_>| node.kind() == IDENTIFIER && text(node, source) == wanted;
+    let subscripts_wanted = |target: Node<'_>| {
+        target.kind() == SUBSCRIPT && target.child_by_field_name(VALUE_FIELD).is_some_and(is_wanted)
+    };
+    match statement.kind() {
+        EXPRESSION_STATEMENT => named(statement)
+            .first()
+            .filter(|call| call.kind() == CALL)
+            .and_then(|call| call.child_by_field_name(FUNCTION_FIELD))
+            .filter(|function| function.kind() == ATTRIBUTE)
+            .is_some_and(|function| {
+                function
+                    .child_by_field_name(ATTRIBUTE_FIELD)
+                    .is_some_and(|method| MUTATING_METHODS.contains(&text(method, source)))
+                    && function.child_by_field_name(OBJECT_FIELD).is_some_and(is_wanted)
+            }),
+        ASSIGNMENT => statement
+            .child_by_field_name(LEFT_FIELD)
+            .is_some_and(|target| flattened_targets(target).into_iter().any(subscripts_wanted)),
+        AUGMENTED_ASSIGNMENT => statement.child_by_field_name(LEFT_FIELD).is_some_and(is_wanted),
+        DELETE_STATEMENT => named(statement)
+            .into_iter()
+            .flat_map(flattened_targets)
+            .any(subscripts_wanted),
+        _ => false,
+    }
+}
+
+fn flattened_targets(target: Node<'_>) -> Vec<Node<'_>> {
+    if matches!(target.kind(), PATTERN_LIST | EXPRESSION_LIST) {
+        named(target)
+    } else {
+        vec![target]
+    }
 }
 fn single_statement(body: Option<Node<'_>>) -> Option<Node<'_>> {
     let statements = significant(body?);

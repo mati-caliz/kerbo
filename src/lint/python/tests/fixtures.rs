@@ -1,5 +1,5 @@
 // Cada archivo de ejemplo con la salida de ruff 0.17 al lado.
-pub const FIXTURES: [(&str, &str, &str); 72] = [
+pub const FIXTURES: [(&str, &str, &str); 75] = [
     (
         "scopes.py",
         include_str!("../fixtures/scopes.py"),
@@ -359,5 +359,20 @@ pub const FIXTURES: [(&str, &str, &str); 72] = [
         "shadowed_fixes.py",
         include_str!("../fixtures/shadowed_fixes.py"),
         include_str!("../fixtures/shadowed_fixes.ruff"),
+    ),
+    (
+        "lazy_imports.py",
+        include_str!("../fixtures/lazy_imports.py"),
+        include_str!("../fixtures/lazy_imports.ruff"),
+    ),
+    (
+        "gzip.py",
+        include_str!("../fixtures/gzip.py"),
+        include_str!("../fixtures/gzip.ruff"),
+    ),
+    (
+        "bom_coding.py",
+        include_str!("../fixtures/bom_coding.py"),
+        include_str!("../fixtures/bom_coding.ruff"),
     ),
 ];

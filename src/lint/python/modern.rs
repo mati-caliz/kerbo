@@ -143,6 +143,8 @@ fn future_features(statement: Node<'_>) -> Vec<Node<'_>> {
         .collect()
 }
 
+const BYTE_ORDER_MARK: char = '\u{feff}';
+
 // UP009: un `# -*- coding: utf-8 -*-` en las dos primeras líneas, que en Python 3 sobra.
 fn coding_comment(root: Node<'_>, source: &[u8]) -> Option<Report> {
     let codings = leading_codings(root, source);
@@ -166,12 +168,29 @@ fn coding_comment(root: Node<'_>, source: &[u8]) -> Option<Report> {
 }
 
 // Los comentarios del principio del archivo, cada uno sólo en su línea y sin código antes.
+// ruff saca la marca antes de leer el archivo, así que no cuenta en las columnas de la primera línea.
+fn position_without_byte_order_mark(point: Point, source: &[u8]) -> Point {
+    let has_mark = source.starts_with(BYTE_ORDER_MARK.encode_utf8(&mut [0; 4]).as_bytes());
+    if point.row == 0 && has_mark {
+        Point {
+            column: point.column.saturating_sub(BYTE_ORDER_MARK.len_utf8()),
+            ..point
+        }
+    } else {
+        point
+    }
+}
+
 fn leading_codings(root: Node<'_>, source: &[u8]) -> Vec<Coding> {
     let mut codings = Vec::new();
     let mut previous_end = 0;
     for comment in comments_in_order(root) {
         let before = source.get(previous_end..comment.start_byte()).unwrap_or_default();
-        if !String::from_utf8_lossy(before).trim().is_empty() {
+        if !String::from_utf8_lossy(before)
+            .trim_start_matches(BYTE_ORDER_MARK)
+            .trim()
+            .is_empty()
+        {
             break;
         }
         previous_end = comment.end_byte();
@@ -180,13 +199,16 @@ fn leading_codings(root: Node<'_>, source: &[u8]) -> Vec<Coding> {
             .and_then(|head| head.iter().rposition(|byte| *byte == b'\n'))
             .map_or(0, |newline| newline.saturating_add(1));
         let line = String::from_utf8_lossy(source.get(line_start..comment.end_byte()).unwrap_or_default())
-            .into_owned();
+            .trim_start_matches(BYTE_ORDER_MARK)
+            .to_owned();
         let name = CODING_COMMENT
             .as_ref()
             .and_then(|pattern| pattern.captures(&line))
             .and_then(|captures| captures.name("name").map(|name| name.as_str().to_owned()));
         codings.push(match name {
-            Some(name) if UTF8_NAMES.contains(&name.as_str()) => Coding::Utf8(comment.start_position()),
+            Some(name) if UTF8_NAMES.contains(&name.as_str()) => {
+                Coding::Utf8(position_without_byte_order_mark(comment.start_position(), source))
+            }
             Some(_) => Coding::Other,
             None => Coding::Absent,
         });

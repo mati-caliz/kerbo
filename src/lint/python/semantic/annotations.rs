@@ -5,15 +5,15 @@ use crate::lint::python::semantic::annotations::embedded::EmbeddedAnnotations;
 use crate::lint::python::semantic::expressions::Expressions;
 use tree_sitter::{Node, Point};
 
-use super::pep::{is_pep646_unpack, is_typing_only, is_typing_only_annotation, pep604_rule};
+use super::pep::{UnionContext, is_pep646_unpack, is_typing_only, is_typing_only_annotation, pep604_rule};
 use super::pep604_fixes::pep604_replacement;
 use super::qualified::{is_typing, qualified_name};
 use super::{Mode, Pending, Visitor};
 use crate::fix::Fix;
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
-    COMMENT, FUNCTION, PARENTHESIZED, STRING, SUBSCRIPT_FIELD, TUPLE, VALUE_FIELD, fields, is_bytes,
-    is_f_string, named, string_prefix, text,
+    COMMENT, FUNCTION, PARENTHESIZED, STRING, SUBSCRIPT_FIELD, TUPLE, VALUE_FIELD, fields, is_bytes, named,
+    string_prefix, text,
 };
 use crate::lint::python::escapes::decoded;
 use crate::lint::python::fix_edits::{commented_unsafe, pad};
@@ -96,7 +96,12 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
         let typing_context =
             self.file.stub || is_typing_only(subscript, self.boundaries.future_annotations(), self.source);
         let qualify = |node: Node<'_>| qualified_name(&self.model, node, self.source);
-        if let Some(rule) = pep604_rule(&name, slices, &qualify, typing_context) {
+        let union_context = UnionContext {
+            qualify: &qualify,
+            typing_context,
+            source: self.source,
+        };
+        if let Some(rule) = pep604_rule(&name, slices, &union_context) {
             let fix = mode
                 .defines_types()
                 .then(|| pep604_replacement(rule, slices, &qualify, self.source))
@@ -133,10 +138,7 @@ impl<'tree> Annotations<'tree> for Visitor<'tree> {
         } else {
             named(string)
         };
-        if parts
-            .iter()
-            .any(|part| is_f_string(*part, self.source) || is_bytes(*part, self.source))
-        {
+        if parts.iter().any(|part| is_bytes(*part, self.source)) {
             return;
         }
         let contents: Vec<Content> = parts.iter().map(|part| self.content(*part)).collect();

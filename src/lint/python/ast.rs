@@ -104,6 +104,11 @@ pub fn is_f_string(string: Node<'_>, source: &[u8]) -> bool {
     string_prefix(string, source).contains(['f', 'F'])
 }
 
+// Un f-string o un t-string, que tienen interpolaciones adentro.
+pub fn is_interpolated_string(string: Node<'_>, source: &[u8]) -> bool {
+    string_prefix(string, source).contains(['f', 'F', 't', 'T'])
+}
+
 pub fn is_bytes(string: Node<'_>, source: &[u8]) -> bool {
     string_prefix(string, source).contains(['b', 'B'])
 }
@@ -120,8 +125,6 @@ pub fn is_identifier(name: &str) -> bool {
     let mut characters = name.chars();
     let starts = characters
         .next()
-        .is_some_and(|first| first == '_' || first.is_alphabetic());
-    starts
-        && characters.all(|character| character == '_' || character.is_alphanumeric())
-        && !KEYWORDS.contains(&name)
+        .is_some_and(|first| first == '_' || unicode_ident::is_xid_start(first));
+    starts && characters.all(unicode_ident::is_xid_continue) && !KEYWORDS.contains(&name)
 }

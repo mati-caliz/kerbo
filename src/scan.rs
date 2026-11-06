@@ -277,7 +277,7 @@ fn source_file(walk_root: &Path, path: &Path, project_root: &Path) -> SourceFile
 
 fn walked_file(walk_root: &Path, path: &Path, project_root: &Path) -> SourceFile {
     let file = source_file(walk_root, path, project_root);
-    if !walk::is_analyzed(walk_root, path) {
+    if !walk::is_analyzed(walk_root, path, file.language) {
         return SourceFile {
             language: None,
             ..file

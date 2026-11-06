@@ -1,0 +1,57 @@
+import os
+import sys
+from json import dumps, loads
+from typing import Literal
+
+lazy import abc
+lazy import zlib
+lazy from collections import OrderedDict, deque
+lazy from typing import IO
+
+lazy = 1
+print(lazy)
+
+print(os, sys, dumps, loads, abc, zlib, OrderedDict, deque, IO, Literal)
+
+
+def generic[T: int = int, **P = int, *Ts = int](value: T) -> T:
+    return value
+
+
+class Box[T = str]:
+    value: T
+
+
+def splatted(args, kwargs):
+    return args[*kwargs, *(kwargs.values())]
+
+
+def annotated(first: f"{missing_name}", second: t"{other_missing}"):
+    return first, second
+
+
+def typed_slice(value: tuple[:, 1], other: list[:]):
+    return value, other
+
+
+def quoted() -> 'Literal[None]':
+    return None
+
+
+def pattern(value):
+    match value:
+        case +0:
+            return 1
+        case +0.25 + 1.75j:
+            return 2
+    return 3
+
+
+class A:
+    x = 1
+
+    @property
+# comentario sin sangría entre el decorador y la función
+    def name(self):
+        return (self.
+    x)

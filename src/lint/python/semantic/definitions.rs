@@ -17,12 +17,14 @@ use super::returns::{unnecessary_return_none, useless_return};
 use super::stub_signatures::signature_reports;
 use super::targets::Store;
 use super::type_hints::Hints;
+use super::type_parameters::{TYPE_PARAMETER_DEFAULT, type_parameter_parts};
 use super::{Mode, Pending, Visitor};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{
     BODY_FIELD, CLASS, DECORATED, FUNCTION, IDENTIFIER, LEFT_FIELD, NAME_FIELD, RIGHT_FIELD, TYPE_FIELD,
     VALUE_FIELD, named,
 };
+use crate::lint::python::builtins::is_builtin;
 use crate::lint::python::fix_edits::{Parentheses, commented_unsafe, remove_argument};
 use crate::lint::python::semantic::annotations::Annotations;
 use crate::lint::python::semantic::expressions::Expressions;
@@ -39,7 +41,6 @@ const PRIVATE_PREFIX: char = '_';
 const SUPERCLASSES_FIELD: &str = "superclasses";
 const RETURN_TYPE_FIELD: &str = "return_type";
 const GLOBAL_STATEMENT: &str = "global_statement";
-const CONSTRAINED_TYPE: &str = "constrained_type";
 const DEFAULTED: [&str; 2] = ["default_parameter", "typed_default_parameter"];
 const TYPED: [&str; 2] = ["typed_parameter", "typed_default_parameter"];
 const SPLATS: [&str; 2] = ["list_splat_pattern", "dictionary_splat_pattern"];
@@ -204,6 +205,14 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
 
     fn bind_type_parameters(&mut self, parameters: Node<'tree>, definition: Node<'tree>) {
         for parameter in named(parameters) {
+            if parameter.kind() == TYPE_PARAMETER_DEFAULT {
+                let defaults: Vec<_> = named(parameter)
+                    .into_iter()
+                    .map(|default| self.snapshot(default))
+                    .collect();
+                self.deferred.annotations.extend(defaults);
+                continue;
+            }
             let (name, bounds) = type_parameter_parts(parameter);
             if let Some(name) = name {
                 self.reports
@@ -240,7 +249,8 @@ impl<'tree> Definitions<'tree> for Visitor<'tree> {
             let bound = module
                 .and_then(|id| self.model.binding(id))
                 .is_some_and(|binding| !binding.kind.is_unbound());
-            if bound {
+            // Los builtins ya están ligados en el módulo en ruff: el `global` no los tapa para el resto.
+            if bound || is_builtin(text) {
                 continue;
             }
             let site = Site {
@@ -377,17 +387,3 @@ fn private_type_parameter(definition: Node<'_>, name: Node<'_>, text: &str) -> O
 }
 
 // El nombre de un parámetro de tipo (`T`, `T: int`, `*Ts`) y sus cotas o restricciones.
-pub fn type_parameter_parts(parameter: Node<'_>) -> (Option<Node<'_>>, Vec<Node<'_>>) {
-    let inner = named(parameter).first().copied().unwrap_or(parameter);
-    let parts = if inner.kind() == CONSTRAINED_TYPE {
-        named(inner)
-    } else {
-        vec![inner]
-    };
-    let Some((first, bounds)) = parts.split_first() else {
-        return (None, Vec::new());
-    };
-    let name = std::iter::successors(Some(*first), |node| named(*node).first().copied())
-        .find(|node| node.kind() == IDENTIFIER);
-    (name, bounds.to_vec())
-}

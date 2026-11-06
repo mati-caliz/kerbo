@@ -19,7 +19,8 @@ pub enum Ordered<'source> {
 }
 
 // `order_imports` de ruff con la configuración por defecto: primero los `import`, después los
-// `from`, cada grupo por módulo y con los nombres de cada `from` ordenados.
+// `from`, cada grupo por módulo y con los nombres de cada `from` ordenados. Los `lazy` van detrás de
+// todos los demás, en el mismo orden.
 pub fn order(block: ImportBlock<'_>) -> Vec<Ordered<'_>> {
     let ImportBlock {
         mut straight,
@@ -34,10 +35,16 @@ pub fn order(block: ImportBlock<'_>) -> Vec<Ordered<'_>> {
             .sort_by(|(left, _), (right, _)| compare_members(*left, *right));
     }
     from.sort_by(|left, right| compare_from(left, right).then(left.first_index.cmp(&right.first_index)));
-    straight
+    let (lazy_straight, eager_straight): (Vec<_>, Vec<_>) =
+        straight.into_iter().partition(|import| import.alias.lazy);
+    let (lazy_from, eager_from): (Vec<_>, Vec<_>) =
+        from.into_iter().partition(|statement| statement.module.lazy);
+    eager_straight
         .into_iter()
         .map(Ordered::Straight)
-        .chain(from.into_iter().map(Ordered::From))
+        .chain(eager_from.into_iter().map(Ordered::From))
+        .chain(lazy_straight.into_iter().map(Ordered::Straight))
+        .chain(lazy_from.into_iter().map(Ordered::From))
         .collect()
 }
 

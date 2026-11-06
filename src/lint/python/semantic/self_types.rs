@@ -6,7 +6,6 @@ use tree_sitter::Node;
 use super::Pending;
 use super::classes::{DEFINITION_FIELD, any_base, bases};
 use super::decorators::{decorators_of, is_abstract, is_final, is_overload};
-use super::definitions::type_parameter_parts;
 use super::model::{BindingId, BindingKind, Model, Resolution};
 use super::mutability::{Resolver, without_subscript};
 use super::parameters::{Signature, annotation, matches_annotation};
@@ -14,6 +13,7 @@ use super::private_types::assigned_call;
 use super::qualified::{is_builtin_named, is_typing, qualified_name};
 use super::self_return_fix::self_return_fix;
 use super::type_hints::{Hints, subscript_parts, unwrapped};
+use super::type_parameters::type_parameter_parts;
 use super::type_variable_fix::{SelfTypeVariable, TypeVariable, self_type_variable_fix};
 use crate::lint::python::Report;
 use crate::lint::python::ast::{

@@ -3,7 +3,7 @@ use tree_sitter::Node;
 use super::qualified::is_typing;
 use crate::lint::python::ast::{
     ASSIGNMENT, ATTRIBUTE, CLASS, CONCATENATED_STRING, FUNCTION, IDENTIFIER, MODULE, STRING, SUBSCRIPT,
-    SUBSCRIPT_FIELD, TUPLE, fields, named, text, unparenthesized,
+    SUBSCRIPT_FIELD, TUPLE, fields, is_bytes, is_interpolated_string, named, text, unparenthesized,
 };
 use crate::rules::PythonRule;
 
@@ -46,15 +46,26 @@ pub fn is_pep585_generic(qualified: &str) -> bool {
     PEP585_GENERICS.contains(&qualified)
 }
 
+// `Expr::StringLiteral` de ruff: ni bytes ni f-strings, que no son anotaciones entre comillas.
+fn is_text_literal(element: Node<'_>, source: &[u8]) -> bool {
+    let is_plain = |part: Node<'_>| !is_bytes(part, source) && !is_interpolated_string(part, source);
+    match element.kind() {
+        STRING => is_plain(element),
+        CONCATENATED_STRING => named(element).into_iter().all(is_plain),
+        _ => false,
+    }
+}
+
+pub struct UnionContext<'context> {
+    pub qualify: &'context dyn Fn(Node<'_>) -> Option<String>,
+    pub typing_context: bool,
+    pub source: &'context [u8],
+}
+
 // UP045 (`Optional[X]`) o UP007 (`Union[X, Y]`) para el valor de un subíndice. `slices` son los
 // elementos de adentro, `qualify` da el nombre calificado de un nodo y `typing_context` dice si las
 // anotaciones entre comillas se dejan sin evaluar (futuro, stubs).
-pub fn pep604_rule(
-    value: &str,
-    slices: &[Node<'_>],
-    qualify: &dyn Fn(Node<'_>) -> Option<String>,
-    typing_context: bool,
-) -> Option<PythonRule> {
+pub fn pep604_rule(value: &str, slices: &[Node<'_>], context: &UnionContext<'_>) -> Option<PythonRule> {
     let rule = if is_typing(value, OPTIONAL) {
         PythonRule::UP045
     } else if is_typing(value, UNION) {
@@ -65,12 +76,12 @@ pub fn pep604_rule(
     let elements: Vec<Node<'_>> = slices.iter().flat_map(|slice| flattened(*slice)).collect();
     let quoted = elements
         .iter()
-        .any(|element| matches!(element.kind(), STRING | CONCATENATED_STRING));
+        .any(|element| is_text_literal(*element, context.source));
     let starred = elements.iter().any(|element| STARRED.contains(&element.kind()));
     let named_tuple = elements
         .iter()
-        .any(|element| qualify(*element).is_some_and(|name| is_typing(&name, NAMED_TUPLE)));
-    ((typing_context || !quoted) && !starred && !named_tuple).then_some(rule)
+        .any(|element| (context.qualify)(*element).is_some_and(|name| is_typing(&name, NAMED_TUPLE)));
+    ((context.typing_context || !quoted) && !starred && !named_tuple).then_some(rule)
 }
 
 // UP044: `Unpack[X]` donde Python 3.11 acepta `*X`, adentro de un subíndice o como tipo de `*args`.

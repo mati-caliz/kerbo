@@ -200,13 +200,13 @@ fn noqa_directives_silence_like_ruff() {
 
 #[test]
 fn files_tree_sitter_cannot_parse_keep_only_the_local_rules() {
-    let source = "import os\nlazy import json\nx = 1;\n";
+    let source = "import os\nlazy $mport json\nx = 1;\n";
     assert_eq!(rendered(&lints(source)), ["3:6 E703"]);
 }
 
 #[test]
 fn unparsed_files_only_flag_noqa_codes_that_do_not_need_findings() {
-    let source = "import os  # noqa: F401\nlazy import json  # noqa: E501\nx = 1  # noqa\n";
+    let source = "import os  # noqa: F401\nlazy $mport json  # noqa: E501\nx = 1  # noqa\n";
     assert_eq!(rendered(&lints(source)), ["2:19 RUF100"]);
 }
 

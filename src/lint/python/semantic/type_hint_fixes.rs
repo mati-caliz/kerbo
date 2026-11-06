@@ -70,6 +70,13 @@ pub fn nested_literal_fix(literal: Node<'_>, members: &[Node<'_>], source: &[u8]
 // está adentro de un `|` que tiene un `None`; inseguro con comentarios (y fuera de un stub, que lo
 // decide quien llama).
 pub fn none_literal_fix(literal: Node<'_>, members: &[Node<'_>], source: &[u8]) -> Option<Fix> {
+    let replacement = none_literal_replacement(literal, members, source)?;
+    let fix = commented_unsafe(Fix::replace(literal, &replacement, source), literal, source)
+        .isolated(enclosing_statement(literal).map(|statement| statement.id()));
+    Some(fix)
+}
+
+pub fn none_literal_replacement(literal: Node<'_>, members: &[Node<'_>], source: &[u8]) -> Option<String> {
     let (head, _) = subscript_parts(literal)?;
     let others: Vec<Node<'_>> = members
         .iter()
@@ -79,22 +86,18 @@ pub fn none_literal_fix(literal: Node<'_>, members: &[Node<'_>], source: &[u8]) 
     if inside_union_with_none(literal, source) {
         return None;
     }
-    let replacement = if others.is_empty() {
-        String::from(NONE_WORD)
-    } else {
-        let listed: Vec<String> = others
-            .iter()
-            .map(|member| codegen::unparse(*member, codegen::COMMA, source))
-            .collect();
-        format!(
-            "{}[{}] | {NONE_WORD}",
-            codegen::unparse(head, codegen::MAX, source),
-            listed.join(ELEMENT_SEPARATOR)
-        )
-    };
-    let fix = commented_unsafe(Fix::replace(literal, &replacement, source), literal, source)
-        .isolated(enclosing_statement(literal).map(|statement| statement.id()));
-    Some(fix)
+    if others.is_empty() {
+        return Some(String::from(NONE_WORD));
+    }
+    let listed: Vec<String> = others
+        .iter()
+        .map(|member| codegen::unparse(*member, codegen::COMMA, source))
+        .collect();
+    Some(format!(
+        "{}[{}] | {NONE_WORD}",
+        codegen::unparse(head, codegen::MAX, source),
+        listed.join(ELEMENT_SEPARATOR)
+    ))
 }
 
 fn inside_union_with_none(literal: Node<'_>, source: &[u8]) -> bool {

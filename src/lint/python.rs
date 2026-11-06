@@ -163,7 +163,7 @@ pub fn analysis_context(language: Language, path: &Path) -> Option<u64> {
 
 pub fn findings(root: Node<'_>, source: &[u8], limits: &Limits, path: Option<&Path>) -> Vec<LintFinding> {
     let enabled = |rule: PythonRule| limits.get(RuleId::Python(rule)).is_some();
-    if !PythonRule::ALL.into_iter().any(enabled) {
+    if !PythonRule::ALL.into_iter().any(enabled) || std::str::from_utf8(source).is_err() {
         return Vec::new();
     }
     let file = file_kind(path);
@@ -176,7 +176,7 @@ pub fn findings(root: Node<'_>, source: &[u8], limits: &Limits, path: Option<&Pa
             path,
             stub: file.stub,
         };
-        let mut found = semantic::reports(root, source, file);
+        let mut found = semantic::reports(root, source, file, path);
         found.extend(imports::reports(root, &nodes, &import_file));
         found
     };

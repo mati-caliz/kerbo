@@ -59,12 +59,9 @@ acá.
     (`--isolated --select E4,E7,E9,F`) en requests, fastapi, flask, django, pydantic, sqlalchemy,
     ipython, ansible, sympy y `Lib/` de CPython: 15.916 avisos en unos 11.200 archivos. Lo que queda,
     explicado:
-    - 82 archivos de CPython usan `lazy import` (PEP 810, de 3.15) y quedan fuera de la medición:
-      tree-sitter-python 0.25 no lo conoce.
     - En los archivos donde tree-sitter devuelve errores no corren las reglas que dependen de los
-      alcances (un árbol roto da falsos positivos, que rompen un gate): en CPython son
-      `test_compile.py` (un `dedent` adentro de paréntesis) y `test_patma.py`, 103 avisos que ruff
-      sí da. Las reglas locales (E70x, comparaciones, f-strings) corren igual.
+      alcances (un árbol roto da falsos positivos, que rompen un gate). Las reglas locales (E70x,
+      comparaciones, f-strings) corren igual.
     - E902 (5 avisos) es un error de lectura de ruff con archivos que no están en UTF-8, no una
       regla.
   - Lo que no se ve a simple vista quedó en `src/lint/python/fixtures/`, cada archivo con la salida
@@ -433,9 +430,6 @@ acá.
     seguir los usos del grupo por ramas y loops. Ninguna trae arreglo (ruff lo tiene en B014, SIM911,
     FURB162, FURB169, FURB177, FURB181, PTH210 y ASYNC105). PTH210 sólo reconoce un nombre ligado a una
     llamada a `Path(...)`, no a una anotación.
-  - Los archivos que no están en UTF-8 (ruff da E902 y no los analiza) se analizan igual: falta
-    saltearlos o avisar como ruff. Se hacen en tandas de 15 a 25 reglas por
-    tema, con un solo gate y una sola medición por tanda.
   - Hechas las 18 reglas que quedaban del conjunto por defecto de ruff 0.17 y del clásico, medidas con
     `fixtures/plugin_checks.py` (2026-10-25): EXE001 y EXE002 (shebang contra el permiso de
     ejecución; como ruff, sólo en Unix y fuera de WSL), EXE004 (espacios antes del shebang), INT001 e
@@ -461,14 +455,39 @@ acá.
   `list` o `dict` tapados escribe `builtins.list` y agrega el `import builtins`, como ruff. Se mira si el
   nombre está ligado en todo el archivo y no en el alcance del arreglo: un nombre tapado en otra función
   también deja afuera el arreglo, que es el lado seguro.
+- La gramática y el recorrido de Python (hecho, 2026-11-06). kerbo lleva su copia en
+  `grammars/tree-sitter-python`, con lo que hacía que CPython no parseara: `lazy import` (PEP 810), los
+  defaults de parámetros de tipo (PEP 696), `a[*b, *(c())]`, `a[:, 1]` en una anotación, `case +0:` y un
+  scanner que sólo emite `DEDENT` donde el parser lo espera (rompía `(bar.` con la línea siguiente menos
+  indentada y un comentario sin sangría después de un decorador). I001 ordena los `lazy` detrás de los
+  demás, como ruff.
+  - Python recorre como ruff: también lo oculto (`.ci`, `.azure-pipelines`, `.util.py`), salvo los
+    `DEFAULT_EXCLUDES` de ruff (`.venv`, `venv`, `dist`, `_build`, `site-packages`, `node_modules` y los
+    demás), que kerbo sí analizaba. Los otros lenguajes siguen salteando lo oculto.
+  - Un archivo que no está en UTF-8 no da avisos de Python: ruff lo informa como E902, que no es una
+    regla, y no lo analiza. kerbo no avisa nada: si hace falta, va como regla propia.
+  - El módulo del archivo (`module_identity.rs`, el `Module` de ruff): una función de `gzip.py` es
+    `gzip.open` y `from . import embed` adentro de un paquete resuelve al módulo vecino (SIM115 y T100).
+  - Sueltos: un f-string o t-string en una anotación se lee como valor en el momento, no como anotación
+    entre comillas (F722 de más y F821 de menos); PYI061 adentro de una anotación entre comillas, con su
+    arreglo; UP007 no toma los bytes como anotación entre comillas; UP009 con BOM; B009 con los
+    identificadores XID (`unicode-ident`); PERF101 sólo con un literal asignado y el `MutationVisitor` de
+    ruff; un `global` de un builtin no lo tapa para el resto del archivo.
+  - Paridad contra ruff 0.17.1 en los diez repos, con todas las reglas de kerbo prendidas en los dos: lo
+    único que difiere son 5 RUF100 de los que no se puede decir nada en esta medición, porque EXE002 sale
+    en todos los archivos montados desde Windows y usa el `noqa` de la primera línea. `compare_ruff` dejó
+    de estar perdido: `scripts/parity/python/corpus.sh` y `compare.py`, que comparan por archivo, línea,
+    columna y regla.
 - Pendientes de Python contra ruff:
+  - El arreglo de PYI019 con un parámetro de tipo que tiene default (`def f[T = int](self: T)`) no saca el
+    default junto con el parámetro: PEP 696 es de Python 3.13 y ese caso no está en el corpus ni en los fixtures.
   - Hecha B031 (2026-10-25), el grupo de `itertools.groupby` usado más de una vez, con el
     `GroupNameFinder` de ruff traducido al árbol de tree-sitter: cuenta por rama en `if` y `match`,
     vuelve a cero con `return`, `break` y `continue`, y deja de buscar cuando se reasigna el nombre.
     Paridad exacta en `fixtures/groupby_reuse.py` (25 avisos); en el corpus no aparece. Con esto
     están todas las reglas del conjunto por defecto de ruff 0.17 que pueden salir con Python 3.11;
     del clásico sólo queda E902, que no es una regla.
-  - EXE002 en el corpus: kerbo da 10.905 avisos que ruff no, porque el corpus se analiza montado
+  - EXE002 en el corpus (y los 5 RUF100 de arriba): kerbo da 10.905 avisos que ruff no, porque el corpus se analiza montado
     desde Windows en Docker, donde todo archivo aparece como ejecutable, y ruff corre en Windows, donde
     la regla no existe. Ruff en ese mismo contenedor daría lo mismo (no es WSL), así que no se tocó;
     falta medirlo con ruff en Linux sobre un clon con permisos reales.
@@ -678,16 +697,9 @@ acá.
   - Con eso no quedan arreglos de ruff pendientes en el corpus (medido el 2026-10-26 con
     `../kerbo-parity/scripts/pending_by_frequency.txt`); PLW1510 no va (el arreglo de ruff es sólo
     para mostrar).
-  - Las reglas de alcance en archivos que tree-sitter no parsea, y `lazy import` cuando la
-    gramática lo sume.
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece
     como suprimido con su motivo.
   - `short-name` de Python marca los mismos `l`, `O` e `I` que `e741`: hoy salen los dos.
-  - I001: el aviso que falta en `pydantic-core/python/pydantic_core/_pydantic_core/__init__.pyi`
-    (ruff lo da y kerbo no; sospecha: cómo se clasifica `pydantic_core` desde un paquete que sólo
-    tiene `__init__.pyi`).
-  - El arnés de esta paridad (ruff en JSON contra kerbo en JSON con la conversión de columnas)
-    quedó fuera del repo, como los anteriores.
 - TypeScript y JavaScript contra ESLint (empezada, 2026-10-21): 20 reglas de `@eslint/js`
   recommended y de `typescript-eslint` recommended sin tipos, con el nombre de ESLint sin el prefijo
   del plugin, en una familia propia (`EslintRule`) y un submódulo propio (`src/lint/ecmascript/`).

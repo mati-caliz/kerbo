@@ -61,7 +61,8 @@ kerbo explain cognitive-complexity  # why a rule exists and how to fix it
 
 It honors `.gitignore` and skips hidden files and folders, except `.github/` and `.devcontainer/`,
 which usually hold the repo's own Dockerfiles, compose files and scripts; the other hidden ones
-(`.env`, `.npmrc`) are only checked for secrets. It exits with `0` when there are no problems, `1`
+(`.env`, `.npmrc`) are only checked for secrets. Python walks like ruff: hidden files too, except
+its default excludes (`.venv`, `venv`, `dist`, `site-packages` and the like). It exits with `0` when there are no problems, `1`
 when there are and `2` when something could not be read or the configuration is invalid.
 
 `kerbo check`, `kerbo baseline` and the MCP server store what they measure of each file in a
