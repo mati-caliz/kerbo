@@ -18,6 +18,7 @@ pub use super::java_returns::{ReturnType, Returns};
 use super::java_returns::{return_type, returned};
 use super::java_switch::{rule_bodies, yields_value};
 use super::java_taint::taint_method;
+use super::java_throws::{MethodThrows, method_throws};
 use super::taint::TaintMethod;
 use crate::syntax::{descendants, named_children};
 
@@ -116,6 +117,7 @@ pub struct Extracted<'tree> {
     pub null_flows: Vec<NullFlow>,
     pub resources: Vec<ResourceCandidate>,
     pub taints: Vec<TaintMethod>,
+    pub method_throws: Vec<MethodThrows>,
 }
 
 // Lo que declara y lo que llama una clase de nivel superior, con sus clases anidadas.
@@ -150,6 +152,9 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
             METHOD | CONSTRUCTOR => {
                 facts.enter_method();
                 extracted.callables.extend(callable(node, source));
+                extracted
+                    .method_throws
+                    .extend(method_throws(node, source, variables));
                 if let Some(body) = node.child_by_field_name(BODY_FIELD) {
                     extracted.null_flows.extend(null_flows(body, source, variables));
                     extracted

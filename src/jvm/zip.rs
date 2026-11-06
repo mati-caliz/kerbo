@@ -41,11 +41,13 @@ const LOCAL_EXTRA_LENGTH_AT: usize = 28;
 
 // Un zip (un jar) del que sólo se leyó el índice: las entradas se sacan del disco cuando hacen
 // falta, así un classpath de cientos de jars no se carga entero en memoria.
+#[derive(Debug)]
 pub struct Archive {
     source: Source,
     entries: HashMap<String, Entry>,
 }
 
+#[derive(Debug)]
 struct Source {
     path: PathBuf,
 }
@@ -56,12 +58,16 @@ impl Source {
     }
 
     fn range(&self, offset: usize, length: usize) -> Option<Vec<u8>> {
-        let mut file = File::open(&self.path).ok()?;
-        file.seek(SeekFrom::Start(u64::try_from(offset).ok()?)).ok()?;
-        let mut buffer = vec![0; length];
-        file.read_exact(&mut buffer).ok()?;
-        Some(buffer)
+        read_range(&self.path, offset, length)
     }
+}
+
+pub(super) fn read_range(path: &Path, offset: usize, length: usize) -> Option<Vec<u8>> {
+    let mut file = File::open(path).ok()?;
+    file.seek(SeekFrom::Start(u64::try_from(offset).ok()?)).ok()?;
+    let mut buffer = vec![0; length];
+    file.read_exact(&mut buffer).ok()?;
+    Some(buffer)
 }
 
 #[derive(Debug, Clone, Copy)]

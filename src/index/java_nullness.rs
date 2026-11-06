@@ -38,6 +38,10 @@ impl<'summary> ProjectTypes<'summary> {
         Self { declared }
     }
 
+    pub fn is_declared(&self, name: &str) -> bool {
+        self.declared.contains_key(name)
+    }
+
     // Los métodos que declara un tipo del proyecto, con el archivo donde están.
     pub fn declarations_of<'query>(
         &'query self,
@@ -57,6 +61,7 @@ impl<'summary> ProjectTypes<'summary> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Resolved {
     Project(String),
     Library(String),
@@ -195,7 +200,7 @@ pub fn library_ancestors(types: &ProjectTypes<'_>, library: &Library, name: &str
     found
 }
 
-fn parents_of(types: &ProjectTypes<'_>, library: &Library, name: &str) -> Vec<Resolved> {
+pub fn parents_of(types: &ProjectTypes<'_>, library: &Library, name: &str) -> Vec<Resolved> {
     types
         .declared
         .get(name)

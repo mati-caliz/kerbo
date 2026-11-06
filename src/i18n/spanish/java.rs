@@ -332,6 +332,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Con final, quien lee sabe que el valor no cambia después de construir el objeto, y el compilador lo garantiza. Como FieldMayBeFinal de IntelliJ.",
         "private Instant creadoEn = Instant.now(); se vuelve private final Instant creadoEn = Instant.now();.",
     ),
+    RuleText::new(
+        "Excepción en el throws que el método nunca tira",
+        "sacala del throws, y de los catch que la atrapan al llamarlo",
+        "Quien llama tiene que atrapar o declarar una excepción que nunca llega, y el código de manejo que escribe no corre nunca. Como RedundantThrows de IntelliJ: si kerbo no puede resolver alguna llamada del método, no opina.",
+        "void cargar() throws IOException { lista.clear(); } se vuelve void cargar() { lista.clear(); }.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

@@ -258,7 +258,7 @@ fn class_arguments(invocation: Node<'_>) -> Vec<usize> {
         .collect()
 }
 
-fn argument_count(invocation: Node<'_>) -> usize {
+pub(super) fn argument_count(invocation: Node<'_>) -> usize {
     invocation
         .child_by_field_name(ARGUMENTS_FIELD)
         .map(named_children)

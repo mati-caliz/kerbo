@@ -19,6 +19,7 @@ pub struct Method {
     pub access: u16,
     pub parameter_annotations: Vec<Vec<String>>,
     pub return_annotations: Vec<String>,
+    pub exceptions: Vec<String>,
 }
 
 impl Method {

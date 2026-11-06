@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use super::class_file::{parameter_count, parse};
+use super::class_file::{ClassFile, parameter_count, parse};
+use super::jdk::Jdk;
+use super::jimage::ModulesImage;
 use super::method::Method;
+use super::release::project_release;
 use super::zip::Archive;
 
 const COMPRESSED: &str = "sample.jar";
@@ -144,6 +147,7 @@ fn a_varargs_method_accepts_more_arguments_and_knows_its_class_parameters() {
         access: 0x0080,
         parameter_annotations: vec![Vec::new(); 3],
         return_annotations: Vec::new(),
+        exceptions: Vec::new(),
     };
     assert!(method.accepts(3) && method.accepts(2) && method.accepts(6));
     assert!(!method.accepts(1));
@@ -159,4 +163,111 @@ fn a_varargs_method_accepts_more_arguments_and_knows_its_class_parameters() {
     };
     assert!(fixed.accepts(2) && !fixed.accepts(3));
     assert!(!fixed.returns_reference() && fixed.return_class().is_none());
+}
+
+const JAVA_17: u32 = 17;
+const JAVA_8: u32 = 8;
+const FILE_INPUT_STREAM: &str = "java/io/FileInputStream.class";
+
+fn parsed(jdk: &Jdk, entry: &str) -> ClassFile {
+    parse(&jdk.read(entry).expect("la firma está")).expect("la firma se lee")
+}
+
+#[test]
+fn the_jdk_signatures_come_from_ct_sym_for_an_older_release_with_their_exceptions() {
+    let jdk = Jdk::at(&fixture("jdk"), Some(JAVA_17)).expect("el JDK se abre");
+    assert!(jdk.contains(FILE_INPUT_STREAM) && !jdk.contains("no/Existe.class"));
+    let stream = parsed(&jdk, FILE_INPUT_STREAM);
+    let close = stream
+        .methods
+        .iter()
+        .find(|method| method.name == "close")
+        .expect("close está");
+    assert_eq!(close.exceptions, ["java.io.IOException"]);
+    let old = Jdk::at(&fixture("jdk"), Some(JAVA_8)).expect("el JDK se abre");
+    assert!(old.contains(FILE_INPUT_STREAM));
+    assert!(!old.contains("java/lang/constant/Constable.class"));
+    assert!(jdk.contains("java/lang/constant/Constable.class"));
+}
+
+// `lib/modules` con una clase sin comprimir, una comprimida y un recurso que no es una clase.
+fn modules_image() -> Vec<u8> {
+    let strings = b"\0java/lang\0Hola\0class\0Comprimida\0txt\0";
+    let (parent, hola, class, compressed, text) = (1, 11, 16, 22, 33);
+    let class_bytes = b"\xCA\xFE\xBA\xBE";
+    let location = |base: u8, extension: u8, packed: u8| {
+        vec![
+            0b0001_0000,
+            parent,
+            0b0001_1000,
+            base,
+            0b0010_0000,
+            extension,
+            0b0010_1000,
+            0,
+            0b0011_0000,
+            packed,
+            0b0011_1000,
+            4,
+            0,
+        ]
+    };
+    let locations = [
+        location(hola, class, 0),
+        location(compressed, class, 4),
+        location(hola, text, 0),
+    ];
+    let offsets: Vec<u32> = vec![0, 13, 26];
+    let locations_size: u32 = 39;
+    let mut image = Vec::new();
+    let header = [0xCAFE_DADA, 0x0001_0000, 0, 3, 3, locations_size, 37];
+    image.extend(header.iter().flat_map(|slot: &u32| slot.to_le_bytes()));
+    image.extend([0_u8; 12]);
+    image.extend(offsets.iter().flat_map(|offset| offset.to_le_bytes()));
+    image.extend(locations.iter().flatten());
+    image.extend(strings);
+    image.extend(class_bytes);
+    image
+}
+
+#[test]
+fn the_modules_image_lists_uncompressed_classes_and_reads_them() {
+    use crate::test_support::TempTree;
+    let tree = TempTree::new("jvm-jimage");
+    let path = tree.path().join("modules");
+    std::fs::write(&path, modules_image()).expect("se escribe");
+    let image = ModulesImage::open(&path).expect("la imagen se abre");
+    assert!(image.contains("java/lang/Hola.class"));
+    assert!(!image.contains("java/lang/Comprimida.class"));
+    assert_eq!(
+        image.read("java/lang/Hola.class").as_deref(),
+        Some(&b"\xCA\xFE\xBA\xBE"[..])
+    );
+    assert!(image.read("no/Existe.class").is_none());
+    std::fs::write(&path, b"no es una imagen de jimage, ni de lejos").expect("se escribe");
+    assert!(ModulesImage::open(&path).is_none());
+}
+
+#[test]
+fn the_release_comes_from_the_build_and_skips_what_is_not_a_number() {
+    use crate::test_support::TempTree;
+    let maven = TempTree::new("jvm-release-maven");
+    maven.write(
+        "pom.xml",
+        "<project><maven.compiler.release>${java.version}</maven.compiler.release><java.version>17</java.version></project>",
+    );
+    assert_eq!(project_release(maven.path()), Some(17));
+    let legacy = TempTree::new("jvm-release-legacy");
+    legacy.write(
+        "pom.xml",
+        "<project><maven.compiler.source>1.8</maven.compiler.source></project>",
+    );
+    assert_eq!(project_release(legacy.path()), Some(8));
+    let gradle = TempTree::new("jvm-release-gradle");
+    gradle.write(
+        "build.gradle",
+        "java { sourceCompatibility = JavaVersion.VERSION_11 }",
+    );
+    assert_eq!(project_release(gradle.path()), Some(11));
+    assert_eq!(project_release(TempTree::new("jvm-release-none").path()), None);
 }

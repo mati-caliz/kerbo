@@ -332,6 +332,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "With final, readers know the value does not change after the object is built, and the compiler guarantees it. Like IntelliJ's FieldMayBeFinal.",
         "private Instant createdAt = Instant.now(); becomes private final Instant createdAt = Instant.now();.",
     ),
+    RuleText::new(
+        "Exception in the throws clause that the method never throws",
+        "remove it from the throws clause, and from the catch blocks around its calls",
+        "Callers have to catch or declare an exception that never arrives, and the handling code they write never runs. Like IntelliJ's RedundantThrows: if kerbo cannot resolve some call in the method, it has no opinion.",
+        "void load() throws IOException { list.clear(); } becomes void load() { list.clear(); }.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

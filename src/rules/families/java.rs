@@ -55,6 +55,7 @@ rule_family!(JavaRule {
     UnusedParameter => "unused-parameter",
     BooleanMethodIsAlwaysInverted => "boolean-method-is-always-inverted",
     FieldMayBeFinal => "field-may-be-final",
+    RedundantThrows => "redundant-throws",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {

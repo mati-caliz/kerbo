@@ -1660,9 +1660,21 @@ Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_check
 
 Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y el índice.
 
-- Las excepciones de las firmas (`Exceptions` de cada método de los `.class`) y, con eso,
-  `RedundantThrows` de IntelliJ (28 en Qodana, casi todos `throws Exception` en tests).
-- El JDK desde `ct.sym` para el `release` del proyecto, en vez de la tabla propia.
+- `RedundantThrows` de IntelliJ (`redundant-throws`), con las excepciones de las firmas (`Exceptions`
+  de cada método de los `.class`).
+  - Paridad contra Qodana en junit4 (`scripts/parity/java/`, 2026-11-06): de sus 219 avisos, 184
+    idénticos en archivo, línea y columna, **ninguno de más** y 35 que faltan (31 en tests). Falta
+    analizar esos 35 uno por uno y medir en más repos. `qodana.sh` todavía corre el perfil completo:
+    el de una sola inspección no se aplica, y en un repo grande eso tarda de más.
+  - Pendientes: los constructores, que piden seguir el `super()` implícito y los inicializadores de
+    los campos; `super.metodo()`; `values()` y `valueOf()` de un enum; `throw e` de una variable; las
+    constantes de un `import static`. Un método del proyecto que redefine a uno de librería suma lo
+    que tira el de arriba: calla de más.
+- El JDK para el `release` del proyecto: las firmas salen de `ct.sym` para una versión anterior a la
+  del JDK instalado y de `lib/modules` para la suya, porque `ct.sym` no la trae (como
+  `javac --release`). Por ahora sólo las usa `redundant-throws`.
+  - Pendientes: reemplazar con esto las tablas de `java_jdk.rs` (`CLOSEABLE`, `RETURNS`) midiendo que
+    `AutoCloseableResource` no cambie; un JDK de `jlink --compress` no se lee.
 - Tipos genéricos: `Map.get` y lo que devuelve una lambda en el flujo de nulos.
 - El tipo de retorno de los métodos del proyecto, para seguir cadenas que pasan por ellos, y la
   inferencia de parámetros no nulos para todos los métodos (hoy sólo los `@Override`), para avisar

@@ -11,6 +11,7 @@ mod shard;
 mod store;
 mod summary_codec;
 mod taint_codec;
+mod throws_codec;
 
 use std::collections::HashMap;
 use std::env;
@@ -31,7 +32,7 @@ use crate::rules::RuleId;
 use crate::secrets::{PathProfile, SecretFinding};
 
 const FORMAT_DIRECTORY: &str = "analysis-v2";
-const FORMAT_VERSION: u64 = 50;
+const FORMAT_VERSION: u64 = 51;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisSubject<'subject> {

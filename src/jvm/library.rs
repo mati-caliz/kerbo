@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use super::class_file::{ClassFile, parse};
+use super::jdk::Jdk;
 use super::method::Method;
 use super::zip::Archive;
 
@@ -23,6 +24,8 @@ pub struct Library {
     archives: Vec<Archive>,
     owners: HashMap<String, usize>,
     classes: RefCell<HashMap<String, Option<Rc<ClassFile>>>>,
+    jdk: Option<Jdk>,
+    jdk_classes: RefCell<HashMap<String, Option<Rc<ClassFile>>>>,
 }
 
 impl Library {
@@ -38,7 +41,15 @@ impl Library {
             archives,
             owners,
             classes: RefCell::new(HashMap::new()),
+            jdk: None,
+            jdk_classes: RefCell::new(HashMap::new()),
         }
+    }
+
+    // El JDK va aparte de las dependencias: `class` sigue siendo sólo lo que viene de los jars, porque
+    // las reglas de nulos usan esas clases para saber qué anota una librería, y el JDK no anota nada.
+    pub fn with_jdk(self, jdk: Option<Jdk>) -> Self {
+        Self { jdk, ..self }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -58,9 +69,28 @@ impl Library {
     }
 
     pub fn has_class(&self, name: &str) -> bool {
-        entry_candidates(name)
-            .iter()
-            .any(|entry| self.owners.contains_key(entry))
+        entry_candidates(name).iter().any(|entry| {
+            self.owners.contains_key(entry) || self.jdk.as_ref().is_some_and(|jdk| jdk.contains(entry))
+        })
+    }
+
+    // Una clase de las dependencias o, si no está ahí, del JDK.
+    pub fn class_or_jdk(&self, name: &str) -> Option<Rc<ClassFile>> {
+        self.class(name).or_else(|| self.jdk_class(name))
+    }
+
+    fn jdk_class(&self, name: &str) -> Option<Rc<ClassFile>> {
+        let jdk = self.jdk.as_ref()?;
+        if let Some(known) = self.jdk_classes.borrow().get(name) {
+            return known.clone();
+        }
+        let found = entry_candidates(name)
+            .into_iter()
+            .find_map(|entry| parse(&jdk.read(&entry)?).ok().map(Rc::new));
+        self.jdk_classes
+            .borrow_mut()
+            .insert(name.to_owned(), found.clone());
+        found
     }
 
     fn read_class(&self, entry: &str) -> Option<Rc<ClassFile>> {

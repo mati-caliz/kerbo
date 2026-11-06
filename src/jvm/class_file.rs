@@ -35,6 +35,7 @@ const VISIBLE_PARAMETER_ANNOTATIONS: &str = "RuntimeVisibleParameterAnnotations"
 const INVISIBLE_PARAMETER_ANNOTATIONS: &str = "RuntimeInvisibleParameterAnnotations";
 const VISIBLE_TYPE_ANNOTATIONS: &str = "RuntimeVisibleTypeAnnotations";
 const INVISIBLE_TYPE_ANNOTATIONS: &str = "RuntimeInvisibleTypeAnnotations";
+const EXCEPTIONS: &str = "Exceptions";
 const ACCESS_SYNTHETIC: u16 = 0x1000;
 const ACCESS_BRIDGE: u16 = 0x0040;
 const PATH_SEPARATOR: char = '/';
@@ -204,6 +205,7 @@ fn method(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Option<Method>, Malfor
     let descriptor = pool.text(cursor.u16()?)?.to_owned();
     let mut parameter_annotations = vec![Vec::new(); parameter_count(&descriptor)];
     let mut return_annotations = Vec::new();
+    let mut exceptions = Vec::new();
     let attribute_count = cursor.u16()?;
     for _ in 0..attribute_count {
         let attribute = pool.text(cursor.u16()?)?;
@@ -234,6 +236,12 @@ fn method(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Option<Method>, Malfor
             VISIBLE_ANNOTATIONS | INVISIBLE_ANNOTATIONS => {
                 return_annotations.extend(annotation_list(&mut body, pool)?);
             }
+            EXCEPTIONS => {
+                let count = body.u16()?;
+                for _ in 0..count {
+                    exceptions.push(pool.class(body.u16()?)?);
+                }
+            }
             _ => {}
         }
     }
@@ -244,6 +252,7 @@ fn method(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Option<Method>, Malfor
         access,
         parameter_annotations,
         return_annotations,
+        exceptions,
     }))
 }
 

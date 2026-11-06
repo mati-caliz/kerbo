@@ -31,6 +31,7 @@ mod java_style;
 mod java_switch;
 pub mod java_taint;
 mod java_text;
+pub mod java_throws;
 mod java_tokens;
 mod java_wrap;
 mod modifiers;

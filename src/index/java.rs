@@ -15,6 +15,7 @@ use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_owner::{Owner, annotation_names};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
+use crate::lint::java_throws::{CaughtCall, MethodThrows, caught_calls};
 use crate::lint::taint::TaintMethod;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::JavaRule;
@@ -120,6 +121,9 @@ pub struct JavaSummary {
     pub taints: Vec<TaintMethod>,
     pub declared_types: Vec<DeclaredType>,
     pub exposures: Vec<Exposure>,
+    pub static_imports: Vec<String>,
+    pub method_throws: Vec<MethodThrows>,
+    pub caught_calls: Vec<CaughtCall>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -142,6 +146,12 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
             .into_iter()
             .filter(|node| node.kind() == IMPORT)
             .filter(|import| !children(*import).iter().any(|child| child.kind() == STATIC))
+            .filter_map(|import| imported_path(import, source))
+            .collect(),
+        static_imports: named_children(root)
+            .into_iter()
+            .filter(|node| node.kind() == IMPORT)
+            .filter(|import| children(*import).iter().any(|child| child.kind() == STATIC))
             .filter_map(|import| imported_path(import, source))
             .collect(),
         package_annotations: named_children(root)
@@ -177,6 +187,8 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.null_flows.extend(extracted.null_flows);
         summary.resources.extend(extracted.resources);
         summary.taints.extend(extracted.taints);
+        summary.method_throws.extend(extracted.method_throws);
+        summary.caught_calls.extend(caught_calls(&nodes, source));
         summary.constants.extend(declared_constants(&nodes, source));
         summary
             .fields

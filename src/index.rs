@@ -10,6 +10,8 @@ mod java_project;
 mod java_resources;
 mod java_rules;
 mod java_taint;
+mod java_throw_lookup;
+mod java_throws;
 mod java_unused;
 pub mod python_taint;
 mod taint_engine;
@@ -25,6 +27,8 @@ mod ecmascript_taint_tests;
 mod go_taint_tests;
 #[cfg(test)]
 mod java_escapes_tests;
+#[cfg(test)]
+mod java_throws_tests;
 #[cfg(test)]
 mod python_taint_tests;
 #[cfg(test)]

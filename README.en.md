@@ -394,6 +394,12 @@ From IntelliJ's inspections, kerbo does:
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` chained to
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` or `Optional.ofNullable(...)`.
 
+- `RedundantThrows` (`redundant-throws`): a checked exception in the `throws` clause that the body
+  cannot throw, that no overriding method declares and that no caller catches with a `catch` of that
+  type. It reads the signatures of the jars and of the JDK for the project's `release` (`JAVA_HOME` or
+  the `java` in `PATH`). Like IntelliJ, it has no opinion on a method with a call it cannot resolve.
+  Without a JDK it reports nothing.
+
 - `AutoCloseableResource` (`auto-closeable-resource`): a call that creates something closeable (an
   `InputStream`, a `Connection`, a `ResultSet`, an `ExecutorService`, an `HttpClient`...) outside a
   try-with-resources: in a variable that is not closed, returned or passed to another method, or

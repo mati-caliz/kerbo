@@ -5,6 +5,8 @@ use super::java_nullness::{ProjectTypes, unannotated_overrides};
 use super::java_project::{IndexedSummary, Project, key_of};
 use super::java_resources::unclosed_resources;
 use super::java_taint::tainted_sinks;
+use super::java_throw_lookup::ThrowLookup;
+use super::java_throws::{ThrowsFacts, redundant_throws};
 use super::java_unused::{Usage, unread_field, unused_field, unused_method, unused_parameters};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
@@ -22,6 +24,8 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
     let types = ProjectTypes::new(files);
     let usage = Usage::new(files);
     let package_types = PackageTypes::new(files);
+    let throw_lookup = ThrowLookup::new(&types, library);
+    let throws_facts = ThrowsFacts::new(files);
     let mut tainted = tainted_sinks(files, &project).into_iter();
     files
         .iter()
@@ -31,6 +35,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
             in_file.extend(nullable_dereferences(&types, library, summary));
             in_file.extend(unclosed_resources(&types, library, summary));
             in_file.extend(escaped_types(&package_types, summary));
+            in_file.extend(redundant_throws(&throw_lookup, &throws_facts, summary));
             in_file.extend(
                 summary
                     .fields

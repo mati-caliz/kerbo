@@ -8,14 +8,17 @@ use crate::index::python_taint::{PythonModule, python_tainted};
 use crate::index::templates::Templates;
 use crate::index::{IndexedSummary, project_lints};
 use crate::jvm::classpath;
+use crate::jvm::jdk::Jdk;
 use crate::jvm::library::Library;
+use crate::jvm::release::project_release;
 use crate::language::Language;
 use crate::limits::Limits;
 use crate::lint::LintFinding;
 use crate::lint::taint::{TaintFamily, TaintMethod};
 use crate::rules::{Diagnostic, FileIdentity, JavaRule, RuleId, finding_diagnostics};
 
-const LIBRARY_RULES: [JavaRule; 3] = [
+const LIBRARY_RULES: [JavaRule; 4] = [
+    JavaRule::RedundantThrows,
     JavaRule::NullableProblems,
     JavaRule::DataFlowIssue,
     JavaRule::AutoCloseableResource,
@@ -58,7 +61,15 @@ pub fn diagnostics(files: &[IndexedFile], root: &Path) -> Vec<Diagnostic> {
     } else {
         Vec::new()
     };
-    let library = Library::load(&jars);
+    let wants_jdk = files
+        .iter()
+        .any(|file| file.limits.get(RuleId::Java(JavaRule::RedundantThrows)).is_some());
+    let jdk = if wants_jdk {
+        Jdk::locate(project_release(root))
+    } else {
+        None
+    };
+    let library = Library::load(&jars).with_jdk(jdk);
     let summaries: Vec<IndexedSummary<'_>> = files
         .iter()
         .map(|file| IndexedSummary {

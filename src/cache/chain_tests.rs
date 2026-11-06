@@ -41,3 +41,50 @@ fn chains_and_null_flows_survive_the_round_trip() {
     assert_eq!(read_flow(&mut reader), Ok(classes));
     assert!(read_flow(&mut Reader::new(&[9])).is_err());
 }
+
+#[test]
+fn what_a_method_can_throw_survives_the_round_trip() {
+    use super::throws_codec::{read_caught_call, read_method_throws, write_caught_call, write_method_throws};
+    use crate::lint::java_throws::{
+        CallRoot, CallStep, CaughtCall, MethodThrows, ThrowOrigin, ThrowPoint, ThrowsClause,
+    };
+    let step = CallStep {
+        name: "leer".to_owned(),
+        arity: 2,
+    };
+    let origins = [
+        ThrowOrigin::Unknown,
+        ThrowOrigin::Thrown("IOException".to_owned()),
+        ThrowOrigin::Creation("FileInputStream".to_owned(), 1),
+        ThrowOrigin::Close("InputStream".to_owned()),
+        ThrowOrigin::Call(CallRoot::Scope(vec!["Servicio".to_owned()]), vec![step.clone()]),
+        ThrowOrigin::Call(CallRoot::Type("Repositorio".to_owned()), vec![step]),
+    ];
+    let method = MethodThrows {
+        line: 3,
+        column: 9,
+        clauses: vec![ThrowsClause {
+            written: "Exception".to_owned(),
+            line: 3,
+            column: 30,
+        }],
+        points: origins
+            .into_iter()
+            .map(|origin| ThrowPoint {
+                origin,
+                caught: vec!["IOException".to_owned()],
+            })
+            .collect(),
+    };
+    let call = CaughtCall {
+        name: "leer".to_owned(),
+        caught: vec!["IOException".to_owned()],
+    };
+    let mut writer = Writer::default();
+    write_method_throws(&mut writer, &method);
+    write_caught_call(&mut writer, &call);
+    let bytes = writer.into_bytes();
+    let mut reader = Reader::new(&bytes);
+    assert_eq!(read_method_throws(&mut reader), Ok(method));
+    assert_eq!(read_caught_call(&mut reader), Ok(call));
+}

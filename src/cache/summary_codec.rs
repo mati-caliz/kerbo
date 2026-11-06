@@ -1,6 +1,7 @@
 use super::chain_codec::{read_chain, read_flow, write_chain, write_flow};
 use super::codec::{Corrupt, Reader, Writer};
 use super::taint_codec::{read_taints, write_taints};
+use super::throws_codec::{read_caught_call, read_method_throws, write_caught_call, write_method_throws};
 use crate::index::java::{CallSite, Declaration, Field, JavaSummary, Parameter, Position, Reading};
 use crate::index::java_exposure::{DeclaredType, Exposure};
 use crate::lint::java_calls::{Arity, Body, ResultUse, ReturnType, Returns, Visibility};
@@ -101,6 +102,9 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
         write_visibility(writer, exposure.reach);
         writer.list(&exposure.type_parameters, |writer, name| writer.text(name));
     });
+    writer.list(&summary.static_imports, |writer, path| writer.text(path));
+    writer.list(&summary.method_throws, write_method_throws);
+    writer.list(&summary.caught_calls, write_caught_call);
 }
 
 pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corrupt> {
@@ -175,6 +179,9 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
                 type_parameters: reader.list(Reader::text)?,
             })
         })?,
+        static_imports: reader.list(Reader::text)?,
+        method_throws: reader.list(read_method_throws)?,
+        caught_calls: reader.list(read_caught_call)?,
     }))
 }
 
