@@ -254,6 +254,17 @@ fn comment_directives(source: &str) -> Vec<Directive> {
     found
 }
 
+pub fn split_with_shell_rc(
+    path: &Path,
+    source: &[u8],
+    diagnostics: Vec<Diagnostic>,
+) -> (Vec<Diagnostic>, Vec<Suppressed>) {
+    let (kept, mut suppressed) = split(source, diagnostics);
+    let (kept, disabled_by_rc) = shell::split_disabled_by_rc(path, kept);
+    suppressed.extend(disabled_by_rc);
+    (kept, suppressed)
+}
+
 pub fn split(source: &[u8], diagnostics: Vec<Diagnostic>) -> (Vec<Diagnostic>, Vec<Suppressed>) {
     if diagnostics.is_empty() {
         return (diagnostics, Vec::new());

@@ -355,3 +355,37 @@ fn a_typed_receiver_tells_twin_methods_apart() {
     let outcome = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
     assert_eq!(unused_methods(&outcome), ["Box.java:4"]);
 }
+
+#[test]
+fn a_shellcheck_rc_file_moves_its_codes_to_the_suppressed_list_with_its_name() {
+    let tree = TempTree::new("scan-shell-rc");
+    tree.write(".shellcheckrc", "disable=SC2086\n");
+    tree.write("run.sh", "#!/bin/bash\necho $1\n");
+    let outcome = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
+    assert!(outcome.diagnostics.is_empty(), "{:?}", outcome.diagnostics);
+    let reasons: Vec<&str> = outcome
+        .suppressed
+        .iter()
+        .map(|item| item.reason.as_str())
+        .collect();
+    assert_eq!(reasons, [".shellcheckrc"]);
+}
+
+#[test]
+fn the_shell_of_a_shellcheck_rc_file_replaces_the_shebang_and_loses_to_a_directive() {
+    let tree = TempTree::new("scan-shell-rc-dialect");
+    tree.write(".shellcheckrc", "shell=sh\n");
+    tree.write("by_rc.sh", "#!/bin/bash\n[[ a == b ]]\n");
+    tree.write(
+        "by_directive.sh",
+        "#!/bin/bash\n# shellcheck shell=bash\n[[ a == b ]]\n",
+    );
+    let outcome = scan_tree(tree.path(), &[tree.path().to_path_buf()], &[]);
+    let bashisms: Vec<&str> = outcome
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.rule.as_str() == "sc3010")
+        .map(|diagnostic| diagnostic.relative_path.as_str())
+        .collect();
+    assert_eq!(bashisms, ["by_rc.sh"]);
+}

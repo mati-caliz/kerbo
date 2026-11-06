@@ -18,7 +18,7 @@ use crate::lint::{go_analysis_context, python_analysis_context};
 use crate::macro_rules::MacroIndex;
 use crate::rules::{Diagnostic, FileIdentity, evaluate};
 use crate::shell;
-use crate::suppressions::{Suppressed, split};
+use crate::suppressions::{Suppressed, split_with_shell_rc};
 
 mod go_packages;
 mod go_typed;
@@ -201,7 +201,7 @@ pub fn check_text(path: &Path, source: &[u8], config: &Config) -> Option<Vec<Dia
     let mut analysis = analyze_unit(&mut parser, unit, &limits).ok()?;
     let pooled = pooling::pooled_file(&file.identity, &mut analysis, &limits);
     diagnostics.extend(evaluate(&file.identity, &analysis, &limits));
-    let (mut diagnostics, _suppressed) = split(source, diagnostics);
+    let (mut diagnostics, _suppressed) = split_with_shell_rc(&file.identity.absolute, source, diagnostics);
     go_typed::drop_unconfirmed(&mut diagnostics);
     diagnostics.extend(find_duplicates(pooled.into_iter().collect()));
     Some(diagnostics)
@@ -369,7 +369,7 @@ fn check_file(
             request.cache,
         ));
     }
-    let (diagnostics, suppressed) = split(&source, diagnostics);
+    let (diagnostics, suppressed) = split_with_shell_rc(&file.identity.absolute, &source, diagnostics);
     Ok(Checked {
         diagnostics,
         suppressed,

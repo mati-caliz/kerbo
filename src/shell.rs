@@ -9,6 +9,7 @@ mod parameters;
 mod pattern_scan;
 mod pseudo_glob;
 mod quoting;
+mod rc_file;
 mod repair;
 mod rules;
 mod severity;
@@ -38,6 +39,7 @@ use context::{Context, Finding, Origin};
 use dialect::{Dialect, Interpreter, interpreter};
 pub use directives::Coverage;
 use directives::Directives;
+pub use rc_file::{RC_FILE_NAMES, disables_something_new, split_disabled_by_rc};
 use severity::Severity;
 
 const SHELL_EXTENSIONS: &[&str] = &["sh", "bash"];
@@ -45,6 +47,16 @@ const SHEBANG_PROBE_BYTES: u64 = 256;
 const LINE_FEED: char = '\n';
 const CARRIAGE_RETURN: char = '\r';
 const SHEBANG: &str = "#!";
+const NO_SHELL_DEFAULTS: ShellDefaults = ShellDefaults {
+    by_extension: None,
+    by_rc_file: None,
+};
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+struct ShellDefaults {
+    by_extension: Option<Dialect>,
+    by_rc_file: Option<Dialect>,
+}
 
 pub fn detect(path: &Path) -> Option<Language> {
     let is_shell = path.extension().map_or_else(
@@ -75,11 +87,11 @@ fn has_shell_shebang(path: &Path) -> bool {
 
 pub fn analyze(parser: &mut Parser, unit: SourceUnit<'_>) -> Option<Result<Vec<Violation>, ParseFailed>> {
     (unit.language == Language::Shell).then(|| {
-        let fallback = unit.path.and_then(fallback_dialect);
+        let defaults = unit.path.map_or(NO_SHELL_DEFAULTS, shell_defaults);
         let source = unit.source;
         let tree = parser.parse(source, None).ok_or(ParseFailed)?;
         if !tree.root_node().has_error() {
-            return parsed_violations(parser, tree.root_node(), source, fallback);
+            return parsed_violations(parser, tree.root_node(), source, defaults);
         }
         let Some(requoted) = repair::double_quote_globbed_strings(source) else {
             return Ok(Vec::new());
@@ -89,7 +101,7 @@ pub fn analyze(parser: &mut Parser, unit: SourceUnit<'_>) -> Option<Result<Vec<V
             return Ok(Vec::new());
         }
         Ok(
-            parsed_violations(parser, requoted_tree.root_node(), &requoted.source, fallback)?
+            parsed_violations(parser, requoted_tree.root_node(), &requoted.source, defaults)?
                 .into_iter()
                 .map(|violation| repair::restore(violation, &requoted, source))
                 .collect(),
@@ -101,13 +113,13 @@ fn parsed_violations(
     parser: &mut Parser,
     root: Node<'_>,
     source: &[u8],
-    fallback: Option<Dialect>,
+    defaults: ShellDefaults,
 ) -> Result<Vec<Violation>, ParseFailed> {
     if repair::has_swallowed_lines(root) {
         return Ok(Vec::new());
     }
     if !repair::has_dangling_dollar(root, source) {
-        return Ok(violations(root, source, fallback));
+        return Ok(violations(root, source, defaults));
     }
     let repaired = repair::brace_mid_word_expansions(source);
     let repaired_tree = parser.parse(&repaired.source, None).ok_or(ParseFailed)?;
@@ -118,7 +130,7 @@ fn parsed_violations(
     {
         return Ok(Vec::new());
     }
-    Ok(violations(repaired_root, &repaired.source, fallback)
+    Ok(violations(repaired_root, &repaired.source, defaults)
         .into_iter()
         .map(|violation| repair::restore(violation, &repaired, source))
         .collect())
@@ -127,20 +139,27 @@ fn parsed_violations(
 pub fn analysis_context(language: Language, path: &Path) -> Option<u64> {
     (language == Language::Shell).then(|| {
         let mut hasher = DefaultHasher::new();
-        fallback_dialect(path).hash(&mut hasher);
+        shell_defaults(path).hash(&mut hasher);
         hasher.finish()
     })
 }
 
-fn fallback_dialect(path: &Path) -> Option<Dialect> {
-    path.extension()
-        .and_then(|extension| extension.to_str())
-        .and_then(Dialect::from_extension)
+fn shell_defaults(path: &Path) -> ShellDefaults {
+    ShellDefaults {
+        by_extension: path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .and_then(Dialect::from_extension),
+        by_rc_file: rc_file::find(path)
+            .and_then(|rc_file| rc_file.shell)
+            .as_deref()
+            .and_then(Dialect::from_executable),
+    }
 }
 
-fn violations(root: Node<'_>, source: &[u8], fallback: Option<Dialect>) -> Vec<Violation> {
+fn violations(root: Node<'_>, source: &[u8], defaults: ShellDefaults) -> Vec<Violation> {
     let directives = Directives::read(root, source);
-    let Some(context) = context(root, source, &directives, fallback) else {
+    let Some(context) = context(root, source, &directives, defaults) else {
         return Vec::new();
     };
     let mut found: Vec<Finding> = rules::check(&context)
@@ -164,22 +183,30 @@ fn context<'tree, 'source>(
     root: Node<'tree>,
     source: &'source [u8],
     directives: &Directives,
-    fallback: Option<Dialect>,
+    defaults: ShellDefaults,
 ) -> Option<Context<'tree, 'source>> {
     let text = std::str::from_utf8(source).unwrap_or_default();
     let first_line = text.split(LINE_FEED).next().unwrap_or_default();
     let first_line = first_line.trim_end_matches(CARRIAGE_RETURN);
     let shebang = first_line.strip_prefix(SHEBANG).map(str::trim_start);
-    let overridden = directives.shell.as_deref().and_then(Dialect::from_executable);
+    let overridden = directives
+        .shell
+        .as_deref()
+        .and_then(Dialect::from_executable)
+        .or(defaults.by_rc_file);
     let dialect = match (overridden, interpreter(first_line)) {
         (None, Interpreter::Unsupported) => return None,
         (Some(dialect), _) | (None, Interpreter::Named(Some(dialect))) => dialect,
-        (None, Interpreter::Named(None) | Interpreter::Missing) => fallback.unwrap_or(Dialect::Bash),
+        (None, Interpreter::Named(None) | Interpreter::Missing) => {
+            defaults.by_extension.unwrap_or(Dialect::Bash)
+        }
     };
     let origin = Origin {
         dialect,
         shebang,
-        shell_specified: directives.shell.is_some() || fallback.is_some(),
+        shell_specified: directives.shell.is_some()
+            || defaults.by_rc_file.is_some()
+            || defaults.by_extension.is_some(),
     };
     Some(Context::new(root, source, &origin))
 }

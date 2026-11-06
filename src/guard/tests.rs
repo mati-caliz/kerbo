@@ -322,3 +322,36 @@ fn marks_the_ignore_comments_of_squawk_hadolint_and_shellcheck() {
         ]
     );
 }
+
+#[test]
+fn a_new_code_in_a_shell_rc_file_counts_but_dropping_one_does_not() {
+    let tree = TempTree::new("guard-shell-rc");
+    git(tree.path(), &["init", "-q"]);
+    tree.write(".shellcheckrc", "disable=SC2086,SC2034\n");
+    tree.write("a/.shellcheckrc", "disable=SC2086,SC2034\n");
+    git(tree.path(), &["add", "."]);
+    git(tree.path(), &["commit", "-q", "-m", "base"]);
+    tree.write(".shellcheckrc", "disable=SC2086,SC2034,SC2046\n");
+    tree.write("a/.shellcheckrc", "disable=SC2086\n");
+    tree.write("b/shellcheckrc", "disable=all\n");
+    let root = tree.path().canonicalize().expect("existe");
+    let changes = ChangedLines::since("HEAD", &root).expect("git responde");
+    let config = Config::load(None, &root).expect("sin archivo");
+    let request = GuardRequest {
+        changes: &changes,
+        config: &config,
+        project_root: &root,
+        stacks: &[],
+    };
+    let found: Vec<(String, RuleId)> = inspect(&request)
+        .into_iter()
+        .map(|diagnostic| (diagnostic.relative_path, diagnostic.rule))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            (".shellcheckrc".to_owned(), RuleId::SuppressionAdded),
+            ("b/shellcheckrc".to_owned(), RuleId::SuppressionAdded),
+        ]
+    );
+}

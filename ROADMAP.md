@@ -998,7 +998,7 @@ acá.
     los 49 que faltan, 46 están en archivos que se saltean y 3 son lecturas de tree-sitter
     (abajo).
   - El arnés de shell volvió al repo (`scripts/parity/shell/`): clonar el corpus, correr ShellCheck
-    con y sin directivas (`--norc`, porque kerbo no lee `.shellcheckrc`), kerbo en release,
+    con y sin directivas, kerbo en release,
     comparar, probes con fixtures y `register.py` para sumar reglas. El corpus vive en
     `kerbo-parity/shell-corpus` y el fuente de ShellCheck en `kerbo-parity/shellcheck-src`.
 - Los chequeos de comandos de ShellCheck (hecho, 2026-10-30): 55 reglas de `Checks/Commands.hs` en
@@ -1231,7 +1231,12 @@ acá.
     saltea), y 2 SC2086 en `nvm.sh` (líneas 5037 y 5202, `EXIT_CODE=$?; return $EXIT_CODE`) sin
     explicar todavía.
   - ShellCheck sobre el shell de cada `RUN` de los Dockerfile.
-  - `.shellcheckrc` no se lee.
+  - `.shellcheckrc` (hecho, 2026-11-06, `src/shell/rc_file.rs`): `disable=` y `shell=`. Lo silenciado
+    queda en la lista de suprimidos con el nombre del archivo como motivo, y en `guard` un código nuevo
+    cuenta como excepción agregada: un rc no afloja nada en silencio. Dos diferencias a propósito: la
+    búsqueda se corta en la raíz del repositorio y no mira `~/.shellcheckrc` ni XDG, para que el resultado
+    no dependa de la máquina. `enable=`, `source-path=` y `external-sources=` se ignoran: kerbo no tiene
+    chequeos opcionales ni sigue los `source`.
   - Las columnas cuentan bytes, como el resto de las reglas; ShellCheck cuenta caracteres (la
     medición convierte).
 - Go contra golangci-lint (empezada, 2026-10-21): `ineffassign`, la única regla del conjunto por

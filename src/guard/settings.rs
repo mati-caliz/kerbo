@@ -7,6 +7,7 @@ use crate::diff::{ChangedLines, Changes};
 use crate::i18n::{Cheat, Message};
 use crate::language::Language;
 use crate::rules::{Diagnostic, RuleId};
+use crate::shell::{RC_FILE_NAMES, disables_something_new};
 
 const CONFIG_NAMES: &[&str] = &[
     "kerbo.toml",
@@ -99,6 +100,10 @@ pub fn loosened_settings(changes: &ChangedLines, config: &Config, project_root: 
         let Some(relative) = relative_config_path(path, project_root, config) else {
             continue;
         };
+        if is_shell_rc(path) {
+            diagnostics.extend(shell_rc_disables(path, &relative, changes, file_changes));
+            continue;
+        }
         let (Ok(current), Some(previous)) = (fs::read_to_string(path), changes.previous_version(path)) else {
             continue;
         };
@@ -112,10 +117,51 @@ pub fn loosened_settings(changes: &ChangedLines, config: &Config, project_root: 
     diagnostics
 }
 
+fn is_shell_rc(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| RC_FILE_NAMES.contains(&name))
+}
+
+fn shell_rc_disables(
+    path: &Path,
+    relative: &str,
+    changes: &ChangedLines,
+    file_changes: &Changes,
+) -> Vec<Diagnostic> {
+    let current = fs::read_to_string(path).unwrap_or_default();
+    let previous = changes.previous_version(path).unwrap_or_default();
+    current
+        .lines()
+        .enumerate()
+        .filter(|(index, line)| {
+            file_changes.adds_line(index.saturating_add(1)) && disables_something_new(line, &previous)
+        })
+        .enumerate()
+        .map(|(occurrence, (index, line))| Diagnostic {
+            path: relative.to_owned(),
+            line: index.saturating_add(1),
+            column: FIRST_COLUMN,
+            end_line: index.saturating_add(1),
+            rule: RuleId::SuppressionAdded,
+            message: Message::Cheat(Cheat::SuppressionAdded {
+                marker: line.trim().to_owned(),
+            }),
+            value: LOOSENED,
+            limit: ALLOWED_OCCURRENCES,
+            fingerprint: format!("suppression-added:{relative}:rc#{occurrence}"),
+            relative_path: relative.to_owned(),
+            absolute_path: path.to_path_buf(),
+            fix: None,
+        })
+        .collect()
+}
+
 fn relative_config_path(path: &Path, project_root: &Path, config: &Config) -> Option<String> {
     let name = path.file_name()?.to_str()?;
-    let is_config =
-        CONFIG_NAMES.contains(&name) || CONFIG_PREFIXES.iter().any(|prefix| name.starts_with(prefix));
+    let is_config = CONFIG_NAMES.contains(&name)
+        || RC_FILE_NAMES.contains(&name)
+        || CONFIG_PREFIXES.iter().any(|prefix| name.starts_with(prefix));
     let relative = path
         .strip_prefix(project_root)
         .ok()?

@@ -610,11 +610,16 @@ shell, except for the anti-cheat.
 `# shellcheck disable=` works as in ShellCheck: before the first command, for the whole file;
 before a compound command, for the whole block; it accepts ranges (`SC2000-SC2099`) and `all`.
 
+`.shellcheckrc` (or `shellcheckrc`) is read too: the first one found going up from the script, without
+leaving the repository. `disable=` sends the findings to the suppressed list with the file name as the
+reason, and `shell=` picks the dialect when the script has no directive of its own. In the anti-cheat checks, a
+new code in a `disable=` counts as an added exception.
+
 Parity, against ShellCheck 0.11: zero differences by file, line, column and rule on 1,752 scripts
 from kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku and others (1,680 findings).
-With those repos updated (1,834 scripts): 3,646 identical findings and 87 extra, all
+With those repos updated (1,834 scripts, reading the `.shellcheckrc` files): 2,033 identical findings and 87 extra, all
 `sc2016` in a newer `nvm.sh` that tree-sitter-bash misreads; without the `# shellcheck` directives,
-5,361 identical and none extra. Files tree-sitter-bash cannot parse are
+3,747 identical and none extra. Files tree-sitter-bash cannot parse are
 skipped.
 
 ### Go against golangci-lint

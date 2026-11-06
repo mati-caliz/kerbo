@@ -607,11 +607,16 @@ shell, salvo la antitrampa.
 `# shellcheck disable=` vale como en ShellCheck: antes del primer comando, para el archivo entero;
 antes de un comando compuesto, para todo el bloque; acepta rangos (`SC2000-SC2099`) y `all`.
 
+`.shellcheckrc` (o `shellcheckrc`) también se lee: el primero que aparece subiendo desde el script, sin
+salir del repositorio. `disable=` manda los avisos a la lista de suprimidos con el nombre del archivo como
+motivo, y `shell=` elige el dialecto si el script no trae su directiva. En la antitrampa, un código nuevo
+en un `disable=` cuenta como una excepción agregada.
+
 Paridad, contra ShellCheck 0.11: cero diferencias por archivo, línea, columna y regla en 1.752
 scripts de kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku y otros (1.680 avisos).
-Con esos repos actualizados (1.834 scripts): 3.646 avisos idénticos y 87 de más, todos
+Con esos repos actualizados (1.834 scripts, leyendo los `.shellcheckrc`): 2.033 avisos idénticos y 87 de más, todos
 `sc2016` de un `nvm.sh` nuevo que tree-sitter-bash lee mal; sin las directivas `# shellcheck`,
-5.361 idénticos y ninguno de más. Los archivos que tree-sitter-bash no parsea se
+3.747 idénticos y ninguno de más. Los archivos que tree-sitter-bash no parsea se
 saltean.
 
 ### Go contra golangci-lint
