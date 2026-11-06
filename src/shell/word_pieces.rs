@@ -5,7 +5,7 @@ use super::parameters::is_array_expansion;
 use super::pattern_scan::{Segment, SegmentKind, segments};
 use super::syntax::{
     ANSI_STRING, ARITHMETIC_EXPANSION, COMMAND_SUBSTITUTION, CONCATENATION, EXPANSIONS, NUMBER, RAW_STRING,
-    STRING, STRING_CONTENT, TEST_OPERATOR, WORD, children, text,
+    STRING, STRING_CONTENT, TEST_OPERATOR, TRANSLATED_STRING, WORD, children, text,
 };
 use super::word_scan::scan_unquoted;
 use super::words::{braced_content, literal};
@@ -109,6 +109,10 @@ pub fn pieces(word: Node<'_>, source: &[u8]) -> Vec<Piece> {
         REGEX if follows_regex_match(word, source) => vec![regex_piece(text(word, source), position)],
         REGEX => mixed_pieces(text(word, source), position),
         STRING => vec![double_quoted(word, source)],
+        TRANSLATED_STRING => children(word)
+            .into_iter()
+            .find(|child| child.kind() == STRING)
+            .map_or_else(Vec::new, |string| vec![double_quoted(string, source)]),
         RAW_STRING => vec![Piece::new(
             PieceKind::SingleQuoted,
             text(word, source).trim_matches(SINGLE_QUOTE).to_owned(),
@@ -147,7 +151,7 @@ fn concatenation_pieces(word: Node<'_>, source: &[u8]) -> Vec<Piece> {
     let mut found = Vec::new();
     let mut run: Option<(usize, usize, Position)> = None;
     for part in children(word) {
-        if part.kind() == WORD {
+        if [WORD, NUMBER].contains(&part.kind()) {
             let start = run.map_or_else(
                 || (part.start_byte(), Position::of(part)),
                 |(first, _, at)| (first, at),

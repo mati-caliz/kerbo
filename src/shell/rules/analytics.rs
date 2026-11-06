@@ -1,4 +1,4 @@
-mod annotations;
+pub mod annotations;
 mod functions;
 mod pipelines;
 mod quotes;

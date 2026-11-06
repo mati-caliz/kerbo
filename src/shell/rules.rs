@@ -3,6 +3,7 @@ mod arithmetic;
 mod bashisms;
 mod builtins;
 mod command_checks;
+mod command_shapes;
 mod comparisons;
 mod conditions;
 mod control;
@@ -33,6 +34,7 @@ pub fn check(context: &Context<'_, '_>) -> Vec<Finding> {
         structure::check(node, context, &mut findings);
         comparisons::check(node, context, &numeric_values, &mut findings);
         control::check(node, context, &mut findings);
+        command_shapes::check(node, context, &mut findings);
         conditions::check(node, context, &mut findings);
         redirects::check(node, context, &mut findings);
         arithmetic::check(node, context, &mut findings);
@@ -40,6 +42,7 @@ pub fn check(context: &Context<'_, '_>) -> Vec<Finding> {
     }
     analytics::check_script(context, &mut findings);
     control::check_script(context, &mut findings);
+    command_shapes::check_script(context, &mut findings);
     quoting::check(context, &mut findings);
     variables::check(context, &mut findings);
     findings.found

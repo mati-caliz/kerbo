@@ -76,7 +76,7 @@ fn check_trailing_bracket(command: &Command<'_>, source: &[u8], findings: &mut F
     let Some(last) = command.words.last().copied() else {
         return;
     };
-    if is_misread_group(command, source) {
+    if command.is_misread_group(source) {
         return;
     }
     let [only] = &pieces(last, source)[..] else {
@@ -97,13 +97,6 @@ fn check_trailing_bracket(command: &Command<'_>, source: &[u8], findings: &mut F
     if !opened {
         findings.report(ShellRule::Sc2171, last, text(last, source));
     }
-}
-
-// tree-sitter lee `! { [ -f x ]` como un comando llamado `{ [`: no hay tal comando.
-fn is_misread_group(command: &Command<'_>, source: &[u8]) -> bool {
-    command
-        .first_word()
-        .is_some_and(|name| text(name, source).contains(char::is_whitespace))
 }
 
 // SC2099: `checkArithmeticOpCommand`.

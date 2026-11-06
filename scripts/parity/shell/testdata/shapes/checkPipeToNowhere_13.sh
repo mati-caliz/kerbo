@@ -1,0 +1,2 @@
+#!/bin/bash
+ls > foo 2> bar > baz

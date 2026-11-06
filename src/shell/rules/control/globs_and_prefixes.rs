@@ -5,8 +5,8 @@ use crate::shell::commands::Command;
 use crate::shell::context::Findings;
 use crate::shell::parameters::reference;
 use crate::shell::syntax::{
-    BINARY, COMMAND, CONCATENATION, EXPANSIONS, NAME_FIELD, OPERATOR_FIELD, TEST, UNARY, WORD, ancestors,
-    is_double_bracket, text,
+    ARRAY, BINARY, COMMAND, CONCATENATION, EXPANSIONS, NAME_FIELD, OPERATOR_FIELD, TEST, UNARY, WORD,
+    ancestors, is_double_bracket, text,
 };
 use crate::shell::variables::assigned_name;
 use crate::shell::word_pieces::{Piece, PieceKind, pieces};
@@ -16,6 +16,7 @@ const REGEX: &str = "regex";
 const EXTGLOB_PATTERN: &str = "extglob_pattern";
 const REGEX_MATCH: &str = "=~";
 const OPEN_BRACKET: char = '[';
+const INDEX_VALUE: &str = "]=";
 const ESCAPE: char = '\\';
 const CLOSE_BRACKET: char = ']';
 const COLON: char = ':';
@@ -85,6 +86,7 @@ fn check_character_ranges(word: Node<'_>, source: &[u8], findings: &mut Findings
         })
         .collect();
     if classes.is_empty()
+        || is_array_index(word, source)
         || ancestors(word).any(|ancestor| EXPANSIONS.contains(&ancestor.kind()))
         || is_in_ignored_command(word, source)
         || is_dereferenced(word, source)
@@ -104,6 +106,13 @@ fn check_character_ranges(word: Node<'_>, source: &[u8], findings: &mut Findings
             findings.report_at(ShellRule::Sc2102, class.position, &class.text);
         }
     }
+}
+
+// `a=([foo]=b)`: el corchete es un índice.
+fn is_array_index(word: Node<'_>, source: &[u8]) -> bool {
+    word.parent().is_some_and(|parent| parent.kind() == ARRAY)
+        && text(word, source).starts_with(OPEN_BRACKET)
+        && text(word, source).contains(INDEX_VALUE)
 }
 
 fn has_duplicates(contents: &str) -> bool {

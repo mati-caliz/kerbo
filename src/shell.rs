@@ -184,7 +184,7 @@ fn context<'tree, 'source>(
 }
 
 // SC2157 apunta al texto literal de la palabra, que puede empezar con un espacio.
-const AT_LITERAL_START: &[ShellRule] = &[ShellRule::Sc2148, ShellRule::Sc2157];
+const AT_LITERAL_START: &[ShellRule] = &[ShellRule::Sc2148, ShellRule::Sc2157, ShellRule::Sc2192];
 
 fn at_token(finding: Finding, source: &[u8]) -> Finding {
     if AT_LITERAL_START.contains(&finding.rule) {
@@ -226,5 +226,7 @@ pub fn disables(code: &str, rule: RuleId) -> bool {
     directives::disables(code, rule.as_str())
 }
 
+#[cfg(test)]
+mod fixture_tests;
 #[cfg(test)]
 mod tests;

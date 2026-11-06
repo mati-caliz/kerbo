@@ -1092,7 +1092,23 @@ acá.
     (`testdata/control`), sin avisos de más. En el corpus no aparecen casos nuevos y sigue sin sobrar
     nada, salvo los 87 SC2016 de `nvm.sh` ya anotados. Quedan como fixtures en
     `src/shell/fixtures/control.sh`.
+- La forma de un comando (hecho, 2026-11-06): 38 reglas de `Analytics.hs` en
+  `src/shell/rules/command_shapes/`: `checkRedirectedNowhere` (SC2188, SC2189),
+  `checkArrayAssignmentIndices` (SC2190 a SC2192), `checkRedirectionToNumber` (SC2210),
+  `checkGlobAsCommand` (SC2211), `checkFlagAsCommand` (SC2215), `checkPipeToNowhere` (SC2216, SC2217,
+  SC2259 a SC2261), `checkRedirectionToCommand` (SC2238), `checkDollarQuoteParen` (SC2247),
+  `checkTranslatedStringVariable` (SC2256), `checkAliasUsedInSameParsingUnit` (SC2262, SC2263),
+  `checkBlatantRecursion` (SC2264), `checkEqualsInCommand` (SC2270 a SC2282) y
+  `checkCommandWithTrailingSymbol` (SC2286 a SC2289).
+  - tree-sitter lee `1=2` y `--bar=baz` como asignaciones a variables llamadas `1` y `--bar`: para
+    ShellCheck son comandos, y así se tratan en estas reglas.
+  - `Command::is_misread_group`: `{ [` con un espacio, y los `{` y `}` que tree-sitter deja como
+    comandos sueltos cuando un grupo viene después de `!`. Sin eso daban SC2288 de más.
+  - Paridad contra ShellCheck 0.11.0 en las pruebas `prop_` de esas funciones (`testdata/shapes`), sin
+    avisos de más; en el corpus no aparecen casos nuevos ni sobra nada, salvo los 87 SC2016 de `nvm.sh`
+    ya anotados. Quedan como fixtures en `src/shell/fixtures/command_shapes.sh`.
 - Pendientes de Shell contra ShellCheck:
+  - `$(var[i])` y `var[i]` como comando: tree-sitter da un error y el archivo se saltea (falta SC2211).
   - `case x in a) b ;& esac` con `esac` en la misma línea y `${ cmd; }`: tree-sitter da un error y el
     archivo se saltea (falta SC2127 ahí; con `esac` en su línea sale bien).
   - SC2075 y lo que usa `\<`, `\>` o `\>=`: tree-sitter da un error adentro de `[ ]` y `[[ ]]` y el

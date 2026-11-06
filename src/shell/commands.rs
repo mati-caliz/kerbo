@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
 use super::syntax::{
-    ARGUMENT_FIELD, ASSIGNMENT, COMMAND, DECLARATION, NAME_FIELD, UNSET, children, field_children,
+    ARGUMENT_FIELD, ASSIGNMENT, COMMAND, DECLARATION, NAME_FIELD, UNSET, WORD, children, field_children,
     named_children, text,
 };
 use super::words::{literal, literal_or, oversimplify};
@@ -18,6 +18,7 @@ const EXEC: &str = "exec";
 const EXEC_OPTIONS: &str = "cla:";
 const LINE_FEED: u8 = b'\n';
 const PATH_SEPARATOR: char = '/';
+const GROUP_BRACES: &[&str] = &["{", "}"];
 
 #[derive(Debug, Clone)]
 pub struct Command<'tree> {
@@ -128,6 +129,15 @@ impl<'tree> Command<'tree> {
                 || name
                     .strip_suffix(expected)
                     .is_some_and(|prefix| prefix.ends_with(PATH_SEPARATOR))
+        })
+    }
+
+    // tree-sitter lee `! { [ -f x ]` como un comando llamado `{ [`, y el `{` y el `}` de un grupo que no
+    // reconoce como comandos sueltos: ShellCheck ve un grupo.
+    pub fn is_misread_group(&self, source: &[u8]) -> bool {
+        self.first_word().is_some_and(|name| {
+            let raw = text(name, source);
+            name.kind() == WORD && (GROUP_BRACES.contains(&raw) || raw.contains(char::is_whitespace))
         })
     }
 
