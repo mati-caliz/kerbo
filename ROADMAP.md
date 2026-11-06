@@ -1054,7 +1054,40 @@ acá.
     Quedan como fixtures en `src/shell/fixtures/variable_flow*.sh` (29 avisos). En el corpus, 64
     avisos más sin directivas (5.072) y 38 con ellas (3.368), ninguno de más; todo lo que falta de
     estas reglas está en archivos sin analizar (`classify.py`).
+- Comparaciones y aritmética (hecho, 2026-11-06): 44 reglas de `Analytics.hs` en
+  `src/shell/rules/comparisons/`. Los operadores de `[ ]` y `[[ ]]`: `checkNumberComparisons` (SC2071
+  a SC2073, SC2122, SC2170, SC2309), `checkSingleBracketOperators` (SC2074), `checkConditionalAndOrs`
+  (SC2107 a SC2110), `checkGlobbedRegex` (SC2049), `checkComparisonAgainstGlob` (SC2053, SC2081,
+  SC2330), `checkValidCondOps` (SC2057, SC2058), `checkUnaryTestA` (SC2331) y `checkEmptyCondition`
+  (SC2212). Entre comandos: `checkOrNeq` (SC2055, SC2056, SC2252), `checkAndEq` (SC2333, SC2334),
+  `checkTestRedirects` (SC2065) y `checkBadTestAndOr` (SC2265, SC2266). La aritmética:
+  `checkDivBeforeMult` (SC2017), `checkArithmeticBadOctal` (SC2080), `checkUnnecessaryParens` (SC2322,
+  SC2323), `checkPlusEqualsNumber` (SC2324) y `checkModifiedArithmeticInRedirection` (SC2257). Y
+  `checkCaseAgainstGlob` (SC2254), `checkCommarrays` (SC2054), `checkArithmeticOpCommand` (SC2099),
+  `checkWrongArithmeticAssignment` (SC2100), `checkTrailingBracket` (SC2171), `checkSubshellAsTest`
+  (SC2204, SC2205) y `checkSecondArgIsComparison` (SC2283 a SC2285).
+  - El flujo de datos ahora sabe si una variable puede ser un número (`numericalStatus`): con
+    `x=1; [ "$x" > 2 ]` da SC2071 y no SC2073, y `n=4; x+=$n` da SC2324.
+  - `pending_checks.py` atribuía mal los códigos cuando la primera línea de una cláusula no tenía `=`
+    (SC2053 y SC2081 aparecían en otra función) y `show_checks.py` cortaba las funciones en la primera
+    línea de comentario. Quedaron arreglados.
+  - Paridad contra ShellCheck 0.11.0 en las pruebas `prop_` de esas funciones
+    (`testdata/conditions`), sin avisos de más; lo que falta son formas que tree-sitter no lee (ver
+    pendientes). Quedan como fixtures en `src/shell/fixtures/comparisons.sh` (112 avisos). En el corpus,
+    5.074 avisos idénticos sin directivas y 3.370 con ellas; en los archivos analizados faltan 6 y 4
+    (`compare.py` ahora los separa de los que están en archivos que se saltean) y no sobra ninguno salvo
+    los 87 SC2016 de `nvm.sh` ya anotados.
 - Pendientes de Shell contra ShellCheck:
+  - SC2075 y lo que usa `\<`, `\>` o `\>=`: tree-sitter da un error adentro de `[ ]` y `[[ ]]` y el
+    archivo se saltea, así que la regla no llegaría a correr (faltan SC2071, SC2122 y SC2073 en esos
+    casos). Es la misma familia de `[ a '<' b ]`.
+  - `$((i++))` en un heredoc es para tree-sitter una sustitución con un subshell adentro: falta SC2257
+    ahí. `a=([a]=b, [c]=d)`: la coma rompe el índice siguiente (falta un SC2154 y sobra un SC2034).
+  - Una línea que empieza con algo como `2f` después de `$foo = $bar`: tree-sitter pega al comando de
+    arriba esa línea y las siguientes, sin marcar error, hasta el próximo `[ ]` o similar. Se ven como
+    argumentos y faltan los avisos de esas líneas.
+  - `! { [ -f x ] && …; }`: tree-sitter lee `{ [` como el nombre de un comando con un espacio. SC2171 lo
+    descarta, pero las demás reglas no ven esa condición.
   - `@test` de bats: se asignan y leen `lines`, `status` y `output`, pero tree-sitter deja el cuerpo
     como comandos sueltos y no se abre el subshell de cada prueba (faltan SC2030 y SC2031 entre dos
     `@test`).

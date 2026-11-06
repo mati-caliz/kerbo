@@ -140,7 +140,11 @@ impl<'tree> Commands<'tree> for Interpreter<'tree, '_, '_> {
     }
 
     fn assignment(&mut self, node: Node<'tree>, state: State, scope: AssignmentScope) -> State {
+        self.record(node, &state);
         let value = node.child_by_field_name(VALUE_FIELD);
+        if let Some(value) = value {
+            self.record(value, &state);
+        }
         let mut state = match value {
             Some(value) if value.kind() == ARRAY => self.expand_all(&children(value), state),
             Some(value) => self.expand(value, state),

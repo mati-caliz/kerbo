@@ -14,6 +14,8 @@ pub enum Space {
 pub struct Variable {
     pub space: Space,
     pub integer: bool,
+    // `numericalStatus >= NumericalStatusMaybe` de ShellCheck: por algún camino puede ser un número.
+    pub numeric: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -58,16 +60,23 @@ impl Variable {
     pub const UNKNOWN: Self = Self {
         space: Space::Dirty,
         integer: false,
+        numeric: false,
     };
     pub const UNSET: Self = Self {
         space: Space::Empty,
         integer: false,
+        numeric: false,
     };
     pub const INTEGER_VALUE: Self = Self {
         space: Space::Clean,
         integer: false,
+        numeric: true,
     };
-    pub const CLEAN: Self = Self::INTEGER_VALUE;
+    pub const CLEAN: Self = Self {
+        space: Space::Clean,
+        integer: false,
+        numeric: false,
+    };
 
     pub fn literal(text: &str) -> Self {
         let space = if text.is_empty() {
@@ -80,6 +89,7 @@ impl Variable {
         Self {
             space,
             integer: false,
+            numeric: !text.is_empty() && text.bytes().all(|byte| byte.is_ascii_digit()),
         }
     }
 
@@ -91,6 +101,7 @@ impl Variable {
         Self {
             space: Self::combined(self.space, other.space),
             integer: self.integer && other.integer,
+            numeric: self.numeric || other.numeric,
         }
     }
 
@@ -98,6 +109,11 @@ impl Variable {
         Self {
             space: Self::combined(self.space, other.space),
             integer: false,
+            numeric: match (self.space, other.space) {
+                (Space::Empty, _) => other.numeric,
+                (_, Space::Empty) => self.numeric,
+                _ => self.numeric && other.numeric,
+            },
         }
     }
 
@@ -113,6 +129,7 @@ impl Variable {
         Self {
             space: value.space,
             integer: self.integer,
+            numeric: value.numeric,
         }
     }
 
@@ -123,6 +140,7 @@ impl Variable {
             Self {
                 space: self.space,
                 integer: false,
+                numeric: self.numeric,
             }
         }
     }

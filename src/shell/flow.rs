@@ -17,7 +17,8 @@ use super::context::Context;
 use super::dialect::Dialect;
 use super::environment::{INTERNAL_VARIABLES, SPECIAL_INTEGER_VARIABLES, WITHOUT_SPACES};
 use super::parameters::reference;
-use super::syntax::{FUNCTION, NAME_FIELD, descendants, text};
+use super::syntax::{ASSIGNMENT, EXPANSIONS, FUNCTION, NAME_FIELD, descendants, text};
+use super::variables::assigned_name;
 use super::words::{braced_content, oversimplify};
 use frames::{Dependency, Frame, Stack};
 use state::{Reach, Scope, State, Target, Variable};
@@ -28,6 +29,22 @@ const SHOPT: &str = "shopt";
 const SET_OPTION_FLAG: &str = "o";
 
 pub fn clean_expansions(context: &Context<'_, '_>, candidates: &[Node<'_>]) -> HashSet<usize> {
+    expansions_where(context, candidates, Variable::is_clean)
+}
+
+pub fn integer_assignments(context: &Context<'_, '_>, candidates: &[Node<'_>]) -> HashSet<usize> {
+    expansions_where(context, candidates, |variable| variable.integer)
+}
+
+pub fn numeric_expansions(context: &Context<'_, '_>, candidates: &[Node<'_>]) -> HashSet<usize> {
+    expansions_where(context, candidates, |variable| variable.numeric)
+}
+
+fn expansions_where(
+    context: &Context<'_, '_>,
+    candidates: &[Node<'_>],
+    holds: impl Fn(Variable) -> bool,
+) -> HashSet<usize> {
     let mut interpreter = Interpreter::new(context, candidates);
     let environment = environment();
     interpreter
@@ -40,7 +57,7 @@ pub fn clean_expansions(context: &Context<'_, '_>, candidates: &[Node<'_>]) -> H
     interpreter
         .records
         .into_iter()
-        .filter(|(_, recorded)| recorded.is_clean())
+        .filter(|(_, recorded)| holds(*recorded))
         .map(|(byte, _)| byte)
         .collect()
 }
@@ -77,10 +94,14 @@ impl<'tree, 'context, 'source> Interpreter<'tree, 'context, 'source> {
         let wanted = candidates
             .iter()
             .map(|node| {
-                (
-                    node.start_byte(),
-                    reference(&braced_content(*node, context.source)),
-                )
+                let name = if EXPANSIONS.contains(&node.kind()) {
+                    reference(&braced_content(*node, context.source))
+                } else if node.kind() == ASSIGNMENT {
+                    assigned_name(*node, context.source).unwrap_or_default()
+                } else {
+                    text(*node, context.source).to_owned()
+                };
+                (node.start_byte(), name)
             })
             .collect();
         let functions = descendants(context.root)

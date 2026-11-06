@@ -17,6 +17,7 @@ const FIRST_ARGUMENT_COMMANDS: &[&str] = &["busybox", "builtin", "command", "run
 const EXEC: &str = "exec";
 const EXEC_OPTIONS: &str = "cla:";
 const LINE_FEED: u8 = b'\n';
+const PATH_SEPARATOR: char = '/';
 
 #[derive(Debug, Clone)]
 pub struct Command<'tree> {
@@ -118,6 +119,16 @@ impl<'tree> Command<'tree> {
 
     pub fn is_exactly(&self, expected: &str, source: &[u8]) -> bool {
         self.name(source).is_some_and(|name| name == expected)
+    }
+
+    // `isCommand` de ShellCheck: el nombre, también con su ruta.
+    pub fn is_command(&self, expected: &str, source: &[u8]) -> bool {
+        self.name(source).is_some_and(|name| {
+            name == expected
+                || name
+                    .strip_suffix(expected)
+                    .is_some_and(|prefix| prefix.ends_with(PATH_SEPARATOR))
+        })
     }
 
     pub fn flags(&self, source: &[u8]) -> Vec<(Node<'tree>, String)> {

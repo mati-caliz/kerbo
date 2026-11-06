@@ -3,6 +3,7 @@ mod arithmetic;
 mod bashisms;
 mod builtins;
 mod command_checks;
+mod comparisons;
 mod conditions;
 mod expansions;
 mod quoting;
@@ -19,6 +20,7 @@ pub fn check(context: &Context<'_, '_>) -> Vec<Finding> {
     let mut findings = Findings::default();
     shebang::check(context, &mut findings);
     let bashisms = bashisms::Bashisms::new(context);
+    let numeric_values = comparisons::NumericValues::of(context);
     for node in descendants(context.root) {
         if let Some(bashisms) = &bashisms {
             bashisms.check(node, context, &mut findings);
@@ -28,6 +30,7 @@ pub fn check(context: &Context<'_, '_>) -> Vec<Finding> {
         command_checks::check(node, context, &mut findings);
         analytics::check(node, context, &mut findings);
         structure::check(node, context, &mut findings);
+        comparisons::check(node, context, &numeric_values, &mut findings);
         conditions::check(node, context, &mut findings);
         redirects::check(node, context, &mut findings);
         arithmetic::check(node, context, &mut findings);

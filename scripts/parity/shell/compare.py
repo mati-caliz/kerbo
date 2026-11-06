@@ -40,10 +40,13 @@ for finding in json.load(open(os.path.join(here, 'out', 'kerbo.json'), encoding=
         kerbo.add((finding['rule'], finding['path'].removeprefix('./'), finding['line'], finding['column']))
 rules = arguments or sorted(known)
 totals = collections.Counter()
+analyzed = {key[1] for key in kerbo}
 for rule in rules:
     expected = {key for key in shellcheck if key[0] == rule}
     reported = {key for key in kerbo if key[0] == rule}
-    totals.update(coinciden=len(expected & reported), faltan=len(expected - reported), sobran=len(reported - expected))
+    missing = expected - reported
+    totals.update(coinciden=len(expected & reported), faltan=len(missing), sobran=len(reported - expected),
+                  faltan_en_archivos_analizados=sum(key[1] in analyzed for key in missing))
     if expected or reported:
         print(rule, 'coinciden', len(expected & reported), 'faltan', len(expected - reported), 'sobran', len(reported - expected))
     for key in sorted(expected - reported)[:6]:

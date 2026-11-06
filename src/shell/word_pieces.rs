@@ -22,6 +22,8 @@ const CLOSE_BRACE: char = '}';
 const REGEX_MATCH: &str = "=~";
 const HALF_OPEN_RANGE: &str = "[";
 const EXPANSION_OPEN: char = '$';
+const EXPANDED_PLACEHOLDER: &str = "${VAR}";
+const EXPANSION_MARKS: &[char] = &['$', '`'];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PieceKind {
@@ -95,6 +97,9 @@ pub fn pieces(word: Node<'_>, source: &[u8]) -> Vec<Piece> {
     let position = Position::of(word);
     match word.kind() {
         CONCATENATION => concatenation_pieces(word, source),
+        EXTGLOB_PATTERN if text(word, source).contains(EXPANSION_MARKS) => {
+            mixed_pieces(text(word, source), position)
+        }
         WORD | NUMBER | EXTGLOB_PATTERN => scan_unquoted(text(word, source), position),
         TEST_OPERATOR | STRING_CONTENT => vec![Piece::new(
             PieceKind::Literal,
@@ -331,6 +336,38 @@ pub fn has_brace_expansion(word_pieces: &[Piece]) -> bool {
 // `getLiteralString` de la palabra entera.
 pub fn literal_string(word_pieces: &[Piece]) -> Option<String> {
     word_pieces.iter().map(Piece::literal_string).collect()
+}
+
+// `getLiteralStringDef`: lo que no es texto fijo vale lo que se indique.
+pub fn only_literal_text(word_pieces: &[Piece], not_literal: &str) -> String {
+    flattened(word_pieces)
+        .into_iter()
+        .map(|piece| piece.literal_string().unwrap_or_else(|| not_literal.to_owned()))
+        .collect()
+}
+
+// `oversimplify` de una palabra en partes: los globs quedan como están y las expansiones son `${VAR}`.
+pub fn simplified_text(word_pieces: &[Piece]) -> String {
+    word_pieces
+        .iter()
+        .map(|piece| match piece.kind {
+            PieceKind::DoubleQuoted => simplified_text(&piece.inner),
+            PieceKind::Braced | PieceKind::CommandSubstitution | PieceKind::Arithmetic => {
+                EXPANDED_PLACEHOLDER.to_owned()
+            }
+            PieceKind::Literal
+            | PieceKind::SingleQuoted
+            | PieceKind::DollarSingleQuoted
+            | PieceKind::Glob
+            | PieceKind::Extglob
+            | PieceKind::Brace
+            | PieceKind::Other => piece.text.clone(),
+        })
+        .collect()
+}
+
+pub fn simplified_text_is_number(word: &str) -> bool {
+    word.chars().all(|character| character.is_ascii_digit())
 }
 
 // `getUnquotedLiteral`: la palabra sólo tiene texto sin comillas.

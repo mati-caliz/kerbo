@@ -4,7 +4,7 @@ use crate::rules::ShellRule;
 use crate::shell::context::{Context, Findings};
 use crate::shell::pseudo_glob::{PseudoGlob, can_overlap, exact, fuzzy, is_superset};
 use crate::shell::syntax::{CASE, CASE_ITEM, VALUE_FIELD, field_children, named_children, text};
-use crate::shell::word_pieces::{Piece, is_constant, pieces};
+use crate::shell::word_pieces::{Piece, PieceKind, has_glob, is_constant, pieces};
 
 const FALLTHROUGH_FIELD: &str = "fallthrough";
 
@@ -33,6 +33,15 @@ pub fn check(node: Node<'_>, context: &Context<'_, '_>, findings: &mut Findings)
         }
     }
     check_shadowed_patterns(&items, source, findings);
+    for pattern in items.iter().flat_map(|item| patterns(*item, source)) {
+        let has_expansion = pattern
+            .pieces
+            .iter()
+            .any(|piece| matches!(piece.kind, PieceKind::Braced | PieceKind::CommandSubstitution));
+        if has_expansion && !has_glob(&pattern.pieces) {
+            findings.report(ShellRule::Sc2254, pattern.first, text(pattern.first, source));
+        }
+    }
 }
 
 struct Pattern<'tree> {

@@ -1,0 +1,2 @@
+#!/bin/bash
+if [[ $lol -ne cow || $lol -ne foo ]]; then echo foo; fi

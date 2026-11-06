@@ -213,6 +213,7 @@ impl<'tree> Declarations<'tree> for Interpreter<'tree, '_, '_> {
         let changed = Variable {
             space: current.space,
             integer: change.integer.unwrap_or(current.integer),
+            numeric: current.numeric,
         };
         match change.scope {
             None => self.stack.put(state, name, changed),

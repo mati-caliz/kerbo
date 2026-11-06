@@ -86,9 +86,24 @@ def register_texts(data, catalog, language, key):
     write(path, text[:end] + entries + text[end:])
 
 
+def wire_catalog(catalog, language):
+    path = f'src/i18n/{language}/shell.rs'
+    text = read(path)
+    constant = f'{catalog.upper()}_TEXTS'
+    if f'mod {catalog};' in text:
+        return
+    text = text.replace('mod analytics;\n', f'mod analytics;\nmod {catalog};\n', 1)
+    text = text.replace('use analytics::ANALYTICS_TEXTS;\n', f'use analytics::ANALYTICS_TEXTS;\nuse {catalog}::{constant};\n', 1)
+    chain = '            .chain(ANALYTICS_TEXTS.iter())\n'
+    assert chain in text, path
+    write(path, text.replace(chain, chain + f'            .chain({constant}.iter())\n', 1))
+
+
 def main():
     data = json.load(io.open(sys.argv[1], encoding='utf-8'))
     catalog = sys.argv[2]
+    wire_catalog(catalog, 'english')
+    wire_catalog(catalog, 'spanish')
     for rule in data['rules']:
         assert len(rule['en']) == 4 and len(rule['es']) == 4, rule['code']
     register_family(data['rules'])
