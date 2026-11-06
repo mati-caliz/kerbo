@@ -577,7 +577,7 @@ minúscula: `kerbo explain SC2086`, `--max sc2086=0` o `sc2034 = "off"` en `kerb
 reglas que más aparecen, las 64 de lo que bash agrega en un script de sh (`sc3001` a `sc3067`), 55
 chequeos de comandos (`tr`, `grep`, `expr`, `find`, `rm`, `sudo`, `return`, `alias`, `read` y otros),
 24 de `source`, pipelines y palabras (`ls | grep`, `"x$@"`, `$*`, comillas que descomillan y otras) y
-46 de condiciones, `case`, subshells, redirecciones y asignaciones, 4 sobre el flujo de variables, 44 de comparaciones y aritmética, 35 de `for`, `find -exec`, `exec`, `break`, funciones y shebang, 38 de nombres de comando, pipes, redirecciones y arreglos, 19 del detalle de `printf`, `getopts`, `time` y las declaraciones 10 de código inalcanzable y el tipo de cada variable y 4 sueltas (`sc1003`, `sc1007`, `sc2251`, `sc2316`), que completan los chequeos por defecto de ShellCheck salvo lo que tree-sitter-bash no deja ver; la severidad es la de ShellCheck, `recommended` apaga las de estilo y
+46 de condiciones, `case`, subshells, redirecciones y asignaciones, 4 sobre el flujo de variables, 43 de comparaciones y aritmética, 35 de `for`, `find -exec`, `exec`, `break`, funciones y shebang, 36 de nombres de comando, pipes, redirecciones y arreglos, 19 del detalle de `printf`, `getopts`, `time` y las declaraciones 10 de código inalcanzable y el tipo de cada variable y 4 sueltas (`sc1003`, `sc1007`, `sc2251`, `sc2316`), que completan los chequeos por defecto de ShellCheck salvo lo que tree-sitter-bash no deja ver; la severidad es la de ShellCheck, `recommended` apaga las de estilo y
 `minimal`, también las informativas. Las reglas universales de la tabla de arriba no corren en
 shell, salvo la antitrampa.
 

@@ -1083,7 +1083,7 @@ acá.
     Quedan como fixtures en `src/shell/fixtures/variable_flow*.sh` (29 avisos). En el corpus, 64
     avisos más sin directivas (5.072) y 38 con ellas (3.368), ninguno de más; todo lo que falta de
     estas reglas está en archivos sin analizar (`classify.py`).
-- Comparaciones y aritmética (hecho, 2026-11-06): 44 reglas de `Analytics.hs` en
+- Comparaciones y aritmética (hecho, 2026-11-06): 43 reglas de `Analytics.hs` en
   `src/shell/rules/comparisons/`. Los operadores de `[ ]` y `[[ ]]`: `checkNumberComparisons` (SC2071
   a SC2073, SC2122, SC2170, SC2309), `checkSingleBracketOperators` (SC2074), `checkConditionalAndOrs`
   (SC2107 a SC2110), `checkGlobbedRegex` (SC2049), `checkComparisonAgainstGlob` (SC2053, SC2081,
@@ -1121,7 +1121,7 @@ acá.
     (`testdata/control`), sin avisos de más. En el corpus no aparecen casos nuevos y sigue sin sobrar
     nada, salvo los 87 SC2016 de `nvm.sh` ya anotados. Quedan como fixtures en
     `src/shell/fixtures/control.sh`.
-- La forma de un comando (hecho, 2026-11-06): 38 reglas de `Analytics.hs` en
+- La forma de un comando (hecho, 2026-11-06): 36 reglas de `Analytics.hs` en
   `src/shell/rules/command_shapes/`: `checkRedirectedNowhere` (SC2188, SC2189),
   `checkArrayAssignmentIndices` (SC2190 a SC2192), `checkRedirectionToNumber` (SC2210),
   `checkGlobAsCommand` (SC2211), `checkFlagAsCommand` (SC2215), `checkPipeToNowhere` (SC2216, SC2217,

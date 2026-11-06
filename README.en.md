@@ -580,7 +580,7 @@ lowercase: `kerbo explain SC2086`, `--max sc2086=0` or `sc2034 = "off"` in `kerb
 the 22 rules that show up most, the 64 for what bash adds in an sh script (`sc3001` to `sc3067`), 55 command checks (`tr`, `grep`,
 `expr`, `find`, `rm`, `sudo`, `return`, `alias`, `read` and others), 24 on `source`, pipelines and
 words (`ls | grep`, `"x$@"`, `$*`, quotes that unquote and others) and 46 on conditions, `case`,
-subshells, redirections and assignments, 4 on the variable flow, 44 on comparisons and arithmetic, 35 on `for`, `find -exec`, `exec`, `break`, functions and the shebang, 38 on command names, pipes, redirections and arrays, 19 on the details of `printf`, `getopts`, `time` and declarations 10 on unreachable code and the kind of each variable and 4 more (`sc1003`, `sc1007`, `sc2251`, `sc2316`), which complete ShellCheck's default checks except for what tree-sitter-bash hides; severity is ShellCheck's, `recommended` turns off the style ones
+subshells, redirections and assignments, 4 on the variable flow, 43 on comparisons and arithmetic, 35 on `for`, `find -exec`, `exec`, `break`, functions and the shebang, 36 on command names, pipes, redirections and arrays, 19 on the details of `printf`, `getopts`, `time` and declarations 10 on unreachable code and the kind of each variable and 4 more (`sc1003`, `sc1007`, `sc2251`, `sc2316`), which complete ShellCheck's default checks except for what tree-sitter-bash hides; severity is ShellCheck's, `recommended` turns off the style ones
 and `minimal` the informational ones too. The universal rules in the table above do not run on
 shell, except for the anti-cheat.
 
