@@ -1,5 +1,5 @@
 mod assignments;
-mod cases;
+pub mod cases;
 mod loops;
 mod redirections;
 mod sequences;

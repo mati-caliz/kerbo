@@ -33,7 +33,7 @@ const BRACKETS: &[&str] = &["[", "]", "[[", "]]"];
 pub enum Condition<'tree> {
     And(Node<'tree>, Box<Self>, Box<Self>),
     Or(Node<'tree>, Box<Self>, Box<Self>),
-    Not(Box<Self>),
+    Not(Node<'tree>, Box<Self>),
     Group(Box<Self>),
     Unary(Node<'tree>, Node<'tree>),
     Binary(Node<'tree>, Node<'tree>, Node<'tree>),
@@ -112,8 +112,8 @@ impl<'tree> Reader<'tree, '_> {
 
     fn term(&mut self) -> Option<Condition<'tree>> {
         if self.peek_text() == NEGATION {
-            self.advance()?;
-            return Some(Condition::Not(Box::new(self.expression()?)));
+            let bang = self.advance()?;
+            return Some(Condition::Not(bang, Box::new(self.expression()?)));
         }
         self.expression()
     }
@@ -165,7 +165,7 @@ impl Condition<'_> {
                 left.visit(false, visitor);
                 right.visit(false, visitor);
             }
-            Self::Not(inner) | Self::Group(inner) => inner.visit(only_test, visitor),
+            Self::Not(_, inner) | Self::Group(inner) => inner.visit(only_test, visitor),
             Self::Unary(..) | Self::Binary(..) | Self::Nullary(_) => {}
         }
     }

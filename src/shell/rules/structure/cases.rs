@@ -44,13 +44,13 @@ pub fn check(node: Node<'_>, context: &Context<'_, '_>, findings: &mut Findings)
     }
 }
 
-struct Pattern<'tree> {
-    first: Node<'tree>,
-    pieces: Vec<Piece>,
+pub struct Pattern<'tree> {
+    pub first: Node<'tree>,
+    pub pieces: Vec<Piece>,
 }
 
 // tree-sitter deja `*"a"*` como varios `value` seguidos, uno por parte: sólo un `|` separa patrones.
-fn patterns<'tree>(item: Node<'tree>, source: &[u8]) -> Vec<Pattern<'tree>> {
+pub fn patterns<'tree>(item: Node<'tree>, source: &[u8]) -> Vec<Pattern<'tree>> {
     let mut found: Vec<Pattern<'tree>> = Vec::new();
     let mut previous_end = None;
     for value in field_children(item, VALUE_FIELD) {

@@ -1107,7 +1107,20 @@ acá.
   - Paridad contra ShellCheck 0.11.0 en las pruebas `prop_` de esas funciones (`testdata/shapes`), sin
     avisos de más; en el corpus no aparecen casos nuevos ni sobra nada, salvo los 87 SC2016 de `nvm.sh`
     ya anotados. Quedan como fixtures en `src/shell/fixtures/command_shapes.sh`.
+- El detalle de un comando (hecho, 2026-11-06): 19 reglas de `Checks/Commands.hs`,
+  `Checks/ShellSupport.hs` y `Analytics.hs` en `src/shell/rules/command_details/`: `checkPrintfVar`
+  (SC2182, SC2183), `checkWhileGetoptsCase` (SC2213, SC2214, SC2220), `checkArgComparison` (SC2290),
+  `checkBackreferencingDeclaration` (SC2318), `checkBraceExpansionVars` (SC2051, SC2175),
+  `checkTimedCommand` (SC2176, SC2177), `checkUnquotedEchoSpaces` (SC2291),
+  `checkMultiDimensionalArrays` (SC2180, sólo en elementos de un arreglo), `checkPS1Assignments`
+  (SC2025), `checkMultipleBangs` (SC2325), `checkBangAfterPipe` (SC2326), `checkNegatedUnaryOps`
+  (SC2332) y `checkArrayValueUsedAsIndex` (SC2302, SC2303).
+  - Paridad contra ShellCheck 0.11.0 en las pruebas `prop_` de esas funciones (`testdata/details`), sin
+    avisos de más. Quedan como fixtures en `src/shell/fixtures/command_details*.sh`.
 - Pendientes de Shell contra ShellCheck:
+  - SC2180 en `foo[a][b]=3` y `${foo[bar][baz]}`: tree-sitter da un error y el archivo se saltea.
+  - SC2314 y SC2315 (`!` en una prueba de bats): tree-sitter no reconoce `@test` como bloque, igual que
+    en SC2030 y SC2031.
   - `$(var[i])` y `var[i]` como comando: tree-sitter da un error y el archivo se saltea (falta SC2211).
   - `case x in a) b ;& esac` con `esac` en la misma línea y `${ cmd; }`: tree-sitter da un error y el
     archivo se saltea (falta SC2127 ahí; con `esac` en su línea sale bien).

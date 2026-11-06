@@ -61,6 +61,14 @@ fn checks_commands_words_and_sources_like_shellcheck() {
             include_str!("fixtures/equals_ksh.sh"),
             include_str!("fixtures/equals_ksh.shellcheck"),
         ),
+        (
+            include_str!("fixtures/command_details.sh"),
+            include_str!("fixtures/command_details.shellcheck"),
+        ),
+        (
+            include_str!("fixtures/command_details_sh.sh"),
+            include_str!("fixtures/command_details_sh.shellcheck"),
+        ),
     ];
     for (script, shellcheck) in fixtures {
         let expected: Vec<String> = shellcheck.lines().map(str::to_owned).collect();

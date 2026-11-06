@@ -2,11 +2,11 @@ use tree_sitter::Node;
 
 use crate::rules::ShellRule;
 use crate::shell::context::Findings;
-use crate::shell::parameters::is_array_expansion;
 use crate::shell::syntax::{
     ARITHMETIC_FOR, ASSIGNMENT, BINARY, FOR, LEFT_FIELD, NAME_FIELD, OPERATOR_FIELD, VALUE_FIELD,
     VARIABLE_FIELD, ancestors, children, field_children, text,
 };
+use crate::shell::word_expansion::{may_become_multiple, will_split};
 use crate::shell::word_pieces::{Piece, PieceKind, pieces, unquoted_literal};
 
 const INITIALIZER_FIELD: &str = "initializer";
@@ -14,7 +14,6 @@ const SELECT: &str = "select";
 const DISCARDED_VARIABLE: &str = "_";
 const ELEMENT_COMMA: char = ',';
 const GLOB_STAR: char = '*';
-const INDIRECT: char = '!';
 const ASSIGN: &str = "=";
 
 pub fn check(node: Node<'_>, source: &[u8], findings: &mut Findings) {
@@ -78,74 +77,6 @@ fn check_single_value(value: Node<'_>, word_pieces: &[Piece], findings: &mut Fin
         return true;
     }
     false
-}
-
-// `willSplit`.
-fn will_split(piece: &Piece) -> bool {
-    match piece.kind {
-        PieceKind::Braced
-        | PieceKind::CommandSubstitution
-        | PieceKind::Brace
-        | PieceKind::Glob
-        | PieceKind::Extglob => true,
-        PieceKind::DoubleQuoted => piece.inner.iter().any(will_become_multiple),
-        PieceKind::Literal
-        | PieceKind::SingleQuoted
-        | PieceKind::DollarSingleQuoted
-        | PieceKind::Arithmetic
-        | PieceKind::Other => false,
-    }
-}
-
-// `willBecomeMultipleArgs`.
-fn will_become_multiple(piece: &Piece) -> bool {
-    matches!(
-        piece.kind,
-        PieceKind::Extglob | PieceKind::Glob | PieceKind::Brace
-    ) || concatenates_in_assignment(piece)
-}
-
-const fn is_not_expansion(kind: PieceKind) -> bool {
-    matches!(
-        kind,
-        PieceKind::Literal
-            | PieceKind::SingleQuoted
-            | PieceKind::DollarSingleQuoted
-            | PieceKind::Glob
-            | PieceKind::Extglob
-            | PieceKind::Brace
-            | PieceKind::CommandSubstitution
-            | PieceKind::Arithmetic
-            | PieceKind::Other
-    )
-}
-
-// `willConcatInAssignment`.
-fn concatenates_in_assignment(piece: &Piece) -> bool {
-    if is_not_expansion(piece.kind) {
-        return false;
-    }
-    if piece.kind == PieceKind::Braced {
-        return is_array_expansion(&piece.text);
-    }
-    piece.inner.iter().any(concatenates_in_assignment)
-}
-
-// `mayBecomeMultipleArgs`.
-fn may_become_multiple(word_pieces: &[Piece]) -> bool {
-    word_pieces
-        .iter()
-        .any(|piece| will_become_multiple(piece) || expands_to_several(piece, false))
-}
-
-fn expands_to_several(piece: &Piece, quoted: bool) -> bool {
-    if is_not_expansion(piece.kind) {
-        return false;
-    }
-    if piece.kind == PieceKind::Braced {
-        return !quoted || piece.text.starts_with(INDIRECT);
-    }
-    piece.inner.iter().any(|inner| expands_to_several(inner, true))
 }
 
 // SC2165 y SC2167: `checkLoopVariableReassignment`.

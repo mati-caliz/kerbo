@@ -63,7 +63,7 @@ fn check_test(test: Node<'_>, context: &Context<'_, '_>, findings: &mut Findings
         Condition::Nullary(word) => checker.nullary(*word),
         Condition::Unary(operator, word) => checker.unary(*operator, *word),
         Condition::Binary(operator, left, right) => checker.binary(*operator, *left, *right),
-        Condition::And(..) | Condition::Or(..) | Condition::Not(_) | Condition::Group(_) => {}
+        Condition::And(..) | Condition::Or(..) | Condition::Not(..) | Condition::Group(_) => {}
     });
 }
 

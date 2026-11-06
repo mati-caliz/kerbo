@@ -3,6 +3,7 @@ mod arithmetic;
 mod bashisms;
 mod builtins;
 mod command_checks;
+mod command_details;
 mod command_shapes;
 mod comparisons;
 mod conditions;
@@ -12,7 +13,7 @@ mod quoting;
 mod redirects;
 mod shebang;
 mod single_quotes;
-mod structure;
+pub mod structure;
 
 use super::context::{Context, Finding, Findings};
 use super::syntax::descendants;
@@ -35,6 +36,7 @@ pub fn check(context: &Context<'_, '_>) -> Vec<Finding> {
         comparisons::check(node, context, &numeric_values, &mut findings);
         control::check(node, context, &mut findings);
         command_shapes::check(node, context, &mut findings);
+        command_details::check(node, context, &mut findings);
         conditions::check(node, context, &mut findings);
         redirects::check(node, context, &mut findings);
         arithmetic::check(node, context, &mut findings);

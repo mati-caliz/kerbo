@@ -1,6 +1,7 @@
 mod analytics;
 mod bashism_commands;
 mod bashisms;
+mod command_details;
 mod command_shapes;
 mod comparisons;
 mod control;
@@ -15,6 +16,7 @@ use crate::rules::ShellRule;
 use analytics::ANALYTICS_TEXTS;
 use bashism_commands::BASHISM_COMMANDS_TEXTS;
 use bashisms::BASHISMS_TEXTS;
+use command_details::COMMAND_DETAILS_TEXTS;
 use command_shapes::COMMAND_SHAPES_TEXTS;
 use comparisons::COMPARISONS_TEXTS;
 use control::CONTROL_TEXTS;
@@ -178,6 +180,7 @@ pub fn shell(rule: ShellRule) -> RuleText {
             .chain(TOOLS_TEXTS.iter())
             .chain(SHELL_BUILTINS_TEXTS.iter())
             .chain(ANALYTICS_TEXTS.iter())
+            .chain(COMMAND_DETAILS_TEXTS.iter())
             .chain(COMMAND_SHAPES_TEXTS.iter())
             .chain(CONTROL_TEXTS.iter())
             .chain(COMPARISONS_TEXTS.iter())

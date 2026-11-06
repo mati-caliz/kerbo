@@ -15,6 +15,7 @@ mod severity;
 mod syntax;
 mod test_expression;
 mod variables;
+mod word_expansion;
 mod word_pieces;
 mod word_scan;
 mod words;

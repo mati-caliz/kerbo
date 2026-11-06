@@ -60,7 +60,8 @@ pub fn check(
         Condition::Or(operator, left, right) => checker.disjunction(*operator, left, right),
         Condition::Unary(operator, _) => checker.unary(*operator),
         Condition::Binary(operator, left, right) => checker.binary(*operator, *left, *right),
-        Condition::Not(_) | Condition::Group(_) | Condition::Nullary(_) => {}
+        Condition::Not(bang, inner) => checker.negation(*bang, inner),
+        Condition::Group(_) | Condition::Nullary(_) => {}
     });
 }
 
@@ -107,6 +108,17 @@ impl Checker<'_, '_, '_> {
             && !has_glob(&pieces(repeated.second, source))
         {
             self.report(ShellRule::Sc2055, operator);
+        }
+    }
+
+    // SC2332: `checkNegatedUnaryOps`.
+    fn negation(&mut self, bang: Node<'_>, inner: &Condition<'_>) {
+        if self.single_bracket
+            && self.context.dialect == Dialect::Bash
+            && let Condition::Unary(operator, _) = inner
+            && [FLAG_AND, FLAG_OR].contains(&text(*operator, self.context.source))
+        {
+            self.report(ShellRule::Sc2332, bang);
         }
     }
 

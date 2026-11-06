@@ -576,7 +576,7 @@ minúscula: `kerbo explain SC2086`, `--max sc2086=0` o `sc2034 = "off"` en `kerb
 reglas que más aparecen, las 64 de lo que bash agrega en un script de sh (`sc3001` a `sc3067`), 55
 chequeos de comandos (`tr`, `grep`, `expr`, `find`, `rm`, `sudo`, `return`, `alias`, `read` y otros),
 24 de `source`, pipelines y palabras (`ls | grep`, `"x$@"`, `$*`, comillas que descomillan y otras) y
-46 de condiciones, `case`, subshells, redirecciones y asignaciones, 4 sobre el flujo de variables, 44 de comparaciones y aritmética, 35 de `for`, `find -exec`, `exec`, `break`, funciones y shebang y 38 de nombres de comando, pipes, redirecciones y arreglos; la severidad es la de ShellCheck, `recommended` apaga las de estilo y
+46 de condiciones, `case`, subshells, redirecciones y asignaciones, 4 sobre el flujo de variables, 44 de comparaciones y aritmética, 35 de `for`, `find -exec`, `exec`, `break`, funciones y shebang, 38 de nombres de comando, pipes, redirecciones y arreglos y 19 del detalle de `printf`, `getopts`, `time` y las declaraciones; la severidad es la de ShellCheck, `recommended` apaga las de estilo y
 `minimal`, también las informativas. Las reglas universales de la tabla de arriba no corren en
 shell, salvo la antitrampa.
 
@@ -598,6 +598,7 @@ shell, salvo la antitrampa.
 | `sc2017`, `sc2049`, `sc2053` a `sc2058`, `sc2065`, `sc2071` a `sc2074`, `sc2080`, `sc2081`, `sc2099`, `sc2100`, `sc2107` a `sc2110`, `sc2122`, `sc2170`, `sc2171`, `sc2204`, `sc2205`, `sc2212`, `sc2252`, `sc2254`, `sc2257`, `sc2265`, `sc2266`, `sc2283` a `sc2285`, `sc2309`, `sc2322` a `sc2324`, `sc2330`, `sc2331`, `sc2333`, `sc2334` | comparaciones que no comparan lo que parece: `[[ $a > 3 ]]`, `[ a && b ]`, `[[ a -o b ]]`, `[ $a = *.txt ]`, `[ $a != x ] \|\| [ $a != y ]`, `test 1 > 2`, `a = 1`, `( -e f )`, `a=(1, 2)`, `i=i+1`, `a+=1`, `08` en aritmética y paréntesis de más |
 | `sc2000`, `sc2014`, `sc2032`, `sc2033`, `sc2036`, `sc2041` a `sc2043`, `sc2066`, `sc2067`, `sc2083`, `sc2087`, `sc2093`, `sc2095` a `sc2098`, `sc2101`, `sc2102`, `sc2104` a `sc2106`, `sc2111` a `sc2113`, `sc2118`, `sc2123`, `sc2127`, `sc2147`, `sc2165`, `sc2167`, `sc2187`, `sc2239`, `sc2246`, `sc2258` | el flujo del script: `for` que corre una vez, `find -exec` sin terminar, código después de `exec`, `break` afuera de un loop o en un subshell, `sudo` con una función, `ssh` en un `while read`, `a=1 echo $a`, `[:digit:]`, `PATH=/x`, `function` en sh, el shebang |
 | `sc2188` a `sc2192`, `sc2210`, `sc2211`, `sc2215` a `sc2217`, `sc2238`, `sc2247`, `sc2256`, `sc2259` a `sc2264`, `sc2270` a `sc2282`, `sc2286` a `sc2289` | la forma del comando: `> file` solo, `< f \| cmd`, `foo \| rm`, `a > f \| b`, `a > f > g`, `foo > 2`, `foo > grep`, `*.sh` o `-e` como comando, `$a=1`, `1=a`, `=====`, `foo/`, `ls() { ls; }`, alias usados en su misma unidad, `$"(ls)"` y `a=(1=b)` |
+| `sc2025`, `sc2051`, `sc2175` a `sc2177`, `sc2180`, `sc2182`, `sc2183`, `sc2213`, `sc2214`, `sc2220`, `sc2290`, `sc2291`, `sc2302`, `sc2303`, `sc2318`, `sc2325`, `sc2326`, `sc2332` | el detalle de un comando: formatos de `printf` con otra cantidad de argumentos, el `case` de `getopts`, `export a =b`, `declare a=1 b=$a`, `{1..$n}`, `time a \| b` en sh, `echo a    b`, `for i in "${a[@]}"` con `${a[$i]}`, `a \| ! b` y `[ ! -a f ]` |
 | `sc2030`, `sc2031`, `sc2153`, `sc2154` | lo que se asigna adentro de un subshell y se lee afuera, y variables que nada asigna en el archivo (las de mayúsculas, sólo si hay una parecida) |
 | `sc3001` a `sc3067` | en un script de `sh`, `dash` o busybox, lo que sólo tiene bash: `[[ ]]`, `local`, arreglos, `${x/a/b}`, `echo -n`, `&>`, `source`, `set -o pipefail` y el resto de `checkBashisms` de ShellCheck, con las excepciones de dash y busybox |
 
@@ -606,9 +607,9 @@ antes de un comando compuesto, para todo el bloque; acepta rangos (`SC2000-SC209
 
 Paridad, contra ShellCheck 0.11: cero diferencias por archivo, línea, columna y regla en 1.752
 scripts de kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku y otros (1.680 avisos).
-Con esos repos actualizados (1.834 scripts): 3.370 avisos idénticos y 87 de más, todos
+Con esos repos actualizados (1.834 scripts): 3.371 avisos idénticos y 87 de más, todos
 `sc2016` de un `nvm.sh` nuevo que tree-sitter-bash lee mal; sin las directivas `# shellcheck`,
-5.074 idénticos y ninguno de más. Los archivos que tree-sitter-bash no parsea se
+5.075 idénticos y ninguno de más. Los archivos que tree-sitter-bash no parsea se
 saltean.
 
 ### Go contra golangci-lint

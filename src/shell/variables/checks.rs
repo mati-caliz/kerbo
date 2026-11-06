@@ -35,7 +35,7 @@ pub fn checked_variables(test: Node<'_>, source: &[u8], flow: &mut Flow) {
         }
         Condition::And(..)
         | Condition::Or(..)
-        | Condition::Not(_)
+        | Condition::Not(..)
         | Condition::Group(_)
         | Condition::Binary(..) => {}
     });

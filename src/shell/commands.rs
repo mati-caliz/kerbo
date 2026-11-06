@@ -66,6 +66,17 @@ impl<'tree> Command<'tree> {
         }
     }
 
+    // Lo que sigue al comando efectivo: en `command printf a` son los argumentos de `printf`.
+    pub fn effective_arguments(&self, source: &[u8]) -> &[Node<'tree>] {
+        let Some(name_word) = self.name_word(source) else {
+            return self.arguments();
+        };
+        let position = self.words.iter().position(|word| *word == name_word);
+        position
+            .and_then(|position| self.words.get(position.saturating_add(1)..))
+            .unwrap_or_default()
+    }
+
     pub fn first_word(&self) -> Option<Node<'tree>> {
         self.words.first().copied()
     }

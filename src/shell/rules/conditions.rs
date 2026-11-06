@@ -58,7 +58,7 @@ fn check_test(node: Node<'_>, context: &Context<'_, '_>, findings: &mut Findings
         Condition::And(..)
         | Condition::Or(..)
         | Condition::Binary(..)
-        | Condition::Not(_)
+        | Condition::Not(..)
         | Condition::Group(_)
         | Condition::Unary(..)
         | Condition::Nullary(_) => {}
