@@ -9,6 +9,7 @@ mod comparisons;
 mod conditions;
 mod control;
 mod expansions;
+mod parser_notes;
 mod quoting;
 mod reachability;
 mod redirects;
@@ -37,6 +38,7 @@ pub fn check(context: &Context<'_, '_>) -> Vec<Finding> {
         structure::check(node, context, &mut findings);
         comparisons::check(node, context, &numeric_values, &mut findings);
         control::check(node, context, &mut findings);
+        parser_notes::check(node, context.source, &mut findings);
         command_shapes::check(node, context, &mut findings);
         command_details::check(node, context, &mut findings);
         conditions::check(node, context, &mut findings);

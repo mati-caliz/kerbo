@@ -6,6 +6,7 @@ mod globs_and_prefixes;
 mod loop_keywords;
 mod misc;
 mod read_loops;
+mod useless_bang;
 
 use tree_sitter::Node;
 
@@ -21,6 +22,7 @@ pub fn check(node: Node<'_>, context: &Context<'_, '_>, findings: &mut Findings)
     read_loops::check(node, context.source, findings);
     globs_and_prefixes::check(node, context.source, findings);
     misc::check(node, context, findings);
+    useless_bang::check(node, context, findings);
 }
 
 pub fn check_script(context: &Context<'_, '_>, findings: &mut Findings) {

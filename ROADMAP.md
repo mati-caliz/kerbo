@@ -1136,7 +1136,16 @@ acá.
     avisos idénticos sin directivas y 3.621 con ellas, sin nada de más salvo los 87 SC2016 de `nvm.sh`
     ya anotados; `scripts/parity/shell/show_diffs.py` muestra el código de cada diferencia. Quedan como
     fixtures en `src/shell/fixtures/reachability.sh`.
+- Los últimos chequeos por defecto (hecho, 2026-11-06): SC2251 (`checkUselessBang`), SC2316
+  (`checkMultipleDeclaring`), y los dos avisos del parser que aparecen en archivos que kerbo lee: SC1007
+  (`a= b`) y SC1003 (`'it\'s'`). Con eso están todos los chequeos por defecto de `Analytics.hs`,
+  `Checks/Commands.hs` y `Checks/ShellSupport.hs`, salvo los que tree-sitter no deja ver (abajo).
+  `pending_checks.py` no veía SC2251 porque se emite con `makeCommentWithFix`: para confirmar que no
+  falta otro, se buscaron todos los códigos del fuente que kerbo no tiene.
 - Pendientes de Shell contra ShellCheck:
+  - Los demás avisos del parser de ShellCheck (SC1xxx, unos 120): casi todos son errores de sintaxis, y
+    en esos archivos kerbo no analiza nada. En el corpus aparecen SC1071 (4), SC1073, SC1072, SC1083 (2
+    cada uno), SC1087, SC1008, SC1089 y SC1058, todos en archivos que tree-sitter no lee.
   - SC2218 en `:` antes de `:(){ :|:& };:` en un mismo archivo: kerbo avisa y ShellCheck no, sin explicar
     todavía (un caso armado juntando pruebas; quedó afuera del fixture).
   - SC2218 con un `exit` indirecto: si entre el uso y la definición hay una llamada a una función que

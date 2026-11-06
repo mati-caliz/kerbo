@@ -35,6 +35,7 @@ const FIXTURES: &[(&str, &str)] = &[
     fixture!("command_details"),
     fixture!("command_details_sh"),
     fixture!("reachability"),
+    fixture!("shell_notes"),
 ];
 
 #[test]

@@ -11,7 +11,7 @@ use crate::shell::syntax::{
     descendants, text,
 };
 use crate::shell::variables::assigned_name;
-use crate::shell::word_pieces::{Piece, PieceKind, pieces};
+use crate::shell::word_pieces::{Piece, PieceKind, pieces, unquoted_literal};
 use crate::shell::words::braced_content;
 
 const LET: &str = "let";
@@ -35,6 +35,7 @@ pub fn check(node: Node<'_>, source: &[u8], findings: &mut Findings) {
     }
     if DECLARING_COMMANDS.contains(&name.as_str()) {
         check_back_references(&command, source, findings);
+        check_multiple_declaring(&command, source, findings);
     }
 }
 
@@ -64,6 +65,17 @@ fn check_spaced_equals(command: &Command<'_>, name: &str, source: &[u8], finding
 
 fn trailing_literal(word_pieces: &[Piece]) -> Option<&Piece> {
     word_pieces.last().filter(|last| last.kind == PieceKind::Literal)
+}
+
+// SC2316: `checkMultipleDeclaring`.
+fn check_multiple_declaring(command: &Command<'_>, source: &[u8], findings: &mut Findings) {
+    for argument in command.arguments() {
+        let is_declaring = unquoted_literal(&pieces(*argument, source))
+            .is_some_and(|literal| DECLARING_COMMANDS.contains(&literal.as_str()));
+        if is_declaring {
+            findings.report(ShellRule::Sc2316, *argument, text(*argument, source));
+        }
+    }
 }
 
 // SC2318: `checkBackreferencingDeclaration`.

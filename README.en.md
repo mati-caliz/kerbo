@@ -578,7 +578,7 @@ lowercase: `kerbo explain SC2086`, `--max sc2086=0` or `sc2034 = "off"` in `kerb
 the 22 rules that show up most, the 64 for what bash adds in an sh script (`sc3001` to `sc3067`), 55 command checks (`tr`, `grep`,
 `expr`, `find`, `rm`, `sudo`, `return`, `alias`, `read` and others), 24 on `source`, pipelines and
 words (`ls | grep`, `"x$@"`, `$*`, quotes that unquote and others) and 46 on conditions, `case`,
-subshells, redirections and assignments, 4 on the variable flow, 44 on comparisons and arithmetic, 35 on `for`, `find -exec`, `exec`, `break`, functions and the shebang, 38 on command names, pipes, redirections and arrays, 19 on the details of `printf`, `getopts`, `time` and declarations and 10 on unreachable code and the kind of each variable; severity is ShellCheck's, `recommended` turns off the style ones
+subshells, redirections and assignments, 4 on the variable flow, 44 on comparisons and arithmetic, 35 on `for`, `find -exec`, `exec`, `break`, functions and the shebang, 38 on command names, pipes, redirections and arrays, 19 on the details of `printf`, `getopts`, `time` and declarations 10 on unreachable code and the kind of each variable and 4 more (`sc1003`, `sc1007`, `sc2251`, `sc2316`), which complete ShellCheck's default checks except for what tree-sitter-bash hides; severity is ShellCheck's, `recommended` turns off the style ones
 and `minimal` the informational ones too. The universal rules in the table above do not run on
 shell, except for the anti-cheat.
 
@@ -610,9 +610,9 @@ before a compound command, for the whole block; it accepts ranges (`SC2000-SC209
 
 Parity, against ShellCheck 0.11: zero differences by file, line, column and rule on 1,752 scripts
 from kubernetes, moby, nvm, rustup, ohmyzsh, acme.sh, bash-it, dokku and others (1,680 findings).
-With those repos updated (1,834 scripts): 3,621 identical findings and 87 extra, all
+With those repos updated (1,834 scripts): 3,646 identical findings and 87 extra, all
 `sc2016` in a newer `nvm.sh` that tree-sitter-bash misreads; without the `# shellcheck` directives,
-5,335 identical and none extra. Files tree-sitter-bash cannot parse are
+5,361 identical and none extra. Files tree-sitter-bash cannot parse are
 skipped.
 
 ### Go against golangci-lint
