@@ -57,6 +57,17 @@ const ERRORS: &[ShellRule] = &[
     ShellRule::Sc2284,
     ShellRule::Sc2285,
     ShellRule::Sc2330,
+    ShellRule::Sc2066,
+    ShellRule::Sc2067,
+    ShellRule::Sc2083,
+    ShellRule::Sc2096,
+    ShellRule::Sc2104,
+    ShellRule::Sc2105,
+    ShellRule::Sc2111,
+    ShellRule::Sc2118,
+    ShellRule::Sc2127,
+    ShellRule::Sc2239,
+    ShellRule::Sc2246,
 ];
 const INFOS: &[ShellRule] = &[
     ShellRule::Sc2015,
@@ -95,6 +106,9 @@ const INFOS: &[ShellRule] = &[
     ShellRule::Sc2031,
     ShellRule::Sc2153,
     ShellRule::Sc2017,
+    ShellRule::Sc2014,
+    ShellRule::Sc2032,
+    ShellRule::Sc2102,
 ];
 const STYLES: &[ShellRule] = &[
     ShellRule::Sc2004,
@@ -121,6 +135,7 @@ const STYLES: &[ShellRule] = &[
     ShellRule::Sc2322,
     ShellRule::Sc2323,
     ShellRule::Sc2331,
+    ShellRule::Sc2000,
 ];
 
 // La severidad de ShellCheck; las que no están en ninguna lista son advertencias, como todas las de

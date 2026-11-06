@@ -8,7 +8,7 @@ use crate::shell::context::{Context, Findings};
 use crate::shell::syntax::{
     ASSIGNMENT, BODY_FIELD, COMMAND, COMMAND_NAME, COMMAND_SUBSTITUTION, CONCATENATION, DESCRIPTOR_FIELD,
     DESTINATION_FIELD, EXPANSIONS, FILE_REDIRECT, LIST, PIPELINE, REDIRECT_FIELD, REDIRECTED, STRING,
-    ancestors, children, descendants, field_children, is_statement, named_children, text,
+    VARIABLE_NAME, ancestors, children, descendants, field_children, is_statement, named_children, text,
 };
 use crate::shell::words::{literal, oversimplify};
 
@@ -185,6 +185,10 @@ fn is_whole_word(node: Node<'_>) -> bool {
         return false;
     }
     node.parent().is_some_and(|parent| {
+        // ShellCheck guarda el nombre de `$foo` como una palabra más, que coincide con el archivo `foo`.
+        if node.kind() == VARIABLE_NAME && EXPANSIONS.contains(&parent.kind()) {
+            return named_children(parent).len() == 1;
+        }
         let is_part = [CONCATENATION, STRING].contains(&parent.kind()) || EXPANSIONS.contains(&parent.kind());
         !is_part && (node.child_count() == 0 || [STRING, CONCATENATION].contains(&node.kind()))
     })

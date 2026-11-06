@@ -1077,7 +1077,24 @@ acá.
     5.074 avisos idénticos sin directivas y 3.370 con ellas; en los archivos analizados faltan 6 y 4
     (`compare.py` ahora los separa de los que están en archivos que se saltean) y no sobra ninguno salvo
     los 87 SC2016 de `nvm.sh` ya anotados.
+- El flujo del script (hecho, 2026-11-06): 35 reglas de `Analytics.hs` en `src/shell/rules/control/`:
+  `checkEchoWc` (SC2000), `checkFindExec` (SC2014, SC2067), `checkFunctionsUsedExternally` (SC2032,
+  SC2033), `checkPipedAssignment` (SC2036), `checkForInQuoted` (SC2041 a SC2043, SC2066, SC2258),
+  `checkLonelyDotDash` (SC2083), `checkSshHereDoc` (SC2087), `checkSpuriousExec` (SC2093),
+  `checkWhileReadPitfalls` (SC2095), `checkShebangParameters` y `checkShebang` (SC2096, SC2187, SC2239,
+  SC2246), `checkPrefixAssignmentReference` (SC2097, SC2098), `checkCharRangeGlob` (SC2101, SC2102),
+  `checkLoopKeywordScope` (SC2104 a SC2106), `checkFunctionDeclarations` (SC2111 a SC2113),
+  `checkStderrPipe` (SC2118), `checkOverridingPath` (SC2123), `checkUnsupported` (SC2127),
+  `checkTildeInPath` (SC2147) y `checkLoopVariableReassignment` (SC2165, SC2167).
+  - SC2094 ahora ve el nombre de `$foo` como una palabra, como ShellCheck: `done 3< foo` con `$foo`
+    adentro del loop avisa en los dos.
+  - Paridad contra ShellCheck 0.11.0 en las pruebas `prop_` de esas funciones
+    (`testdata/control`), sin avisos de más. En el corpus no aparecen casos nuevos y sigue sin sobrar
+    nada, salvo los 87 SC2016 de `nvm.sh` ya anotados. Quedan como fixtures en
+    `src/shell/fixtures/control.sh`.
 - Pendientes de Shell contra ShellCheck:
+  - `case x in a) b ;& esac` con `esac` en la misma línea y `${ cmd; }`: tree-sitter da un error y el
+    archivo se saltea (falta SC2127 ahí; con `esac` en su línea sale bien).
   - SC2075 y lo que usa `\<`, `\>` o `\>=`: tree-sitter da un error adentro de `[ ]` y `[[ ]]` y el
     archivo se saltea, así que la regla no llegaría a correr (faltan SC2071, SC2122 y SC2073 en esos
     casos). Es la misma familia de `[ a '<' b ]`.

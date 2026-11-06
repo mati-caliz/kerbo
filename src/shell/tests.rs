@@ -142,6 +142,10 @@ fn checks_commands_words_and_sources_like_shellcheck() {
             include_str!("fixtures/comparisons.sh"),
             include_str!("fixtures/comparisons.shellcheck"),
         ),
+        (
+            include_str!("fixtures/control.sh"),
+            include_str!("fixtures/control.shellcheck"),
+        ),
     ];
     for (script, shellcheck) in fixtures {
         let expected: Vec<String> = shellcheck.lines().map(str::to_owned).collect();

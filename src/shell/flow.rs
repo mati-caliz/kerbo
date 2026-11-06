@@ -185,19 +185,25 @@ pub fn has_lastpipe(context: &Context<'_, '_>) -> bool {
     match context.dialect {
         Dialect::Ksh => true,
         Dialect::Sh | Dialect::Dash | Dialect::Busybox => false,
-        Dialect::Bash => descendants(context.root)
-            .into_iter()
-            .filter_map(Command::of)
-            .any(|command| sets_lastpipe(&command, context.source)),
+        Dialect::Bash => has_option(context, LASTPIPE),
     }
 }
 
-fn sets_lastpipe(command: &Command<'_>, source: &[u8]) -> bool {
+// `isOptionSet`, que sólo mira bash.
+pub fn has_option(context: &Context<'_, '_>, option: &str) -> bool {
+    context.dialect == Dialect::Bash
+        && descendants(context.root)
+            .into_iter()
+            .filter_map(Command::of)
+            .any(|command| sets_option(&command, option, context.source))
+}
+
+fn sets_option(command: &Command<'_>, option: &str, source: &[u8]) -> bool {
     let mentions = || {
         command
             .words
             .iter()
-            .any(|word| oversimplify(*word, source) == LASTPIPE)
+            .any(|word| oversimplify(*word, source) == option)
     };
     (command.is_exactly(SHOPT, source) && mentions())
         || (command.is_exactly(SET, source) && (mentions() || command.has_flag(SET_OPTION_FLAG, source)))

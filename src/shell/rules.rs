@@ -5,6 +5,7 @@ mod builtins;
 mod command_checks;
 mod comparisons;
 mod conditions;
+mod control;
 mod expansions;
 mod quoting;
 mod redirects;
@@ -31,12 +32,14 @@ pub fn check(context: &Context<'_, '_>) -> Vec<Finding> {
         analytics::check(node, context, &mut findings);
         structure::check(node, context, &mut findings);
         comparisons::check(node, context, &numeric_values, &mut findings);
+        control::check(node, context, &mut findings);
         conditions::check(node, context, &mut findings);
         redirects::check(node, context, &mut findings);
         arithmetic::check(node, context, &mut findings);
         single_quotes::check(node, context, &mut findings);
     }
     analytics::check_script(context, &mut findings);
+    control::check_script(context, &mut findings);
     quoting::check(context, &mut findings);
     variables::check(context, &mut findings);
     findings.found
