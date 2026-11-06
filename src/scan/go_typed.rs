@@ -13,6 +13,7 @@ use super::ScanFailure;
 pub use direct::{DirectFile, direct_files};
 
 mod direct;
+mod errcheck_options;
 
 const ARGUMENT_OPEN: &str = "(";
 const ARGUMENT_CLOSE: &str = ")";
@@ -105,7 +106,7 @@ pub fn confirm_typed_findings(
         extra_excluded: platform.errcheck_exclude_functions(),
     };
     keep_confirmed(diagnostics, suppressed, &confirmation);
-    let (direct, direct_suppressed) = direct::direct_reports(direct_files, &roots, &modules);
+    let (direct, direct_suppressed) = direct::direct_reports(direct_files, &roots, &modules, platform);
     diagnostics.extend(direct);
     suppressed.extend(direct_suppressed);
     failures

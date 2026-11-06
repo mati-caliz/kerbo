@@ -242,6 +242,8 @@ goos = "linux"                    # de fábrica, GOOS o la máquina donde corre 
 goarch = "amd64"                  # de fábrica, GOARCH o la máquina
 build_tags = ["integration"]      # como run.build-tags de golangci-lint
 errcheck_exclude_functions = ["os.Remove"]  # como exclude-functions de errcheck
+errcheck_check_blank = true       # como check-blank: también `_ = f()`
+errcheck_check_type_assertions = true  # como check-type-assertions: también `x.(T)` sin `ok`
 ```
 
 | Preset | Archivo | Función | Ciclomática | Cognitiva | Parámetros |
@@ -542,7 +544,7 @@ que es un error de lectura y no una regla.
 ### TypeScript y JavaScript contra ESLint
 
 En TypeScript y JavaScript, kerbo hace las reglas de `@eslint/js` recommended y de
-`typescript-eslint` recommended que no piden tipos (falta `no-misleading-character-class`), con el nombre de ESLint sin el prefijo del
+`typescript-eslint` recommended que no piden tipos, con el nombre de ESLint sin el prefijo del
 plugin: `kerbo explain no-unused-vars`, `--max no-explicit-any=0` o `no-var = "off"`. Corren en los
 dos lenguajes como en un `eslint.config.js` con `js.configs.recommended` y
 `tseslint.configs.recommended`; en los `.ts` no corre `no-dupe-keys`, que ya revisa el compilador.

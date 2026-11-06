@@ -4,6 +4,7 @@ rule_family!(EslintRule {
     NoInvalidRegexp => "no-invalid-regexp",
     NoEmptyCharacterClass => "no-empty-character-class",
     NoRegexSpaces => "no-regex-spaces",
+    NoMisleadingCharacterClass => "no-misleading-character-class",
     NoUselessBackreference => "no-useless-backreference",
     NoIrregularWhitespace => "no-irregular-whitespace",
     ForDirection => "for-direction",

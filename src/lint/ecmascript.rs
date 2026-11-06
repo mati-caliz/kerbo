@@ -11,6 +11,7 @@ mod constants;
 mod core_recommended;
 mod disable_directives;
 pub use disable_directives::{DisabledRange, disabled_ranges};
+mod combining_marks;
 mod duplicates;
 mod errors;
 mod escapes;
@@ -20,6 +21,7 @@ mod finally;
 mod for_direction;
 mod irregular_whitespace;
 mod members;
+mod misleading_classes;
 mod modules;
 mod multiline;
 mod no_var;
@@ -31,6 +33,8 @@ mod prefer_const;
 mod presets;
 mod private_members;
 mod redeclare;
+mod regex_class_sequences;
+mod regex_code_units;
 mod regex_rules;
 mod regex_syntax;
 mod regexes;
@@ -173,6 +177,10 @@ const CHECKS: &[(EslintRule, Check)] = &[
         regex_rules::empty_character_classes,
     ),
     (EslintRule::NoRegexSpaces, regex_rules::repeated_regex_spaces),
+    (
+        EslintRule::NoMisleadingCharacterClass,
+        misleading_classes::misleading_character_classes,
+    ),
     (
         EslintRule::NoUselessBackreference,
         regex_rules::useless_backreferences,

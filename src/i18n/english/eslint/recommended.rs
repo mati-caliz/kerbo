@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 24] = [
+pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 25] = [
     (
         EslintRule::ForDirection,
         RuleText::new(
@@ -189,6 +189,15 @@ pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 24] = [
             "add the characters, or escape the bracket",
             "[] matches nothing, so the whole expression never matches.",
             "/a[]/ becomes /a\\\\[\\\\]/.",
+        ),
+    ),
+    (
+        EslintRule::NoMisleadingCharacterClass,
+        RuleText::new(
+            "A character made of several code points in a regular expression class",
+            "write the alternatives with `|`, or add the `u` flag for a surrogate pair",
+            "The class takes each code point on its own: it matches a piece of the character, not the character.",
+            "/[👍]/ becomes /[👍]/u.",
         ),
     ),
     (

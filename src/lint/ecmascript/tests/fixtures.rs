@@ -1,6 +1,12 @@
 use crate::language::Language;
 
-pub const FIXTURES: [(&str, Language, &str, &str); 39] = [
+pub const FIXTURES: [(&str, Language, &str, &str); 40] = [
+    (
+        "misleading_classes",
+        Language::JavaScript,
+        include_str!("../fixtures/misleading_classes.js"),
+        include_str!("../fixtures/misleading_classes.eslint"),
+    ),
     (
         "regexes_recommended",
         Language::JavaScript,

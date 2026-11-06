@@ -921,8 +921,13 @@ acá.
   - `compare_rules.py` reemplaza a `rule_compare.py`, que sólo miraba los archivos donde kerbo ya había
     avisado y escondía lo que le faltaba.
 - Pendientes de TypeScript y JavaScript contra ESLint, por frecuencia:
-  - `no-misleading-character-class` (290 en la medición vieja, casi todo en código compilado): pide las
-    tablas de Unicode de marcas combinantes y emojis.
+  - `no-misleading-character-class` (hecho, 2026-11-06): sobre las unidades UTF-16 del patrón, como
+    `regexpp`, con la tabla de `\p{M}` generada por `scripts/parity/ecmascript/combining_marks.js` (Unicode
+    16). Fixture con 53 avisos idénticos a ESLint. En el corpus ESLint da 12: 11 están bajo un
+    `eslint-disable` de `vscode/build/hygiene.ts`, que la medición ignora y kerbo respeta (las 11 columnas
+    coinciden al borrar el comentario), y el otro es el pendiente que sigue. Dos pendientes: `getStaticValue`
+    (el patrón armado con constantes o concatenando, como en `isAttributeNameSafe.js` de react, y los flags
+    en un template) y la opción `allowEscape`, que ninguna regla de esta familia toma todavía.
   - El parser de expresiones regulares no valida los nombres de `\p{…}` ni el contenido de las clases
     con `--` y `&&` en modo `v`: `no-invalid-regexp` puede dejar pasar esos casos.
   - `no-useless-escape` no mira las expresiones regulares con el flag `v`.
@@ -1478,7 +1483,8 @@ acá.
     inferencia de tipos genéricos y otros casos): calcarlo es reimplementar un motor de refactor.
   - errcheck en el editor y en `kerbo fix`: el texto sin guardar no tiene tipos, así que ahí no se
     muestra. `exclude-functions` se configura con `errcheck_exclude_functions` en `[go]` (hecho,
-    2026-11-06); `check-blank` y `check-type-assertions` todavía no.
+    2026-11-06); `check-blank` y `check-type-assertions` se prenden con `errcheck_check_blank` y
+    `errcheck_check_type_assertions` (hecho, 2026-11-06, `errcheck_options.go`).
   - Los tags de versión de arquitectura (`arm64.v8.0`, `arm.v7`, `386.sse2` y los demás) cumplen con los
     valores de fábrica de Go (hecho, 2026-11-06); `GOAMD64`, `GOARM` y compañía en el entorno no se leen.
     Los `goexperiment` son los fijos de Go 1.27.

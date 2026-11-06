@@ -52,6 +52,14 @@ pub struct RangeFact {
     pub call: Option<CallFact>,
 }
 
+// Una aserción de tipo sin mirar el `ok`; con `blank`, sólo cuenta si además se pidió `check-blank`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub struct AssertionFact {
+    pub line: usize,
+    pub column: usize,
+    pub blank: bool,
+}
+
 // Una escritura que QF1012 pasa a fmt.Fprint*, con la función que la reemplaza.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct FprintFact {
@@ -85,6 +93,10 @@ pub struct FileFacts {
     pub fprints: Option<Vec<FprintFact>>,
     #[serde(default)]
     pub reports: Option<Vec<ReportFact>>,
+    #[serde(default)]
+    pub blanks: Option<Vec<RangeFact>>,
+    #[serde(default)]
+    pub assertions: Option<Vec<AssertionFact>>,
 }
 
 // Los hechos de tipos de un módulo, por archivo (con la ruta canónica).
@@ -120,6 +132,8 @@ fn merge(into: &mut FileFacts, facts: FileFacts) {
     extend(&mut into.embedded, facts.embedded);
     extend(&mut into.fprints, facts.fprints);
     extend(&mut into.reports, facts.reports);
+    extend(&mut into.blanks, facts.blanks);
+    extend(&mut into.assertions, facts.assertions);
 }
 
 fn extend<Item>(into: &mut Option<Vec<Item>>, more: Option<Vec<Item>>) {

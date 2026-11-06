@@ -80,6 +80,8 @@ type fileFacts struct {
 	Embedded []positionFact `json:"embedded"`
 	Fprints  []fprintFact   `json:"fprints"`
 	Reports  []report       `json:"reports"`
+	Blanks     []rangeFact     `json:"blanks"`
+	Assertions []assertionFact `json:"assertions"`
 }
 
 var errorInterface = types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
@@ -219,6 +221,7 @@ func checkPackage(listed listedPackage, exports map[string]string, index depreca
 	collector.indexIotaConstants(files)
 	for _, file := range files {
 		ast.Inspect(file, collector.visit)
+		ast.Inspect(file, collector.visitErrcheckOptions)
 		collector.collectEmbedded(file)
 		collector.collectDeprecatedUses(file, index)
 		collector.collectCanonicalMethods(file)

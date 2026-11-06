@@ -8,7 +8,7 @@ use super::{Context, report};
 use crate::lint::LintFinding;
 use crate::rules::EslintRule;
 
-const REGEX: &str = "regex";
+pub const REGEX: &str = "regex";
 const PATTERN_FIELD: &str = "pattern";
 const FLAGS_FIELD: &str = "flags";
 const NEW: &str = "new_expression";
@@ -37,11 +37,11 @@ const STRICT_MODES: [Mode; 3] = [
     },
 ];
 
-struct Constructed<'tree> {
-    node: Node<'tree>,
-    pattern: Option<Node<'tree>>,
-    flags: Option<String>,
-    has_dynamic_flags: bool,
+pub struct Constructed<'tree> {
+    pub node: Node<'tree>,
+    pub pattern: Option<Node<'tree>>,
+    pub flags: Option<String>,
+    pub has_dynamic_flags: bool,
 }
 
 fn string_value(node: Node<'_>, context: &Context<'_, '_>) -> Option<String> {
@@ -54,7 +54,7 @@ fn string_value(node: Node<'_>, context: &Context<'_, '_>) -> Option<String> {
 }
 
 // Las llamadas a `RegExp` y `new RegExp` del global, con sus argumentos.
-fn constructions<'tree>(context: &Context<'tree, '_>) -> Vec<Constructed<'tree>> {
+pub fn constructions<'tree>(context: &Context<'tree, '_>) -> Vec<Constructed<'tree>> {
     let constants = Constants::new(context);
     context
         .of_kind(&[CALL, NEW])
@@ -90,7 +90,7 @@ fn constructions<'tree>(context: &Context<'tree, '_>) -> Vec<Constructed<'tree>>
         .collect()
 }
 
-fn literal_parts<'tree>(regex: Node<'tree>, context: &Context<'tree, '_>) -> (String, String) {
+pub fn literal_parts<'tree>(regex: Node<'tree>, context: &Context<'tree, '_>) -> (String, String) {
     let part = |field: &str| {
         regex
             .child_by_field_name(field)

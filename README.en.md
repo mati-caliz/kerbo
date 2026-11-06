@@ -246,6 +246,8 @@ goos = "linux"                    # by default, GOOS or the machine kerbo runs o
 goarch = "amd64"                  # by default, GOARCH or the machine
 build_tags = ["integration"]      # like golangci-lint's run.build-tags
 errcheck_exclude_functions = ["os.Remove"]  # like exclude-functions of errcheck
+errcheck_check_blank = true       # like check-blank: `_ = f()` too
+errcheck_check_type_assertions = true  # like check-type-assertions: `x.(T)` without `ok` too
 ```
 
 | Preset | File | Function | Cyclomatic | Cognitive | Parameters |
@@ -544,8 +546,7 @@ rather than a rule.
 ### TypeScript and JavaScript against ESLint
 
 In TypeScript and JavaScript, kerbo runs the rules of `@eslint/js` recommended and of
-`typescript-eslint` recommended that need no type information (`no-misleading-character-class` is
-missing), with the ESLint name without the
+`typescript-eslint` recommended that need no type information, with the ESLint name without the
 plugin prefix: `kerbo explain no-unused-vars`, `--max no-explicit-any=0` or `no-var = "off"`. They
 run in both languages as in an `eslint.config.js` with `js.configs.recommended` and
 `tseslint.configs.recommended`; in `.ts` files `no-dupe-keys` does not run, since the compiler

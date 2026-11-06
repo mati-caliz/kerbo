@@ -71,7 +71,14 @@ pub struct GoPlatform {
     arch: String,
     cgo: bool,
     build_tags: Vec<String>,
-    errcheck_exclude_functions: Vec<String>,
+    errcheck: ErrcheckOptions,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+struct ErrcheckOptions {
+    exclude_functions: Vec<String>,
+    check_blank: bool,
+    check_type_assertions: bool,
 }
 
 impl Default for GoPlatform {
@@ -81,7 +88,7 @@ impl Default for GoPlatform {
             arch: DEFAULT_ARCH.to_owned(),
             cgo: true,
             build_tags: Vec::new(),
-            errcheck_exclude_functions: Vec::new(),
+            errcheck: ErrcheckOptions::default(),
         }
     }
 }
@@ -114,7 +121,11 @@ impl GoPlatform {
             arch,
             cgo,
             build_tags: target.build_tags.clone(),
-            errcheck_exclude_functions: target.errcheck_exclude_functions.clone(),
+            errcheck: ErrcheckOptions {
+                exclude_functions: target.errcheck_exclude_functions.clone(),
+                check_blank: target.errcheck_check_blank,
+                check_type_assertions: target.errcheck_check_type_assertions,
+            },
         }
     }
 
@@ -135,7 +146,15 @@ impl GoPlatform {
     }
 
     pub fn errcheck_exclude_functions(&self) -> &[String] {
-        &self.errcheck_exclude_functions
+        &self.errcheck.exclude_functions
+    }
+
+    pub const fn errcheck_check_blank(&self) -> bool {
+        self.errcheck.check_blank
+    }
+
+    pub const fn errcheck_check_type_assertions(&self) -> bool {
+        self.errcheck.check_type_assertions
     }
 
     // `matchTag` de `go/build`.

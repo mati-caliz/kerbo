@@ -112,7 +112,7 @@ fn the_configured_platform_and_build_tags_decide_like_go_list() {
         goos: Some("windows".to_owned()),
         goarch: Some("arm64".to_owned()),
         build_tags: vec!["integration".to_owned()],
-        errcheck_exclude_functions: Vec::new(),
+        ..GoTarget::default()
     };
     let windows = GoPlatform::of(&target);
     let verdict = |name: &str, header: &str| {

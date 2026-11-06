@@ -6,10 +6,13 @@ use crate::go_types::{ModuleFacts, ReportFact};
 use crate::language::Language;
 use crate::limits::Limits;
 use crate::lint::go::is_generated_source;
+use crate::lint::go::platform::GoPlatform;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::{Diagnostic, FileIdentity, GoRule, RuleId, finding_diagnostics};
 use crate::scan::{ScanRequest, SourceFile, file_limits};
 use crate::suppressions::{Suppressed, split};
+
+use super::errcheck_options;
 
 // Las reglas que el helper decide entero: aparecen poco y cada una pide tipos para saber si va, así
 // que no hay candidatos por archivo; el aviso sale directo de los hechos.
@@ -103,6 +106,7 @@ pub fn direct_files<'scan>(files: &'scan [SourceFile], request: &ScanRequest<'_>
 pub fn wants_direct_reports(limits: &Limits) -> bool {
     DIRECT_RULES
         .iter()
+        .chain(&[GoRule::Errcheck])
         .any(|rule| limits.get(RuleId::Go(*rule)).is_some())
 }
 
@@ -112,6 +116,7 @@ pub fn direct_reports(
     files: &[DirectFile<'_>],
     roots: &HashMap<PathBuf, PathBuf>,
     modules: &HashMap<&Path, ModuleFacts>,
+    platform: &GoPlatform,
 ) -> (Vec<Diagnostic>, Vec<Suppressed>) {
     let mut kept = Vec::new();
     let mut suppressed = Vec::new();
@@ -128,6 +133,7 @@ pub fn direct_reports(
             .iter()
             .flatten()
             .filter_map(|report| finding(report, &file.limits))
+            .chain(errcheck_options::findings(facts, &file.limits, platform))
             .collect();
         if findings.is_empty() {
             continue;

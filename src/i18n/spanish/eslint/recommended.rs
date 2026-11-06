@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::EslintRule;
 
-pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 24] = [
+pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 25] = [
     (
         EslintRule::ForDirection,
         RuleText::new(
@@ -189,6 +189,15 @@ pub const RECOMMENDED_TEXTS: [(EslintRule, RuleText); 24] = [
             "agregá los caracteres, o escapá el corchete",
             "[] no coincide con nada, así que la expresión entera nunca coincide.",
             "/a[]/ se vuelve /a\\\\[\\\\]/.",
+        ),
+    ),
+    (
+        EslintRule::NoMisleadingCharacterClass,
+        RuleText::new(
+            "Un carácter de varios puntos de código en una clase de una expresión regular",
+            "escribí las alternativas con `|`, o agregá la bandera `u` si es un par sustituto",
+            "La clase toma cada punto de código por separado: coincide con un pedazo del carácter, no con el carácter.",
+            "/[👍]/ se vuelve /[👍]/u.",
         ),
     ),
     (
