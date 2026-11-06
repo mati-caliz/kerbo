@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Compila kerbo en release y lo corre sobre un repo Java del corpus con un JDK real (el volumen jdk21)
-# y los jars indicados, sacados de la caché de Qodana de ese repo. Deja kerbo-parity/qodana/<repo>/kerbo.json.
+# y los jars indicados (admite comodines), sacados de la caché de Qodana de ese repo. Deja
+# kerbo-parity/qodana/<repo>/kerbo.json.
 #
 #   scripts/parity/java/kerbo.sh junit4 hamcrest-core-1.3.jar
 set -euo pipefail
@@ -26,7 +27,9 @@ MSYS_NO_PATHCONV=1 docker run --rm -m "$MEMORY_LIMIT" --cpus="$CPUS" -v "$crate:
   "$image" bash -euo pipefail -c '
     cargo build --release --locked --bin kerbo 2>&1 | tail -1
     classpath=""
-    for jar in $JARS; do classpath="$classpath:$(find /m2 -name "$jar" | head -1)"; done
+    for jar in $JARS; do
+      for found in $(find /m2 -name "$jar"); do classpath="$classpath:$found"; done
+    done
     export KERBO_JAVA_CLASSPATH="${classpath#:}"
     echo "classpath: $KERBO_JAVA_CLASSPATH"
     cd /c

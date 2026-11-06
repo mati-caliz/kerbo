@@ -109,6 +109,10 @@ class Anonymous {
         }
     };
 
+    void throwsOnlyUnchecked() throws Exception {
+        throw new RuntimeException();
+    }
+
     void readsTheCaughtVariable() throws IOException {
         try {
             new FileInputStream("a");
@@ -149,7 +153,8 @@ fn a_throws_nothing_can_reach_is_reported_and_anything_unknown_keeps_quiet() {
         found,
         [
             "100:34 IOException",
-            "104:42 IOException",
+            "104:39 Exception",
+            "108:42 IOException",
             "14:42 IOException",
             "18:27 Exception",
             "25:27 IOException",

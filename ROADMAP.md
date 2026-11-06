@@ -1674,10 +1674,11 @@ Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y 
 
 - `RedundantThrows` de IntelliJ (`redundant-throws`), con las excepciones de las firmas (`Exceptions`
   de cada método de los `.class`).
-  - Paridad contra Qodana en junit4 (`scripts/parity/java/`, 2026-11-06): de sus 219 avisos, 184
-    idénticos en archivo, línea y columna, **ninguno de más** y 35 que faltan (31 en tests). Falta
-    analizar esos 35 uno por uno y medir en más repos. `qodana.sh` todavía corre el perfil completo:
-    el de una sola inspección no se aplica, y en un repo grande eso tarda de más.
+  - Paridad contra Qodana (`scripts/parity/java/`, 2026-11-06), por archivo, línea y columna:
+    junit4 (Java del JDK instalado), 195 de 219; commons-lang (Java 8, firmas de `ct.sym`), 107 de
+    125. **Ninguno de más en los dos.** Por la muestra revisada, buena parte de los que faltan pide
+    genéricos (`lista.get(0).metodo()`, el punto de abajo) y constantes de un `import static`. Faltan
+    medir Guava y spring-boot, más grandes.
   - Pendientes: los constructores, que piden seguir el `super()` implícito y los inicializadores de
     los campos; `super.metodo()`; `values()` y `valueOf()` de un enum; `throw e` de una variable; las
     constantes de un `import static`. Un método del proyecto que redefine a uno de librería suma lo

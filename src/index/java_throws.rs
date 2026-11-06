@@ -160,7 +160,19 @@ impl Checker<'_, '_, '_> {
         })
     }
 
+    // Sólo cuenta lo chequeado: un `throw new RuntimeException()` no justifica un `throws Exception`.
+    fn is_known_unchecked(&self, exception: &Resolved) -> bool {
+        [RUNTIME_EXCEPTION, ERROR].iter().any(|unchecked| {
+            self.lookup
+                .is_subclass(exception, &Resolved::Library((*unchecked).to_owned()))
+                == Some(true)
+        })
+    }
+
     fn escapes_as(&self, exception: &Resolved, caught: &[String], declared: &Resolved) -> bool {
+        if self.is_known_unchecked(exception) {
+            return false;
+        }
         let handled = caught.iter().any(|written| {
             let handler = self.lookup.named(self.summary, written);
             self.lookup.is_subclass(exception, &handler) == Some(true)
