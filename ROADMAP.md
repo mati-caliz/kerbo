@@ -1548,6 +1548,26 @@ cerrarse se borra de acá.
 - Código muerto entre archivos: exports que nadie importa y dependencias declaradas que nadie
   usa, con paridad contra knip, vulture y depcheck donde las haya.
 
+### 17. Versiones de referencia al día
+
+kerbo reimplementa las reglas, así que no se actualiza solo: cada familia está medida contra una
+versión fija y lo que traiga una versión nueva hay que portarlo. Hoy las versiones están repartidas
+y desparejas: ShellCheck 0.11.0 repetido en cuatro scripts de `scripts/parity/shell/`,
+golangci-lint v2.15.0 en dos de `scripts/parity/go/`, ruff 0.17.1 en `.parity` pero 0.17.0 en
+`scripts/agent-harness/run.py`, ESLint 10.13 y typescript-eslint 8.72 en
+`.parity/eslint/package.json`, Qodana sin versión fija (`:latest`), y las gramáticas de
+tree-sitter copiadas en `grammars/`.
+
+- Un solo archivo de versiones de referencia (`scripts/parity/versions.toml`) del que lean todos
+  los scripts de paridad, y que el README cite las mismas. Fijar la versión de Qodana.
+- Un script que compare esas versiones con las últimas publicadas de cada herramienta y de cada
+  gramática, y muestre cuánto atraso hay por familia.
+- Un script que corra todos los corpus de paridad seguidos, por la cola de `heavy_lock.py`, y deje
+  las diferencias por familia: la lista de lo que cuesta subir de versión.
+- Criterio de ritmo: los parches y las menores se siguen apenas salen, que son baratos si se hacen
+  seguido (ruff y typescript-eslint sacan casi todas las semanas); las mayores (ESLint 11,
+  golangci-lint v3) o una gramática nueva se agendan como una tanda propia.
+
 ### 14. Más migraciones: Django y Rails
 
 - Migraciones de Django (sobre el árbol de Python que ya existe: `AddIndex` sin
@@ -1737,23 +1757,3 @@ Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_check
       buscan secretos en el archivo editado.
     - Una regla de kerbo o una allowlist propia de secretos en `kerbo.toml`, además de las
       excepciones por ruta, y un `kerbo explain` por cada tipo de secreto.
-
-### 17. Versiones de referencia al día
-
-kerbo reimplementa las reglas, así que no se actualiza solo: cada familia está medida contra una
-versión fija y lo que traiga una versión nueva hay que portarlo. Hoy las versiones están repartidas
-y desparejas: ShellCheck 0.11.0 repetido en cuatro scripts de `scripts/parity/shell/`,
-golangci-lint v2.15.0 en dos de `scripts/parity/go/`, ruff 0.17.1 en `.parity` pero 0.17.0 en
-`scripts/agent-harness/run.py`, ESLint 10.13 y typescript-eslint 8.72 en
-`.parity/eslint/package.json`, Qodana sin versión fija (`:latest`), y las gramáticas de
-tree-sitter copiadas en `grammars/`.
-
-- Un solo archivo de versiones de referencia (`scripts/parity/versions.toml`) del que lean todos
-  los scripts de paridad, y que el README cite las mismas. Fijar la versión de Qodana.
-- Un script que compare esas versiones con las últimas publicadas de cada herramienta y de cada
-  gramática, y muestre cuánto atraso hay por familia.
-- Un script que corra todos los corpus de paridad seguidos, por la cola de `heavy_lock.py`, y deje
-  las diferencias por familia: la lista de lo que cuesta subir de versión.
-- Criterio de ritmo: los parches y las menores se siguen apenas salen, que son baratos si se hacen
-  seguido (ruff y typescript-eslint sacan casi todas las semanas); las mayores (ESLint 11,
-  golangci-lint v3) o una gramática nueva se agendan como una tanda propia.
