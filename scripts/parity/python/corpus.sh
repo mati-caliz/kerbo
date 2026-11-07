@@ -26,7 +26,7 @@ if [ -z "$skip_ruff" ]; then
 fi
 if [ -z "$skip_kerbo" ]; then
   image="$(docker images --format '{{.Repository}}:{{.Tag}}' quality-rust | head -1)"
-  corpus="$(cd "$parity/corpus" && pwd -W)"
+  corpus="$("$here/../corpus_volume.sh" "$parity/corpus" kerbo-corpus)"
   MSYS_NO_PATHCONV=1 docker run --rm -m 16g --cpus=8 -v "$repo:/src:ro" -w /src -v rust-quality-cache:/cache \
     -v "$corpus:/c:ro" -v "$(cd "$here/out" && pwd -W):/o" \
     -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR=/cache/target/kerbo-dev -e CARGO_BUILD_JOBS=8 -e CARGO_TERM_COLOR=never -e RUSTFLAGS="-C link-arg=-fuse-ld=mold" \

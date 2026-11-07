@@ -37,12 +37,53 @@ print(",".join(re.findall(r'=> "([^"]+)"', open(sys.argv[1], encoding="utf-8").r
 PY
 }
 
+# La salida de una herramienta de referencia sólo cambia si cambia su versión, el corpus o lo que se
+# le pide: se guarda al lado la clave con que se sacó, y con la misma clave no se vuelve a correr.
+version_of() { python "$here/versions.py" version "$1"; }
+fingerprint() { printf '%s' "$*" | sha256sum | cut -c1-16; }
+corpus_key() { git -C "$repo" hash-object "$here/corpus.toml"; }
+shell_corpus_key() {
+  local corpus="${KERBO_PARITY:-$repo/.parity}/shell-corpus" folder
+  for folder in "$corpus"/*/; do git -C "$folder" rev-parse HEAD 2>/dev/null || echo "$folder"; done
+}
+is_fresh() { [ -f "$1.clave" ] && [ "$(cat "$1.clave")" = "$2" ]; }
+remember() { printf '%s' "$2" > "$1.clave"; }
+
+reference() {
+  local output="$1" key="$2" refresh="$3" reuse="$4"
+  if is_fresh "$output" "$key"; then
+    echo "referencia al día ($(basename "$output")): no se vuelve a correr"
+    queued "$reuse"
+  else
+    queued "$refresh" && remember "$output" "$key"
+  fi
+}
+
 run_family() {
+  local parity="${KERBO_PARITY:-$repo/.parity}" key rules
   case "$1" in
-    python) queued "'$here/python/corpus.sh'" ;;
-    ecmascript) queued "'$here/ecmascript/corpus.sh' '$(eslint_rules)'" ;;
-    shell) queued "'$here/shell/shellcheck.sh' && '$here/shell/kerbo.sh' && python '$here/shell/compare.py'" ;;
-    go) queued "'$here/go/helper-build.sh' && '$here/go/corpus-golangci.sh' && '$here/go/corpus-helper.sh' && python '$here/go/compare_corpus.py'" ;;
+    python)
+      key="$(fingerprint "$(version_of ruff)" "$(corpus_key)" "$(python "$here/python/compare.py" --select-codes)")"
+      reference "$here/python/out/ruff.json" "$key" "'$here/python/corpus.sh'" "'$here/python/corpus.sh' --skip-ruff"
+      ;;
+    ecmascript)
+      rules="$(eslint_rules)"
+      key="$(fingerprint "$(version_of eslint)" "$(version_of typescript-eslint)" "$(corpus_key)" "$rules")"
+      reference "$parity/eslint/out_rules.json" "$key" "'$here/ecmascript/corpus.sh' '$rules'" \
+        "'$here/ecmascript/corpus.sh' '$rules' --skip-eslint"
+      ;;
+    shell)
+      key="$(fingerprint "$(version_of shellcheck)" "$(shell_corpus_key)")"
+      reference "$here/shell/out/shellcheck.json" "$key" \
+        "'$here/shell/shellcheck.sh' && '$here/shell/kerbo.sh' && python '$here/shell/compare.py'" \
+        "'$here/shell/kerbo.sh' && python '$here/shell/compare.py'"
+      ;;
+    go)
+      key="$(fingerprint "$(version_of golangci-lint)" "$(git -C "$repo" hash-object "$here/go/golangci-default.yml")")"
+      reference "$here/go/out/default.json" "$key" \
+        "'$here/go/helper-build.sh' && '$here/go/corpus-golangci.sh' && '$here/go/corpus-helper.sh' && python '$here/go/compare_corpus.py'" \
+        "'$here/go/helper-build.sh' && '$here/go/corpus-helper.sh' && python '$here/go/compare_corpus.py'"
+      ;;
     java)
       for name in "${JAVA_REPOS[@]}"; do
         if [ -n "${QODANA:-}" ]; then

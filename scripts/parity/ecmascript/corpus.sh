@@ -18,7 +18,7 @@ PY
   (cd "$parity/corpus" && NODE_OPTIONS=--max-old-space-size=12000 node ../eslint/node_modules/eslint/bin/eslint.js     -c ../eslint/eslint.config.mjs --no-warn-ignored -f json -o ../eslint/out_rules.json "${CORPUS_REPOS[@]}") || true
 fi
 image="$(docker images --format '{{.Repository}}:{{.Tag}}' quality-rust | head -1)"
-corpus="$(cd "$parity/corpus" && pwd -W)"
+corpus="$("$here/../corpus_volume.sh" "$parity/corpus" kerbo-corpus)"
 eslint_out="$(pwd -W)"
 MSYS_NO_PATHCONV=1 docker run --rm -m 16g --cpus=8 -v "$repo:/src:ro" -w /src -v rust-quality-cache:/cache \
   -v "$corpus:/c:ro" -v "$eslint_out:/o" \

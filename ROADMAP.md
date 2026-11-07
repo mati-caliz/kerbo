@@ -1711,6 +1711,10 @@ Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_check
 - **Mutation testing sólo sobre lo cambiado**: con el mapa de qué test ejecuta qué código, mutar
   las líneas del cambio y correr sólo los tests que las cubren. Marca el test que pasa sin
   verificar nada, que es la trampa típica de un agente.
+- Partir el crate en varios (gramáticas, familias de reglas, índice, caché) para que un cambio
+  recompile y pase clippy sólo en lo que toca. Hoy son unas 180.000 líneas en un crate: el gate
+  rápido (`verify-rust.sh --quick`) tarda unos 2 minutos y el entero 4. Es un cambio grande de
+  visibilidades y rutas; conviene hacerlo de una vez y sin otras sesiones trabajando.
 - `kerbo gate`: el gate entero (análisis, tipos, tests, cobertura) con un planificador propio que
   decide el orden y cuántos pasos en paralelo según la memoria libre.
 - Vulnerabilidades de dependencias con OSV y secretos versionados (hecho en main).

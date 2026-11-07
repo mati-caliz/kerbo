@@ -7,7 +7,7 @@ repo="$(cd "$here/../../.." && pwd -W)"
 corpus="${SHELL_CORPUS:-${KERBO_PARITY:-$(cd "$here/../../.." && pwd)/.parity}/shell-corpus}"
 image="$(docker images --format '{{.Repository}}:{{.Tag}}' quality-rust | head -1)"
 MSYS_NO_PATHCONV=1 docker run --rm -m 16g --cpus=8 -v "$repo:/src:ro" -w /src -v rust-quality-cache:/cache \
-  -v "$(cd "$corpus" && pwd -W):/c:ro" -v "$(cd "$here/out" && pwd -W):/o" \
+  -v "$("$here/../corpus_volume.sh" "$corpus" kerbo-shell-corpus):/c:ro" -v "$(cd "$here/out" && pwd -W):/o" \
   -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR=/cache/target/kerbo-dev -e CARGO_BUILD_JOBS=8 -e CARGO_TERM_COLOR=never -e RUSTFLAGS="-C link-arg=-fuse-ld=mold" \
   "$image" bash -euo pipefail -c '
     cargo build --profile parity --locked --bin kerbo 2>&1 | tail -2
