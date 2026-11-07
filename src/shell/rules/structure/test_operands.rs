@@ -9,7 +9,7 @@ use crate::shell::syntax::{
     BODY_FIELD, COMMAND, COMMAND_SUBSTITUTION, PIPELINE, REDIRECTED, STRING, TEST, is_backticked,
     is_double_bracket, named_children, text,
 };
-use crate::shell::test_expression::{Condition, parse};
+use crate::shell::test_expression::{Condition, operator_text, parse};
 use crate::shell::word_pieces::{
     Piece, PieceKind, flattened, has_array_expansion, has_brace_expansion, has_glob, is_constant,
     literal_string, pieces,
@@ -135,7 +135,7 @@ impl Checker<'_, '_> {
     }
 
     fn binary(&mut self, operator: Node<'_>, left: Node<'_>, right: Node<'_>) {
-        let operator_text = text(operator, self.source);
+        let operator_text = operator_text(operator, self.source);
         let left_pieces = pieces(left, self.source);
         let right_pieces = pieces(right, self.source);
         self.constant_comparison(operator, &left_pieces, &right_pieces);

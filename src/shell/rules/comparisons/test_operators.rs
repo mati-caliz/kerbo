@@ -5,15 +5,16 @@ use crate::rules::ShellRule;
 use crate::shell::context::{Context, Findings};
 use crate::shell::dialect::Dialect;
 use crate::shell::syntax::{TEST, is_double_bracket, named_children, text};
-use crate::shell::test_expression::{Condition, parse};
+use crate::shell::test_expression::{Condition, operator_text, parse};
 use crate::shell::word_pieces::{
     PieceKind, has_glob, literal_string, pieces, simplified_text, simplified_text_is_number,
 };
 
 const BINARY_OPERATORS: &[&str] = &[
     "-nt", "-ot", "-ef", "==", "!=", "<=", ">=", "-eq", "-ne", "-lt", "-le", "-gt", "-ge", "=~", ">", "<",
-    "=",
+    "=", "\\<", "\\>", "\\<=", "\\>=",
 ];
+const ESCAPED_ORDERING: &[&str] = &["\\<", "\\>"];
 const UNARY_OPERATORS: &[&str] = &[
     "!", "-a", "-b", "-c", "-d", "-e", "-f", "-g", "-h", "-L", "-k", "-p", "-r", "-s", "-S", "-t", "-u",
     "-w", "-x", "-O", "-G", "-N", "-z", "-n", "-o", "-v", "-R",
@@ -134,9 +135,12 @@ impl Checker<'_, '_, '_> {
     }
 
     fn binary(&mut self, operator: Node<'_>, left: Node<'_>, right: Node<'_>) {
-        let operator_text = text(operator, self.context.source);
+        let operator_text = operator_text(operator, self.context.source);
         if !BINARY_OPERATORS.contains(&operator_text) {
             self.report(ShellRule::Sc2057, operator);
+        }
+        if !self.single_bracket && ESCAPED_ORDERING.contains(&operator_text) {
+            self.report(ShellRule::Sc2075, operator);
         }
         numbers::check(
             numbers::Comparison {
@@ -203,8 +207,8 @@ fn repeated_subject<'tree, 'source>(
     else {
         return None;
     };
-    let operator = text(*left_operator, source);
-    (operator == text(*right_operator, source)
+    let operator = operator_text(*left_operator, source);
+    (operator == operator_text(*right_operator, source)
         && text(*left_subject, source) == text(*right_subject, source)
         && text(*first, source) != text(*second, source))
     .then_some(RepeatedSubject {

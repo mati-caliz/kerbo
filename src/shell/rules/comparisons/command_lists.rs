@@ -8,7 +8,7 @@ use crate::shell::syntax::{
     AND, BACKGROUND, BODY_FIELD, DESCRIPTOR_FIELD, FILE_REDIRECT, LIST, OR, PIPELINE, REDIRECT_FIELD,
     REDIRECTED, TEST, children, field_children, named_children, text,
 };
-use crate::shell::test_expression::{Condition, parse};
+use crate::shell::test_expression::{Condition, operator_text, parse};
 use crate::shell::word_pieces::{has_glob, is_constant, pieces};
 
 const NOT_EQUAL_OPERATORS: &[&str] = &["-ne", "!="];
@@ -89,7 +89,7 @@ fn operands<'tree, 'source>(
             let Condition::Binary(operator, left, right) = parse(node, source)? else {
                 return None;
             };
-            let operator = text(operator, source);
+            let operator = operator_text(operator, source);
             match (
                 is_constant(&pieces(left, source)),
                 is_constant(&pieces(right, source)),

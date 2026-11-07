@@ -1,0 +1,24 @@
+[package]
+edition = "2021"
+name = "kerbo-tree-sitter-bash"
+version = "0.25.1"
+authors = [
+    "Max Brunsfeld <maxbrunsfeld@gmail.com>",
+    "Amaan Qureshi <amaanq12@gmail.com>",
+]
+build = "bindings/rust/build.rs"
+description = "tree-sitter-bash 0.25.1 con las formas que le faltan, para kerbo"
+license = "MIT"
+repository = "https://github.com/mati-caliz/kerbo"
+readme = "README.md"
+include = ["LICENSE", "README.md", "bindings/rust/*", "grammar.js", "queries/*", "src/*", "src/tree_sitter/*", "tree-sitter.json"]
+
+[lib]
+name = "tree_sitter_bash"
+path = "bindings/rust/lib.rs"
+
+[dependencies.tree-sitter-language]
+version = "0.1"
+
+[build-dependencies.cc]
+version = "1.2"

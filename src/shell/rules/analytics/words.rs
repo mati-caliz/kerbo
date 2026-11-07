@@ -5,7 +5,7 @@ use crate::shell::commands::Command;
 use crate::shell::context::{Context, Findings};
 use crate::shell::parameters::{is_array_expansion, is_variable_character, modifier};
 use crate::shell::quoting::{Strictness, is_quote_free};
-use crate::shell::rules::command_checks::word_shapes::{is_glob, will_split};
+use crate::shell::rules::command_checks::word_shapes::{has_glob_part, will_split};
 use crate::shell::syntax::{
     ARITHMETIC_EXPANSION, ASSIGNMENT, BINARY, COMMAND, COMMAND_SUBSTITUTION, CONCATENATION, DOUBLE_BRACKET,
     EXPANSIONS, FOR, LEFT_FIELD, NAME_FIELD, OPERATOR_FIELD, PIPELINE, RAW_STRING, STRING, STRING_CONTENT,
@@ -96,7 +96,7 @@ fn check_assignment(assignment: Node<'_>, source: &[u8], findings: &mut Findings
     };
     if parts(value).into_iter().any(|part| is_array_part(part, source)) {
         findings.report(ShellRule::Sc2124, value, text(value, source));
-    } else if is_glob(value, source)
+    } else if has_glob_part(value, source)
         || value.kind() == BRACE_EXPRESSION
         || (value.kind() == CONCATENATION && is_brace_expansion(value, source))
     {

@@ -9,7 +9,7 @@ use crate::shell::syntax::{
     NEGATED, OPERATOR_FIELD, OR, PARENTHESIZED, PIPELINE, REDIRECTED, SUBSHELL, TEST, UNARY, ancestors,
     children, field_children, is_arithmetic_command, is_double_bracket, named_children, text,
 };
-use crate::shell::test_expression::{Condition, parse};
+use crate::shell::test_expression::{Condition, operator_text, parse};
 use crate::shell::words::{braced_content, literal, parts};
 
 const SINGLE_BRACKET_AND: &str = "-a";
@@ -49,7 +49,7 @@ fn check_test(node: Node<'_>, context: &Context<'_, '_>, findings: &mut Findings
         }
         Condition::Binary(operator, left, right) if only_test => {
             compare_exit_code(
-                text(*operator, context.source),
+                operator_text(*operator, context.source),
                 (*left, *right),
                 context,
                 findings,

@@ -289,6 +289,12 @@ fn directives_cover_the_next_statement_or_the_whole_file_like_shellcheck() {
     let before_else =
         "#!/bin/bash\necho\nif x; then\n  :\n# shellcheck disable=SC2086\nelse\n  echo $a\nfi\n";
     assert!(directive_coverage(before_else).is_empty());
+    let with_backtick_comments =
+        "#!/bin/bash\n# shellcheck disable=2046\nset -e\ngit ls-files `# nota` \\\n  'a'\necho $(ls)\n";
+    assert_eq!(
+        directive_coverage(with_backtick_comments).get(&2),
+        Some(&Coverage::File)
+    );
     let rule = RuleId::Shell(ShellRule::Sc2086);
     assert!(disables("SC2086", rule) && disables("2086", rule) && disables("all", rule));
     assert!(disables("SC2000-SC2099", rule) && !disables("SC2087-SC2099", rule) && !disables("SC2034", rule));
@@ -325,4 +331,23 @@ fn quotes_only_what_may_contain_spaces() {
     assert_eq!(codes("#!/bin/bash\nf() { s=$?; echo $s; }\n"), NO_CODES);
     assert_eq!(codes("#!/bin/bash\necho foo > $file\n"), ["sc2086"]);
     assert_eq!(codes("#!/bin/bash\n(( $1 + 3 ))\n"), NO_CODES);
+}
+
+#[test]
+fn analyzes_whole_the_scripts_the_upstream_grammar_could_not_read() {
+    let expected: Vec<String> = include_str!("fixtures/grammar_forms.shellcheck")
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    let mut actual: Vec<(usize, usize, String)> =
+        found_with_flow(include_str!("fixtures/grammar_forms.sh"), "script.sh")
+            .into_iter()
+            .map(|(code, line, column)| (line, column, code))
+            .collect();
+    actual.sort();
+    let actual: Vec<String> = actual
+        .into_iter()
+        .map(|(line, column, code)| format!("{line}:{column} {code}"))
+        .collect();
+    assert_eq!(actual, expected);
 }

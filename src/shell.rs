@@ -88,7 +88,8 @@ fn has_shell_shebang(path: &Path) -> bool {
 pub fn analyze(parser: &mut Parser, unit: SourceUnit<'_>) -> Option<Result<Vec<Violation>, ParseFailed>> {
     (unit.language == Language::Shell).then(|| {
         let defaults = unit.path.map_or(NO_SHELL_DEFAULTS, shell_defaults);
-        let source = unit.source;
+        let blanked = repair::blank_backtick_comments(unit.source);
+        let source = blanked.as_deref().unwrap_or(unit.source);
         let tree = parser.parse(source, None).ok_or(ParseFailed)?;
         if !tree.root_node().has_error() {
             return parsed_violations(parser, tree.root_node(), source, defaults);
@@ -251,8 +252,10 @@ pub fn directive_coverage(source: &str) -> HashMap<usize, Coverage> {
     if parser.set_language(&tree_sitter_bash::LANGUAGE.into()).is_err() {
         return HashMap::new();
     }
-    parser.parse(source, None).map_or_else(HashMap::new, |tree| {
-        Directives::read(tree.root_node(), source.as_bytes()).coverage
+    let blanked = repair::blank_backtick_comments(source.as_bytes());
+    let parsed = blanked.as_deref().unwrap_or(source.as_bytes());
+    parser.parse(parsed, None).map_or_else(HashMap::new, |tree| {
+        Directives::read(tree.root_node(), parsed).coverage
     })
 }
 

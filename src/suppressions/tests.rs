@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use super::{Scope, directives, split};
 use crate::i18n::Message;
 use crate::language::Language;
-use crate::rules::{Diagnostic, DockerfileRule, EslintRule, MigrationRule, RuleId};
+use crate::rules::{Diagnostic, DockerfileRule, EslintRule, MigrationRule, RuleId, ShellRule};
 
 fn diagnostic(rule: RuleId, line: usize) -> Diagnostic {
     Diagnostic {
@@ -87,6 +87,30 @@ fn ignores_markers_that_are_not_a_leading_comment() {
     );
     let (kept, suppressed) = split(b"FROM debian\n", vec![diagnostic(PINNED, 1)]);
     assert_eq!((kept.len(), suppressed.len()), (1, 0));
+}
+
+#[test]
+fn a_file_wide_shellcheck_directive_reads_codes_like_shellcheck() {
+    let rule = RuleId::Shell(ShellRule::Sc2046);
+    let source =
+        "#!/bin/bash\n# shellcheck disable=2046 # el split es a propósito\nset -e\nf() {\n  echo $(ls)\n}\n";
+    let (kept, suppressed) = split(source.as_bytes(), vec![shell_diagnostic(rule, 5)]);
+    assert_eq!((kept.len(), suppressed.len()), (0, 1));
+    assert_eq!(
+        directives(source, Some(Language::Shell))
+            .first()
+            .map(|directive| directive.scope),
+        Some(Scope::ShellFile)
+    );
+}
+
+fn shell_diagnostic(rule: RuleId, line: usize) -> Diagnostic {
+    Diagnostic {
+        path: "script.sh".to_owned(),
+        relative_path: "script.sh".to_owned(),
+        absolute_path: PathBuf::from("/repo/script.sh"),
+        ..diagnostic(rule, line)
+    }
 }
 
 #[test]

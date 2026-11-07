@@ -30,6 +30,7 @@ pub enum Scope {
     NextLine,
     File,
     ShellStatement,
+    ShellFile,
     GoNolint,
     SquawkLines,
     SquawkFile,
@@ -92,7 +93,7 @@ impl Directive {
             return self.covers_position(diagnostic, first_column, last_column);
         }
         let in_scope = match self.scope {
-            Scope::File | Scope::SquawkFile => true,
+            Scope::File | Scope::SquawkFile | Scope::ShellFile => true,
             Scope::NextLine => self.covered_line == Some(diagnostic.line),
             Scope::GoNolint if !diagnostic.path.ends_with(GO_EXTENSION) => false,
             Scope::ShellStatement | Scope::GoNolint | Scope::SquawkLines | Scope::EslintRange { .. } => self
@@ -104,7 +105,8 @@ impl Directive {
             && ((matches!(self.scope, Scope::GoNolint | Scope::SquawkFile) && self.codes.is_empty())
                 || self.codes.iter().any(|code| {
                     diagnostic.rule.as_str().eq_ignore_ascii_case(code)
-                        || (self.scope == Scope::ShellStatement && shell::disables(code, diagnostic.rule))
+                        || (matches!(self.scope, Scope::ShellStatement | Scope::ShellFile)
+                            && shell::disables(code, diagnostic.rule))
                         || (self.scope == Scope::GoNolint && go_linter_covers(code, diagnostic.rule))
                 }))
     }
@@ -127,7 +129,7 @@ impl Directive {
 
     const fn with_shell_coverage(mut self, coverage: Option<Coverage>) -> Self {
         match coverage {
-            Some(Coverage::File) => self.scope = Scope::File,
+            Some(Coverage::File) => self.scope = Scope::ShellFile,
             Some(Coverage::Lines(first, last)) => {
                 self.covered_line = Some(first);
                 self.last_covered_line = Some(last);

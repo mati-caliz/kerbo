@@ -2,9 +2,10 @@ use tree_sitter::Node;
 
 use crate::rules::ShellRule;
 use crate::shell::context::{Context, Findings};
+use crate::shell::dialect::Dialect;
 use crate::shell::syntax::{
-    ARITHMETIC_EXPANSION, ARITHMETIC_FOR, ASSIGNMENT, BINARY, EXPANSIONS, NAME_FIELD, PARENTHESIZED, POSTFIX,
-    SUBSCRIPT, TERNARY, UNARY, is_arithmetic_command,
+    ARITHMETIC_EXPANSION, ARITHMETIC_FOR, ASSIGNMENT, BINARY, EXPANSIONS, NAME_FIELD, NUMBER, PARENTHESIZED,
+    POSTFIX, SUBSCRIPT, TERNARY, UNARY, is_arithmetic_command,
 };
 use crate::shell::words::braced_content;
 
@@ -12,8 +13,10 @@ const EXCEPTION_CHARACTERS: &[char] = &[
     '/', '.', ':', '#', '%', '?', '*', '@', '$', '-', '!', '+', '=', '^', ',',
 ];
 const EXPRESSION_KINDS: &[&str] = &[BINARY, UNARY, POSTFIX, PARENTHESIZED, TERNARY];
+const DECIMAL_POINT: char = '.';
 
 pub fn check(node: Node<'_>, context: &Context<'_, '_>, findings: &mut Findings) {
+    check_decimal(node, context, findings);
     if !EXPANSIONS.contains(&node.kind()) || !is_arithmetic_operand(node, context) {
         return;
     }
@@ -23,6 +26,22 @@ pub fn check(node: Node<'_>, context: &Context<'_, '_>, findings: &mut Findings)
         || braced.starts_with(|first: char| first.is_ascii_digit());
     if !exempt {
         findings.report(ShellRule::Sc2004, node, context.text(node));
+    }
+}
+
+// SC2079: `checkForDecimals`. El índice de `a[1.2]=x` lo mira la regla de asignaciones.
+fn check_decimal(node: Node<'_>, context: &Context<'_, '_>, findings: &mut Findings) {
+    let literal = context.text(node);
+    let is_decimal =
+        literal.starts_with(|first: char| first.is_ascii_digit()) && literal.contains(DECIMAL_POINT);
+    if node.kind() == NUMBER
+        && node.named_child_count() == 0
+        && is_decimal
+        && context.dialect != Dialect::Ksh
+        && node.parent().is_some_and(|parent| parent.kind() != SUBSCRIPT)
+        && is_arithmetic_operand(node, context)
+    {
+        findings.report(ShellRule::Sc2079, node, literal);
     }
 }
 

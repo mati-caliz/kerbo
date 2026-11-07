@@ -22,7 +22,13 @@ const OPERAND_KINDS: &[&str] = &[
 ];
 const AND_OPERATORS: &[&str] = &["&&", "-a"];
 const OR_OPERATORS: &[&str] = &["||", "-o"];
-const FLAGLESS_BINARY: &[&str] = &["==", "!=", "<=", ">=", "=~", ">", "<", "="];
+const FLAGLESS_BINARY: &[&str] = &[
+    "==", "!=", "<=", ">=", "=~", ">", "<", "=", "\\<=", "\\>=", "\\>", "\\<",
+];
+const QUOTED_LESS: &str = "'<'";
+const QUOTED_GREATER: &str = "'>'";
+const ESCAPED_LESS: &str = "\\<";
+const ESCAPED_GREATER: &str = "\\>";
 const OPEN_GROUP: &[&str] = &["(", "\\("];
 const CLOSE_GROUP: &[&str] = &[")", "\\)"];
 const NEGATION: &str = "!";
@@ -143,11 +149,20 @@ impl<'tree> Reader<'tree, '_> {
     }
 
     fn is_binary_operator(&self) -> bool {
-        let operator = self.peek_text();
+        let operator = self.peek().map_or("", |token| operator_text(token, self.source));
         (is_flag_operator(operator)
             && !AND_OPERATORS.contains(&operator)
             && !OR_OPERATORS.contains(&operator))
             || FLAGLESS_BINARY.contains(&operator)
+    }
+}
+
+// ShellCheck lee `'<'` como `\<`: el operador entre comillas es el escapado.
+pub fn operator_text<'source>(operator: Node<'_>, source: &'source [u8]) -> &'source str {
+    match text(operator, source) {
+        QUOTED_LESS => ESCAPED_LESS,
+        QUOTED_GREATER => ESCAPED_GREATER,
+        written => written,
     }
 }
 

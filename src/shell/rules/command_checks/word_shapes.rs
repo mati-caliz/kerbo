@@ -11,6 +11,8 @@ const GLOB_CHARACTERS: &[u8] = b"*?";
 const OPEN_CLASS: u8 = b'[';
 const CLOSE_CLASS: u8 = b']';
 const ESCAPE: u8 = b'\\';
+// ShellCheck no lee como clase un `[...]` con una expansión o llaves adentro: `[$a]`, `[${a}]`.
+const CLASS_BREAKERS: &[u8] = b"{}$`";
 const EXTGLOB_STARTS: &[&str] = &["?(", "*(", "+(", "@(", "!("];
 const INDIRECTION: &str = "!";
 const SPLITTING_KINDS: &[&str] = &[SIMPLE_EXPANSION, EXPANSION, "command_substitution"];
@@ -38,12 +40,29 @@ fn unquoted_text(word: Node<'_>, source: &[u8]) -> Vec<u8> {
     joined
 }
 
-// `isGlob` de ShellCheck: un `*`, `?`, una clase `[...]` o un extglob sin comillas.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ClassReading {
+    SplitRange,
+    WholeClass,
+}
+
+// `isGlob` de ShellCheck: un `*`, `?`, una clase `[...]` o un extglob sin comillas. La clase puede
+// estar partida por una expansión (`foo[x${i}y]`), como en su `hasSplitRange`.
 pub fn is_glob(word: Node<'_>, source: &[u8]) -> bool {
+    scans_as_glob(word, source, ClassReading::SplitRange)
+}
+
+// El `T_Glob` de `willSplit`: una clase sólo cuenta si nada la corta.
+pub fn has_glob_part(word: Node<'_>, source: &[u8]) -> bool {
+    scans_as_glob(word, source, ClassReading::WholeClass)
+}
+
+fn scans_as_glob(word: Node<'_>, source: &[u8], reading: ClassReading) -> bool {
     if QUOTED_KINDS.contains(&word.kind()) {
         return false;
     }
     let unquoted = unquoted_text(word, source);
+    let written = source.get(word.byte_range()).unwrap_or_default();
     let mut index = 0;
     let mut open_class = false;
     while let Some(byte) = unquoted.get(index) {
@@ -54,7 +73,13 @@ pub fn is_glob(word: Node<'_>, source: &[u8]) -> bool {
         if GLOB_CHARACTERS.contains(byte) {
             return true;
         }
-        if *byte == OPEN_CLASS {
+        let breaks_the_class = reading == ClassReading::WholeClass
+            && written
+                .get(index)
+                .is_some_and(|written_byte| CLASS_BREAKERS.contains(written_byte));
+        if breaks_the_class {
+            open_class = false;
+        } else if *byte == OPEN_CLASS {
             open_class = true;
         } else if *byte == CLOSE_CLASS && open_class {
             return true;

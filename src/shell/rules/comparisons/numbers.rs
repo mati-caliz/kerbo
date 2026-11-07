@@ -6,6 +6,7 @@ use crate::shell::context::{Context, Findings};
 use crate::shell::dialect::Dialect;
 use crate::shell::parameters::is_variable_name;
 use crate::shell::syntax::text;
+use crate::shell::test_expression::operator_text;
 use crate::shell::variables::{EventKind, flow};
 use crate::shell::word_pieces::{
     Piece, PieceKind, flattened, only_literal_text, pieces, simplified_text, simplified_text_is_number,
@@ -36,7 +37,7 @@ pub fn check(
     findings: &mut Findings,
 ) {
     let source = context.source;
-    let operator = text(comparison.operator, source);
+    let operator = operator_text(comparison.operator, source);
     let left = pieces(comparison.left, source);
     let right = pieces(comparison.right, source);
     let has_string_comparison = context.dialect != Dialect::Sh;

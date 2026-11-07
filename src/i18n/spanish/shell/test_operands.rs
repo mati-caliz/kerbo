@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::ShellRule;
 
 // Chequeos de Analytics.hs de ShellCheck sobre los operandos de [ ] y [[ ]].
-pub const TEST_OPERANDS_TEXTS: [(ShellRule, RuleText); 22] = [
+pub const TEST_OPERANDS_TEXTS: [(ShellRule, RuleText); 23] = [
     (
         ShellRule::Sc2050,
         RuleText::new(
@@ -199,6 +199,15 @@ pub const TEST_OPERANDS_TEXTS: [(ShellRule, RuleText); 22] = [
             "compará los valores directamente",
             "Los shells que lo necesitaban ya no existen hace décadas.",
             "[ x$a = xb ] se vuelve [ \"$a\" = b ].",
+        ),
+    ),
+    (
+        ShellRule::Sc2075,
+        RuleText::new(
+            "\\< o \\> escapado en [[ ]] (SC2075 de ShellCheck)",
+            "sacá la barra",
+            "[[ ]] compara con < y > tal cual; la forma escapada sólo va en [ ].",
+            "[[ a \\< b ]] se vuelve [[ a < b ]].",
         ),
     ),
 ];

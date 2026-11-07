@@ -5,9 +5,9 @@ use tree_sitter::Node;
 use crate::shell::context::Context;
 use crate::shell::flow::{integer_assignments, numeric_expansions};
 use crate::shell::syntax::{
-    ASSIGNMENT, EXPANSIONS, STRING, TEST, VALUE_FIELD, WORD, descendants, named_children, text,
+    ASSIGNMENT, EXPANSIONS, STRING, TEST, VALUE_FIELD, WORD, descendants, named_children,
 };
-use crate::shell::test_expression::{Condition, parse};
+use crate::shell::test_expression::{Condition, operator_text, parse};
 use crate::shell::word_pieces::{pieces, unquoted_literal};
 
 use super::assignments::is_append;
@@ -68,7 +68,7 @@ fn ordering_operands<'tree>(test: Node<'tree>, source: &[u8], candidates: &mut V
     };
     condition.visit(true, &mut |part, _| {
         if let Condition::Binary(operator, left, right) = part
-            && ORDERING_OPERATORS.contains(&text(*operator, source))
+            && ORDERING_OPERATORS.contains(&operator_text(*operator, source))
         {
             candidates.extend([*left, *right].into_iter().filter_map(sole_expansion));
         }

@@ -1,6 +1,8 @@
 use tree_sitter::{Node, Point};
 
 const LINE_FEED: u8 = b'\n';
+const CARRIAGE_RETURN: u8 = b'\r';
+const BACKSLASH: u8 = b'\\';
 const SWALLOWED: &[char] = &[' ', '\t', '\n', '\r', '\\'];
 pub const PROGRAM: &str = "program";
 pub const COMMENT: &str = "comment";
@@ -101,10 +103,10 @@ pub fn token_text<'source>(node: Node<'_>, source: &'source [u8]) -> &'source st
 pub fn token_start(byte: usize, point: Point, source: &[u8]) -> (usize, Point) {
     let mut byte = byte;
     let mut point = point;
-    while let Some(&current) = source
-        .get(byte)
-        .filter(|current| SWALLOWED.contains(&char::from(**current)))
-    {
+    while let Some(&current) = source.get(byte).filter(|current| {
+        SWALLOWED.contains(&char::from(**current))
+            && (**current != BACKSLASH || continues_the_line(source, byte.saturating_add(1)))
+    }) {
         byte = byte.saturating_add(1);
         point = if current == LINE_FEED {
             Point {
@@ -119,6 +121,11 @@ pub fn token_start(byte: usize, point: Point, source: &[u8]) -> (usize, Point) {
         };
     }
     (byte, point)
+}
+
+fn continues_the_line(source: &[u8], after_backslash: usize) -> bool {
+    let rest = source.get(after_backslash..).unwrap_or_default();
+    rest.starts_with(&[LINE_FEED]) || rest.starts_with(&[CARRIAGE_RETURN, LINE_FEED])
 }
 
 pub fn children(node: Node<'_>) -> Vec<Node<'_>> {

@@ -1188,6 +1188,24 @@ acá.
   `Checks/Commands.hs` y `Checks/ShellSupport.hs`, salvo los que tree-sitter no deja ver (abajo).
   `pending_checks.py` no veía SC2251 porque se emite con `makeCommentWithFix`: para confirmar que no
   falta otro, se buscaron todos los códigos del fuente que kerbo no tiene.
+- Gramática propia de tree-sitter-bash (hecho, 2026-11-07): `grammars/tree-sitter-bash`, publicada como
+  `kerbo-tree-sitter-bash` igual que las de Go y Python, con las formas válidas que la de arriba dejaba con
+  error y hacían saltear el script entero (la lista está en su README). Entre otros, el `acme.sh`
+  principal ahora se analiza (272 de 274 avisos).
+  - `` `# nota` `` entre los argumentos de un comando se blanquea antes de parsear (tree-sitter se
+    tragaba la comilla de cierre), también al leer las directivas, que sin eso veían otro árbol.
+  - Con las comparaciones que ahora parsean: `'<'` y `'>'` se leen como `\<` y `\>`, como hace
+    ShellCheck (SC2050, SC2071), SC2075 (`\<` o `\>` en `[[ ]]`) es nueva, y SC2079 mira también los
+    números con punto adentro de `(( ))`. `token_start` salteaba cualquier `\` al principio de un
+    token y corría la columna de `\<`: ahora sólo la de una continuación de línea.
+  - SC2125 distingue `isGlob` de `willSplit`: `[${a}]` o `[$a]` en una asignación no es un glob para
+    ShellCheck, aunque `unset foo[x${i}y]` sí lo sea (su `hasSplitRange`).
+  - Una directiva de archivo con el código sin `SC` (`# shellcheck disable=2046`) no silenciaba nada:
+    al pasar a cubrir el archivo dejaba de leer los códigos como ShellCheck.
+  - Paridad contra ShellCheck 0.11.0 en el corpus: sin directivas 4.240 avisos idénticos, faltan 163
+    (eran 245) y sobran 2; con directivas 2.348 idénticos y sobran 89 (los 87 SC2016 de `nvm.sh` ya
+    anotados y los 2 de `acme.sh` de abajo). Quedan como fixture en `src/shell/fixtures/grammar_forms.sh`,
+    con un test que compara todos los códigos, y como pruebas en `scripts/parity/shell/testdata/grammar`.
 - Pendientes de Shell contra ShellCheck:
   - Los demás avisos del parser de ShellCheck (SC1xxx, unos 120): casi todos son errores de sintaxis, y
     en esos archivos kerbo no analiza nada. En el corpus aparecen SC1071 (4), SC1073, SC1072, SC1083 (2
@@ -1202,11 +1220,7 @@ acá.
   - SC2314 y SC2315 (`!` en una prueba de bats): tree-sitter no reconoce `@test` como bloque, igual que
     en SC2030 y SC2031.
   - `$(var[i])` y `var[i]` como comando: tree-sitter da un error y el archivo se saltea (falta SC2211).
-  - `case x in a) b ;& esac` con `esac` en la misma línea y `${ cmd; }`: tree-sitter da un error y el
-    archivo se saltea (falta SC2127 ahí; con `esac` en su línea sale bien).
-  - SC2075 y lo que usa `\<`, `\>` o `\>=`: tree-sitter da un error adentro de `[ ]` y `[[ ]]` y el
-    archivo se saltea, así que la regla no llegaría a correr (faltan SC2071, SC2122 y SC2073 en esos
-    casos). Es la misma familia de `[ a '<' b ]`.
+  - `${ cmd; }` como argumento (`echo ${ date; }`) todavía da error y el archivo se saltea.
   - `$((i++))` en un heredoc es para tree-sitter una sustitución con un subshell adentro: falta SC2257
     ahí. `a=([a]=b, [c]=d)`: la coma rompe el índice siguiente (falta un SC2154 y sobra un SC2034).
   - Una línea que empieza con algo como `2f` después de `$foo = $bar`: tree-sitter pega al comando de
@@ -1219,11 +1233,10 @@ acá.
     `@test`).
   - Los `${…}` mal formados (SC2082, SC2296 a SC2301) quedaron afuera: tree-sitter da nodos de error
     y el archivo se saltea entero, así que la regla no llegaría a correr. Tendría que leerlos un
-    pase sobre el texto, antes de decidir saltear. También SC2079 en `((3.14*c))`, SC2255 en
-    `[ var[x] -eq 2 ]` y SC2327 en `${ cmd > f; }`, por lo mismo.
+    pase sobre el texto, antes de decidir saltear. También SC2255 en `[ var[x] -eq 2 ]` y SC2327 en
+    `${ cmd > f; }`, por lo mismo.
   - `[[ ~/a == /b ]]`: tree-sitter lee `~` como un operador unario y no se ve la palabra (falta un
-    SC2193). `[ a '<' b ]`: el operador entre comillas no se reconoce y la condición no se analiza
-    (falta un SC2050). `A=ls --sort=$x` seguido de otra asignación en la línea siguiente se lee como
+    SC2193). `A=ls --sort=$x` seguido de otra asignación en la línea siguiente se lee como
     un solo comando (falta SC2037).
   - Dos avisos sin explicar: SC2327 y SC2328 en la línea 766 de `kubernetes/test/cmd/core.sh`; la
     misma línea suelta en un script aparte sí avisa.
@@ -1241,8 +1254,13 @@ acá.
     directivas). Un archivo con errores de parseo que kerbo no saltea, a revisar.
   - `${x:=valor}` asigna `x` para el flujo de ShellCheck (después no hay SC2086 sobre `x`); el
     seguimiento de valores de SC2086 (`shell/flow/`) no lo modela todavía.
-  - 55 archivos del corpus (260 avisos de ShellCheck, 375 sin directivas) quedan afuera porque
-    tree-sitter-bash no los parsea o se traga líneas; entre ellos el `acme.sh` principal.
+  - 21 archivos del corpus no tienen ningún aviso de kerbo (149 avisos de ShellCheck sin directivas)
+    porque tree-sitter-bash no los parsea o se traga líneas: `git-completion.bash` de ohmyzsh (80),
+    `neofetch` (20) y los `.integration-*` de moby, entre otros.
+  - En `_hmac` de `acme.sh`, `(… "$(printf "%s" "$x" | _h2b)") | cut -d = -f 2 | tr -d ' '` seguido de
+    `else` y otra línea parecida: tree-sitter (también el de arriba) pega `else` y la línea siguiente como
+    argumentos de `tr`, sin marcar error. Sobran un SC2020 y un SC2086. Recortando cualquier parte de las
+    dos líneas parsea bien, así que es una elección del GLR y no una forma que falte.
   - Sin directivas faltan 5 avisos: 3 SC2034 en `dnsapi/dns_ali.sh`, `deploy/ali_cdn.sh` y
     `deploy/ali_dcdn.sh` de acme.sh (el `$` suelto que la reparación no alcanza, y el archivo se
     saltea), y 2 SC2086 en `nvm.sh` (líneas 5037 y 5202, `EXIT_CODE=$?; return $EXIT_CODE`) sin

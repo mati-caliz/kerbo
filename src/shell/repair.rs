@@ -16,6 +16,9 @@ const CLOSE_PARENTHESIS: u8 = b')';
 const OPEN_BRACE: u8 = b'{';
 const CLOSE_BRACE: u8 = b'}';
 const COMMENT: u8 = b'#';
+const BACKTICK: u8 = b'`';
+const SPACE: u8 = b' ';
+const TAB: u8 = b'\t';
 const LINE_FEED: u8 = b'\n';
 const UNDERSCORE: u8 = b'_';
 const WORD_ENDS: &[u8] = b";|&()<>";
@@ -38,10 +41,19 @@ pub struct Repaired {
 pub fn has_dangling_dollar(root: Node<'_>, source: &[u8]) -> bool {
     descendants(root).into_iter().any(|node| {
         node.kind() == CONCATENATION
-            && children(node)
-                .last()
-                .is_some_and(|last| !last.is_named() && text(*last, source).trim() == DANGLING_DOLLAR)
+            && children(node).last().is_some_and(|last| {
+                !last.is_named()
+                    && text(*last, source).trim() == DANGLING_DOLLAR
+                    && !closes_the_word(source, last.end_byte())
+            })
     })
+}
+
+// `grep 404$;` termina en un `$` de verdad: lo que queda colgado es un `$` pegado a algo que el árbol no leyó.
+fn closes_the_word(source: &[u8], end: usize) -> bool {
+    source
+        .get(end)
+        .is_none_or(|next| next.is_ascii_whitespace() || WORD_ENDS.contains(next))
 }
 
 pub fn has_swallowed_lines(root: Node<'_>) -> bool {
@@ -52,6 +64,59 @@ pub fn has_swallowed_lines(root: Node<'_>) -> bool {
                 .skip_while(|child| child.kind() != COMMENT_KIND)
                 .any(|child| child.is_named() && child.kind() != COMMENT_KIND)
     })
+}
+
+// `cmd arg `# nota` otro`: una sustitución que sólo tiene un comentario, la forma común de comentar los
+// argumentos de un comando. tree-sitter lee el comentario hasta el final de la línea y se traga la comilla que
+// cierra, así que se blanquea antes de parsear; las posiciones no cambian.
+pub fn blank_backtick_comments(source: &[u8]) -> Option<Vec<u8>> {
+    let mut blanked: Option<Vec<u8>> = None;
+    let mut index = 0;
+    while let Some(offset) = source
+        .get(index..)
+        .and_then(|rest| rest.iter().position(|byte| *byte == BACKTICK))
+    {
+        let opening = index.saturating_add(offset);
+        let Some(closing) = backtick_comment_end(source, opening) else {
+            index = opening.saturating_add(1);
+            continue;
+        };
+        let target = blanked.get_or_insert_with(|| source.to_vec());
+        if let Some(comment) = target.get_mut(opening..=closing) {
+            comment.fill(SPACE);
+        }
+        index = closing.saturating_add(1);
+    }
+    blanked
+}
+
+fn backtick_comment_end(source: &[u8], opening: usize) -> Option<usize> {
+    let follows_space = opening
+        .checked_sub(1)
+        .and_then(|before| source.get(before))
+        .is_some_and(u8::is_ascii_whitespace);
+    if !follows_space {
+        return None;
+    }
+    let after = source.get(opening.saturating_add(1)..)?;
+    let spaces = after
+        .iter()
+        .take_while(|byte| matches!(**byte, SPACE | TAB))
+        .count();
+    if after.get(spaces) != Some(&COMMENT) {
+        return None;
+    }
+    let length = after
+        .iter()
+        .position(|byte| matches!(*byte, BACKTICK | LINE_FEED))?;
+    if after.get(length) != Some(&BACKTICK) {
+        return None;
+    }
+    let closing = opening.saturating_add(1).saturating_add(length);
+    source
+        .get(closing.saturating_add(1))
+        .is_none_or(u8::is_ascii_whitespace)
+        .then_some(closing)
 }
 
 pub fn brace_mid_word_expansions(source: &[u8]) -> Repaired {
@@ -314,3 +379,6 @@ pub fn point_of(source: &[u8], byte: usize) -> Point {
         column: byte.saturating_sub(line_start),
     }
 }
+
+#[cfg(test)]
+mod tests;

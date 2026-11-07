@@ -167,7 +167,7 @@ jobs:
             exit 0
           fi
           rustup toolchain install "${RUSTUP_TOOLCHAIN}" --profile minimal
-          for grammar in go python; do
+          for grammar in bash go python; do
             grammar_manifest="grammars/tree-sitter-${grammar}/Cargo.toml"
             grammar_version="$(sed -n 's/^version = "\(.*\)"$/\1/p' "${grammar_manifest}" | head -1)"
             if ! curl -fsS -A "kerbo-release" \
