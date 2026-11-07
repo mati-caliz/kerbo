@@ -696,7 +696,7 @@ cerrarse se borra de acá.
     analizar los bindings, kerbo avisa al recorrer el árbol y arma el arreglo al final, cuando el
     modelo ya tiene todas las referencias.
   - Con eso no quedan arreglos de ruff pendientes en el corpus (medido el 2026-10-26 con
-    `../kerbo-parity/scripts/pending_by_frequency.txt`); PLW1510 no va (el arreglo de ruff es sólo
+    `.parity/scripts/pending_by_frequency.txt`); PLW1510 no va (el arreglo de ruff es sólo
     para mostrar).
   - `noqa` no pasa por el registro de supresiones de `src/suppressions.rs`: lo silenciado no aparece
     como suprimido con su motivo.
@@ -905,7 +905,7 @@ cerrarse se borra de acá.
     más. A propósito, `no-unused-vars` y `@typescript-eslint/no-unused-vars` son la misma regla para
     kerbo: un `eslint-disable-next-line no-unused-vars` la silencia aunque el repo use la de
     typescript-eslint (ESLint no; son 16 avisos en tests de react, que usa la del núcleo).
-  - El arnés quedó en `../kerbo-parity/eslint/` (config con todo `recommended` de los dos limitado a
+  - El arnés quedó en `.parity/eslint/` (config con todo `recommended` de los dos limitado a
     las reglas de kerbo, `INLINE=1` para leer los comentarios, y `compare.py`).
 - 19 reglas más de `recommended` (hecho, 2026-11-06), en `src/lint/ecmascript/core_recommended.rs` y
   `typescript_recommended.rs`: `for-direction`, `no-delete-var`, `no-dupe-args`,
@@ -920,7 +920,7 @@ cerrarse se borra de acá.
     reglas no aparecen: ni ESLint ni kerbo avisan.
   - El arnés pasó al repo: `scripts/parity/ecmascript/fixture.py` (salida de ESLint de un fixture) y
     `corpus.sh` (ESLint con las reglas pedidas contra kerbo). `next.js` ya no está en
-    `kerbo-parity/corpus`, y se reemplazó por juice-shop.
+    `.parity/corpus`, y se reemplazó por juice-shop.
   - Pendientes: `no-obj-calls` no sigue los alias (`const m = Math; m()`) y `for-direction` sólo lee
     literales como paso (ESLint también constantes con `getStaticValue`). ESLint arregla
     `no-extra-non-null-assertion` y `prefer-namespace-keyword`, y kerbo todavía no.
@@ -1018,7 +1018,7 @@ cerrarse se borra de acá.
   - El arnés de shell volvió al repo (`scripts/parity/shell/`): clonar el corpus, correr ShellCheck
     con y sin directivas, kerbo en release,
     comparar, probes con fixtures y `register.py` para sumar reglas. El corpus vive en
-    `kerbo-parity/shell-corpus` y el fuente de ShellCheck en `kerbo-parity/shellcheck-src`.
+    `.parity/shell-corpus` y el fuente de ShellCheck en `.parity/shellcheck-src`.
 - Los chequeos de comandos de ShellCheck (hecho, 2026-10-30): 55 reglas de `Checks/Commands.hs` en
   `src/shell/rules/command_checks/`: `tr` (SC2018 a SC2021, SC2060), `grep` (SC2022, SC2062,
   SC2063), `expr` (SC2003, SC2304 a SC2308), `find` (SC2061, SC2146, SC2150, SC2156, SC2185,
@@ -1743,9 +1743,9 @@ Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_check
 kerbo reimplementa las reglas, así que no se actualiza solo: cada familia está medida contra una
 versión fija y lo que traiga una versión nueva hay que portarlo. Hoy las versiones están repartidas
 y desparejas: ShellCheck 0.11.0 repetido en cuatro scripts de `scripts/parity/shell/`,
-golangci-lint v2.15.0 en dos de `scripts/parity/go/`, ruff 0.17.1 en `kerbo-parity` pero 0.17.0 en
+golangci-lint v2.15.0 en dos de `scripts/parity/go/`, ruff 0.17.1 en `.parity` pero 0.17.0 en
 `scripts/agent-harness/run.py`, ESLint 10.13 y typescript-eslint 8.72 en
-`kerbo-parity/eslint/package.json`, Qodana sin versión fija (`:latest`), y las gramáticas de
+`.parity/eslint/package.json`, Qodana sin versión fija (`:latest`), y las gramáticas de
 tree-sitter copiadas en `grammars/`.
 
 - Un solo archivo de versiones de referencia (`scripts/parity/versions.toml`) del que lean todos

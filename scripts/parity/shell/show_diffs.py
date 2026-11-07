@@ -8,7 +8,7 @@ import re
 import sys
 
 here = os.path.dirname(os.path.abspath(__file__))
-corpus = os.environ.get('SHELL_CORPUS', os.path.join(here, '..', '..', '..', '..', 'kerbo-parity', 'shell-corpus'))
+corpus = os.environ.get('SHELL_CORPUS', os.path.join(here, '..', '..', '..', '.parity', 'shell-corpus'))
 DIRECTIVE = re.compile(rb'^[ \t]*#[ \t]*shellcheck[ \t]')
 arguments = sys.argv[1:]
 without_directives = '--no-directives' in arguments

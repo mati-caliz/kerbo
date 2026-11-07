@@ -3,7 +3,7 @@
 # Con --no-directives, antes borra las directivas `# shellcheck` de una copia del corpus.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-corpus="${SHELL_CORPUS:-$(cd "$here/../../../.." && pwd)/kerbo-parity/shell-corpus}"
+corpus="${SHELL_CORPUS:-$(cd "$here/../../.." \&\& pwd)/.parity/shell-corpus}"
 mkdir -p "$here/out"
 PYTHONIOENCODING=utf-8 python "$here/list_files.py" "$corpus" > "$here/out/files.txt"
 MSYS_NO_PATHCONV=1 docker run --rm -v "$(cd "$corpus" && pwd -W):/c:ro" -v "$(cd "$here/out" && pwd -W):/o" \

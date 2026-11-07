@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Compila kerbo en release y lo corre sobre un repo Java del corpus con un JDK real (el volumen jdk21)
 # y los jars indicados (admite comodines), sacados de la caché de Qodana de ese repo. Deja
-# kerbo-parity/qodana/<repo>/kerbo.json.
+# .parity/qodana/<repo>/kerbo.json.
 #
 #   scripts/parity/java/kerbo.sh junit4 hamcrest-core-1.3.jar
 #   scripts/parity/java/kerbo.sh commons-lang "opentest4j-*.jar apiguardian-api-*.jar junit-pioneer-*.jar #     jmh-core-*.jar commons-math3-*.jar commons-text-*.jar easymock-*.jar objenesis-3.4.jar #     junit-jupiter-params-*.jar junit-jupiter-api-*.jar junit-platform-commons-*.jar mockito-core-*.jar"
@@ -19,7 +19,7 @@ jars="$*"
 here="$(cd "$(dirname "$0")" && pwd)"
 crate="$(cd "$here/../../.." && pwd -W)"
 target="$(basename "$crate")"
-parity="$(cd "$here/../../../.." && pwd)/kerbo-parity"
+parity="$(cd "$here/../../.." \&\& pwd)/.parity"
 image="$(docker images --format '{{.Repository}}:{{.Tag}}' quality-rust | head -1)"
 mkdir -p "$parity/qodana/$repo_name"
 MSYS_NO_PATHCONV=1 docker run --rm -m "$MEMORY_LIMIT" --cpus="$CPUS" -v "$crate:/src:ro" -w /src \

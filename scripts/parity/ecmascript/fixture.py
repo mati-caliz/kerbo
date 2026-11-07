@@ -1,7 +1,7 @@
 """Corre ESLint sobre un fixture de src/lint/ecmascript/fixtures y escribe al lado su salida, como
 `línea:columna regla` y con las columnas en bytes, igual que los demás `.eslint`.
 
-Usa el ESLint y la configuración de kerbo-parity/eslint: sólo las reglas de `recommended` que kerbo
+Usa el ESLint y la configuración de .parity/eslint: sólo las reglas de `recommended` que kerbo
 tiene (kerbo_rules.txt, que se regenera de src/rules/families/eslint.rs).
 
 Los archivos `*_sloppy.js` se leen con el parser de ESLint en modo script: el de typescript-eslint rechaza
@@ -18,7 +18,7 @@ import sys
 here = os.path.dirname(os.path.abspath(__file__))
 repo = os.path.join(here, '..', '..', '..')
 fixtures = os.path.join(repo, 'src', 'lint', 'ecmascript', 'fixtures')
-eslint_dir = os.path.abspath(os.path.join(repo, '..', 'kerbo-parity', 'eslint'))
+eslint_dir = os.path.abspath(os.path.join(repo, '.parity', 'eslint'))
 scratch = os.path.join(eslint_dir, 'fixture')
 ERROR_MARK = 'FATAL'
 SLOPPY_SUFFIX = '_sloppy.js'

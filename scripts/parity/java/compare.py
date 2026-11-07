@@ -10,7 +10,7 @@ import json
 import pathlib
 import sys
 
-PARITY = pathlib.Path(__file__).resolve().parents[4] / "kerbo-parity" / "qodana"
+PARITY = pathlib.Path(__file__).resolve().parents[3] / ".parity" / "qodana"
 DEFAULT_RULES = ("RedundantThrows", "redundant-throws")
 SHOWN = 40
 

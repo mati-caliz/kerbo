@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Mide reglas de JS/TS contra ESLint en los repos de kerbo-parity/corpus. ESLint corre sólo con las
+# Mide reglas de JS/TS contra ESLint en los repos de .parity/corpus. ESLint corre sólo con las
 # reglas pedidas, así tarda menos, y kerbo en la imagen del gate. Deja out_rules.json y kerbo.json en
-# kerbo-parity/eslint y compara por archivo, línea, columna y regla.
+# .parity/eslint y compara por archivo, línea, columna y regla.
 # Uso: scripts/parity/ecmascript/corpus.sh no-octal,no-with [--skip-eslint]
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../.." && pwd -W)"
-parity="$(cd "$here/../../../.." && pwd)/kerbo-parity"
+parity="$(cd "$here/../../.." \&\& pwd)/.parity"
 rules="$1"
 readonly CORPUS_REPOS=(express zod react vscode juice-shop)
 cd "$parity/eslint"

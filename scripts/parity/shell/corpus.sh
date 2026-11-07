@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Clona (o deja como está) el corpus de shell de la paridad contra ShellCheck en
-# kerbo-parity/shell-corpus: kubernetes y moby sólo con sus carpetas de scripts, y los demás enteros.
+# .parity/shell-corpus: kubernetes y moby sólo con sus carpetas de scripts, y los demás enteros.
 set -euo pipefail
-corpus="${SHELL_CORPUS:-$(cd "$(dirname "$0")/../../../.." && pwd)/kerbo-parity/shell-corpus}"
+corpus="${SHELL_CORPUS:-$(cd "$(dirname "$0")/../../.." \&\& pwd)/.parity/shell-corpus}"
 mkdir -p "$corpus"
 clone() {
   local name="$1" url="$2"; shift 2

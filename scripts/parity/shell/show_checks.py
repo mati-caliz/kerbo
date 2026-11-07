@@ -5,7 +5,7 @@ import re
 import sys
 
 here = os.path.dirname(os.path.abspath(__file__))
-source_root = os.path.join(here, '..', '..', '..', '..', 'kerbo-parity', 'shellcheck-src', 'src', 'ShellCheck')
+source_root = os.path.join(here, '..', '..', '..', '.parity', 'shellcheck-src', 'src', 'ShellCheck')
 SKIPPED_BETWEEN_CLAUSES = ('--', 'prop_')
 for name in ('Analytics.hs', 'Checks/Commands.hs', 'Checks/ShellSupport.hs', 'ASTLib.hs', 'AnalyzerLib.hs', 'Data.hs'):
     lines = open(os.path.join(source_root, name), encoding='utf-8').read().split('\n')

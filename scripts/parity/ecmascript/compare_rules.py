@@ -1,4 +1,4 @@
-"""Compara las reglas pedidas entre out_rules.json (ESLint) y kerbo.json en kerbo-parity/eslint, por
+"""Compara las reglas pedidas entre out_rules.json (ESLint) y kerbo.json en .parity/eslint, por
 archivo, línea, columna y regla. Lo de ESLint en archivos que kerbo no analiza se cuenta aparte, y no se
 filtra por los archivos donde kerbo avisó: si no, lo que kerbo no ve quedaría escondido.
 
@@ -10,7 +10,7 @@ import pathlib
 import sys
 
 here = os.path.dirname(os.path.abspath(__file__))
-eslint_dir = pathlib.Path(here, '..', '..', '..', '..', 'kerbo-parity', 'eslint').resolve()
+eslint_dir = pathlib.Path(here, '..', '..', '..', '.parity', 'eslint').resolve()
 corpus = eslint_dir.parent / 'corpus'
 rules = sys.argv[1].split(',')
 limit = int(sys.argv[2]) if len(sys.argv) > 2 else 15

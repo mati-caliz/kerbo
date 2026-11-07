@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Corre una sola inspección de Qodana (RedundantThrows si no se dice otra) sobre una copia de un repo
-# del corpus, y deja el SARIF en kerbo-parity/qodana/<repo>/results-<inspección>. Trabaja en una copia
+# del corpus, y deja el SARIF en .parity/qodana/<repo>/results-<inspección>. Trabaja en una copia
 # porque Qodana escribe en la carpeta del proyecto.
 #
 #   scripts/parity/java/qodana.sh junit4 AutoCloseableResource
@@ -12,7 +12,7 @@ readonly MEMORY_LIMIT="8g"
 repo="$1"
 inspection="${2:-RedundantThrows}"
 scripts_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-parity="$(cd "${scripts_dir}/../../../../kerbo-parity" && pwd)"
+parity="$(cd "${scripts_dir}/../../../.parity" && pwd)"
 work="${parity}/qodana/${repo}"
 results="${work}/results-${inspection}"
 mkdir -p "${results}"

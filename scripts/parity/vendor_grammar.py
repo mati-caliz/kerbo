@@ -1,4 +1,4 @@
-"""Copia una gramática de kerbo-parity/grammar/ts-<nombre> a grammars/tree-sitter-<nombre> de kerbo,
+"""Copia una gramática de .parity/grammar/ts-<nombre> a grammars/tree-sitter-<nombre> de kerbo,
 con su Cargo.toml propio.
 
 Uso: python vendor_grammar.py python 0.25.0 "descripción"
@@ -9,7 +9,7 @@ import sys
 
 name, version, description = sys.argv[1:4]
 repository = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-parity = os.path.join(os.path.dirname(repository), "kerbo-parity")
+parity = os.path.join(repository, ".parity")
 source = os.path.join(parity, "grammar", f"ts-{name}")
 target = os.path.join(repository, "grammars", f"tree-sitter-{name}")
 os.makedirs(target, exist_ok=True)

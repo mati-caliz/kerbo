@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Mide las reglas de Python contra ruff en los diez repos de kerbo-parity/corpus: ruff.json y kerbo.json
+# Mide las reglas de Python contra ruff en los diez repos de .parity/corpus: ruff.json y kerbo.json
 # en out/, comparados por archivo, línea, columna y regla.
 # Uso: scripts/parity/python/corpus.sh [--skip-ruff] [--skip-kerbo] [reglas de compare.py...]
 set -euo pipefail
 unset MSYS_NO_PATHCONV
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../.." && pwd -W)"
-parity="$(cd "$here/../../../.." && pwd)/kerbo-parity"
+parity="$(cd "$here/../../.." \&\& pwd)/.parity"
 readonly CORPUS_PATHS=(requests fastapi flask django pydantic sqlalchemy ipython ansible sympy cpython/Lib)
 mkdir -p "$here/out"
 skip_ruff=""

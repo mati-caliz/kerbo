@@ -4,7 +4,7 @@ import os
 import re
 
 here = os.path.dirname(os.path.abspath(__file__))
-source_root = os.path.join(here, '..', '..', '..', '..', 'kerbo-parity', 'shellcheck-src', 'src', 'ShellCheck')
+source_root = os.path.join(here, '..', '..', '..', '.parity', 'shellcheck-src', 'src', 'ShellCheck')
 families = open(os.path.join(here, '..', '..', '..', 'src', 'rules', 'families', 'shell.rs'), encoding='utf-8').read()
 known = set(re.findall(r'"sc(\d+)"', families))
 EMIT = re.compile(r'\b(?:warn|err|info|style|warnWithFix|styleWithFix|errWithFix|infoWithFix|makeComment\s+\w+)\s+(?:\(?[\w.]+(?:\s+[\w.]+)*\)?\s+)?(\d{4})\b')

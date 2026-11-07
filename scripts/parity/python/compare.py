@@ -15,7 +15,7 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent.parent.parent
-CORPUS = REPO.parent / "kerbo-parity" / "corpus"
+CORPUS = REPO / ".parity" / "corpus"
 FAMILY_FILES = ("python.rs", "python_slots.rs")
 EXCLUDED_RULES = {"exe001", "exe002"}
 SHOWN_DIFFERENCES = 8

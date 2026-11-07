@@ -1,5 +1,5 @@
 """Escribe en testdata/<carpeta>/ un script por cada prop_<función> de ShellCheck (de su fuente en
-kerbo-parity/shellcheck-src). Las pruebas sin shebang van con el del dialecto por defecto.
+.parity/shellcheck-src). Las pruebas sin shebang van con el del dialecto por defecto.
 
 Uso: python extract_props.py checkBashisms bashisms
      python extract_props.py checkTr,checkExpr commands '#!/bin/bash'
@@ -10,7 +10,7 @@ import re
 import sys
 
 here = os.path.dirname(os.path.abspath(__file__))
-source_root = os.path.join(here, '..', '..', '..', '..', 'kerbo-parity', 'shellcheck-src', 'src', 'ShellCheck')
+source_root = os.path.join(here, '..', '..', '..', '.parity', 'shellcheck-src', 'src', 'ShellCheck')
 functions, folder = sys.argv[1].split(','), sys.argv[2]
 default_shebang = sys.argv[3] if len(sys.argv) > 3 else '#!/bin/sh'
 QUOTED = r'("(?:[^"\\]|\\.)*")'

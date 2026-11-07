@@ -8,7 +8,7 @@ import re
 import sys
 
 here = os.path.dirname(os.path.abspath(__file__))
-corpus = os.path.join(here, "..", "..", "..", "..", "kerbo-parity", "shell-corpus")
+corpus = os.path.join(here, "..", "..", "..", ".parity", "shell-corpus")
 families = open(os.path.join(here, "..", "..", "..", "src", "rules", "families", "shell.rs"), encoding="utf-8").read()
 known = set(re.findall(r'"(sc\d+)"', families))
 out = os.path.join(here, "out")
