@@ -1220,6 +1220,11 @@ cerrarse se borra de acá.
     sueltos; `scripts/parity/shell/grammar.sh` corre `tree-sitter generate`, `test` y `parse` (con
     `DEBUG=1`, la traza del lexer) en un contenedor de node, sin compilar kerbo.
   - Corpus sin directivas: 4.246 idénticos, faltan 135 y sobran 2 (los de `acme.sh`).
+- Los `${(flags)…}` de zsh (hecho, 2026-11-07): la gramática los lee (`zsh_flags`, con un nombre, un
+  subíndice o una expansión anidada, y el filtro `:#patrón`), y SC2296 avisa en el paréntesis como
+  ShellCheck. Entran `git-completion.bash` de ohmyzsh (81 de 82) y `_wd.sh`. `grammar.sh test` corre
+  el corpus de upstream desde `.parity/grammar/ts-bash/test` (100 de 100). Corpus sin directivas: 4.338
+  idénticos, faltan 47 y sobran 2.
 - Pendientes de Shell contra ShellCheck:
   - Los demás avisos del parser de ShellCheck (SC1xxx, unos 120): casi todos son errores de sintaxis, y
     en esos archivos kerbo no analiza nada. En el corpus aparecen SC1071 (4), SC1073, SC1072, SC1083 (2
@@ -1245,7 +1250,7 @@ cerrarse se borra de acá.
   - `@test` de bats: se asignan y leen `lines`, `status` y `output`, pero tree-sitter deja el cuerpo
     como comandos sueltos y no se abre el subshell de cada prueba (faltan SC2030 y SC2031 entre dos
     `@test`).
-  - Los `${…}` mal formados (SC2082, SC2296 a SC2301) quedaron afuera: tree-sitter da nodos de error
+  - Los `${…}` mal formados (SC2082, SC2296 salvo los flags de zsh, SC2297 a SC2301) quedaron afuera: tree-sitter da nodos de error
     y el archivo se saltea entero, así que la regla no llegaría a correr. Tendría que leerlos un
     pase sobre el texto, antes de decidir saltear. También SC2255 en `[ var[x] -eq 2 ]` y SC2327 en
     `${ cmd > f; }`, por lo mismo.
@@ -1268,12 +1273,11 @@ cerrarse se borra de acá.
     directivas). Un archivo con errores de parseo que kerbo no saltea, a revisar.
   - `${x:=valor}` asigna `x` para el flujo de ShellCheck (después no hay SC2086 sobre `x`); el
     seguimiento de valores de SC2086 (`shell/flow/`) no lo modela todavía.
-  - Lo que más falta en el corpus (135 sin directivas) son archivos que la gramática no lee:
-    `git-completion.bash` de ohmyzsh (80, por `${(M)${(k)parameters[@]}:#…}` de zsh en la línea 326),
-    `neofetch` (20, `"${disk_sub:+ ($disk_sub)}"`: un `(` adentro de `${x:+…}` entre comillas), `_wd.sh`
-    (9, `${(f)…}` de zsh), `dns_servercow.sh` (línea 16) y `windows_rdp.sh` (un heredoc con
-    `[Convert]::…('${x}')`). Los ali_cdn/ali_dcdn/dns_ali de acme.sh siguen con el `$` suelto.
-    `parse_errors.sh` los lista.
+  - Lo que más falta en el corpus (47 sin directivas) son archivos que la gramática no lee: `neofetch`
+    (20, `"${disk_sub:+ ($disk_sub)}"`: un `(` adentro de `${x:+…}` entre comillas), `dns_servercow.sh`
+    (línea 16) y `windows_rdp.sh` (un heredoc con `[Convert]::…('${x}')`). Los ali_cdn/ali_dcdn/dns_ali
+    de acme.sh siguen con el `$` suelto. Los demás `${…}` mal formados (SC2082, SC2297 a SC2301) siguen
+    sin leerse. `parse_errors.sh` los lista.
   - `set +e # x⏎: nvm.sh⏎\. ../../nvm.sh` (el test "nvm unload"): la línea con la barra se pega a
     `: nvm.sh` pero la reparación no la ve, sin explicar todavía. `update-vendor.sh` y `core.sh` de
     kubernetes aparecen en `parse_errors.sh` como comandos que se tragan una línea, también sin revisar.

@@ -17,6 +17,12 @@ fixtures = os.path.join(here, '..', '..', '..', 'src', 'shell', 'fixtures')
 families = open(os.path.join(here, '..', '..', '..', 'src', 'rules', 'families', 'shell.rs'), encoding='utf-8').read()
 known = set(re.findall(r'"sc(\d+)"', families))
 DIRECTIVE = re.compile(r'^\s*#\s*shellcheck\s')
+def shellcheck_image():
+    versions = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'versions.py')
+    return subprocess.run([sys.executable, versions, 'image', 'shellcheck'], capture_output=True, text=True,
+                          check=True).stdout.strip()
+
+
 name, prefix, shebang, sources = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:]
 script_path = os.path.join(fixtures, f'{name}.sh')
 if sources:
@@ -36,13 +42,6 @@ output = subprocess.run(
     capture_output=True, text=True, env=dict(os.environ, MSYS_NO_PATHCONV='1'),
 ).stdout
 lines = body.split('\n')
-
-
-
-def shellcheck_image():
-    versions = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'versions.py')
-    return subprocess.run([sys.executable, versions, 'image', 'shellcheck'], capture_output=True, text=True,
-                          check=True).stdout.strip()
 
 
 def selected(code):

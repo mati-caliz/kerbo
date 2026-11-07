@@ -53,3 +53,5 @@ echo "$body" "$list"
 set +e # nota
 \. ./lib.sh
 set -e
+unset ${(M)${(k)parameters[@]}:#__gitcomp_builtin_*} 2>/dev/null
+echo "${(%):-%x}"
