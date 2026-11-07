@@ -4,7 +4,7 @@ use std::collections::hash_map::Entry;
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
-use crate::syntax::named_children;
+use crate::syntax::{descendants, named_children};
 
 const TYPE_DECLARATIONS: &[&str] = &[
     "class_declaration",
@@ -19,6 +19,11 @@ const VARIABLE_OWNERS: &[&str] = &[
 ];
 const NAMED_VARIABLES: &[&str] = &["formal_parameter", "enhanced_for_statement", "resource"];
 const VARIABLE_DECLARATOR: &str = "variable_declarator";
+const METHODS: &[&str] = &[
+    "method_declaration",
+    "constructor_declaration",
+    "lambda_expression",
+];
 const CREATION: &str = "object_creation_expression";
 const CLASS_BODY: &str = "class_body";
 const PROGRAM: &str = "program";
@@ -83,6 +88,43 @@ pub fn variable_types(nodes: &[Node<'_>], source: &[u8]) -> Variables {
         declare(variable, written);
     }
     variables
+}
+
+// Los argumentos de tipo con que se declara una variable (`List<Fallo> fallos` da `Fallo`), mirando
+// primero el método que la usa y después la clase de nivel superior, como `variable_types`. Si se
+// declara con argumentos distintos, no se sabe.
+pub fn declared_arguments(usage: Node<'_>, name: &str, source: &[u8]) -> Option<Vec<String>> {
+    let method = ancestors(usage).find(|node| METHODS.contains(&node.kind()));
+    let top_level = ancestors(usage)
+        .filter(|node| TYPE_DECLARATIONS.contains(&node.kind()))
+        .last();
+    [method, top_level]
+        .into_iter()
+        .flatten()
+        .find_map(|scope| arguments_in(scope, name, source))
+        .filter(|arguments| !arguments.is_empty())
+}
+
+fn ancestors(node: Node<'_>) -> impl Iterator<Item = Node<'_>> {
+    std::iter::successors(node.parent(), Node::parent)
+}
+
+fn arguments_in(scope: Node<'_>, name: &str, source: &[u8]) -> Option<Vec<String>> {
+    let mut found: Option<Vec<String>> = None;
+    for (variable, written) in descendants(scope).into_iter().flat_map(declared_by) {
+        if text(variable, source) != name {
+            continue;
+        }
+        let arguments = written
+            .map(|node| type_arguments(node, source))
+            .unwrap_or_default();
+        match &found {
+            Some(known) if *known != arguments => return Some(Vec::new()),
+            Some(_) => {}
+            None => found = Some(arguments),
+        }
+    }
+    found
 }
 
 // Las variables que declara un nodo, con el tipo escrito si lo tiene.

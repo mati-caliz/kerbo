@@ -98,12 +98,14 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         let Some((first, rest)) = before.split_first() else {
             return match root {
                 CallRoot::Scope(enclosing) => self.scope_owner(summary, enclosing, last),
-                CallRoot::Type(written) => Some(vec![self.root_type(summary, written).class]),
+                CallRoot::Type(_) | CallRoot::Generic(..) => Some(vec![self.root_type(summary, root)?.class]),
             };
         };
         let mut signatures = match root {
             CallRoot::Scope(enclosing) => self.in_scope(summary, enclosing, first)?,
-            CallRoot::Type(written) => self.on_receivers(&[self.root_type(summary, written)], first)?,
+            CallRoot::Type(_) | CallRoot::Generic(..) => {
+                self.on_receivers(&[self.root_type(summary, root)?], first)?
+            }
         };
         for step in rest {
             signatures = self.on_receivers(&returned_by(&signatures)?, step)?;
@@ -142,7 +144,9 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         let (first, rest) = steps.split_first()?;
         let mut signatures = match root {
             CallRoot::Scope(enclosing) => self.in_scope(summary, enclosing, first)?,
-            CallRoot::Type(written) => self.on_receivers(&[self.root_type(summary, written)], first)?,
+            CallRoot::Type(_) | CallRoot::Generic(..) => {
+                self.on_receivers(&[self.root_type(summary, root)?], first)?
+            }
         };
         let mut thrown = all_thrown(&signatures);
         for step in rest {

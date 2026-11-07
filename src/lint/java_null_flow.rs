@@ -340,11 +340,26 @@ impl Analysis<'_, '_> {
                 self.expression(left, after)
             };
         }
+        // El receptor se usa antes que los argumentos: en `x.put(k, x.get(k))` el primer uso es `put`.
+        let receiver = node
+            .child_by_field_name(OBJECT_FIELD)
+            .filter(|_| kind == INVOCATION);
         let mut current = state;
-        for child in named_children(node) {
+        if let Some(object) = receiver {
+            current = self.expression(object, current);
+            current = self.dereference(node, current);
+        }
+        for child in named_children(node)
+            .into_iter()
+            .filter(|child| Some(child.id()) != receiver.map(|object| object.id()))
+        {
             current = self.expression(child, current);
         }
-        self.dereference(node, current)
+        if receiver.is_some() {
+            current
+        } else {
+            self.dereference(node, current)
+        }
     }
 
     fn dereference(&mut self, node: Node<'_>, mut state: State) -> State {

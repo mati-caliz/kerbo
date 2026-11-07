@@ -10,6 +10,7 @@ const ORIGIN_CALL: u64 = 4;
 const ORIGIN_RETHROWN: u64 = 5;
 const ROOT_SCOPE: u64 = 0;
 const ROOT_TYPE: u64 = 1;
+const ROOT_GENERIC: u64 = 2;
 
 pub fn write_method_throws(writer: &mut Writer, method: &MethodThrows) {
     writer.size(method.line);
@@ -120,6 +121,11 @@ fn write_root(writer: &mut Writer, root: &CallRoot) {
             writer.number(ROOT_TYPE);
             writer.text(name);
         }
+        CallRoot::Generic(name, arguments) => {
+            writer.number(ROOT_GENERIC);
+            writer.text(name);
+            writer.list(arguments, |writer, argument| writer.text(argument));
+        }
     }
 }
 
@@ -127,6 +133,7 @@ fn read_root(reader: &mut Reader<'_>) -> Result<CallRoot, Corrupt> {
     match reader.number()? {
         ROOT_SCOPE => Ok(CallRoot::Scope(reader.list(Reader::text)?)),
         ROOT_TYPE => Ok(CallRoot::Type(reader.text()?)),
+        ROOT_GENERIC => Ok(CallRoot::Generic(reader.text()?, reader.list(Reader::text)?)),
         _ => Err(Corrupt),
     }
 }

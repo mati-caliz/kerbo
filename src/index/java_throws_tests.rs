@@ -180,6 +180,7 @@ import static app.Holder.OPENER;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.List;
 
 class Holder {
     static final Opener OPENER = new Opener();
@@ -204,9 +205,45 @@ class User {
         OPENER.toString();
     }
 }
+
+class Generic {
+    void viaVariable(List<FileInputStream> opened) throws IOException {
+        opened.get(0).close();
+    }
+
+    void raw(List opened) throws IOException {
+        opened.get(0).close();
+    }
+
+    List<FileInputStream> all() {
+        return null;
+    }
+
+    void viaMethod() throws IOException {
+        all().get(0).close();
+    }
+
+    void notThrown() throws IOException {
+        all().get(0).hashCode();
+    }
+}
+
+class Wrapper extends FileInputStream {
+    Wrapper() throws IOException {
+        super("a");
+    }
+
+    void closes() throws IOException {
+        super.close();
+    }
+
+    void hashes() throws IOException {
+        super.hashCode();
+    }
+}
 "#;
 
-fn fixture_jdk() -> Option<Jdk> {
+pub(super) fn fixture_jdk() -> Option<Jdk> {
     Jdk::at(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("src/jvm/fixtures/jdk"),
         Some(JAVA_17),
@@ -255,9 +292,12 @@ fn a_throws_nothing_can_reach_is_reported_and_anything_unknown_keeps_quiet() {
 }
 
 #[test]
-fn a_constant_is_followed_by_its_type_whether_imported_or_qualified() {
+fn constants_generics_and_super_are_followed_by_their_types() {
     let library = Library::load(&[]).with_jdk(fixture_jdk());
-    assert_eq!(redundant_in(CONSTANTS, &library), ["27:25 IOException"]);
+    assert_eq!(
+        redundant_in(CONSTANTS, &library),
+        ["28:25 IOException", "50:29 IOException", "64:26 IOException"]
+    );
 }
 
 #[test]

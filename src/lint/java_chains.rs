@@ -24,6 +24,8 @@ const IS_NOT_NULL: &str = "isNotNull";
 const NON_NULL_CHECKS: &[&str] = &["assertNotNull", "requireNonNull", "notNull"];
 const PARENTHESIZED: &str = "parenthesized_expression";
 const CLASS_LITERAL: &str = "class_literal";
+const STRING_LITERAL: &str = "string_literal";
+const QUOTE: char = '"';
 const RETURN: &str = "return_statement";
 const LAMBDA: &str = "lambda_expression";
 const METHOD: &str = "method_declaration";
@@ -50,6 +52,7 @@ pub struct ChainStep {
     pub column: usize,
     pub checked: bool,
     pub class_arguments: Vec<usize>,
+    pub text_arguments: Vec<String>,
 }
 
 // `respuesta.getBody().error()`: la raíz y los pasos en orden. Interesan las de al menos dos pasos,
@@ -209,6 +212,7 @@ fn walk(
             column: one_based(start.column),
             checked: facts.is_checked(current, source),
             class_arguments: class_arguments(current),
+            text_arguments: text_arguments(current, source),
         });
         let Some(object) = current.child_by_field_name(OBJECT_FIELD) else {
             steps.reverse();
@@ -255,6 +259,18 @@ fn class_arguments(invocation: Node<'_>) -> Vec<usize> {
         .enumerate()
         .filter(|(_, argument)| argument.kind() == CLASS_LITERAL)
         .map(|(position, _)| position)
+        .collect()
+}
+
+// Lo que dicen los argumentos que son un texto literal (`System.getProperty("java.version")`).
+fn text_arguments(invocation: Node<'_>, source: &[u8]) -> Vec<String> {
+    invocation
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|argument| argument.kind() == STRING_LITERAL)
+        .map(|literal| text(literal, source).trim_matches(QUOTE).to_owned())
         .collect()
 }
 

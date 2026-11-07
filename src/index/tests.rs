@@ -3,6 +3,7 @@ use std::path::Path;
 use tree_sitter::Parser;
 
 use super::java::{JavaSummary, summarize};
+use super::java_throws_tests::fixture_jdk;
 use super::{IndexedSummary, project_lints};
 use crate::jvm::library::Library;
 use crate::language::Language;
@@ -95,18 +96,34 @@ const JOBS: &str = "package app;\n\nimport java.io.InputStream;\nimport java.uti
 
 #[test]
 fn a_resource_created_outside_try_with_resources_is_reported() {
+    assert_eq!(
+        unclosed(&Library::load(&[])),
+        ["9:42 ExecutorService", "33:16 InputStream"]
+    );
+}
+
+// Con el JDK manda su jerarquía: en Java 17 `ExecutorService` todavía no es `AutoCloseable` (el
+// fixture ni lo trae), e `InputStream` sí, por `Closeable`.
+#[test]
+fn with_the_jdk_a_resource_is_whatever_inherits_from_auto_closeable() {
+    assert_eq!(
+        unclosed(&Library::load(&[]).with_jdk(fixture_jdk())),
+        ["33:16 InputStream"]
+    );
+}
+
+fn unclosed(library: &Library) -> Vec<String> {
     let summary = summary_of(JOBS);
     let files = [IndexedSummary {
         summary: &summary,
         in_tests: false,
     }];
-    let found: Vec<String> = project_lints(&files, &Library::load(&[]))
+    project_lints(&files, library)
         .into_iter()
         .flatten()
         .filter(|finding| finding.kind.rule().as_str() == "auto-closeable-resource")
         .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
-        .collect();
-    assert_eq!(found, ["9:42 ExecutorService", "33:16 InputStream"]);
+        .collect()
 }
 
 const APPLICATION: &str = "package app;\n\n@SpringBootApplication\nclass App {\n    public static void main(String[] args) {\n    }\n}\n";
@@ -184,7 +201,7 @@ fn a_private_field_that_is_only_written_is_reported() {
     assert_eq!(found, ["7 adjustment"]);
 }
 
-const RESOURCES: &str = "package app;\n\nimport java.io.File;\nimport java.io.InputStream;\n\nclass Loader {\n    byte[] read() throws Exception {\n        try (InputStream stream = getClass().getResourceAsStream(\"/data\")) {\n            return stream.readAllBytes();\n        }\n    }\n\n    String version(File file) {\n        file.getParentFile().mkdirs();\n        return System.getProperty(\"java.version\").trim() + file.getName().trim();\n    }\n}\n";
+const RESOURCES: &str = "package app;\n\nimport java.io.File;\nimport java.io.InputStream;\n\nclass Loader {\n    byte[] read() throws Exception {\n        try (InputStream stream = getClass().getResourceAsStream(\"/data\")) {\n            return stream.readAllBytes();\n        }\n    }\n\n    String version(File file) {\n        file.getParentFile().mkdirs();\n        return System.getProperty(\"app.mode\").trim() + file.getName().trim();\n    }\n}\n";
 
 #[test]
 fn what_the_jdk_may_return_as_null_is_known_without_a_classpath() {

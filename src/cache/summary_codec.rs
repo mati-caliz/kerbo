@@ -1,12 +1,14 @@
 use super::chain_codec::{read_chain, read_flow, write_chain, write_flow};
 use super::codec::{Corrupt, Reader, Writer};
+use super::declaration_codec::{read_declaration, read_owner, write_declaration, write_owner};
+use super::null_codec::{read_null_argument, write_null_argument};
 use super::taint_codec::{read_taints, write_taints};
 use super::throws_codec::{read_caught_call, read_method_throws, write_caught_call, write_method_throws};
-use crate::index::java::{CallSite, Declaration, Field, JavaSummary, Parameter, Position, Reading};
+use crate::index::java::{CallSite, Field, JavaSummary, Position};
+
 use crate::index::java_exposure::{DeclaredType, Exposure};
-use crate::lint::java_calls::{Arity, Body, ResultUse, ReturnType, Returns, Visibility};
+use crate::lint::java_calls::{ResultUse, Visibility};
 use crate::lint::java_constants::Constant;
-use crate::lint::java_owner::{Owner, OwnerKind};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
 
@@ -21,18 +23,6 @@ const PRIVATE: u64 = 0;
 const PACKAGE: u64 = 1;
 const PROTECTED: u64 = 2;
 const PUBLIC: u64 = 3;
-const RETURNS_NOTHING: u64 = 0;
-const RETURNS_ALWAYS: u64 = 1;
-const RETURNS_VARIED: u64 = 2;
-const OWNER_CLASS: u64 = 0;
-const OWNER_INTERFACE: u64 = 1;
-const OWNER_ENUM: u64 = 2;
-const OWNER_RECORD: u64 = 3;
-const OWNER_ANNOTATION: u64 = 4;
-const OWNER_LOCAL: u64 = 5;
-const RETURN_TYPE_VOID: u64 = 0;
-const RETURN_TYPE_PRIMITIVE: u64 = 1;
-const RETURN_TYPE_REFERENCE: u64 = 2;
 const RECEIVER_UNKNOWN: u64 = 0;
 const RECEIVER_TYPE: u64 = 1;
 const RECEIVER_SCOPE: u64 = 2;
@@ -105,6 +95,7 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     writer.list(&summary.static_imports, |writer, path| writer.text(path));
     writer.list(&summary.method_throws, write_method_throws);
     writer.list(&summary.caught_calls, write_caught_call);
+    writer.list(&summary.null_arguments, write_null_argument);
 }
 
 pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corrupt> {
@@ -182,126 +173,11 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         static_imports: reader.list(Reader::text)?,
         method_throws: reader.list(read_method_throws)?,
         caught_calls: reader.list(read_caught_call)?,
+        null_arguments: reader.list(read_null_argument)?,
     }))
 }
 
-fn write_declaration(writer: &mut Writer, declaration: &Declaration) {
-    writer.text(&declaration.name);
-    writer.text(&declaration.scope);
-    write_position(writer, &declaration.position);
-    write_flag(writer, declaration.is_constructor);
-    write_visibility(writer, declaration.visibility);
-    write_flag(writer, declaration.overrides);
-    write_flag(writer, declaration.body == Body::Written);
-    write_flag(writer, declaration.arity == Arity::Variadic);
-    match &declaration.returns {
-        Returns::Nothing => writer.number(RETURNS_NOTHING),
-        Returns::Always(value) => {
-            writer.number(RETURNS_ALWAYS);
-            writer.text(value);
-        }
-        Returns::Varied => writer.number(RETURNS_VARIED),
-    }
-    writer.text(&declaration.returned);
-    writer.list(&declaration.returned_arguments, |writer, argument| {
-        writer.text(argument);
-    });
-    writer.number(match declaration.return_type {
-        ReturnType::Void => RETURN_TYPE_VOID,
-        ReturnType::Primitive => RETURN_TYPE_PRIMITIVE,
-        ReturnType::Reference => RETURN_TYPE_REFERENCE,
-    });
-    writer.list(&declaration.parameters, |writer, parameter| {
-        writer.text(&parameter.name);
-        write_position(writer, &parameter.position);
-        write_flag(writer, parameter.declares_nullness);
-        write_flag(writer, parameter.dereferenced);
-        write_flag(writer, parameter.reading == Reading::Read);
-    });
-    writer.list(&declaration.annotations, |writer, name| writer.text(name));
-    write_owner(writer, &declaration.owner);
-}
-
-fn write_owner(writer: &mut Writer, owner: &Owner) {
-    writer.number(match owner.kind {
-        OwnerKind::Class => OWNER_CLASS,
-        OwnerKind::Interface => OWNER_INTERFACE,
-        OwnerKind::Enum => OWNER_ENUM,
-        OwnerKind::Record => OWNER_RECORD,
-        OwnerKind::Annotation => OWNER_ANNOTATION,
-        OwnerKind::Local => OWNER_LOCAL,
-    });
-    writer.text(&owner.name);
-    writer.list(&owner.annotations, |writer, name| writer.text(name));
-}
-
-fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
-    Ok(Declaration {
-        name: reader.text()?,
-        scope: reader.text()?,
-        position: read_position(reader)?,
-        is_constructor: read_flag(reader)?,
-        visibility: read_visibility(reader)?,
-        overrides: read_flag(reader)?,
-        body: if read_flag(reader)? {
-            Body::Written
-        } else {
-            Body::Abstract
-        },
-        arity: if read_flag(reader)? {
-            Arity::Variadic
-        } else {
-            Arity::Fixed
-        },
-        returns: match reader.number()? {
-            RETURNS_NOTHING => Returns::Nothing,
-            RETURNS_ALWAYS => Returns::Always(reader.text()?),
-            RETURNS_VARIED => Returns::Varied,
-            _ => return Err(Corrupt),
-        },
-        returned: reader.text()?,
-        returned_arguments: reader.list(Reader::text)?,
-        return_type: match reader.number()? {
-            RETURN_TYPE_VOID => ReturnType::Void,
-            RETURN_TYPE_PRIMITIVE => ReturnType::Primitive,
-            RETURN_TYPE_REFERENCE => ReturnType::Reference,
-            _ => return Err(Corrupt),
-        },
-        parameters: reader.list(|reader| {
-            Ok(Parameter {
-                name: reader.text()?,
-                position: read_position(reader)?,
-                declares_nullness: read_flag(reader)?,
-                dereferenced: read_flag(reader)?,
-                reading: if read_flag(reader)? {
-                    Reading::Read
-                } else {
-                    Reading::Unread
-                },
-            })
-        })?,
-        annotations: reader.list(Reader::text)?,
-        owner: read_owner(reader)?,
-    })
-}
-
-fn read_owner(reader: &mut Reader<'_>) -> Result<Owner, Corrupt> {
-    Ok(Owner {
-        kind: match reader.number()? {
-            OWNER_CLASS => OwnerKind::Class,
-            OWNER_INTERFACE => OwnerKind::Interface,
-            OWNER_ENUM => OwnerKind::Enum,
-            OWNER_RECORD => OwnerKind::Record,
-            OWNER_ANNOTATION => OwnerKind::Annotation,
-            OWNER_LOCAL => OwnerKind::Local,
-            _ => return Err(Corrupt),
-        },
-        name: reader.text()?,
-        annotations: reader.list(Reader::text)?,
-    })
-}
-
-fn write_visibility(writer: &mut Writer, visibility: Visibility) {
+pub(super) fn write_visibility(writer: &mut Writer, visibility: Visibility) {
     writer.number(match visibility {
         Visibility::Private => PRIVATE,
         Visibility::Package => PACKAGE,
@@ -310,7 +186,7 @@ fn write_visibility(writer: &mut Writer, visibility: Visibility) {
     });
 }
 
-fn read_visibility(reader: &mut Reader<'_>) -> Result<Visibility, Corrupt> {
+pub(super) fn read_visibility(reader: &mut Reader<'_>) -> Result<Visibility, Corrupt> {
     match reader.number()? {
         PRIVATE => Ok(Visibility::Private),
         PACKAGE => Ok(Visibility::Package),
@@ -343,12 +219,12 @@ pub(super) fn read_receiver(reader: &mut Reader<'_>) -> Result<Receiver, Corrupt
     }
 }
 
-fn write_position(writer: &mut Writer, position: &Position) {
+pub(super) fn write_position(writer: &mut Writer, position: &Position) {
     writer.size(position.line);
     writer.size(position.column);
 }
 
-fn read_position(reader: &mut Reader<'_>) -> Result<Position, Corrupt> {
+pub(super) fn read_position(reader: &mut Reader<'_>) -> Result<Position, Corrupt> {
     Ok(Position {
         line: reader.size()?,
         column: reader.size()?,

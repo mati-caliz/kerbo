@@ -5,6 +5,7 @@ mod java_dereference;
 mod java_escapes;
 pub mod java_exposure;
 mod java_jdk;
+mod java_null_arguments;
 mod java_nullness;
 mod java_project;
 mod java_resources;
@@ -29,6 +30,8 @@ mod ecmascript_taint_tests;
 mod go_taint_tests;
 #[cfg(test)]
 mod java_escapes_tests;
+#[cfg(test)]
+mod java_null_tests;
 #[cfg(test)]
 mod java_throws_tests;
 #[cfg(test)]

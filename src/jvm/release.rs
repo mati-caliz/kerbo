@@ -4,13 +4,19 @@ use std::path::Path;
 use super::classpath::{files_named, pom_files};
 use super::gradle::BUILD_FILES;
 
-const POM_PROPERTIES: [&str; 5] = [
+const POM_PROPERTIES: [&str; 7] = [
     "<maven.compiler.release>",
     "<release>",
     "<java.version>",
     "<maven.compiler.target>",
     "<maven.compiler.source>",
+    "<target>",
+    "<source>",
 ];
+const PROPERTY_START: &str = "${";
+const PROPERTY_END: char = '}';
+const TAG_OPEN: char = '<';
+const TAG_CLOSE: char = '>';
 const GRADLE_SETTINGS: [&str; 4] = [
     "JavaLanguageVersion.of(",
     "options.release = ",
@@ -38,10 +44,18 @@ fn first_setting(files: &[std::path::PathBuf], settings: &[&str]) -> Option<u32>
         .filter_map(|file| fs::read_to_string(file).ok())
         .collect();
     settings.iter().find_map(|setting| {
-        contents
-            .iter()
-            .find_map(|content| version_after(content, setting))
+        contents.iter().find_map(|content| {
+            version_after(content, setting).or_else(|| property_after(&contents, content, setting))
+        })
     })
+}
+
+// `<source>${jdkVersion}</source>` toma el valor de `<jdkVersion>`, en cualquiera de los archivos.
+fn property_after(contents: &[String], content: &str, marker: &str) -> Option<u32> {
+    let (_, rest) = content.split_once(marker)?;
+    let name = rest.strip_prefix(PROPERTY_START)?.split(PROPERTY_END).next()?;
+    let property = format!("{TAG_OPEN}{name}{TAG_CLOSE}");
+    contents.iter().find_map(|other| version_after(other, &property))
 }
 
 fn version_after(content: &str, marker: &str) -> Option<u32> {

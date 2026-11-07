@@ -1,6 +1,5 @@
-// Lo que kerbo sabe del JDK sin leerlo: no viene en el classpath de Maven, y `ct.sym` no trae las
-// anotaciones ni el detalle que hace falta. Tablas chicas, de lo que aparece en el código de todos
-// los días.
+// Lo que kerbo sabe del JDK sin leerlo. `CLOSEABLE` y `RETURNS` sólo hacen falta si no se encontró
+// un JDK; los nulos de `METHODS` vienen de IntelliJ, porque `ct.sym` no trae anotaciones.
 
 // Lo que se cierra: las interfaces raíz y las clases e interfaces más usadas que las implementan.
 pub const CLOSEABLE: &[&str] = &[
@@ -29,7 +28,6 @@ pub const CLOSEABLE: &[&str] = &[
     "java.net.ServerSocket",
     "java.util.zip.ZipFile",
     "java.util.jar.JarFile",
-    "java.util.Scanner",
     "java.nio.channels.FileChannel",
     "java.nio.channels.SocketChannel",
     "java.nio.file.DirectoryStream",
@@ -37,19 +35,28 @@ pub const CLOSEABLE: &[&str] = &[
     "java.nio.file.WatchService",
 ];
 
-// Lo que se cierra pero IntelliJ no pide cerrar: no toma nada del sistema.
+// Lo que se cierra pero IntelliJ no pide cerrar (sus `ignoredTypes` por defecto), con sus subtipos.
 pub const NOT_RESOURCES: &[&str] = &[
-    "java.io.ByteArrayInputStream",
-    "java.io.ByteArrayOutputStream",
-    "java.io.CharArrayReader",
-    "java.io.CharArrayWriter",
-    "java.io.StringReader",
-    "java.io.StringWriter",
     "java.util.stream.Stream",
     "java.util.stream.IntStream",
     "java.util.stream.LongStream",
     "java.util.stream.DoubleStream",
+    "java.io.ByteArrayOutputStream",
+    "java.io.ByteArrayInputStream",
+    "java.io.StringBufferInputStream",
+    "java.io.CharArrayWriter",
+    "java.io.CharArrayReader",
+    "java.io.StringWriter",
+    "java.io.StringReader",
+    "java.util.Formatter",
+    "java.util.Scanner",
+    "org.springframework.context.ConfigurableApplicationContext",
+    "io.micronaut.context.ApplicationContext",
+    "org.apache.pekko.actor.ActorSystem",
 ];
+
+// Los `Stream` que tienen un archivo o un directorio abierto: aunque `Stream` se ignore, éstos sí.
+pub const STREAM_HOLDERS: (&str, &[&str]) = ("java.nio.file.Files", &["lines", "walk", "list", "find"]);
 
 // Qué devuelve un método del JDK que crea un recurso: (clase, método, clase devuelta).
 pub const RETURNS: &[(&str, &str, &str)] = &[
@@ -175,6 +182,50 @@ const METHODS: &[(&str, &str, usize, &str, bool)] = &[
     ("java.io.File", "listFiles", 0, "java.io.File[]", true),
     ("java.io.File", "list", 0, "java.lang.String[]", true),
 ];
+
+// Las propiedades que la JVM siempre define: `System.getProperty` de una de ellas no es null.
+const SYSTEM: &str = "java.lang.System";
+const GET_PROPERTY: &str = "getProperty";
+const ALWAYS_DEFINED: &[&str] = &[
+    "java.version",
+    "java.version.date",
+    "java.vendor",
+    "java.vendor.url",
+    "java.vendor.version",
+    "java.home",
+    "java.vm.specification.version",
+    "java.vm.specification.vendor",
+    "java.vm.specification.name",
+    "java.vm.version",
+    "java.vm.vendor",
+    "java.vm.name",
+    "java.specification.version",
+    "java.specification.maintenance.version",
+    "java.specification.vendor",
+    "java.specification.name",
+    "java.class.version",
+    "java.class.path",
+    "java.library.path",
+    "java.io.tmpdir",
+    "os.name",
+    "os.arch",
+    "os.version",
+    "file.separator",
+    "path.separator",
+    "line.separator",
+    "user.name",
+    "user.home",
+    "user.dir",
+    "native.encoding",
+    "stdout.encoding",
+    "stderr.encoding",
+];
+
+pub fn is_always_defined(classes: &[String], name: &str, arguments: &[String]) -> bool {
+    name == GET_PROPERTY
+        && classes.iter().any(|class| class == SYSTEM)
+        && matches!(arguments, [property] if ALWAYS_DEFINED.contains(&property.as_str()))
+}
 
 // Un método del JDK de alguna de esas clases (o de `Object`, que heredan todas): qué devuelve y si
 // puede ser null.

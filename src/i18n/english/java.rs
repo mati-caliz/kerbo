@@ -281,8 +281,14 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
     RuleText::new(
         "Use of a result that may be null",
         "check for null first, or use Objects.requireNonNull with a message",
-        "The previous method in the chain is declared @Nullable in its library (like ResponseEntity's getBody()) or the JDK may return null (getResourceAsStream, System.getProperty): if it returns null, calling on the result or unboxing it into a primitive (return jdbc.queryForObject(...) in a long) throws NullPointerException. Like IntelliJ's DataFlowIssue.",
+        "The previous method in the chain is declared @Nullable in its library (like ResponseEntity's getBody()), the JDK may return null (getResourceAsStream, System.getProperty), or it belongs to the project, returns null in some return and nothing can override it: if it returns null, calling on the result or unboxing it into a primitive (return jdbc.queryForObject(...) in a long) throws NullPointerException. Like IntelliJ's DataFlowIssue.",
         "response.getBody().error() becomes Objects.requireNonNull(response.getBody()).error(), or the null is checked first.",
+    ),
+    RuleText::new(
+        "null passed to a parameter the method uses without checking",
+        "pass a value, or make the method accept null and check it",
+        "The method dereferences that parameter on every path and nothing can override it (it is static, private, final or in a final class): IntelliJ infers it does not accept null, and passing null throws NullPointerException inside. Like IntelliJ's DataFlowIssue.",
+        "ArrayUtils.concat((int[][]) null) throws NullPointerException while walking the array; pass an empty array or check first.",
     ),
     RuleText::new(
         "Optional get() without checking it has a value",

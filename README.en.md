@@ -391,7 +391,13 @@ From IntelliJ's inspections, kerbo does:
   varargs method accepts its parameter count or more. For the JDK, which does not come in the jars,
   there is kerbo's own table (`src/index/java_jdk.rs`) of what IntelliJ treats as possibly null:
   `getResourceAsStream` and `getResource`, `System.getProperty` and `getenv`, `File.getParentFile`,
-  `getParent`, `listFiles` and `list`. That part works without a classpath.
+  `getParent`, `listFiles` and `list`. That part works without a classpath. A project method that
+  returns `null` in some `return` and that nothing can override (static, private, `final`, in a
+  `final` class) counts as `@Nullable`, as IntelliJ infers it, and the chain follows its declared
+  type.
+- `DataFlowIssue`, the argument case (`null-argument`): a `null` (or `(Type) null`) passed to a
+  parameter the method dereferences on every path, if nothing can override it: from that IntelliJ
+  infers the parameter is non-null. With overloads, only if all of them dereference it.
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` chained to
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` or `Optional.ofNullable(...)`.
 

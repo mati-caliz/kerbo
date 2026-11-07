@@ -26,6 +26,7 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
         writer.size(step.column);
         write_flag(writer, step.checked);
         writer.list(&step.class_arguments, |writer, position| writer.size(*position));
+        writer.list(&step.text_arguments, |writer, argument| writer.text(argument));
     });
     match chain.unboxed {
         Some((line, column)) => {
@@ -52,6 +53,7 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
                 column: reader.size()?,
                 checked: read_flag(reader)?,
                 class_arguments: reader.list(Reader::size)?,
+                text_arguments: reader.list(Reader::text)?,
             })
         })?,
         unboxed: match reader.number()? {

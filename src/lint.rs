@@ -19,6 +19,7 @@ mod java_implicit_constructor;
 pub mod java_inference;
 mod java_null_conditions;
 pub mod java_null_flow;
+pub mod java_null_inference;
 mod java_optional;
 mod java_order;
 pub mod java_owner;

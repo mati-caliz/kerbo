@@ -15,6 +15,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
                 column: 21,
                 checked: false,
                 class_arguments: vec![1],
+                text_arguments: vec!["java.version".to_owned()],
             }],
             unboxed: Some((12, 16)),
         },
@@ -93,4 +94,25 @@ fn what_a_method_can_throw_survives_the_round_trip() {
     let mut reader = Reader::new(&bytes);
     assert_eq!(read_method_throws(&mut reader), Ok(method));
     assert_eq!(read_caught_call(&mut reader), Ok(call));
+}
+
+#[test]
+fn null_arguments_survive_the_round_trip() {
+    use super::null_codec::{read_null_argument, write_null_argument};
+    use crate::lint::java_null_inference::NullArgument;
+    use crate::lint::java_receivers::Receiver;
+
+    let argument = NullArgument {
+        name: "concat".to_owned(),
+        is_constructor: false,
+        arity: 1,
+        receiver: Receiver::Type("ArrayUtils".to_owned()),
+        index: 0,
+        line: 35,
+        column: 88,
+    };
+    let mut writer = Writer::default();
+    write_null_argument(&mut writer, &argument);
+    let bytes = writer.into_bytes();
+    assert_eq!(read_null_argument(&mut Reader::new(&bytes)), Ok(argument));
 }

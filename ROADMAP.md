@@ -1688,33 +1688,32 @@ Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_check
 
 ### 16. Tipos y firmas completas
 
-Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y el índice.
+Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y el índice. Paridad
+contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/java/`
+(`qodana.sh <repo> <inspección>`, `kerbo.sh`, `compare_all.py`), 2026-11-07.
 
-- `RedundantThrows` de IntelliJ (`redundant-throws`), con las excepciones de las firmas (`Exceptions`
-  de cada método de los `.class`).
-  - Paridad contra Qodana (`scripts/parity/java/`, 2026-11-07), por archivo, línea y columna:
-    junit4 (Java del JDK instalado), 215 de 219; commons-lang (Java 8, firmas de `ct.sym`), 112 de
-    125. **Ninguno de más en los dos.** Ya sigue genéricos de la librería (`List<Fallo>.get(0)`, con
-    el atributo `Signature` de los `.class`), constantes de un `import static` y `Clase.CAMPO`,
-    constructores (`super()` implícito, `this(...)` e inicializadores de los campos), `throw e` de
-    una variable, padres anidados (`Map.Entry`) y, para el `catch` de un llamador, a qué método va
-    la llamada. Faltan medir Guava y spring-boot, más grandes.
-  - Pendientes, por lo que falta en esos dos repos: los genéricos en las variables
-    (`List<Throwable> causes`, hoy se guarda sólo `List`) y en las clases del proyecto (los builders
+- `RedundantThrows` (`redundant-throws`): junit4 216 de 219, commons-lang 112 de 125, **ninguno de
+  más**. Faltan medir Guava y spring-boot, más grandes.
+  - Pendientes, por lo que falta: los genéricos en las clases del proyecto (los builders
     `X.<I, T>builder().get()` de commons-lang); los parámetros de una lambda (`(k, v) -> v.get()`)
     no tienen tipo, así que su `catch` cuenta para cualquier `get`; la sobrecarga se elige por
     cantidad de argumentos y no por tipo (`getBytes(Charset)` calla por `getBytes(String)`); las
-    excepciones genéricas (`FailableConsumer<T, E>` tira `E`); `super.metodo()`; `values()` y
-    `valueOf()` de un enum; los arreglos como receptor (`excepciones[0].getMessage()`). Un método
-    del proyecto que redefine a uno de librería suma lo que tira el de arriba: calla de más.
-- El JDK para el `release` del proyecto: las firmas salen de `ct.sym` para una versión anterior a la
-  del JDK instalado y de `lib/modules` para la suya, porque `ct.sym` no la trae (como
-  `javac --release`). Por ahora sólo las usa `redundant-throws`.
-  - Pendientes: reemplazar con esto las tablas de `java_jdk.rs` (`CLOSEABLE`, `RETURNS`) midiendo que
-    `AutoCloseableResource` no cambie; un JDK de `jlink --compress` no se lee.
-- Tipos genéricos: `Map.get` y lo que devuelve una lambda en el flujo de nulos.
-- El tipo de retorno de los métodos del proyecto, para seguir cadenas que pasan por ellos, y la
-  inferencia de parámetros no nulos para todos los métodos (hoy sólo los `@Override`), para avisar
-  de un `null` pasado a uno.
+    excepciones genéricas (`FailableConsumer<T, E>` tira `E`); `values()` y `valueOf()` de un enum
+    (el índice no sabe qué tipo es un enum); los arreglos como receptor
+    (`excepciones[0].getMessage()`). Un método del proyecto que redefine a uno de librería suma lo
+    que tira el de arriba: calla de más.
+- `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
+  commons-lang 0 de 2, ninguno de más. Pendientes: los dos de commons-lang son un recurso que se
+  crea con una clase del proyecto en un test y un `OutputStream` que vuelve de un método.
+- `DataFlowIssue` (`data-flow-issue` y `null-argument`): commons-lang 39 de 141 sin ninguno de más;
+  junit4 1 de 19 con uno de más (`f.getParentFile().getParentFile()` en un test, que IntelliJ no
+  marca aunque `getParentFile` está en la tabla de nulos del JDK). Lo que falta es en su mayoría de
+  otras formas de la inspección que kerbo no calca: "The call to X always fails, according to its
+  method contracts" (contratos `null -> fail` inferidos, 47 entre los dos), "Variable is already
+  assigned to this value" (20) y el resto del flujo entre métodos.
+- `Map.get` y lo que devuelve una lambda en el flujo de nulos: en junit4 y commons-lang Qodana no
+  marca ninguno; queda para medir en un repo que los use (Spring, Micrometer).
 - En JS/TS, los tipos del compilador de TypeScript para reconocer conexiones y objetos del pedido
-  sin depender del nombre de la variable.
+  sin depender del nombre de la variable. Hoy kerbo no habla con el compilador: hace falta levantar
+  Node con el `typescript` del proyecto y preguntarle el tipo de cada receptor.
+- Un JDK de `jlink --compress` no se lee.

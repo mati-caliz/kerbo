@@ -19,6 +19,10 @@ const VARIABLE_DECLARATOR: &str = "variable_declarator";
 const INSTANCE_INITIALIZER: &str = "block";
 const STATIC: &str = "static";
 const NO_ARGUMENTS: usize = 0;
+const OBJECT: &str = "Object";
+const CREATION: &str = "object_creation_expression";
+const CLASS_BODY: &str = "class_body";
+const TYPE_FIELD: &str = "type";
 
 // Lo que tira un constructor: su cuerpo, el `super()` implícito si no llama a otro, y los
 // inicializadores de los campos y los bloques de instancia, que corren adentro de él salvo que
@@ -70,6 +74,27 @@ fn delegates_to_this(invocation: Node<'_>) -> bool {
     invocation
         .child_by_field_name(CONSTRUCTOR_FIELD)
         .is_some_and(|keyword| keyword.kind() == THIS)
+}
+
+// La clase de arriba de la que encierra a `super`: la que extiende, `Object` si no extiende nada, o
+// la que crea una clase anónima.
+pub fn super_type(keyword: Node<'_>, source: &[u8]) -> Option<String> {
+    let mut current = keyword.parent();
+    while let Some(candidate) = current {
+        if is_type_declaration(candidate) {
+            return Some(superclass_of(candidate, source).unwrap_or_else(|| OBJECT.to_owned()));
+        }
+        if candidate.kind() == CREATION
+            && named_children(candidate)
+                .iter()
+                .any(|child| child.kind() == CLASS_BODY)
+        {
+            let created = candidate.child_by_field_name(TYPE_FIELD)?;
+            return Some(written_type(text(created, source)));
+        }
+        current = candidate.parent();
+    }
+    None
 }
 
 fn enclosing_class(node: Node<'_>) -> Option<Node<'_>> {

@@ -387,7 +387,13 @@ De las inspecciones de IntelliJ, kerbo hace:
   compilador; un varargs acepta su cantidad de parámetros o más. Del JDK, que no viene en los jars,
   hay una tabla propia (`src/index/java_jdk.rs`) con lo que IntelliJ da por posiblemente null:
   `getResourceAsStream` y `getResource`, `System.getProperty` y `getenv`, `File.getParentFile`,
-  `getParent`, `listFiles` y `list`. Esa parte anda sin classpath.
+  `getParent`, `listFiles` y `list`. Esa parte anda sin classpath. Un método del proyecto que
+  devuelve `null` en algún `return` y que nadie puede redefinir (estático, privado, `final`, de una
+  clase `final`) cuenta como `@Nullable`, como lo infiere IntelliJ, y la cadena sigue por el tipo
+  que declara.
+- `DataFlowIssue`, el caso de los argumentos (`null-argument`): un `null` (o `(Tipo) null`) pasado a
+  un parámetro que el método desreferencia en todos los caminos, si nadie puede redefinirlo: de eso
+  IntelliJ infiere que el parámetro es no nulo. Con sobrecargas, sólo si todas lo desreferencian.
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` encadenado a
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` u `Optional.ofNullable(...)`.
 

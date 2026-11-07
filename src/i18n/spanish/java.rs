@@ -281,8 +281,14 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
     RuleText::new(
         "Uso de un resultado que puede ser null",
         "chequeá el null antes, o usá Objects.requireNonNull con un mensaje",
-        "El método anterior de la cadena está declarado @Nullable en su librería (como getBody() de ResponseEntity) o el JDK puede devolver null (getResourceAsStream, System.getProperty): si devuelve null, llamar sobre el resultado o desempaquetarlo en un primitivo (return jdbc.queryForObject(...) en un long) tira NullPointerException. Como DataFlowIssue de IntelliJ.",
+        "El método anterior de la cadena está declarado @Nullable en su librería (como getBody() de ResponseEntity), el JDK puede devolver null (getResourceAsStream, System.getProperty) o es del proyecto, devuelve null en algún return y nadie puede redefinirlo: si devuelve null, llamar sobre el resultado o desempaquetarlo en un primitivo (return jdbc.queryForObject(...) en un long) tira NullPointerException. Como DataFlowIssue de IntelliJ.",
         "respuesta.getBody().error() se vuelve Objects.requireNonNull(respuesta.getBody()).error(), o se chequea el null antes.",
+    ),
+    RuleText::new(
+        "null pasado a un parámetro que el método usa sin chequear",
+        "pasale un valor, o hacé que el método acepte null y lo chequee",
+        "El método desreferencia ese parámetro en todos los caminos y nadie puede redefinirlo (es estático, privado, final o de una clase final): IntelliJ infiere que no acepta null, y pasarle null tira NullPointerException adentro. Como DataFlowIssue de IntelliJ.",
+        "ArrayUtils.concat((int[][]) null) tira NullPointerException al recorrer el arreglo; se pasa un arreglo vacío o se chequea antes.",
     ),
     RuleText::new(
         "get() de un Optional sin ver si tiene valor",

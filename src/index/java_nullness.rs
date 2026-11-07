@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use super::java::{Declaration, Field, JavaSummary, lint_at};
+use super::java::{Declaration, Dereferenced, Field, JavaSummary, lint_at};
 use super::java_project::IndexedSummary;
 use crate::jvm::class_file::ClassFile;
 use crate::jvm::library::Library;
@@ -153,7 +153,7 @@ fn unannotated_parameters(declaration: &Declaration, method: &Method, label: &st
         .zip(&method.parameter_annotations)
         .filter(|(parameter, inherited)| {
             !parameter.declares_nullness
-                && !parameter.dereferenced
+                && parameter.dereferenced == Dereferenced::No
                 && !inherited.iter().any(|annotation| is_nullable(annotation))
         })
         .map(|(parameter, _)| {
@@ -285,4 +285,21 @@ pub fn resolve(types: &ProjectTypes<'_>, library: &Library, summary: &JavaSummar
             || Resolved::Library(format!("{JAVA_LANG}{simple}")),
             Resolved::Library,
         )
+}
+
+// La clase y las del proyecto de las que hereda, de la más cercana a la más lejana.
+pub fn project_lineage(types: &ProjectTypes<'_>, library: &Library, owner: &str) -> Vec<String> {
+    let mut lineage = vec![owner.to_owned()];
+    let mut index = 0;
+    while let Some(current) = lineage.get(index).cloned() {
+        for parent in parents_of(types, library, &current) {
+            if let Resolved::Project(name) = parent
+                && !lineage.contains(&name)
+            {
+                lineage.push(name);
+            }
+        }
+        index += 1;
+    }
+    lineage
 }

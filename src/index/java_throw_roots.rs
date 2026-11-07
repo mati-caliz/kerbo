@@ -2,6 +2,8 @@ use super::java::JavaSummary;
 use super::java_nullness::Resolved;
 use super::java_throw_lookup::ThrowLookup;
 use super::java_typed::{Typed, library_field};
+use crate::lint::java_receivers::UNKNOWN_TYPE_ARGUMENT;
+use crate::lint::java_throws::CallRoot;
 
 const QUALIFIER_SEPARATOR: char = '.';
 const WILDCARD: &str = "*";
@@ -10,10 +12,24 @@ const WILDCARD: &str = "*";
 impl ThrowLookup<'_, '_> {
     // Un nombre en mayúsculas puede ser una constante de un `import static`, y `Clase.CAMPO` un
     // campo: se siguen por su tipo.
-    pub(super) fn root_type(&self, summary: &JavaSummary, written: &str) -> Typed {
-        self.imported_constant(summary, written)
-            .or_else(|| self.qualified_field(summary, written))
-            .unwrap_or_else(|| Typed::raw(self.named(summary, written)))
+    pub(super) fn root_type(&self, summary: &JavaSummary, root: &CallRoot) -> Option<Typed> {
+        match root {
+            CallRoot::Type(written) => Some(
+                self.imported_constant(summary, written)
+                    .or_else(|| self.qualified_field(summary, written))
+                    .unwrap_or_else(|| Typed::raw(self.named(summary, written))),
+            ),
+            CallRoot::Generic(written, arguments) => Some(Typed {
+                class: self.named(summary, written),
+                arguments: arguments
+                    .iter()
+                    .map(|argument| {
+                        (argument != UNKNOWN_TYPE_ARGUMENT).then(|| Typed::raw(self.named(summary, argument)))
+                    })
+                    .collect(),
+            }),
+            CallRoot::Scope(_) => None,
+        }
     }
 
     fn qualified_field(&self, summary: &JavaSummary, written: &str) -> Option<Typed> {

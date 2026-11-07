@@ -5,8 +5,8 @@ use tree_sitter::Node;
 use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, text};
 use super::java_calls::TYPE_DECLARATIONS;
 use super::java_chains::argument_count;
-use super::java_constructor_throws::{constructor_points, explicit_origin};
-use super::java_receivers::{Variables, enclosing_types, simple_type_name};
+use super::java_constructor_throws::{constructor_points, explicit_origin, super_type};
+use super::java_receivers::{Variables, declared_arguments, enclosing_types, simple_type_name};
 use crate::syntax::{descendants, named_children, one_based};
 
 const THROWS: &str = "throws";
@@ -29,6 +29,7 @@ const STRING_LITERAL: &str = "string_literal";
 const CLASS_LITERAL: &str = "class_literal";
 const CLASS_TYPE: &str = "Class";
 const THIS: &str = "this";
+const SUPER: &str = "super";
 const STRING_TYPE: &str = "String";
 const INFERRED: &str = "var";
 const BODY_FIELD: &str = "body";
@@ -50,6 +51,7 @@ pub struct ThrowsClause {
 pub enum CallRoot {
     Scope(Vec<String>),
     Type(String),
+    Generic(String, Vec<String>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -267,16 +269,32 @@ pub(super) fn call_origin(invocation: Node<'_>, source: &[u8], variables: &Varia
         };
         if object.kind() != INVOCATION {
             steps.reverse();
-            return root_of(object, source, variables)
-                .map_or(ThrowOrigin::Unknown, |root| ThrowOrigin::Call(root, steps));
+            return root_of(object, source, variables).map_or(ThrowOrigin::Unknown, |root| {
+                ThrowOrigin::Call(with_arguments(root, object, steps.len(), source), steps)
+            });
         }
         current = object;
+    }
+}
+
+// Una cadena que sigue después de la primera llamada puede pasar por un genérico: hacen falta los
+// argumentos de tipo de la variable.
+fn with_arguments(root: CallRoot, object: Node<'_>, steps: usize, source: &[u8]) -> CallRoot {
+    match root {
+        CallRoot::Type(declared) if object.kind() == IDENTIFIER && steps > 1 => {
+            match declared_arguments(object, text(object, source), source) {
+                Some(arguments) => CallRoot::Generic(declared, arguments),
+                None => CallRoot::Type(declared),
+            }
+        }
+        other @ (CallRoot::Scope(_) | CallRoot::Type(_) | CallRoot::Generic(..)) => other,
     }
 }
 
 fn root_of(object: Node<'_>, source: &[u8], variables: &Variables) -> Option<CallRoot> {
     match object.kind() {
         THIS => Some(CallRoot::Scope(enclosing_types(object, source))),
+        SUPER => super_type(object, source).map(CallRoot::Type),
         IDENTIFIER => identifier_root(text(object, source), variables),
         STRING_LITERAL => Some(CallRoot::Type(STRING_TYPE.to_owned())),
         CLASS_LITERAL => Some(CallRoot::Type(CLASS_TYPE.to_owned())),
@@ -356,7 +374,7 @@ fn close_origin(resource: Node<'_>, source: &[u8], variables: &Variables) -> Thr
         .first()
         .and_then(|variable| root_of(*variable, source, variables))
         .map_or(ThrowOrigin::Unknown, |root| match root {
-            CallRoot::Type(declared) => ThrowOrigin::Close(declared),
+            CallRoot::Type(declared) | CallRoot::Generic(declared, _) => ThrowOrigin::Close(declared),
             CallRoot::Scope(_) => ThrowOrigin::Unknown,
         })
 }

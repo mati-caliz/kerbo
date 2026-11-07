@@ -145,3 +145,40 @@ fn collect(expression: Node<'_>, source: &[u8], found: &mut HashSet<String>) {
         pending.extend(named_children(node));
     }
 }
+
+// Los nombres cuyo primer uso en el cuerpo es desreferenciarlos (o recorrerlos en un `for`). Si lo
+// primero es pasarlos a otro método (`Objects.requireNonNull(p)`, `validar(p)`), IntelliJ infiere un
+// contrato `null -> fail` en vez de un parámetro no nulo.
+pub fn dereferenced_first(body: Node<'_>, source: &[u8]) -> HashSet<String> {
+    let mut seen = HashSet::new();
+    let mut found = HashSet::new();
+    let mut pending = vec![body];
+    while let Some(node) = pending.pop() {
+        if node.kind() == IDENTIFIER {
+            let name = text(node, source);
+            if seen.insert(name.to_owned()) && is_dereference_target(node) {
+                found.insert(name.to_owned());
+            }
+            continue;
+        }
+        let mut children = named_children(node);
+        children.reverse();
+        pending.extend(children);
+    }
+    found
+}
+
+fn is_dereference_target(identifier: Node<'_>) -> bool {
+    let Some(parent) = identifier.parent() else {
+        return false;
+    };
+    let field = match parent.kind() {
+        kind if DEREFERENCES.contains(&kind) => OBJECT_FIELD,
+        ARRAY_ACCESS => ARRAY_FIELD,
+        ENHANCED_FOR => VALUE_FIELD,
+        _ => return false,
+    };
+    parent
+        .child_by_field_name(field)
+        .is_some_and(|target| target.id() == identifier.id())
+}

@@ -1,0 +1,225 @@
+use tree_sitter::Node;
+
+use super::java::{CONSTRUCTOR, FINAL, PRIVATE, STATIC, has_modifier, is_type_declaration, text};
+use super::java_chains::argument_count;
+use super::java_receivers::{Receiver, StaticImports, Variables, simple_type_name};
+use crate::syntax::{named_children, one_based};
+
+const BODY_FIELD: &str = "body";
+const VALUE_FIELD: &str = "value";
+const TYPE_FIELD: &str = "type";
+const NAME_FIELD: &str = "name";
+const ARGUMENTS_FIELD: &str = "arguments";
+const CONSEQUENCE_FIELD: &str = "consequence";
+const ALTERNATIVE_FIELD: &str = "alternative";
+const RETURN: &str = "return_statement";
+const IF: &str = "if_statement";
+const VARIABLE_DECLARATOR: &str = "variable_declarator";
+const CONDITION_FIELD: &str = "condition";
+const PARAMETERS_FIELD: &str = "parameters";
+const PARAMETER_FIRST_CHECKS: [&str; 3] = ["==null", "!=null", "instanceof"];
+const NULL_FIRST_CHECKS: [&str; 2] = ["null==", "null!="];
+const NULL: &str = "null_literal";
+const CAST: &str = "cast_expression";
+const PARENTHESIZED: &str = "parenthesized_expression";
+const TERNARY: &str = "ternary_expression";
+const INVOCATION: &str = "method_invocation";
+const CREATION: &str = "object_creation_expression";
+const CLASS_BODY: &str = "class_body";
+const RETURN_BOUNDARIES: &[&str] = &["lambda_expression", "class_body"];
+const INTERFACE: &str = "interface_declaration";
+const ENUM: &str = "enum_declaration";
+const RECORD: &str = "record_declaration";
+const COMMENTS: &[&str] = &["line_comment", "block_comment"];
+
+// Un `null` escrito como argumento (también `(Tipo) null`), con la llamada que lo recibe.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NullArgument {
+    pub name: String,
+    pub is_constructor: bool,
+    pub arity: usize,
+    pub receiver: Receiver,
+    pub index: usize,
+    pub line: usize,
+    pub column: usize,
+}
+
+// Si algún `return` del método devuelve `null`, directo o en una rama de un ternario: IntelliJ
+// infiere de eso que el método es `@Nullable`. Si alguna condición pregunta por un parámetro
+// (`texto == null`, `texto != null`, `objeto instanceof Cloneable`), lo que infiere es un contrato
+// (`null -> null`), y con un contrato ya no da el método por `@Nullable`.
+pub fn returns_null(method: Node<'_>, source: &[u8]) -> bool {
+    let Some(body) = method.child_by_field_name(BODY_FIELD) else {
+        return false;
+    };
+    let checks = parameter_checks(method, source);
+    let mut returns_null = false;
+    let mut pending = vec![body];
+    while let Some(node) = pending.pop() {
+        if (node.kind() == IF || node.kind() == TERNARY) && checks_a_parameter(node, source, &checks) {
+            return false;
+        }
+        if node.kind() == RETURN {
+            returns_null |= named_children(node)
+                .first()
+                .is_some_and(|value| may_be_null(*value));
+        }
+        if !RETURN_BOUNDARIES.contains(&node.kind()) {
+            pending.extend(named_children(node));
+        }
+    }
+    returns_null
+}
+
+// `p == null`, `p != null`, sus vueltas y `p instanceof` de cada parámetro, sin espacios.
+fn parameter_checks(method: Node<'_>, source: &[u8]) -> Vec<String> {
+    method
+        .child_by_field_name(PARAMETERS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(parameter_name)
+        .flat_map(|name| {
+            let name = text(name, source);
+            PARAMETER_FIRST_CHECKS
+                .iter()
+                .map(move |check| format!("{name}{check}"))
+                .chain(
+                    NULL_FIRST_CHECKS
+                        .iter()
+                        .map(move |check| format!("{check}{name}")),
+                )
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+fn checks_a_parameter(node: Node<'_>, source: &[u8], checks: &[String]) -> bool {
+    node.child_by_field_name(CONDITION_FIELD)
+        .is_some_and(|condition| {
+            let written: String = text(condition, source).split_whitespace().collect();
+            checks.iter().any(|check| written.contains(check.as_str()))
+        })
+}
+
+fn may_be_null(value: Node<'_>) -> bool {
+    match value.kind() {
+        NULL => true,
+        PARENTHESIZED => named_children(value)
+            .first()
+            .is_some_and(|inner| may_be_null(*inner)),
+        TERNARY => [CONSEQUENCE_FIELD, ALTERNATIVE_FIELD]
+            .iter()
+            .filter_map(|field| value.child_by_field_name(field))
+            .any(may_be_null),
+        _ => false,
+    }
+}
+
+// El nombre de un parámetro; el de un varargs (`String... textos`) está en su declarador.
+fn parameter_name(parameter: Node<'_>) -> Option<Node<'_>> {
+    parameter.child_by_field_name(NAME_FIELD).or_else(|| {
+        named_children(parameter)
+            .into_iter()
+            .find(|child| child.kind() == VARIABLE_DECLARATOR)
+            .and_then(|declarator| declarator.child_by_field_name(NAME_FIELD))
+    })
+}
+
+fn null_inside(argument: Node<'_>) -> Option<Node<'_>> {
+    match argument.kind() {
+        NULL => Some(argument),
+        CAST => argument.child_by_field_name(VALUE_FIELD).and_then(null_inside),
+        PARENTHESIZED => named_children(argument).first().copied().and_then(null_inside),
+        _ => None,
+    }
+}
+
+// Si alguien puede redefinir el método: IntelliJ sólo infiere nulos de los que no (un constructor,
+// lo estático, privado o `final`, y lo de una clase `final`, anónima, un record o un enum sin
+// cuerpos en sus constantes no se toca).
+pub fn is_overridable(method: Node<'_>) -> bool {
+    if method.kind() == CONSTRUCTOR
+        || has_modifier(method, STATIC)
+        || has_modifier(method, PRIVATE)
+        || has_modifier(method, FINAL)
+    {
+        return false;
+    }
+    let Some(owner) = method.parent().and_then(|body| body.parent()) else {
+        return true;
+    };
+    if owner.kind() == CREATION || owner.kind() == RECORD {
+        return false;
+    }
+    if owner.kind() == INTERFACE || !is_type_declaration(owner) {
+        return true;
+    }
+    if owner.kind() == ENUM {
+        return enum_has_bodies(owner);
+    }
+    !has_modifier(owner, FINAL)
+}
+
+fn enum_has_bodies(declaration: Node<'_>) -> bool {
+    declaration
+        .child_by_field_name(BODY_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(named_children)
+        .any(|part| part.kind() == CLASS_BODY)
+}
+
+// Los `null` que una llamada pasa como argumento.
+pub fn null_arguments(
+    call: Node<'_>,
+    source: &[u8],
+    variables: &Variables,
+    imported: &StaticImports,
+) -> Vec<NullArgument> {
+    let (name, is_constructor, receiver) = match call.kind() {
+        INVOCATION => {
+            let Some(name) = call.child_by_field_name(NAME_FIELD) else {
+                return Vec::new();
+            };
+            (
+                text(name, source).to_owned(),
+                false,
+                imported.receiver(call, source, variables),
+            )
+        }
+        CREATION
+            if !named_children(call)
+                .iter()
+                .any(|child| child.kind() == CLASS_BODY) =>
+        {
+            let Some(created) = call.child_by_field_name(TYPE_FIELD) else {
+                return Vec::new();
+            };
+            let name = simple_type_name(text(created, source));
+            (name.clone(), true, Receiver::Type(name))
+        }
+        _ => return Vec::new(),
+    };
+    let arity = argument_count(call);
+    call.child_by_field_name(ARGUMENTS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|argument| !COMMENTS.contains(&argument.kind()))
+        .enumerate()
+        .filter_map(|(index, argument)| {
+            let literal = null_inside(argument)?.start_position();
+            Some(NullArgument {
+                name: name.clone(),
+                is_constructor,
+                arity,
+                receiver: receiver.clone(),
+                index,
+                line: one_based(literal.row),
+                column: one_based(literal.column),
+            })
+        })
+        .collect()
+}

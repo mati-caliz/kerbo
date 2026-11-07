@@ -11,10 +11,11 @@ use crate::lint::java_caught_calls::CaughtCall;
 use crate::lint::java_chains::Chain;
 use crate::lint::java_constants::{Constant, declared_constants};
 use crate::lint::java_fields::{DeclaredField, declared_fields, used_identifiers, written_only_identifiers};
-use crate::lint::java_inference::unconditionally_dereferenced;
+use crate::lint::java_inference::{dereferenced_first, unconditionally_dereferenced};
 use crate::lint::java_null_flow::NullFlow;
+use crate::lint::java_null_inference::{NullArgument, is_overridable, null_arguments, returns_null};
 use crate::lint::java_owner::{Owner, annotation_names};
-use crate::lint::java_receivers::Receiver;
+use crate::lint::java_receivers::{Receiver, StaticImports, variable_types};
 use crate::lint::java_resources::ResourceCandidate;
 use crate::lint::java_throws::MethodThrows;
 use crate::lint::taint::TaintMethod;
@@ -49,7 +50,7 @@ pub struct Parameter {
     pub name: String,
     pub position: Position,
     pub declares_nullness: bool,
-    pub dereferenced: bool,
+    pub dereferenced: Dereferenced,
     pub reading: Reading,
 }
 
@@ -58,6 +59,24 @@ pub struct Parameter {
 pub enum Reading {
     Read,
     Unread,
+}
+
+// Si el método desreferencia el parámetro en todos los caminos (IntelliJ lo infiere no nulo) y si
+// eso es lo primero que hace con él.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Dereferenced {
+    No,
+    Always,
+    AlwaysFirst,
+}
+
+// Lo que IntelliJ infiere de nulos en un método: nada si se puede redefinir, y si no, si devuelve
+// `null` sin un contrato que lo explique.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NullInference {
+    Overridable,
+    Closed,
+    ClosedReturnsNull,
 }
 
 // Un método o constructor tal como lo necesita el índice: sin nodos, para guardarlo en la caché.
@@ -75,6 +94,7 @@ pub struct Declaration {
     pub return_type: ReturnType,
     pub returned: String,
     pub returned_arguments: Vec<String>,
+    pub inference: NullInference,
     pub parameters: Vec<Parameter>,
     pub annotations: Vec<String>,
     pub owner: Owner,
@@ -126,6 +146,7 @@ pub struct JavaSummary {
     pub static_imports: Vec<String>,
     pub method_throws: Vec<MethodThrows>,
     pub caught_calls: Vec<CaughtCall>,
+    pub null_arguments: Vec<NullArgument>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -191,6 +212,9 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.taints.extend(extracted.taints);
         summary.method_throws.extend(extracted.method_throws);
         summary.caught_calls.extend(extracted.caught_calls);
+        summary
+            .null_arguments
+            .extend(null_arguments_in(top_level, &nodes, source));
         summary.constants.extend(declared_constants(&nodes, source));
         summary
             .fields
@@ -259,21 +283,35 @@ fn read_names(callable: &Callable<'_>, source: &[u8]) -> HashSet<String> {
         .collect()
 }
 
+fn null_arguments_in(top_level: Node<'_>, nodes: &[Node<'_>], source: &[u8]) -> Vec<NullArgument> {
+    let variables = variable_types(nodes, source);
+    let imported = StaticImports::of(top_level, source);
+    nodes
+        .iter()
+        .flat_map(|node| null_arguments(*node, source, &variables, &imported))
+        .collect()
+}
+
 fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declaration {
     let read = read_names(&callable, source);
     let record = callable
         .name_node
         .parent()
         .is_some_and(|declaration| declaration.kind() == RECORD);
-    let dereferenced = if callable.overrides {
-        callable
-            .name_node
-            .parent()
-            .and_then(|declaration| declaration.child_by_field_name(BODY_FIELD))
-            .map(|body| unconditionally_dereferenced(body, source))
-            .unwrap_or_default()
+    let method = callable.name_node.parent();
+    let body = method.and_then(|declaration| declaration.child_by_field_name(BODY_FIELD));
+    let dereferenced: HashSet<String> = body
+        .map(|body| unconditionally_dereferenced(body, source))
+        .unwrap_or_default();
+    let used_first: HashSet<String> = body
+        .map(|body| dereferenced_first(body, source))
+        .unwrap_or_default();
+    let inference = if method.is_none_or(is_overridable) {
+        NullInference::Overridable
+    } else if method.is_some_and(|declaration| returns_null(declaration, source)) {
+        NullInference::ClosedReturnsNull
     } else {
-        HashSet::new()
+        NullInference::Closed
     };
     Declaration {
         name: callable.name,
@@ -288,6 +326,7 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
         return_type: callable.return_type,
         returned: callable.returned,
         returned_arguments: callable.returned_arguments,
+        inference,
         annotations: callable.annotations,
         owner: callable.owner,
         parameters: callable
@@ -299,7 +338,11 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
                     name: name.to_owned(),
                     position: position_of(*parameter),
                     declares_nullness: declares_nullness(*parameter, source),
-                    dereferenced: dereferenced.contains(name),
+                    dereferenced: match (dereferenced.contains(name), used_first.contains(name)) {
+                        (false, _) => Dereferenced::No,
+                        (true, false) => Dereferenced::Always,
+                        (true, true) => Dereferenced::AlwaysFirst,
+                    },
                     reading: if record || callable.body != Body::Written || read.contains(name) {
                         Reading::Read
                     } else {

@@ -1,9 +1,10 @@
-use super::java::{JavaSummary, Position, lint_at};
-use super::java_jdk::jdk_method;
-use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, resolve};
+use super::java::{JavaSummary, NullInference, Position, lint_at};
+use super::java_jdk::{is_always_defined, jdk_method};
+use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
-use crate::lint::java_chains::{Chain, ChainRoot};
+use crate::lint::java_calls::{Body, ReturnType};
+use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::rules::JavaRule;
 
 const QUALIFIER_SEPARATOR: char = '.';
@@ -67,7 +68,8 @@ fn report(line: usize, column: usize, name: &str) -> LintFinding {
 
 // Por cada paso de la cadena que se pudo resolver en la librería, si devuelve `@Nullable`. El tipo
 // de cada paso sale de la firma del anterior; con sobrecargas del mismo nombre y aridad, sólo si
-// todas dicen lo mismo.
+// todas dicen lo mismo. Lo del JDK que IntelliJ da por posiblemente null va primero: `ct.sym` no
+// trae anotaciones.
 fn nullable_steps(
     types: &ProjectTypes<'_>,
     library: &Library,
@@ -75,12 +77,28 @@ fn nullable_steps(
     chain: &Chain,
 ) -> Vec<bool> {
     let (ChainRoot::Instance(root) | ChainRoot::Class(root)) = &chain.root;
-    let mut classes = match resolve(types, library, summary, root) {
-        Resolved::Library(class) => vec![class],
-        Resolved::Project(name) => library_ancestors(types, library, &name),
-    };
+    let mut current = resolve(types, library, summary, root);
     let mut nullable = Vec::new();
     for step in &chain.steps {
+        if let Resolved::Project(owner) = &current
+            && let Some((is_nullable, returned)) = project_step(types, library, owner, step)
+        {
+            nullable.push(is_nullable);
+            let Some(returned) = returned else {
+                break;
+            };
+            current = returned;
+            continue;
+        }
+        let classes = match &current {
+            Resolved::Library(class) => vec![class.clone()],
+            Resolved::Project(name) => library_ancestors(types, library, name),
+        };
+        if let Some((returned, is_nullable)) = jdk_method(&classes, &step.name, step.arity) {
+            nullable.push(is_nullable && !is_always_defined(&classes, &step.name, &step.text_arguments));
+            current = Resolved::Library(returned.to_owned());
+            continue;
+        }
         let overloads = classes
             .iter()
             .map(|class| library.overloads(class, &step.name, step.arity))
@@ -101,12 +119,7 @@ fn nullable_steps(
             by_class_arguments
         };
         let Some(first) = candidates.first() else {
-            let Some((returned, is_nullable)) = jdk_method(&classes, &step.name, step.arity) else {
-                break;
-            };
-            nullable.push(is_nullable);
-            classes = vec![returned.to_owned()];
-            continue;
+            break;
         };
         nullable.push(candidates.iter().all(|method| {
             method
@@ -121,7 +134,39 @@ fn nullable_steps(
         let Some(returned) = returned else {
             break;
         };
-        classes = vec![returned];
+        current = Resolved::Library(returned);
     }
     nullable
+}
+
+// Un paso que va a un método del proyecto (de la clase o de las de arriba en el proyecto): IntelliJ
+// lo infiere `@Nullable` si devuelve `null` en algún `return` y nadie puede redefinirlo. Sigue por
+// el tipo que declara, si todas las sobrecargas dicen el mismo.
+fn project_step(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    owner: &str,
+    step: &ChainStep,
+) -> Option<(bool, Option<Resolved>)> {
+    let candidates: Vec<_> = project_lineage(types, library, owner).iter().find_map(|class| {
+        let found: Vec<_> = types
+            .declarations_of(class)
+            .filter(|(_, declaration)| {
+                !declaration.is_constructor
+                    && declaration.name == step.name
+                    && declaration.parameters.len() == step.arity
+            })
+            .collect();
+        (!found.is_empty()).then_some(found)
+    })?;
+    let is_nullable = candidates.iter().all(|(_, declaration)| {
+        declaration.inference == NullInference::ClosedReturnsNull && declaration.body == Body::Written
+    });
+    let mut returned = candidates.iter().map(|(declaring, declaration)| {
+        (declaration.return_type == ReturnType::Reference)
+            .then(|| resolve(types, library, declaring, &declaration.returned))
+    });
+    let first = returned.next().flatten();
+    let same = returned.all(|other| other == first);
+    Some((is_nullable, first.filter(|_| same)))
 }

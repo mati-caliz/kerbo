@@ -61,15 +61,9 @@ pub fn diagnostics(files: &[IndexedFile], root: &Path) -> Vec<Diagnostic> {
     } else {
         Vec::new()
     };
-    let wants_jdk = files
-        .iter()
-        .any(|file| file.limits.get(RuleId::Java(JavaRule::RedundantThrows)).is_some());
-    let jdk = if wants_jdk {
-        Jdk::locate(project_release(root))
-    } else {
-        None
-    };
-    let library = Library::load(&jars).with_jdk(jdk);
+    let release = wants_library.then(|| project_release(root)).flatten();
+    let jdk = if wants_library { Jdk::locate(release) } else { None };
+    let library = Library::load(&jars).with_jdk(jdk).with_release(release);
     let summaries: Vec<IndexedSummary<'_>> = files
         .iter()
         .map(|file| IndexedSummary {

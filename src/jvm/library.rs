@@ -26,6 +26,7 @@ pub struct Library {
     classes: RefCell<HashMap<String, Option<Rc<ClassFile>>>>,
     jdk: Option<Jdk>,
     jdk_classes: RefCell<HashMap<String, Option<Rc<ClassFile>>>>,
+    release: Option<u32>,
 }
 
 impl Library {
@@ -43,7 +44,18 @@ impl Library {
             classes: RefCell::new(HashMap::new()),
             jdk: None,
             jdk_classes: RefCell::new(HashMap::new()),
+            release: None,
         }
+    }
+
+    // El `release` de Java del proyecto, si el build lo dice.
+    pub const fn with_release(mut self, release: Option<u32>) -> Self {
+        self.release = release;
+        self
+    }
+
+    pub const fn release(&self) -> Option<u32> {
+        self.release
     }
 
     // El JDK va aparte de las dependencias: `class` sigue siendo sólo lo que viene de los jars, porque
@@ -124,7 +136,7 @@ impl Library {
             if !seen.insert(current.clone()) {
                 continue;
             }
-            let Some(found) = self.class(&current) else {
+            let Some(found) = self.class_or_jdk(&current) else {
                 continue;
             };
             let matching: Vec<Method> = found

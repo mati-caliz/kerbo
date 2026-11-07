@@ -265,6 +265,12 @@ fn the_release_comes_from_the_build_and_skips_what_is_not_a_number() {
         "<project><maven.compiler.source>1.8</maven.compiler.source></project>",
     );
     assert_eq!(project_release(legacy.path()), Some(8));
+    let indirect = TempTree::new("jvm-release-indirect");
+    indirect.write(
+        "pom.xml",
+        "<project><properties><jdkVersion>1.5</jdkVersion></properties><source>${jdkVersion}</source></project>",
+    );
+    assert_eq!(project_release(indirect.path()), Some(5));
     let gradle = TempTree::new("jvm-release-gradle");
     gradle.write(
         "build.gradle",
