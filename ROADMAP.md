@@ -1556,7 +1556,8 @@ y desparejas: ShellCheck 0.11.0 repetido en cuatro scripts de `scripts/parity/sh
 golangci-lint v2.15.0 en dos de `scripts/parity/go/`, ruff 0.17.1 en `.parity` pero 0.17.0 en
 `scripts/agent-harness/run.py`, ESLint 10.13 y typescript-eslint 8.72 en
 `.parity/eslint/package.json`, Qodana sin versión fija (`:latest`), y las gramáticas de
-tree-sitter copiadas en `grammars/`.
+tree-sitter copiadas en `grammars/`. Cuando entre tsrs (etapas 11 y 16), su commit y la versión de
+TypeScript que sigue van en el mismo archivo.
 
 - Un solo archivo de versiones de referencia (`scripts/parity/versions.toml`) del que lean todos
   los scripts de paridad, y que el README cite las mismas. Fijar la versión de Qodana.
@@ -1604,8 +1605,24 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
 - `Map.get` y lo que devuelve una lambda en el flujo de nulos: en junit4 y commons-lang Qodana no
   marca ninguno; queda para medir en un repo que los use (Spring, Micrometer).
 - En JS/TS, los tipos del compilador de TypeScript para reconocer conexiones y objetos del pedido
-  sin depender del nombre de la variable. Hoy kerbo no habla con el compilador: hace falta levantar
-  Node con el `typescript` del proyecto y preguntarle el tipo de cada receptor.
+  sin depender del nombre de la variable, y para las reglas de typescript-eslint que piden tipos
+  (`no-floating-promises`, `no-misused-promises`, `await-thenable`, `no-unnecessary-condition`).
+  Hoy kerbo no habla con el compilador. En vez de levantar Node con el `typescript` del proyecto,
+  usar [tsrs](https://github.com/oxc-project/tsrs) como librería, adentro del binario:
+  - tsrs (Apache-2.0, de Oxc, Cloudflare y VoidZero) es el port a Rust de TypeScript 7, función
+    por función desde el de Go, y está separado en crates: `tsrs_parser`, `tsrs_binder`,
+    `tsrs_checker`, `tsrs_compiler`, y un `tsrs_lint` con unas 60 reglas de typescript-eslint con
+    tipos ya portadas sobre su checker. Mismo Rust (1.99) y edición (2024) que kerbo.
+  - Se puede, pero no está pensado para eso: todos sus crates son `publish = false`, así que va
+    como dependencia de git fijada a un commit (y `deny.toml` tiene que permitir ese repo), y su
+    API de Rust calca la estructura del port de Go, sin promesa de estabilidad: cada subida de
+    versión puede romper. `stiles-tsrs` en crates.io lo reempaqueta en un crate, pero es de un
+    tercero y casi sin uso.
+  - Primero medir: tamaño del binario y tiempo de compilación con el checker adentro, y memoria y
+    tiempo chequeando un monorepo real. Si pesa demasiado, la alternativa es el proceso aparte
+    (`tsrs --api`, la API de TypeScript 7 por MessagePack sobre stdio), sin Node.
+  - Ver si conviene usar `tsrs_lint` para las reglas con tipos, en vez de portarlas, midiendo
+    paridad contra typescript-eslint igual que las demás.
 - Un JDK de `jlink --compress` no se lee.
 
 ### 15. Java: Javadoc, paridad con PMD y Qodana, y la API nueva
@@ -1682,9 +1699,11 @@ Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_check
   - Go: `go test` ya compila y guarda resultados en caché; sólo la selección de tests.
 - Procesos vivos con tope de memoria y servicios de los tests (bases en contenedores) reusados en
   vez de levantados de cero.
-- Los chequeos de tipos en caliente, sin reimplementarlos: `tsc` (o `tsrs`, su port a Rust, que
-  chequea lo mismo con un tercio de la memoria) incremental y sólo en los paquetes del monorepo
-  que toca el cambio, y el demonio de mypy (`dmypy`) vivo entre corridas.
+- Los chequeos de tipos en caliente, sin reimplementarlos: `tsrs` (el port a Rust de TypeScript 7,
+  que sigue a TypeScript 7.1 beta; ver la etapa 16) en vez de `tsc`, incremental y sólo en los
+  paquetes del monorepo que toca el cambio, y el demonio de mypy (`dmypy`) vivo entre corridas.
+  tsrs es experimental y documenta diferencias con TypeScript (`docs/COMPATIBILITY.md`): medir sus
+  diagnósticos contra `tsgo` de la misma versión sobre repos reales antes de usarlo en el gate.
 - **Mutation testing sólo sobre lo cambiado**: con el mapa de qué test ejecuta qué código, mutar
   las líneas del cambio y correr sólo los tests que las cubren. Marca el test que pasa sin
   verificar nada, que es la trampa típica de un agente.
