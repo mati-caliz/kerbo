@@ -17,6 +17,7 @@
 
 - [Sitio en español](https://kerbo.matiascaliz.com.ar/)
 - [README en español](https://github.com/mati-caliz/kerbo/blob/main/README.md)
+- [Documentación](https://github.com/mati-caliz/kerbo/tree/main/docs)
 - [Hoja de ruta](https://github.com/mati-caliz/kerbo/blob/main/ROADMAP.md)
 
 ## English
@@ -29,3 +30,4 @@
 
 - [English site](https://kerbo.matiascaliz.com.ar/en/)
 - [README in English](https://github.com/mati-caliz/kerbo/blob/main/README.en.md)
+- [Documentation](https://github.com/mati-caliz/kerbo/tree/main/docs/en)

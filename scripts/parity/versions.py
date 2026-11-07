@@ -3,7 +3,7 @@
 
     python scripts/parity/versions.py version shellcheck     # 0.11.0
     python scripts/parity/versions.py image shellcheck       # koalaman/shellcheck-alpine:v0.11.0
-    python scripts/parity/versions.py check                  # Cargo.toml, gramáticas, ESLint y README dicen lo mismo
+    python scripts/parity/versions.py check                  # Cargo.toml, gramáticas, ESLint y la documentación dicen lo mismo
     python scripts/parity/versions.py outdated               # cuánto atraso hay contra lo último publicado
 """
 
@@ -19,7 +19,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 VERSIONS = HERE / "versions.toml"
 CARGO = REPO / "Cargo.toml"
-README = REPO / "README.md"
+DOCS = REPO / "docs"
 ESLINT_PACKAGE = pathlib.Path(os.environ.get("KERBO_PARITY", REPO / ".parity")) / "eslint" / "package.json"
 USER_AGENT = "kerbo-parity-versions"
 TIMEOUT_SECONDS = 20
@@ -135,11 +135,11 @@ def check():
             copied_cargo = (REPO / copied / "Cargo.toml").read_text(encoding="utf-8")
             if f'version = "{grammar["version"]}"' not in copied_cargo:
                 problems.append(f"{copied}/Cargo.toml no dice la versión {grammar['version']}")
-    readme = README.read_text(encoding="utf-8")
+    documentation = "\n".join(page.read_text(encoding="utf-8") for page in sorted(DOCS.glob("*.md")))
     for name, tool in data["tools"].items():
-        cited = tool.get("readme")
-        if cited and expand(cited, tool["version"]) not in readme:
-            problems.append(f"el README no cita «{expand(cited, tool['version'])}» ({name})")
+        cited = tool.get("cited_as")
+        if cited and expand(cited, tool["version"]) not in documentation:
+            problems.append(f"docs/ no cita «{expand(cited, tool['version'])}» ({name})")
     if ESLINT_PACKAGE.exists():
         dependencies = json.loads(ESLINT_PACKAGE.read_text(encoding="utf-8")).get("dependencies", {})
         for name, tool in data["tools"].items():
@@ -153,7 +153,7 @@ def check():
         print(problem)
     if problems:
         sys.exit(1)
-    print("versions.toml, Cargo.toml, las gramáticas, ESLint y el README coinciden")
+    print("versions.toml, Cargo.toml, las gramáticas, ESLint y la documentación coinciden")
 
 
 def main():

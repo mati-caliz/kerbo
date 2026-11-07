@@ -25,7 +25,7 @@ para Java, TypeScript/JavaScript, Python y Go.
 
 ## Qué sigue
 
-Lo que kerbo ya hace está en el [README](README.md); acá queda sólo lo abierto. Después de la 10,
+Lo que kerbo ya hace está en el [README](README.md) y en [docs/](docs/); acá queda sólo lo abierto. Después de la 10,
 las etapas van de la que menos trabajo le queda a la que más, y se atacan en ese orden; los números
 no cambian. Cada etapa se cierra con la paridad medida y los tests del caso que la motivó, y al
 cerrarse se borra de acá.
