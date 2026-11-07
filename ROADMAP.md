@@ -1207,6 +1207,19 @@ cerrarse se borra de acá.
     (eran 245) y sobran 2; con directivas 2.348 idénticos y sobran 89 (los 87 SC2016 de `nvm.sh` ya
     anotados y los 2 de `acme.sh` de abajo). Quedan como fixture en `src/shell/fixtures/grammar_forms.sh`,
     con un test que compara todos los códigos, y como pruebas en `scripts/parity/shell/testdata/grammar`.
+- Líneas que empiezan con una barra y medición sin ocultos (hecho, 2026-11-07):
+  - El lexer de tree-sitter-bash pega al comando de arriba una línea con `\` en la primera columna
+    (`set +e⏎\. ../nvm.sh`): arma una palabra que arranca en el salto de línea. Si aparece esa firma
+    en un argumento o el nombre de un comando, se inserta un espacio antes de la barra, se vuelve a
+    parsear y las posiciones se devuelven con el mapa de `Repaired` (`shell/repair/backslash_lines.rs`).
+    Con eso entran los tests de nvm que cargan `nvm.sh` así.
+  - `list_files.py` saltea lo oculto como kerbo (el README lo decide así), y los `.integration-*` de
+    moby dejan de contar como faltantes.
+  - Herramientas: `scripts/parity/shell/parse_errors.sh` (con `examples/shell_parse_errors.rs`) lista
+    dónde la gramática da error o un comando se traga una línea, en todo el corpus o en archivos
+    sueltos; `scripts/parity/shell/grammar.sh` corre `tree-sitter generate`, `test` y `parse` (con
+    `DEBUG=1`, la traza del lexer) en un contenedor de node, sin compilar kerbo.
+  - Corpus sin directivas: 4.246 idénticos, faltan 135 y sobran 2 (los de `acme.sh`).
 - Pendientes de Shell contra ShellCheck:
   - Los demás avisos del parser de ShellCheck (SC1xxx, unos 120): casi todos son errores de sintaxis, y
     en esos archivos kerbo no analiza nada. En el corpus aparecen SC1071 (4), SC1073, SC1072, SC1083 (2
@@ -1255,9 +1268,15 @@ cerrarse se borra de acá.
     directivas). Un archivo con errores de parseo que kerbo no saltea, a revisar.
   - `${x:=valor}` asigna `x` para el flujo de ShellCheck (después no hay SC2086 sobre `x`); el
     seguimiento de valores de SC2086 (`shell/flow/`) no lo modela todavía.
-  - 21 archivos del corpus no tienen ningún aviso de kerbo (149 avisos de ShellCheck sin directivas)
-    porque tree-sitter-bash no los parsea o se traga líneas: `git-completion.bash` de ohmyzsh (80),
-    `neofetch` (20) y los `.integration-*` de moby, entre otros.
+  - Lo que más falta en el corpus (135 sin directivas) son archivos que la gramática no lee:
+    `git-completion.bash` de ohmyzsh (80, por `${(M)${(k)parameters[@]}:#…}` de zsh en la línea 326),
+    `neofetch` (20, `"${disk_sub:+ ($disk_sub)}"`: un `(` adentro de `${x:+…}` entre comillas), `_wd.sh`
+    (9, `${(f)…}` de zsh), `dns_servercow.sh` (línea 16) y `windows_rdp.sh` (un heredoc con
+    `[Convert]::…('${x}')`). Los ali_cdn/ali_dcdn/dns_ali de acme.sh siguen con el `$` suelto.
+    `parse_errors.sh` los lista.
+  - `set +e # x⏎: nvm.sh⏎\. ../../nvm.sh` (el test "nvm unload"): la línea con la barra se pega a
+    `: nvm.sh` pero la reparación no la ve, sin explicar todavía. `update-vendor.sh` y `core.sh` de
+    kubernetes aparecen en `parse_errors.sh` como comandos que se tragan una línea, también sin revisar.
   - En `_hmac` de `acme.sh`, `(… "$(printf "%s" "$x" | _h2b)") | cut -d = -f 2 | tr -d ' '` seguido de
     `else` y otra línea parecida: tree-sitter (también el de arriba) pega `else` y la línea siguiente como
     argumentos de `tr`, sin marcar error. Sobran un SC2020 y un SC2086. Recortando cualquier parte de las

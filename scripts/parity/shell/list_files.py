@@ -1,14 +1,18 @@
 """Lista los scripts del corpus que kerbo analiza como shell: .sh, .bash y los que no tienen
-extensión con shebang de sh, bash, dash o busybox (también por env). Rutas relativas al corpus."""
+extensión con shebang de sh, bash, dash o busybox (también por env). Rutas relativas al corpus.
+Saltea lo oculto como kerbo, salvo `.github/` y `.devcontainer/`."""
 import os
 import re
 import sys
 
 SHEBANG = re.compile(rb'^#!\s*(?:\S*/)?(?:env\s+(?:-\S+\s+)*)?(?:\S*/)?(sh|bash|dash|busybox)\b')
+VISIBLE_HIDDEN = {'.github', '.devcontainer'}
 corpus = sys.argv[1]
 for root, directories, files in os.walk(corpus):
-    directories[:] = [name for name in directories if name != '.git']
+    directories[:] = [name for name in directories if not name.startswith('.') or name in VISIBLE_HIDDEN]
     for name in sorted(files):
+        if name.startswith('.'):
+            continue
         path = os.path.join(root, name)
         extension = os.path.splitext(name)[1]
         if extension in ('.sh', '.bash'):

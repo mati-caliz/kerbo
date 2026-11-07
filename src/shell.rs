@@ -91,23 +91,49 @@ pub fn analyze(parser: &mut Parser, unit: SourceUnit<'_>) -> Option<Result<Vec<V
         let blanked = repair::blank_backtick_comments(unit.source);
         let source = blanked.as_deref().unwrap_or(unit.source);
         let tree = parser.parse(source, None).ok_or(ParseFailed)?;
-        if !tree.root_node().has_error() {
-            return parsed_violations(parser, tree.root_node(), source, defaults);
-        }
-        let Some(requoted) = repair::double_quote_globbed_strings(source) else {
-            return Ok(Vec::new());
-        };
-        let requoted_tree = parser.parse(&requoted.source, None).ok_or(ParseFailed)?;
-        if requoted_tree.root_node().has_error() {
-            return Ok(Vec::new());
-        }
-        Ok(
-            parsed_violations(parser, requoted_tree.root_node(), &requoted.source, defaults)?
+        let line_starts = repair::glued_backslash_lines(tree.root_node(), source);
+        if !line_starts.is_empty() {
+            let indented = repair::indent_lines(source, &line_starts);
+            return Ok(source_violations(parser, &indented.source, defaults)?
                 .into_iter()
-                .map(|violation| repair::restore(violation, &requoted, source))
-                .collect(),
-        )
+                .map(|violation| repair::restore(violation, &indented, source))
+                .collect());
+        }
+        tree_violations(parser, tree.root_node(), source, defaults)
     })
+}
+
+fn source_violations(
+    parser: &mut Parser,
+    source: &[u8],
+    defaults: ShellDefaults,
+) -> Result<Vec<Violation>, ParseFailed> {
+    let tree = parser.parse(source, None).ok_or(ParseFailed)?;
+    tree_violations(parser, tree.root_node(), source, defaults)
+}
+
+fn tree_violations(
+    parser: &mut Parser,
+    root: Node<'_>,
+    source: &[u8],
+    defaults: ShellDefaults,
+) -> Result<Vec<Violation>, ParseFailed> {
+    if !root.has_error() {
+        return parsed_violations(parser, root, source, defaults);
+    }
+    let Some(requoted) = repair::double_quote_globbed_strings(source) else {
+        return Ok(Vec::new());
+    };
+    let requoted_tree = parser.parse(&requoted.source, None).ok_or(ParseFailed)?;
+    if requoted_tree.root_node().has_error() {
+        return Ok(Vec::new());
+    }
+    Ok(
+        parsed_violations(parser, requoted_tree.root_node(), &requoted.source, defaults)?
+            .into_iter()
+            .map(|violation| repair::restore(violation, &requoted, source))
+            .collect(),
+    )
 }
 
 fn parsed_violations(
@@ -254,9 +280,19 @@ pub fn directive_coverage(source: &str) -> HashMap<usize, Coverage> {
     }
     let blanked = repair::blank_backtick_comments(source.as_bytes());
     let parsed = blanked.as_deref().unwrap_or(source.as_bytes());
-    parser.parse(parsed, None).map_or_else(HashMap::new, |tree| {
-        Directives::read(tree.root_node(), parsed).coverage
-    })
+    let Some(tree) = parser.parse(parsed, None) else {
+        return HashMap::new();
+    };
+    let line_starts = repair::glued_backslash_lines(tree.root_node(), parsed);
+    if line_starts.is_empty() {
+        return Directives::read(tree.root_node(), parsed).coverage;
+    }
+    let indented = repair::indent_lines(parsed, &line_starts);
+    parser
+        .parse(&indented.source, None)
+        .map_or_else(HashMap::new, |indented_tree| {
+            Directives::read(indented_tree.root_node(), &indented.source).coverage
+        })
 }
 
 pub fn disables(code: &str, rule: RuleId) -> bool {

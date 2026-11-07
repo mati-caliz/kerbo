@@ -380,5 +380,9 @@ pub fn point_of(source: &[u8], byte: usize) -> Point {
     }
 }
 
+mod backslash_lines;
+
+pub use backslash_lines::{glued_backslash_lines, indent_lines};
+
 #[cfg(test)]
 mod tests;

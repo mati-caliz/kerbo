@@ -50,3 +50,6 @@ echo $((10#${a##*.}))
 body="{\"rdata\":"[${a}]"}"
 list=[$a]
 echo "$body" "$list"
+set +e # nota
+\. ./lib.sh
+set -e
