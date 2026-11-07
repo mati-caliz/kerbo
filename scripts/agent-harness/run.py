@@ -18,6 +18,7 @@ import statistics
 import subprocess
 import tempfile
 import time
+import tomllib
 from pathlib import Path
 
 HARNESS = Path(__file__).resolve().parent
@@ -41,11 +42,18 @@ PROTECTED_FILES = {
 HIDDEN_WINDOW = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
 GATE_COUNTER = f'echo run >> {GATE_LOG}\n'
 HERE = '"$(pwd -W 2>/dev/null || pwd)"'
+VERSIONS = Path(__file__).resolve().parent.parent / "parity" / "versions.toml"
+
+
+def reference_version(tool):
+    return tomllib.loads(VERSIONS.read_text(encoding="utf-8"))["tools"][tool]["version"]
+
+
 TOOL_GATES = {
-    "python": "uvx ruff@0.17.0 check --no-cache --select E4,E7,E9,F .\n",
+    "python": f"uvx ruff@{reference_version('ruff')} check --no-cache --select E4,E7,E9,F .\n",
     "go": (
         f"MSYS_NO_PATHCONV=1 docker run --rm -v {HERE}:/app -w /app "
-        "golangci/golangci-lint:v2.15.0 golangci-lint run ./...\n"
+        f"golangci/golangci-lint:v{reference_version('golangci-lint')} golangci-lint run ./...\n"
     ),
     "java": 'java -jar "{tools}/checkstyle.jar" -c "{harness}/tools/checkstyle.xml" src\n',
     "ts": '"{tools}/node_modules/.bin/eslint" --config "{tools}/eslint.config.mjs" .\n',

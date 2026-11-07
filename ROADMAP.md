@@ -1550,24 +1550,24 @@ cerrarse se borra de acá.
 
 ### 17. Versiones de referencia al día
 
-kerbo reimplementa las reglas, así que no se actualiza solo: cada familia está medida contra una
-versión fija y lo que traiga una versión nueva hay que portarlo. Hoy las versiones están repartidas
-y desparejas: ShellCheck 0.11.0 repetido en cuatro scripts de `scripts/parity/shell/`,
-golangci-lint v2.15.0 en dos de `scripts/parity/go/`, ruff 0.17.1 en `.parity` pero 0.17.0 en
-`scripts/agent-harness/run.py`, ESLint 10.13 y typescript-eslint 8.72 en
-`.parity/eslint/package.json`, Qodana sin versión fija (`:latest`), y las gramáticas de
-tree-sitter copiadas en `grammars/`. Cuando entre tsrs (etapas 11 y 16), su commit y la versión de
-TypeScript que sigue van en el mismo archivo.
+Hecho (2026-11-07): las versiones contra las que se mide cada familia están en
+`scripts/parity/versions.toml`, y los scripts de paridad las leen con `scripts/parity/versions.py`
+(`version`, `image`). `versions.py check` verifica que `Cargo.toml`, las gramáticas copiadas, el
+ESLint de `.parity/eslint` y el README digan lo mismo; `versions.py outdated` muestra el atraso
+contra lo último publicado; `scripts/parity/run_all.sh` corre los corpus de todas las familias por la
+cola y deja la salida en `.parity/logs/<fecha>/`. Qodana quedó fijado en `2026.3-eap`, la imagen con
+que se midió. El criterio de ritmo está en el encabezado de `versions.toml`.
 
-- Un solo archivo de versiones de referencia (`scripts/parity/versions.toml`) del que lean todos
-  los scripts de paridad, y que el README cite las mismas. Fijar la versión de Qodana.
-- Un script que compare esas versiones con las últimas publicadas de cada herramienta y de cada
-  gramática, y muestre cuánto atraso hay por familia.
-- Un script que corra todos los corpus de paridad seguidos, por la cola de `heavy_lock.py`, y deje
-  las diferencias por familia: la lista de lo que cuesta subir de versión.
-- Criterio de ritmo: los parches y las menores se siguen apenas salen, que son baratos si se hacen
-  seguido (ruff y typescript-eslint sacan casi todas las semanas); las mayores (ESLint 11,
-  golangci-lint v3) o una gramática nueva se agendan como una tanda propia.
+- Pendientes:
+  - Subir lo atrasado al 2026-11-07, con `run_all.sh` antes y después de cada familia: ESLint 10.14,
+    typescript-eslint 8.72.1, ruff 0.17.4, squawk 2.71, tree-sitter 0.27.2 (parches y menores);
+    TypeScript 7 y Django 6 (mayores, tanda propia). Checkstyle figura como 14 sin la menor medida.
+  - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
+    siempre pero falta una corrida completa.
+  - Los arneses de squawk, hadolint, gitleaks y osv-scanner no quedaron en el repo (se perdieron
+    con los scratchpads): hay que rearmarlos en `scripts/parity/` para que entren en `run_all.sh`.
+  - Cuando entre tsrs (etapas 11 y 16), su commit y la versión de TypeScript que sigue van en
+    `versions.toml`.
 
 ### 14. Más migraciones: Django y Rails
 

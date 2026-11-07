@@ -6,7 +6,8 @@
 #   scripts/parity/java/qodana.sh junit4 AutoCloseableResource
 set -euo pipefail
 
-readonly IMAGE="jetbrains/qodana-jvm-community:latest"
+IMAGE="$(python "$(dirname "${BASH_SOURCE[0]}")/../versions.py" image qodana)"
+readonly IMAGE
 readonly CPUS=4
 readonly MEMORY_LIMIT="8g"
 repo="$1"

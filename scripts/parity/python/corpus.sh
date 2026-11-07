@@ -17,6 +17,9 @@ while [ "${1:-}" = "--skip-ruff" ] || [ "${1:-}" = "--skip-kerbo" ]; do
   shift
 done
 if [ -z "$skip_ruff" ]; then
+  wanted="$(python "$here/../versions.py" version ruff)"
+  installed="$("$parity/ruff/ruff.exe" --version | cut -d" " -f2)"
+  [ "$installed" = "$wanted" ] || { echo "ruff $installed en .parity/ruff, versions.toml pide $wanted" >&2; exit 1; }
   select_codes="$(python "$here/compare.py" --select-codes)"
   (cd "$parity/corpus" && "$parity/ruff/ruff.exe" check --isolated --no-cache --exit-zero --output-format json \
     --select "$select_codes" "${CORPUS_PATHS[@]}" > "$here/out/ruff.json")

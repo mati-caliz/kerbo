@@ -4,9 +4,9 @@
 # .parity/qodana/<repo>/kerbo.json.
 #
 #   scripts/parity/java/kerbo.sh junit4 hamcrest-core-1.3.jar
-#   scripts/parity/java/kerbo.sh commons-lang "opentest4j-*.jar apiguardian-api-*.jar junit-pioneer-*.jar #     jmh-core-*.jar commons-math3-*.jar commons-text-*.jar easymock-*.jar objenesis-3.4.jar #     junit-jupiter-params-*.jar junit-jupiter-api-*.jar junit-platform-commons-*.jar mockito-core-*.jar"
 #
-# Con "*.jar" entra el propio jar del repo, que tapa a sus clases y ensucia la comparación.
+# Los jars de cada repo del corpus están en classpaths.txt. Con "*.jar" entra el propio jar del repo,
+# que tapa a sus clases y ensucia la comparación.
 set -euo pipefail
 
 readonly CPUS=4

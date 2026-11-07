@@ -4,12 +4,13 @@
 # go-parity y testdata/errcheck_options. Deja la salida en out/errcheck_options para el comparador.
 # uso: errcheck_options.sh [repos...]
 set -euo pipefail
+versions="$(cd "$(dirname "$0")/.." && pwd)/versions.py"
 here="$(cd "$(dirname "$0")" && pwd -W)"
 out="$(cd "$(dirname "$0")" && pwd)/out/errcheck_options"
 repos="${*:-chi cobra gin fzf caddy}"
 rm -rf "$out" && mkdir -p "$out/helper" "$out/golangci"
 MSYS_NO_PATHCONV=1 docker run --rm -v "$here:/p:ro" -v "$(cd "$out" && pwd -W):/o" -v go-parity:/w \
-  -v gocache:/root/.cache/go-build -v gomodcache:/go/pkg/mod golangci/golangci-lint:v2.15.0 bash -c '
+  -v gocache:/root/.cache/go-build -v gomodcache:/go/pkg/mod "$(python "$versions" image golangci-lint)" bash -c '
     rm -rf /w/repos/errcheck_options && cp -r /p/testdata/errcheck_options /w/repos/errcheck_options
     for repo in errcheck_options '"$repos"'; do
       for mod in $(cd /w/repos/$repo && find . -name go.mod -not -path "*/testdata/*" -not -path "*/vendor/*" | sort); do
@@ -20,7 +21,7 @@ MSYS_NO_PATHCONV=1 docker run --rm -v "$here:/p:ro" -v "$(cd "$out" && pwd -W):/
       done
     done'
 MSYS_NO_PATHCONV=1 docker run --rm -v "$(cd "$out" && pwd -W):/o" -v go-parity:/w \
-  -v gocache:/root/.cache/go-build -v gomodcache:/go/pkg/mod golang:1.27 bash -c '
+  -v gocache:/root/.cache/go-build -v gomodcache:/go/pkg/mod "$(python "$versions" image go)" bash -c '
     for repo in errcheck_options '"$repos"'; do
       for mod in $(cd /w/repos/$repo && find . -name go.mod -not -path "*/testdata/*" -not -path "*/vendor/*" | sort); do
         dir=$(dirname $mod); tag=$(echo "$repo/$dir" | tr "/." "__")

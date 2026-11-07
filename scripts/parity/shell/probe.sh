@@ -3,6 +3,7 @@
 # avisos cuyo código empieza con el prefijo (por defecto, todos).
 # Uso: scripts/parity/shell/probe.sh bashisms [sc30]
 set -euo pipefail
+versions="$(cd "$(dirname "$0")/.." && pwd)/versions.py"
 here="$(cd "$(dirname "$0")" && pwd)"
 folder="$1"
 prefix="${2:-sc}"
@@ -10,7 +11,7 @@ repo="$(cd "$here/../../.." && pwd -W)"
 data="$(cd "$here/testdata/$folder" && pwd -W)"
 mkdir -p "$here/out"
 out="$(cd "$here/out" && pwd -W)"
-MSYS_NO_PATHCONV=1 docker run --rm -v "$data:/p:ro" -v "$out:/o" koalaman/shellcheck-alpine:v0.11.0 \
+MSYS_NO_PATHCONV=1 docker run --rm -v "$data:/p:ro" -v "$out:/o" "$(python "$versions" image shellcheck)" \
   sh -c 'cd /p && shellcheck -f json1 *.sh > /o/probe-shellcheck.json; exit 0'
 image="$(docker images --format '{{.Repository}}:{{.Tag}}' quality-rust | head -1)"
 MSYS_NO_PATHCONV=1 docker run --rm -m 16g --cpus=8 -v "$repo:/src:ro" -w /src -v rust-quality-cache:/cache \

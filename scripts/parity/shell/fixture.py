@@ -31,11 +31,18 @@ else:
     body = open(script_path, encoding='utf-8', newline='').read()
 folder = subprocess.run(['cygpath', '-w', os.path.abspath(fixtures)], capture_output=True, text=True).stdout.strip()
 output = subprocess.run(
-    ['docker', 'run', '--rm', '-v', f'{folder}:/f:ro', 'koalaman/shellcheck-alpine:v0.11.0',
+    ['docker', 'run', '--rm', '-v', f'{folder}:/f:ro', shellcheck_image(),
      'shellcheck', '--norc', '-f', 'json1', f'/f/{name}.sh'],
     capture_output=True, text=True, env=dict(os.environ, MSYS_NO_PATHCONV='1'),
 ).stdout
 lines = body.split('\n')
+
+
+
+def shellcheck_image():
+    versions = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'versions.py')
+    return subprocess.run([sys.executable, versions, 'image', 'shellcheck'], capture_output=True, text=True,
+                          check=True).stdout.strip()
 
 
 def selected(code):

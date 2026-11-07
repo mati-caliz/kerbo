@@ -13,8 +13,9 @@ readonly CPUS=2
 readonly MEMORY_LIMIT="4g"
 readonly PYTHON_IMAGE="python:3.12-slim"
 readonly POSTGRES_IMAGE="postgres:16-alpine"
-readonly DJANGO_VERSION="5.2.8"
-readonly SQUAWK_VERSION="2.70.0"
+DJANGO_VERSION="$(python "$(dirname "$0")/../versions.py" version django)"
+SQUAWK_VERSION="$(python "$(dirname "$0")/../versions.py" version squawk)"
+readonly DJANGO_VERSION SQUAWK_VERSION
 repo="$1"
 here="$(cd "$(dirname "$0")" && pwd)"
 parity="$(cd "$here/../../../.parity" && pwd)"

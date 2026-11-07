@@ -1,7 +1,7 @@
 """Regenera los .fixed y .unsafe de los fixtures de Python con `ruff check --fix`.
 
 Uso: python -I scripts/parity/ruff_fixed.py [--check]
-Necesita ruff 0.17.1 en .parity/ruff/ruff.exe (adentro del repo, ignorada por git).
+Necesita el ruff de versions.toml en .parity/ruff/ruff.exe (adentro del repo, ignorada por git).
 Con --check no escribe nada: sólo lista los fixtures cuyo golden cambiaría.
 """
 import pathlib

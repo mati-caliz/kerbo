@@ -1,0 +1,146 @@
+# Las versiones de referencia contra las que se mide cada familia de reglas. Los scripts de paridad
+# las leen de acá (scripts/parity/versions.py) y el README cita las mismas. Subir una es portar lo
+# que cambió: ver la etapa 17 del ROADMAP.
+#
+# Cada herramienta dice su versión y de dónde se averigua la última publicada (`latest`):
+# pypi:<paquete>, npm:<paquete>, github:<dueño>/<repo>, crates:<crate>, go o dockerhub:<imagen>.
+# `image` es la imagen de Docker con que la corren los scripts y `readme`, cómo la cita el README;
+# `{version}`, `{minor}` (las dos primeras partes) y `{major}` se reemplazan. `floating` es una imagen
+# que ya sigue sola el último parche (`golang:1.27`).
+#
+# Ritmo: los parches y las menores se siguen apenas salen (`versions.py outdated` los muestra), que
+# son baratos si se hacen seguido; las mayores (ESLint 11, golangci-lint v3, TypeScript 7) o una
+# gramática nueva se agendan como una tanda propia. Antes y después de subir una, `run_all.sh` de las
+# familias que toca: la diferencia es lo que hay que portar.
+
+[tools.ruff]
+family = "python"
+version = "0.17.1"
+latest = "pypi:ruff"
+readme = "ruff {minor}"
+
+[tools.eslint]
+family = "ecmascript"
+version = "10.13.0"
+latest = "npm:eslint"
+readme = "ESLint {minor}"
+
+[tools.eslint-js]
+family = "ecmascript"
+package = "@eslint/js"
+version = "10.0.1"
+latest = "npm:@eslint/js"
+
+[tools.typescript-eslint]
+family = "ecmascript"
+version = "8.72.0"
+latest = "npm:typescript-eslint"
+readme = "typescript-eslint {minor}"
+
+[tools.typescript]
+family = "ecmascript"
+version = "6.0.3"
+latest = "npm:typescript"
+
+[tools.shellcheck]
+family = "shell"
+version = "0.11.0"
+image = "koalaman/shellcheck-alpine:v{version}"
+latest = "github:koalaman/shellcheck"
+readme = "ShellCheck {minor}"
+
+[tools.golangci-lint]
+family = "go"
+version = "2.15.0"
+image = "golangci/golangci-lint:v{version}"
+latest = "github:golangci/golangci-lint"
+readme = "golangci-lint {minor}"
+
+[tools.go]
+family = "go"
+version = "1.27"
+floating = true
+image = "golang:{version}"
+latest = "go"
+
+[tools.qodana]
+family = "java"
+version = "2026.3-eap"
+image = "jetbrains/qodana-jvm-community:{version}"
+latest = "dockerhub:jetbrains/qodana-jvm-community"
+
+[tools.checkstyle]
+family = "java"
+version = "14"
+latest = "github:checkstyle/checkstyle"
+readme = "Checkstyle {major}"
+
+[tools.squawk]
+family = "migrations"
+package = "squawk-cli"
+version = "2.70.0"
+latest = "pypi:squawk-cli"
+readme = "squawk {minor}"
+
+[tools.django]
+family = "migrations"
+version = "5.2.8"
+latest = "pypi:django"
+
+[tools.hadolint]
+family = "dockerfile"
+version = "2.15.1"
+latest = "github:hadolint/hadolint"
+readme = "hadolint {version}"
+
+[tools.gitleaks]
+family = "secrets"
+version = "8.30.1"
+latest = "github:gitleaks/gitleaks"
+
+[tools.osv-scanner]
+family = "dependencies"
+version = "2.7.0"
+latest = "github:google/osv-scanner"
+
+# Las gramáticas de tree-sitter: las de crates.io van por su versión en Cargo.toml; las copiadas en
+# grammars/ (con cambios propios) dicen de qué versión de upstream salieron.
+
+[grammars.tree-sitter]
+version = "0.27.1"
+latest = "crates:tree-sitter"
+
+[grammars.tree-sitter-java]
+version = "0.23.5"
+latest = "crates:tree-sitter-java"
+
+[grammars.tree-sitter-javascript]
+version = "0.25.0"
+latest = "crates:tree-sitter-javascript"
+
+[grammars.tree-sitter-typescript]
+version = "0.23.2"
+latest = "crates:tree-sitter-typescript"
+
+[grammars.tree-sitter-rust]
+version = "0.24.2"
+latest = "crates:tree-sitter-rust"
+
+[grammars.tree-sitter-yaml]
+version = "0.7.2"
+latest = "crates:tree-sitter-yaml"
+
+[grammars.tree-sitter-bash]
+version = "0.25.1"
+copied = "grammars/tree-sitter-bash"
+latest = "crates:tree-sitter-bash"
+
+[grammars.tree-sitter-go]
+version = "0.25.0"
+copied = "grammars/tree-sitter-go"
+latest = "crates:tree-sitter-go"
+
+[grammars.tree-sitter-python]
+version = "0.25.0"
+copied = "grammars/tree-sitter-python"
+latest = "crates:tree-sitter-python"
