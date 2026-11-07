@@ -7,11 +7,13 @@ escribís /exit y se abre la siguiente. Un archivo .parity\autopilot\STOP corta 
   .\scripts\autopilot\sesion.ps1 -Carril b            # otro carril, en ..\kerbo-b
   .\scripts\autopilot\sesion.ps1 -Etapa 14            # una etapa fija
   .\scripts\autopilot\sesion.ps1 -Modelo sonnet       # otro modelo que el de la tabla
+  .\scripts\autopilot\sesion.ps1 -Esfuerzo high       # otro esfuerzo que el de la tabla
 #>
 param(
     [string]$Carril = 'principal',
     [string]$Etapa = '',
     [string]$Modelo = '',
+    [string]$Esfuerzo = '',
     [string]$Permisos = 'bypassPermissions',
     [string]$Compactar = '150k'
 )
@@ -22,8 +24,12 @@ $Paridad = Join-Path $Principal '.parity'
 $Tomas = Join-Path $Paridad 'autopilot'
 $Parada = Join-Path $Tomas 'STOP'
 $EtapasExcluidas = @('10')
+# Mecánico con arnés (versiones, tandas de reglas): Sonnet. Diseño con paridad: Opus en medio.
+# Investigación difícil (tipos, tests inteligentes): Opus en alto.
 $ModeloPorDefecto = 'opus'
+$EsfuerzoPorDefecto = 'medium'
 $ModelosPorEtapa = @{ '17' = 'sonnet' }
+$EsfuerzosPorEtapa = @{ '16' = 'high'; '11' = 'high' }
 
 New-Item -ItemType Directory -Force $Tomas | Out-Null
 # Los scripts de paridad buscan .parity en esta variable: los carriles no la copian ni la enlazan,
@@ -78,10 +84,13 @@ while (-not (Test-Path $Parada)) {
     $ElModelo = $Modelo
     if (-not $ElModelo) { $ElModelo = $ModelosPorEtapa[$Elegida.Numero] }
     if (-not $ElModelo) { $ElModelo = $ModeloPorDefecto }
+    $ElEsfuerzo = $Esfuerzo
+    if (-not $ElEsfuerzo) { $ElEsfuerzo = $EsfuerzosPorEtapa[$Elegida.Numero] }
+    if (-not $ElEsfuerzo) { $ElEsfuerzo = $EsfuerzoPorDefecto }
     $Mensaje = "Seguí la etapa $($Elegida.Numero) del ROADMAP ($($Elegida.Titulo)), carril $Carril. Leé scripts/autopilot/pedido.md y hacé lo que dice."
-    Write-Host "== Etapa $($Elegida.Numero): $($Elegida.Titulo) | carril $Carril | $ElModelo" -ForegroundColor Cyan
+    Write-Host "== Etapa $($Elegida.Numero): $($Elegida.Titulo) | carril $Carril | $ElModelo, esfuerzo $ElEsfuerzo" -ForegroundColor Cyan
     Push-Location $Carpeta
-    try { & claude --model $ElModelo --permission-mode $Permisos --autocompact $Compactar -n "kerbo $($Elegida.Numero) ($Carril)" $Mensaje }
+    try { & claude --model $ElModelo --effort $ElEsfuerzo --permission-mode $Permisos --autocompact $Compactar -n "kerbo $($Elegida.Numero) ($Carril)" $Mensaje }
     finally { Pop-Location; Remove-Item $Toma -ErrorAction SilentlyContinue }
     $Respuesta = Read-Host 'Enter: otra sesión limpia | q: salir'
     if ($Respuesta -eq 'q') { break }
