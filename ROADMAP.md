@@ -25,9 +25,10 @@ para Java, TypeScript/JavaScript, Python y Go.
 
 ## Qué sigue
 
-Lo que kerbo ya hace está en el [README](README.md); acá queda sólo lo abierto, en orden. Cada
-etapa se cierra con la paridad medida y los tests del caso que la motivó, y al cerrarse se borra de
-acá.
+Lo que kerbo ya hace está en el [README](README.md); acá queda sólo lo abierto. Después de la 10,
+las etapas van de la que menos trabajo le queda a la que más, y se atacan en ese orden; los números
+no cambian. Cada etapa se cierra con la paridad medida y los tests del caso que la motivó, y al
+cerrarse se borra de acá.
 
 ### 10. Go, Python, TypeScript y shell completos
 
@@ -1528,6 +1529,105 @@ acá.
 - Código muerto entre archivos: exports que nadie importa y dependencias declaradas que nadie
   usa, con paridad contra knip, vulture y depcheck donde las haya.
 
+### 14. Más migraciones: Django y Rails
+
+- Migraciones de Django (sobre el árbol de Python que ya existe: `AddIndex` sin
+  `AddIndexConcurrently`, `AddField` con `null=False` sin default, `RemoveField`, `RenameField`) y
+  de Rails (`add_index` sin `algorithm: :concurrently`, `remove_column`, `change_column`), con
+  strong_migrations como referencia de Rails. Rails pide sumar una gramática de Ruby. Viene de la
+  etapa 12.
+
+### 16. Tipos y firmas completas
+
+Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y el índice. Paridad
+contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/java/`
+(`qodana.sh <repo> <inspección>`, `kerbo.sh`, `compare_all.py`), 2026-11-07.
+
+- `RedundantThrows` (`redundant-throws`): junit4 216 de 219, commons-lang 112 de 125, **ninguno de
+  más**. Faltan medir Guava y spring-boot, más grandes.
+  - Pendientes, por lo que falta: los genéricos en las clases del proyecto (los builders
+    `X.<I, T>builder().get()` de commons-lang); los parámetros de una lambda (`(k, v) -> v.get()`)
+    no tienen tipo, así que su `catch` cuenta para cualquier `get`; la sobrecarga se elige por
+    cantidad de argumentos y no por tipo (`getBytes(Charset)` calla por `getBytes(String)`); las
+    excepciones genéricas (`FailableConsumer<T, E>` tira `E`); `values()` y `valueOf()` de un enum
+    (el índice no sabe qué tipo es un enum); los arreglos como receptor
+    (`excepciones[0].getMessage()`). Un método del proyecto que redefine a uno de librería suma lo
+    que tira el de arriba: calla de más.
+- `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
+  commons-lang 0 de 2, ninguno de más. Pendientes: los dos de commons-lang son un recurso que se
+  crea con una clase del proyecto en un test y un `OutputStream` que vuelve de un método.
+- `DataFlowIssue` (`data-flow-issue` y `null-argument`): commons-lang 39 de 141 sin ninguno de más;
+  junit4 1 de 19 con uno de más (`f.getParentFile().getParentFile()` en un test, que IntelliJ no
+  marca aunque `getParentFile` está en la tabla de nulos del JDK). Lo que falta es en su mayoría de
+  otras formas de la inspección que kerbo no calca: "The call to X always fails, according to its
+  method contracts" (contratos `null -> fail` inferidos, 47 entre los dos), "Variable is already
+  assigned to this value" (20) y el resto del flujo entre métodos.
+- `Map.get` y lo que devuelve una lambda en el flujo de nulos: en junit4 y commons-lang Qodana no
+  marca ninguno; queda para medir en un repo que los use (Spring, Micrometer).
+- En JS/TS, los tipos del compilador de TypeScript para reconocer conexiones y objetos del pedido
+  sin depender del nombre de la variable. Hoy kerbo no habla con el compilador: hace falta levantar
+  Node con el `typescript` del proyecto y preguntarle el tipo de cada receptor.
+- Un JDK de `jlink --compress` no se lee.
+
+### 15. Java: Javadoc, paridad con PMD y Qodana, y la API nueva
+
+Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_checks.xml`.
+
+- Las reglas de Javadoc de `sun_checks.xml`, por frecuencia sobre Guava, spring-boot,
+  commons-lang y junit4: `JavadocVariable` (29.407), `MissingJavadocMethod` (27.721),
+  `JavadocMethod` (19.370), `JavadocType` (1.921), `JavadocPackage` (1.508),
+  `InvalidJavadocPosition` (13). Piden leer el Javadoc como árbol; tree-sitter lo deja como un
+  comentario.
+- La misma paridad contra PMD para quien usa el quickstart en vez de Checkstyle:
+  `UnnecessaryImport` resuelve tipos con el classpath y no va a coincidir sin las firmas de la
+  etapa 9; `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal`, sí.
+- Sumar Qodana al arnés de paridad para las reglas que coinciden con una inspección (imports sin
+  usar y modificadores redundantes).
+- Por lo que más aparece en Qodana: la API nueva que reemplaza a la vieja (`getFirst()`,
+  `List.of`, `Math.clamp`, bloques de texto) y las redundancias (valor por defecto repetido en una
+  anotación, escapes Unicode de más).
+
+### 13. Formateo propio (empezada: Go medido contra gofmt)
+
+- Lenguaje por lenguaje, y sólo cuando la salida sea idéntica a la de la herramienta actual.
+- Go (2026-10-22; la primera versión la armó un agente en una rama aparte que quedó cortada):
+  `kerbo fmt [rutas]` reescribe los `.go` y `kerbo fmt --check` sólo avisa cuáles cambiarían. No
+  reimplementa gofmt a ojo: arma desde tree-sitter el mismo AST que `go/parser` y lo imprime con un
+  port de `go/printer` (`src/formatter/go/`: tabwriter, comentarios, cortes de línea, orden de
+  imports, paréntesis que se sacan de las condiciones). `new(expresión)` de Go 1.26, que
+  tree-sitter-go todavía no conoce, se parsea cambiando `new` por un nombre del mismo largo.
+  - Un archivo que tree-sitter-go no lee, o que lee distinto que Go, queda como está y se avisa:
+    formatearlo cambiaría el programa. Las lecturas distintas que se detectan: `if x {...}` seguido
+    de un bloque suelto (tree-sitter toma `x{...}` como literal), `*(*T)(p).f` (lo lee como el campo
+    de una conversión al tipo `*(*T)`) y `chan<- chan T` (lo lee como un `chan` de `<-chan T`).
+    Las dos últimas, sin la guarda, cambiaban el significado del archivo.
+  - Paridad contra gofmt (2026-10-22) sobre 19.143 archivos (la biblioteca estándar de Go, golang/
+    tools, terraform, consul, hugo, caddy, etcd, prometheus, syncthing, tailscale, gin, cobra, chi y
+    fzf), en tres versiones: el original, uno desordenado a propósito (sangrías, espacios y líneas en
+    blanco cambiados sin tocar textos ni comentarios) y el desordenado con CRLF. Idénticos a gofmt:
+    19.043 de 19.071 originales, 19.018 de 19.068 desordenados y 19.030 de 19.068 con CRLF (los que
+    gofmt mismo no parsea, excluidos). Formatear dos veces no cambia nada salvo en 7 archivos.
+  - Lo que falta, por tipo, en los originales: 16 archivos que tree-sitter-go no lee (sintaxis nueva
+    como los métodos genéricos, o las lecturas distintas de arriba) y 12 comentarios de
+    documentación que gofmt reescribe desde Go 1.19 (`go/doc/comment`: `//texto` pasa a `// texto`,
+    las sangrías a bloques de código con tab y las listas se reacomodan) y kerbo deja como están. En
+    los desordenados se suman los mismos comentarios.
+  - Lo que se arregló con esta medición: un grupo de comentarios con `/* */` en posición de
+    documentación ya no se junta en una línea, las directivas (`//go:noinline`, `//export`) van al
+    final de la documentación separadas por `//` y el texto pierde las líneas en blanco de los
+    bordes, y las líneas en blanco entre el último import y el `)` se juntan como en `SortImports`.
+  - El arnés (desordenar, gofmt y kerbo sobre el mismo corpus y comparar archivo por archivo) corre
+    entero en un volumen de Docker, así no choca con el largo máximo de las rutas de Windows; quedó
+    fuera del repo, como los demás.
+  - Pendientes: el reformateo de `go/doc/comment`, y recién después de eso recomendar `kerbo fmt`.
+    Después de Go: ruff format (Python), Prettier (JS/TS) y google-java-format (Java).
+- Con el formateador, compilar los tests con cobertura queda al borde de los 1,5 GB del gate: sin
+  la caché caliente lo mata el límite de memoria (SIGKILL). Pasa, pero hay que ganar margen
+  (partir el crate o bajar la información de depuración de los tests) antes de que crezca más.
+- El test intermitente de osv (`reports_what_curl_says_when_it_fails`, "Broken pipe" cuando el curl
+  falso termina antes de leer el cuerpo) quedó arreglado (2026-10-22): si curl sale antes de leer, la
+  escritura se ignora y vale lo que curl dice al salir. Pasaba igual con el curl de verdad.
+
 ### 11. Tests y chequeos inteligentes, dependencias y secretos
 
 - Correr sólo los tests que afecta el cambio y reusar resultados.
@@ -1618,102 +1718,3 @@ acá.
       buscan secretos en el archivo editado.
     - Una regla de kerbo o una allowlist propia de secretos en `kerbo.toml`, además de las
       excepciones por ruta, y un `kerbo explain` por cada tipo de secreto.
-
-### 13. Formateo propio (empezada: Go medido contra gofmt)
-
-- Lenguaje por lenguaje, y sólo cuando la salida sea idéntica a la de la herramienta actual.
-- Go (2026-10-22; la primera versión la armó un agente en una rama aparte que quedó cortada):
-  `kerbo fmt [rutas]` reescribe los `.go` y `kerbo fmt --check` sólo avisa cuáles cambiarían. No
-  reimplementa gofmt a ojo: arma desde tree-sitter el mismo AST que `go/parser` y lo imprime con un
-  port de `go/printer` (`src/formatter/go/`: tabwriter, comentarios, cortes de línea, orden de
-  imports, paréntesis que se sacan de las condiciones). `new(expresión)` de Go 1.26, que
-  tree-sitter-go todavía no conoce, se parsea cambiando `new` por un nombre del mismo largo.
-  - Un archivo que tree-sitter-go no lee, o que lee distinto que Go, queda como está y se avisa:
-    formatearlo cambiaría el programa. Las lecturas distintas que se detectan: `if x {...}` seguido
-    de un bloque suelto (tree-sitter toma `x{...}` como literal), `*(*T)(p).f` (lo lee como el campo
-    de una conversión al tipo `*(*T)`) y `chan<- chan T` (lo lee como un `chan` de `<-chan T`).
-    Las dos últimas, sin la guarda, cambiaban el significado del archivo.
-  - Paridad contra gofmt (2026-10-22) sobre 19.143 archivos (la biblioteca estándar de Go, golang/
-    tools, terraform, consul, hugo, caddy, etcd, prometheus, syncthing, tailscale, gin, cobra, chi y
-    fzf), en tres versiones: el original, uno desordenado a propósito (sangrías, espacios y líneas en
-    blanco cambiados sin tocar textos ni comentarios) y el desordenado con CRLF. Idénticos a gofmt:
-    19.043 de 19.071 originales, 19.018 de 19.068 desordenados y 19.030 de 19.068 con CRLF (los que
-    gofmt mismo no parsea, excluidos). Formatear dos veces no cambia nada salvo en 7 archivos.
-  - Lo que falta, por tipo, en los originales: 16 archivos que tree-sitter-go no lee (sintaxis nueva
-    como los métodos genéricos, o las lecturas distintas de arriba) y 12 comentarios de
-    documentación que gofmt reescribe desde Go 1.19 (`go/doc/comment`: `//texto` pasa a `// texto`,
-    las sangrías a bloques de código con tab y las listas se reacomodan) y kerbo deja como están. En
-    los desordenados se suman los mismos comentarios.
-  - Lo que se arregló con esta medición: un grupo de comentarios con `/* */` en posición de
-    documentación ya no se junta en una línea, las directivas (`//go:noinline`, `//export`) van al
-    final de la documentación separadas por `//` y el texto pierde las líneas en blanco de los
-    bordes, y las líneas en blanco entre el último import y el `)` se juntan como en `SortImports`.
-  - El arnés (desordenar, gofmt y kerbo sobre el mismo corpus y comparar archivo por archivo) corre
-    entero en un volumen de Docker, así no choca con el largo máximo de las rutas de Windows; quedó
-    fuera del repo, como los demás.
-  - Pendientes: el reformateo de `go/doc/comment`, y recién después de eso recomendar `kerbo fmt`.
-    Después de Go: ruff format (Python), Prettier (JS/TS) y google-java-format (Java).
-- Con el formateador, compilar los tests con cobertura queda al borde de los 1,5 GB del gate: sin
-  la caché caliente lo mata el límite de memoria (SIGKILL). Pasa, pero hay que ganar margen
-  (partir el crate o bajar la información de depuración de los tests) antes de que crezca más.
-- El test intermitente de osv (`reports_what_curl_says_when_it_fails`, "Broken pipe" cuando el curl
-  falso termina antes de leer el cuerpo) quedó arreglado (2026-10-22): si curl sale antes de leer, la
-  escritura se ignora y vale lo que curl dice al salir. Pasaba igual con el curl de verdad.
-
-### 14. Más migraciones: Django y Rails
-
-- Migraciones de Django (sobre el árbol de Python que ya existe: `AddIndex` sin
-  `AddIndexConcurrently`, `AddField` con `null=False` sin default, `RemoveField`, `RenameField`) y
-  de Rails (`add_index` sin `algorithm: :concurrently`, `remove_column`, `change_column`), con
-  strong_migrations como referencia de Rails. Rails pide sumar una gramática de Ruby. Viene de la
-  etapa 12.
-
-### 15. Java: Javadoc, paridad con PMD y Qodana, y la API nueva
-
-Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_checks.xml`.
-
-- Las reglas de Javadoc de `sun_checks.xml`, por frecuencia sobre Guava, spring-boot,
-  commons-lang y junit4: `JavadocVariable` (29.407), `MissingJavadocMethod` (27.721),
-  `JavadocMethod` (19.370), `JavadocType` (1.921), `JavadocPackage` (1.508),
-  `InvalidJavadocPosition` (13). Piden leer el Javadoc como árbol; tree-sitter lo deja como un
-  comentario.
-- La misma paridad contra PMD para quien usa el quickstart en vez de Checkstyle:
-  `UnnecessaryImport` resuelve tipos con el classpath y no va a coincidir sin las firmas de la
-  etapa 9; `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal`, sí.
-- Sumar Qodana al arnés de paridad para las reglas que coinciden con una inspección (imports sin
-  usar y modificadores redundantes).
-- Por lo que más aparece en Qodana: la API nueva que reemplaza a la vieja (`getFirst()`,
-  `List.of`, `Math.clamp`, bloques de texto) y las redundancias (valor por defecto repetido en una
-  anotación, escapes Unicode de más).
-
-### 16. Tipos y firmas completas
-
-Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y el índice. Paridad
-contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/java/`
-(`qodana.sh <repo> <inspección>`, `kerbo.sh`, `compare_all.py`), 2026-11-07.
-
-- `RedundantThrows` (`redundant-throws`): junit4 216 de 219, commons-lang 112 de 125, **ninguno de
-  más**. Faltan medir Guava y spring-boot, más grandes.
-  - Pendientes, por lo que falta: los genéricos en las clases del proyecto (los builders
-    `X.<I, T>builder().get()` de commons-lang); los parámetros de una lambda (`(k, v) -> v.get()`)
-    no tienen tipo, así que su `catch` cuenta para cualquier `get`; la sobrecarga se elige por
-    cantidad de argumentos y no por tipo (`getBytes(Charset)` calla por `getBytes(String)`); las
-    excepciones genéricas (`FailableConsumer<T, E>` tira `E`); `values()` y `valueOf()` de un enum
-    (el índice no sabe qué tipo es un enum); los arreglos como receptor
-    (`excepciones[0].getMessage()`). Un método del proyecto que redefine a uno de librería suma lo
-    que tira el de arriba: calla de más.
-- `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
-  commons-lang 0 de 2, ninguno de más. Pendientes: los dos de commons-lang son un recurso que se
-  crea con una clase del proyecto en un test y un `OutputStream` que vuelve de un método.
-- `DataFlowIssue` (`data-flow-issue` y `null-argument`): commons-lang 39 de 141 sin ninguno de más;
-  junit4 1 de 19 con uno de más (`f.getParentFile().getParentFile()` en un test, que IntelliJ no
-  marca aunque `getParentFile` está en la tabla de nulos del JDK). Lo que falta es en su mayoría de
-  otras formas de la inspección que kerbo no calca: "The call to X always fails, according to its
-  method contracts" (contratos `null -> fail` inferidos, 47 entre los dos), "Variable is already
-  assigned to this value" (20) y el resto del flujo entre métodos.
-- `Map.get` y lo que devuelve una lambda en el flujo de nulos: en junit4 y commons-lang Qodana no
-  marca ninguno; queda para medir en un repo que los use (Spring, Micrometer).
-- En JS/TS, los tipos del compilador de TypeScript para reconocer conexiones y objetos del pedido
-  sin depender del nombre de la variable. Hoy kerbo no habla con el compilador: hace falta levantar
-  Node con el `typescript` del proyecto y preguntarle el tipo de cada receptor.
-- Un JDK de `jlink --compress` no se lee.
