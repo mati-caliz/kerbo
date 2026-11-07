@@ -10,7 +10,7 @@ import pathlib
 import sys
 
 here = os.path.dirname(os.path.abspath(__file__))
-eslint_dir = pathlib.Path(here, '..', '..', '..', '.parity', 'eslint').resolve()
+eslint_dir = pathlib.Path(os.environ.get('KERBO_PARITY', os.path.join(here, '..', '..', '..', '.parity')), 'eslint').resolve()
 corpus = eslint_dir.parent / 'corpus'
 rules = sys.argv[1].split(',')
 limit = int(sys.argv[2]) if len(sys.argv) > 2 else 15

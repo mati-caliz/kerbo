@@ -1123,6 +1123,16 @@
     "type": "expansion",
     "named": true,
     "fields": {
+      "flags": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "zsh_flags",
+            "named": true
+          }
+        ]
+      },
       "operator": {
         "multiple": true,
         "required": false,
@@ -2946,6 +2956,10 @@
   {
     "type": "while",
     "named": false
+  },
+  {
+    "type": "zsh_flags",
+    "named": true
   },
   {
     "type": "{",

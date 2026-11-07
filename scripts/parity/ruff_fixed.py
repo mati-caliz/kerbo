@@ -4,6 +4,7 @@ Uso: python -I scripts/parity/ruff_fixed.py [--check]
 Necesita el ruff de versions.toml en .parity/ruff/ruff.exe (adentro del repo, ignorada por git).
 Con --check no escribe nada: sólo lista los fixtures cuyo golden cambiaría.
 """
+import os
 import pathlib
 import re
 import shutil
@@ -12,7 +13,7 @@ import sys
 import tempfile
 
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
-PARITY = REPO / ".parity"
+PARITY = pathlib.Path(os.environ.get("KERBO_PARITY", REPO / ".parity"))
 RUFF = PARITY / "ruff" / "ruff.exe"
 FIXTURES = REPO / "src" / "lint" / "python" / "fixtures"
 REGISTRY = REPO / "src" / "lint" / "python" / "tests" / "fixtures.rs"

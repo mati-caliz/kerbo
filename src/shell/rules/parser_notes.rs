@@ -4,6 +4,8 @@ use crate::rules::ShellRule;
 use crate::shell::context::{Findings, Position};
 use crate::shell::syntax::{ASSIGNMENT, NAME_FIELD, RAW_STRING, VALUE_FIELD, text};
 
+// `${(M)x}` de zsh: ShellCheck lo lee y avisa SC2296 en el paréntesis.
+const ZSH_FLAGS: &str = "zsh_flags";
 const FIELD_SEPARATOR_VARIABLE: &str = "IFS";
 const SPACES: &[u8] = b" \t";
 const END_OF_COMMAND: &[u8] = b"\r\n;&|)#";
@@ -17,6 +19,8 @@ pub fn check(node: Node<'_>, source: &[u8], findings: &mut Findings) {
         check_space_after_equals(node, source, findings);
     } else if node.kind() == RAW_STRING {
         check_escaped_quote(node, source, findings);
+    } else if node.kind() == ZSH_FLAGS {
+        findings.report(ShellRule::Sc2296, node, text(node, source));
     }
 }
 

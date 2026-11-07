@@ -18,7 +18,7 @@ import sys
 here = os.path.dirname(os.path.abspath(__file__))
 repo = os.path.join(here, '..', '..', '..')
 fixtures = os.path.join(repo, 'src', 'lint', 'ecmascript', 'fixtures')
-eslint_dir = os.path.abspath(os.path.join(repo, '.parity', 'eslint'))
+eslint_dir = os.path.abspath(os.path.join(os.environ.get('KERBO_PARITY', os.path.join(repo, '.parity')), 'eslint'))
 scratch = os.path.join(eslint_dir, 'fixture')
 ERROR_MARK = 'FATAL'
 SLOPPY_SUFFIX = '_sloppy.js'

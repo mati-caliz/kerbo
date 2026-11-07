@@ -5630,6 +5630,107 @@
       "type": "CHOICE",
       "members": [
         {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "flags",
+              "content": {
+                "type": "ALIAS",
+                "content": {
+                  "type": "IMMEDIATE_TOKEN",
+                  "content": {
+                    "type": "PATTERN",
+                    "value": "\\([^()]*\\)"
+                  }
+                },
+                "named": true,
+                "value": "zsh_flags"
+              }
+            },
+            {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "SYMBOL",
+                          "name": "expansion"
+                        },
+                        {
+                          "type": "SYMBOL",
+                          "name": "variable_name"
+                        },
+                        {
+                          "type": "SYMBOL",
+                          "name": "_simple_variable_name"
+                        },
+                        {
+                          "type": "SYMBOL",
+                          "name": "subscript"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "CHOICE",
+                          "members": [
+                            {
+                              "type": "SYMBOL",
+                              "name": "_expansion_expression"
+                            },
+                            {
+                              "type": "SYMBOL",
+                              "name": "_expansion_regex"
+                            },
+                            {
+                              "type": "SYMBOL",
+                              "name": "_expansion_regex_replacement"
+                            },
+                            {
+                              "type": "SYMBOL",
+                              "name": "_expansion_regex_removal"
+                            },
+                            {
+                              "type": "SYMBOL",
+                              "name": "_expansion_max_length"
+                            },
+                            {
+                              "type": "SYMBOL",
+                              "name": "_expansion_operator"
+                            },
+                            {
+                              "type": "SYMBOL",
+                              "name": "_zsh_filter"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "BLANK"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_expansion_expression"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_zsh_filter"
+                }
+              ]
+            }
+          ]
+        },
+        {
           "type": "REPEAT1",
           "content": {
             "type": "FIELD",
@@ -5902,6 +6003,42 @@
                   ]
                 }
               }
+            }
+          ]
+        }
+      ]
+    },
+    "_zsh_filter": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "operator",
+          "content": {
+            "type": "IMMEDIATE_TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": ":#"
+            }
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "IMMEDIATE_TOKEN",
+                "content": {
+                  "type": "PATTERN",
+                  "value": "[^}]+"
+                }
+              },
+              "named": true,
+              "value": "regex"
+            },
+            {
+              "type": "BLANK"
             }
           ]
         }

@@ -19,7 +19,7 @@ jars="$*"
 here="$(cd "$(dirname "$0")" && pwd)"
 crate="$(cd "$here/../../.." && pwd -W)"
 target="$(basename "$crate")"
-parity="$(cd "$here/../../.." && pwd)/.parity"
+parity="${KERBO_PARITY:-$(cd "$here/../../.." && pwd)/.parity}"
 image="$(docker images --format '{{.Repository}}:{{.Tag}}' quality-rust | head -1)"
 mkdir -p "$parity/qodana/$repo_name"
 MSYS_NO_PATHCONV=1 docker run --rm -m "$MEMORY_LIMIT" --cpus="$CPUS" -v "$crate:/src:ro" -w /src \

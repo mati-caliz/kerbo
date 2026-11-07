@@ -4,7 +4,7 @@
 set -euo pipefail
 versions="$(cd "$(dirname "$0")/.." && pwd)/versions.py"
 here="$(cd "$(dirname "$0")" && pwd)"
-corpus="${SHELL_CORPUS:-$(cd "$here/../../.." && pwd)/.parity/shell-corpus}"
+corpus="${SHELL_CORPUS:-${KERBO_PARITY:-$(cd "$here/../../.." && pwd)/.parity}/shell-corpus}"
 mkdir -p "$here/out"
 PYTHONIOENCODING=utf-8 python "$here/list_files.py" "$corpus" > "$here/out/files.txt"
 MSYS_NO_PATHCONV=1 docker run --rm -v "$(cd "$corpus" && pwd -W):/c:ro" -v "$(cd "$here/out" && pwd -W):/o" \

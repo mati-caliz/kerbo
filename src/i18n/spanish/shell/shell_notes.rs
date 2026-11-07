@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::ShellRule;
 
 // Avisos que ShellCheck da mientras parsea, y los últimos chequeos por defecto.
-pub const SHELL_NOTES_TEXTS: [(ShellRule, RuleText); 4] = [
+pub const SHELL_NOTES_TEXTS: [(ShellRule, RuleText); 5] = [
     (
         ShellRule::Sc1003,
         RuleText::new(
@@ -37,6 +37,15 @@ pub const SHELL_NOTES_TEXTS: [(ShellRule, RuleText); 4] = [
             "usá un comando aparte, o la opción de declare",
             "Declara una variable que se llama local o readonly.",
             "local readonly a se vuelve local -r a.",
+        ),
+    ),
+    (
+        ShellRule::Sc2296,
+        RuleText::new(
+            "Expansión que empieza con un carácter inválido (SC2296 de ShellCheck)",
+            "revisá la sintaxis; ${(flags)x} sólo existe en zsh",
+            "Bash no puede expandir ${(M)x} ni ${{x}: el script falla cuando llega ahí.",
+            "${(f)lineas} se vuelve un ciclo sobre \"$lineas\" con read.",
         ),
     ),
 ];

@@ -929,6 +929,31 @@ module.exports = grammar({
       '}',
     ),
     _expansion_body: $ => choice(
+      // ${(M)${(k)a[@]}:#x*} de zsh: ShellCheck lo lee y avisa SC2296.
+      seq(
+        field('flags', alias(token.immediate(/\([^()]*\)/), $.zsh_flags)),
+        choice(
+          seq(
+            choice(
+              $.expansion,
+              $.variable_name,
+              $._simple_variable_name,
+              $.subscript,
+            ),
+            optional(choice(
+              $._expansion_expression,
+              $._expansion_regex,
+              $._expansion_regex_replacement,
+              $._expansion_regex_removal,
+              $._expansion_max_length,
+              $._expansion_operator,
+              $._zsh_filter,
+            )),
+          ),
+          $._expansion_expression,
+          $._zsh_filter,
+        ),
+      ),
       // ${!##} ${!#}
       repeat1(field(
         'operator',
@@ -975,6 +1000,11 @@ module.exports = grammar({
           ),
         )),
       ),
+    ),
+
+    _zsh_filter: $ => seq(
+      field('operator', token.immediate(/:#/)),
+      optional(alias(token.immediate(/[^}]+/), $.regex)),
     ),
 
     _expansion_expression: $ => prec(1, seq(

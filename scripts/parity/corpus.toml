@@ -1,0 +1,113 @@
+# Los repos del corpus de paridad (.parity/corpus) y el commit con que se midió cada uno.
+# `scripts/parity/corpus.py sync` los clona; `record` anota el commit que tiene cada copia.
+# El corpus de shell va aparte, en scripts/parity/shell/corpus.sh.
+
+[repos.ansible]
+url = "https://github.com/ansible/ansible.git"
+commit = "fd540eda9f96783955b227e84e229ca51f041cae"
+uso = "Python contra ruff"
+
+[repos.commons-lang]
+url = "https://github.com/apache/commons-lang.git"
+commit = "2341c9cd7ed4b7f2e841e165b6077d1aa7a61b17"
+uso = "Java contra Qodana"
+
+[repos.cpython]
+url = "https://github.com/python/cpython.git"
+commit = "d7684fbef52e563a89c88a23efc68de2de9b3503"
+uso = "Python contra ruff (Lib/)"
+
+[repos.detect-secrets]
+url = "https://github.com/Yelp/detect-secrets.git"
+commit = "5e141933554a0b74e7341841f318be21e895339c"
+uso = "secretos contra gitleaks"
+
+[repos.django]
+url = "https://github.com/django/django.git"
+commit = "a1f2b45ce5a327f42437bdb620a817839d0bd067"
+uso = "Python contra ruff, migraciones de Django"
+
+[repos.express]
+url = "https://github.com/expressjs/express.git"
+commit = "43fca52d28a422c8be48fd489cbd4f2d6152bab6"
+uso = "JS/TS contra ESLint"
+
+[repos.fastapi]
+url = "https://github.com/fastapi/fastapi.git"
+commit = "2f935fedbb2e7625bebc7e1d09c9bd394340f86e"
+uso = "Python contra ruff"
+
+[repos.flask]
+url = "https://github.com/pallets/flask.git"
+commit = "49943b5a94413a530761350f04e896f76e8d620e"
+uso = "Python contra ruff"
+
+[repos.gitleaks]
+url = "https://github.com/gitleaks/gitleaks.git"
+commit = "5f6ec56cfa6f8c67648d863582c7ae2f206d5c1c"
+uso = "secretos contra gitleaks"
+
+[repos.guava]
+url = "https://github.com/google/guava.git"
+commit = "ed0921b633d73d5a1d32c8c147784ca7add48757"
+uso = "Java contra Qodana y Checkstyle"
+
+[repos.ipython]
+url = "https://github.com/ipython/ipython.git"
+commit = "cf63afd11e2fca4eb4645e9d5b4a712f3549f632"
+uso = "Python contra ruff"
+
+[repos.juice-shop]
+url = "https://github.com/juice-shop/juice-shop.git"
+commit = "717f5efa886b0417eeecb52378b03cf10567b7e2"
+uso = "JS/TS contra ESLint, secretos"
+
+[repos.junit4]
+url = "https://github.com/junit-team/junit4.git"
+commit = "890f3c972647de378f25e7271d8fbbd9d3456b79"
+uso = "Java contra Qodana"
+
+[repos.pydantic]
+url = "https://github.com/pydantic/pydantic.git"
+commit = "b947584cc89eb0f4e57ba6efd0debdcccdcd3515"
+uso = "Python contra ruff"
+
+[repos.react]
+url = "https://github.com/facebook/react.git"
+commit = "d71b537241d26861df496413db2142c7ba192c25"
+uso = "JS/TS contra ESLint"
+
+[repos.requests]
+url = "https://github.com/psf/requests.git"
+commit = "3c7baaa05ab4aa49cc819ce3a819d260de19c157"
+uso = "Python contra ruff"
+
+[repos.spring-boot]
+url = "https://github.com/spring-projects/spring-boot.git"
+commit = "8552ac1799bd5b889a48ce858ba1d744f8fe0348"
+uso = "Java contra Checkstyle, secretos"
+
+[repos.sqlalchemy]
+url = "https://github.com/sqlalchemy/sqlalchemy.git"
+commit = "ac3deaea1e2fd9538896cc553a434dc16a600d07"
+uso = "Python contra ruff"
+
+[repos.sympy]
+url = "https://github.com/sympy/sympy.git"
+commit = "b386392cd62ed543aadd696d9953ab35cb38d666"
+uso = "Python contra ruff"
+
+[repos.trufflehog]
+url = "https://github.com/trufflesecurity/trufflehog.git"
+commit = "f8221ca52ac51bf66228d6ec3691f3ea0782ae15"
+uso = "secretos contra gitleaks"
+
+[repos.vscode]
+url = "https://github.com/microsoft/vscode.git"
+commit = "74481a315e40e6c717202ae74185a7f4621883e5"
+uso = "JS/TS contra ESLint, secretos"
+
+[repos.zod]
+url = "https://github.com/colinhacks/zod.git"
+commit = "afdac65e0f80c0ccf9e8909da97c411567908b57"
+uso = "JS/TS contra ESLint"

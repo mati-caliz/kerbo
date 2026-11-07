@@ -97,6 +97,7 @@ const ERRORS: &[ShellRule] = &[
     ShellRule::Sc2218,
     ShellRule::Sc2316,
     ShellRule::Sc2075,
+    ShellRule::Sc2296,
 ];
 const INFOS: &[ShellRule] = &[
     ShellRule::Sc2015,

@@ -7,6 +7,7 @@ archivo parece ejecutable.
 
 Uso: python compare.py [--select-codes] [reglas...]
 """
+import os
 import collections
 import json
 import pathlib
@@ -15,7 +16,7 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent.parent.parent
-CORPUS = REPO / ".parity" / "corpus"
+CORPUS = pathlib.Path(os.environ.get("KERBO_PARITY", REPO / ".parity")) / "corpus"
 FAMILY_FILES = ("python.rs", "python_slots.rs")
 EXCLUDED_RULES = {"exe001", "exe002"}
 SHOWN_DIFFERENCES = 8

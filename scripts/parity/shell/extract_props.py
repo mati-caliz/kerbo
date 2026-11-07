@@ -10,7 +10,7 @@ import re
 import sys
 
 here = os.path.dirname(os.path.abspath(__file__))
-source_root = os.path.join(here, '..', '..', '..', '.parity', 'shellcheck-src', 'src', 'ShellCheck')
+source_root = os.path.join(os.environ.get('KERBO_PARITY', os.path.join(here, '..', '..', '..', '.parity')), 'shellcheck-src', 'src', 'ShellCheck')
 functions, folder = sys.argv[1].split(','), sys.argv[2]
 default_shebang = sys.argv[3] if len(sys.argv) > 3 else '#!/bin/sh'
 QUOTED = r'("(?:[^"\\]|\\.)*")'

@@ -9,7 +9,7 @@ import sys
 
 name, version, description = sys.argv[1:4]
 repository = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-parity = os.path.join(repository, ".parity")
+parity = os.environ.get("KERBO_PARITY", os.path.join(repository, ".parity"))
 source = os.path.join(parity, "grammar", f"ts-{name}")
 target = os.path.join(repository, "grammars", f"tree-sitter-{name}")
 os.makedirs(target, exist_ok=True)

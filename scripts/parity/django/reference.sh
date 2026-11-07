@@ -18,7 +18,7 @@ SQUAWK_VERSION="$(python "$(dirname "$0")/../versions.py" version squawk)"
 readonly DJANGO_VERSION SQUAWK_VERSION
 repo="$1"
 here="$(cd "$(dirname "$0")" && pwd)"
-parity="$(cd "$here/../../../.parity" && pwd)"
+parity="$(cd "${KERBO_PARITY:-$here/../../../.parity}" && pwd)"
 out="$parity/django/$repo"
 network="kerbo-django-$repo"
 database="kerbo-django-db-$repo"

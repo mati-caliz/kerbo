@@ -2,7 +2,7 @@ use crate::i18n::catalog::RuleText;
 use crate::rules::ShellRule;
 
 // Notes ShellCheck gives while parsing, and the last default checks.
-pub const SHELL_NOTES_TEXTS: [(ShellRule, RuleText); 4] = [
+pub const SHELL_NOTES_TEXTS: [(ShellRule, RuleText); 5] = [
     (
         ShellRule::Sc1003,
         RuleText::new(
@@ -37,6 +37,15 @@ pub const SHELL_NOTES_TEXTS: [(ShellRule, RuleText); 4] = [
             "use a separate command, or the option of declare",
             "It declares a variable named local or readonly.",
             "local readonly a becomes local -r a.",
+        ),
+    ),
+    (
+        ShellRule::Sc2296,
+        RuleText::new(
+            "Parameter expansion that starts with an invalid character (ShellCheck SC2296)",
+            "check the syntax; ${(flags)x} only exists in zsh",
+            "Bash cannot expand ${(M)x} or ${{x}: the script fails when it gets there.",
+            "${(f)lines} becomes a loop over \"$lines\" with read.",
         ),
     ),
 ];

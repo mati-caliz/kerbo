@@ -6,7 +6,7 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../.." && pwd -W)"
-parity="$(cd "$here/../../.." && pwd)/.parity"
+parity="${KERBO_PARITY:-$(cd "$here/../../.." && pwd)/.parity}"
 rules="$1"
 readonly CORPUS_REPOS=(express zod react vscode juice-shop)
 cd "$parity/eslint"

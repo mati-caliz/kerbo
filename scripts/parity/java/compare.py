@@ -5,12 +5,13 @@
     python scripts/parity/java/compare.py junit4 AutoCloseableResource auto-closeable-resource
 """
 
+import os
 import collections
 import json
 import pathlib
 import sys
 
-PARITY = pathlib.Path(__file__).resolve().parents[3] / ".parity" / "qodana"
+PARITY = pathlib.Path(os.environ.get("KERBO_PARITY", pathlib.Path(__file__).resolve().parents[3] / ".parity")) / "qodana"
 DEFAULT_RULES = ("RedundantThrows", "redundant-throws")
 SHOWN = 40
 
