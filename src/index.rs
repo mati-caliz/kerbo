@@ -11,7 +11,9 @@ mod java_resources;
 mod java_rules;
 mod java_taint;
 mod java_throw_lookup;
+mod java_throw_roots;
 mod java_throws;
+mod java_typed;
 mod java_unused;
 pub mod python_taint;
 mod taint_engine;
@@ -29,6 +31,8 @@ mod go_taint_tests;
 mod java_escapes_tests;
 #[cfg(test)]
 mod java_throws_tests;
+#[cfg(test)]
+mod java_typed_tests;
 #[cfg(test)]
 mod python_taint_tests;
 #[cfg(test)]

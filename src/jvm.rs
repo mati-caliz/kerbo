@@ -1,6 +1,7 @@
 mod annotations;
 pub mod class_file;
 pub mod classpath;
+pub mod generics;
 mod gradle;
 pub mod jdk;
 mod jimage;

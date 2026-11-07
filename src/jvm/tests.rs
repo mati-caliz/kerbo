@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use super::class_file::{ClassFile, parameter_count, parse};
+use super::generics::{Generic, class_signature, field_signature, method_signature};
 use super::jdk::Jdk;
 use super::jimage::ModulesImage;
 use super::method::Method;
@@ -148,6 +149,7 @@ fn a_varargs_method_accepts_more_arguments_and_knows_its_class_parameters() {
         parameter_annotations: vec![Vec::new(); 3],
         return_annotations: Vec::new(),
         exceptions: Vec::new(),
+        signature: None,
     };
     assert!(method.accepts(3) && method.accepts(2) && method.accepts(6));
     assert!(!method.accepts(1));
@@ -270,4 +272,59 @@ fn the_release_comes_from_the_build_and_skips_what_is_not_a_number() {
     );
     assert_eq!(project_release(gradle.path()), Some(11));
     assert_eq!(project_release(TempTree::new("jvm-release-none").path()), None);
+}
+
+fn class_type(name: &str, arguments: Vec<Generic>) -> Generic {
+    Generic::Class(name.to_owned(), arguments)
+}
+
+fn variable(name: &str) -> Generic {
+    Generic::Variable(name.to_owned())
+}
+
+#[test]
+fn generic_signatures_keep_the_type_parameters_and_what_each_parent_receives() {
+    let list = class_signature(
+        "<E:Ljava/lang/Object;>Ljava/util/AbstractList<TE;>;Ljava/util/List<TE;>;Ljava/util/RandomAccess;",
+    )
+    .expect("la firma se lee");
+    assert_eq!(list.parameters, ["E"]);
+    assert_eq!(
+        list.parents,
+        [
+            class_type("java.util.AbstractList", vec![variable("E")]),
+            class_type("java.util.List", vec![variable("E")]),
+            class_type("java.util.RandomAccess", Vec::new()),
+        ]
+    );
+    let bounded =
+        class_signature("<K::Ljava/lang/Comparable<-TK;>;V:TK;>Ljava/lang/Object;").expect("la firma se lee");
+    assert_eq!(bounded.parameters, ["K", "V"]);
+    let get = method_signature("(I)TE;").expect("la firma se lee");
+    assert_eq!((get.parameters, get.returned), (Vec::new(), variable("E")));
+    let to_array = method_signature("<T:Ljava/lang/Object;>([TT;)[TT;").expect("la firma se lee");
+    assert_eq!(
+        (to_array.parameters, to_array.returned),
+        (vec!["T".to_owned()], Generic::Other)
+    );
+    let entries =
+        method_signature("()Ljava/util/Set<Ljava/util/Map$Entry<TK;TV;>;>;").expect("la firma se lee");
+    assert_eq!(
+        entries.returned,
+        class_type(
+            "java.util.Set",
+            vec![class_type(
+                "java.util.Map.Entry",
+                vec![variable("K"), variable("V")]
+            )]
+        )
+    );
+    assert_eq!(
+        field_signature("Lapp/Outer<TT;>.Inner<+Ljava/lang/Number;*>;"),
+        Some(class_type(
+            "app.Outer.Inner",
+            vec![class_type("java.lang.Number", Vec::new()), Generic::Other]
+        ))
+    );
+    assert_eq!(method_signature("(I"), None);
 }

@@ -121,6 +121,89 @@ class Anonymous {
         }
     }
 }
+
+class Built {
+    Built() throws IOException {
+    }
+
+    Built(int size) throws IOException {
+        this();
+    }
+}
+
+class Derived extends FileInputStream {
+    Derived() throws IOException {
+        super("a");
+    }
+}
+
+class Initialized {
+    Object stream = new FileInputStream("a");
+
+    Initialized() throws IOException {
+    }
+}
+
+class Rethrows {
+    void widened() throws FileNotFoundException {
+        try {
+            new FileInputStream("a");
+        } catch (IOException problem) {
+            throw problem;
+        }
+    }
+}
+
+class Unrelated {
+    void get() throws FileNotFoundException {
+    }
+}
+
+class Other {
+    void get() throws FileNotFoundException {
+        throw new FileNotFoundException("a");
+    }
+
+    void calls(Other other) {
+        try {
+            other.get();
+        } catch (FileNotFoundException problem) {
+            other.toString();
+        }
+    }
+}
+"#;
+
+const CONSTANTS: &str = r#"package app;
+
+import static app.Holder.OPENER;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+
+class Holder {
+    static final Opener OPENER = new Opener();
+}
+
+class Opener {
+    void open() throws IOException {
+        new FileInputStream("a");
+    }
+}
+
+class User {
+    void imported() throws IOException {
+        OPENER.open();
+    }
+
+    void qualified() throws IOException {
+        Holder.OPENER.open();
+    }
+
+    void quiet() throws IOException {
+        OPENER.toString();
+    }
+}
 "#;
 
 fn fixture_jdk() -> Option<Jdk> {
@@ -131,37 +214,50 @@ fn fixture_jdk() -> Option<Jdk> {
 }
 
 fn redundant_with(library: &Library) -> Vec<String> {
-    let summary = summary_of(SERVICE);
+    redundant_in(SERVICE, library)
+}
+
+fn redundant_in(source: &str, library: &Library) -> Vec<String> {
+    let summary = summary_of(source);
     let files = [IndexedSummary {
         summary: &summary,
         in_tests: false,
     }];
-    project_lints(&files, library)
+    let mut found: Vec<String> = project_lints(&files, library)
         .into_iter()
         .flatten()
         .filter(|finding| finding.kind.rule().as_str() == "redundant-throws")
         .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
-        .collect()
+        .collect();
+    found.sort();
+    found
 }
 
 #[test]
 fn a_throws_nothing_can_reach_is_reported_and_anything_unknown_keeps_quiet() {
     let library = Library::load(&[]).with_jdk(fixture_jdk());
-    let mut found = redundant_with(&library);
-    found.sort();
     assert_eq!(
-        found,
+        redundant_with(&library),
         [
             "100:34 IOException",
             "104:39 Exception",
             "108:42 IOException",
+            "118:20 IOException",
             "14:42 IOException",
+            "150:23 FileNotFoundException",
             "18:27 Exception",
             "25:27 IOException",
             "36:28 IOException",
+            "70:22 IOException",
             "95:34 IOException",
         ]
     );
+}
+
+#[test]
+fn a_constant_is_followed_by_its_type_whether_imported_or_qualified() {
+    let library = Library::load(&[]).with_jdk(fixture_jdk());
+    assert_eq!(redundant_in(CONSTANTS, &library), ["27:25 IOException"]);
 }
 
 #[test]

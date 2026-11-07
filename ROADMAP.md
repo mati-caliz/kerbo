@@ -1674,15 +1674,21 @@ Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y 
 
 - `RedundantThrows` de IntelliJ (`redundant-throws`), con las excepciones de las firmas (`Exceptions`
   de cada método de los `.class`).
-  - Paridad contra Qodana (`scripts/parity/java/`, 2026-11-06), por archivo, línea y columna:
-    junit4 (Java del JDK instalado), 195 de 219; commons-lang (Java 8, firmas de `ct.sym`), 107 de
-    125. **Ninguno de más en los dos.** Por la muestra revisada, buena parte de los que faltan pide
-    genéricos (`lista.get(0).metodo()`, el punto de abajo) y constantes de un `import static`. Faltan
-    medir Guava y spring-boot, más grandes.
-  - Pendientes: los constructores, que piden seguir el `super()` implícito y los inicializadores de
-    los campos; `super.metodo()`; `values()` y `valueOf()` de un enum; `throw e` de una variable; las
-    constantes de un `import static`. Un método del proyecto que redefine a uno de librería suma lo
-    que tira el de arriba: calla de más.
+  - Paridad contra Qodana (`scripts/parity/java/`, 2026-11-07), por archivo, línea y columna:
+    junit4 (Java del JDK instalado), 215 de 219; commons-lang (Java 8, firmas de `ct.sym`), 112 de
+    125. **Ninguno de más en los dos.** Ya sigue genéricos de la librería (`List<Fallo>.get(0)`, con
+    el atributo `Signature` de los `.class`), constantes de un `import static` y `Clase.CAMPO`,
+    constructores (`super()` implícito, `this(...)` e inicializadores de los campos), `throw e` de
+    una variable, padres anidados (`Map.Entry`) y, para el `catch` de un llamador, a qué método va
+    la llamada. Faltan medir Guava y spring-boot, más grandes.
+  - Pendientes, por lo que falta en esos dos repos: los genéricos en las variables
+    (`List<Throwable> causes`, hoy se guarda sólo `List`) y en las clases del proyecto (los builders
+    `X.<I, T>builder().get()` de commons-lang); los parámetros de una lambda (`(k, v) -> v.get()`)
+    no tienen tipo, así que su `catch` cuenta para cualquier `get`; la sobrecarga se elige por
+    cantidad de argumentos y no por tipo (`getBytes(Charset)` calla por `getBytes(String)`); las
+    excepciones genéricas (`FailableConsumer<T, E>` tira `E`); `super.metodo()`; `values()` y
+    `valueOf()` de un enum; los arreglos como receptor (`excepciones[0].getMessage()`). Un método
+    del proyecto que redefine a uno de librería suma lo que tira el de arriba: calla de más.
 - El JDK para el `release` del proyecto: las firmas salen de `ct.sym` para una versión anterior a la
   del JDK instalado y de `lib/modules` para la suya, porque `ct.sym` no la trae (como
   `javac --release`). Por ahora sólo las usa `redundant-throws`.

@@ -25,7 +25,6 @@ const INVOKE_DYNAMIC: u8 = 18;
 const MODULE: u8 = 19;
 const PACKAGE: u8 = 20;
 pub(super) const TWO_BYTES: usize = 2;
-const FIELD_HEADER: usize = 6;
 pub(super) const THREE_BYTES: usize = 3;
 pub(super) const FOUR_BYTES: usize = 4;
 const EIGHT_BYTES: usize = 8;
@@ -36,6 +35,7 @@ const INVISIBLE_PARAMETER_ANNOTATIONS: &str = "RuntimeInvisibleParameterAnnotati
 const VISIBLE_TYPE_ANNOTATIONS: &str = "RuntimeVisibleTypeAnnotations";
 const INVISIBLE_TYPE_ANNOTATIONS: &str = "RuntimeInvisibleTypeAnnotations";
 const EXCEPTIONS: &str = "Exceptions";
+const SIGNATURE: &str = "Signature";
 const ACCESS_SYNTHETIC: u16 = 0x1000;
 const ACCESS_BRIDGE: u16 = 0x0040;
 const PATH_SEPARATOR: char = '/';
@@ -49,6 +49,16 @@ pub struct ClassFile {
     pub interfaces: Vec<String>,
     pub annotations: Vec<String>,
     pub methods: Vec<Method>,
+    pub fields: Vec<ClassField>,
+    pub signature: Option<String>,
+}
+
+// Un campo: el nombre, el tipo borrado (`Ljava/nio/charset/Charset;`) y el genérico, si lo tiene.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassField {
+    pub name: String,
+    pub descriptor: String,
+    pub signature: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,22 +139,50 @@ pub fn parse(bytes: &[u8]) -> Result<ClassFile, Malformed> {
         .map(|_| pool.class(cursor.u16()?))
         .collect::<Result<Vec<_>, _>>()?;
     let field_count = cursor.u16()?;
-    for _ in 0..field_count {
-        cursor.take(FIELD_HEADER)?;
-        skip_attributes(&mut cursor)?;
-    }
+    let fields = (0..field_count)
+        .map(|_| field(&mut cursor, &pool))
+        .collect::<Result<Vec<_>, _>>()?;
     let method_count = cursor.u16()?;
     let mut methods = Vec::new();
     for _ in 0..method_count {
         methods.extend(method(&mut cursor, &pool)?);
     }
-    let annotations = class_annotations(&mut cursor, &pool)?;
+    let ClassAttributes {
+        annotations,
+        signature,
+    } = class_attributes(&mut cursor, &pool)?;
     Ok(ClassFile {
         name,
         superclass,
         interfaces,
         annotations,
         methods,
+        fields,
+        signature,
+    })
+}
+
+fn field(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<ClassField, Malformed> {
+    cursor.u16()?;
+    let name = pool.text(cursor.u16()?)?.to_owned();
+    let descriptor = pool.text(cursor.u16()?)?.to_owned();
+    let mut signature = None;
+    let attribute_count = cursor.u16()?;
+    for _ in 0..attribute_count {
+        let attribute = pool.text(cursor.u16()?)?;
+        let length = cursor.length()?;
+        let mut body = Cursor {
+            bytes: cursor.take(length)?,
+            offset: 0,
+        };
+        if attribute == SIGNATURE {
+            signature = Some(pool.text(body.u16()?)?.to_owned());
+        }
+    }
+    Ok(ClassField {
+        name,
+        descriptor,
+        signature,
     })
 }
 
@@ -206,6 +244,7 @@ fn method(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Option<Method>, Malfor
     let mut parameter_annotations = vec![Vec::new(); parameter_count(&descriptor)];
     let mut return_annotations = Vec::new();
     let mut exceptions = Vec::new();
+    let mut signature = None;
     let attribute_count = cursor.u16()?;
     for _ in 0..attribute_count {
         let attribute = pool.text(cursor.u16()?)?;
@@ -242,6 +281,7 @@ fn method(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Option<Method>, Malfor
                     exceptions.push(pool.class(body.u16()?)?);
                 }
             }
+            SIGNATURE => signature = Some(pool.text(body.u16()?)?.to_owned()),
             _ => {}
         }
     }
@@ -253,6 +293,7 @@ fn method(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Option<Method>, Malfor
         parameter_annotations,
         return_annotations,
         exceptions,
+        signature,
     }))
 }
 
@@ -274,8 +315,14 @@ fn add_to(parameters: &mut [Vec<String>], index: usize, found: Vec<String>) {
     }
 }
 
-fn class_annotations(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Vec<String>, Malformed> {
+struct ClassAttributes {
+    annotations: Vec<String>,
+    signature: Option<String>,
+}
+
+fn class_attributes(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<ClassAttributes, Malformed> {
     let mut annotations = Vec::new();
+    let mut signature = None;
     let attribute_count = cursor.u16()?;
     for _ in 0..attribute_count {
         let attribute = pool.text(cursor.u16()?)?;
@@ -286,19 +333,14 @@ fn class_annotations(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Vec<String>
         };
         if attribute == VISIBLE_ANNOTATIONS || attribute == INVISIBLE_ANNOTATIONS {
             annotations.extend(annotation_list(&mut body, pool)?);
+        } else if attribute == SIGNATURE {
+            signature = Some(pool.text(body.u16()?)?.to_owned());
         }
     }
-    Ok(annotations)
-}
-
-fn skip_attributes(cursor: &mut Cursor<'_>) -> Result<(), Malformed> {
-    let count = cursor.u16()?;
-    for _ in 0..count {
-        cursor.u16()?;
-        let length = cursor.length()?;
-        cursor.take(length)?;
-    }
-    Ok(())
+    Ok(ClassAttributes {
+        annotations,
+        signature,
+    })
 }
 
 // Cuántos parámetros declara un descriptor como `(ILjava/lang/String;[J)V`.

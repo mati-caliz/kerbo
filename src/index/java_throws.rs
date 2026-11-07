@@ -8,7 +8,7 @@ use super::java_throw_lookup::{ThrowLookup, declared_clauses};
 use crate::lint::LintFinding;
 use crate::lint::java_calls::Body;
 use crate::lint::java_owner::OwnerKind;
-use crate::lint::java_throws::{MethodThrows, ThrowPoint, ThrowsClause};
+use crate::lint::java_throws::{MethodThrows, ThrowOrigin, ThrowPoint, ThrowsClause};
 use crate::rules::JavaRule;
 
 const RUNTIME_EXCEPTION: &str = "java.lang.RuntimeException";
@@ -27,13 +27,19 @@ const SERIALIZATION_METHODS: [&str; 5] = [
 // método, y qué llamadas con ese nombre están adentro de un `try`.
 pub struct ThrowsFacts<'summary> {
     declaring: HashMap<&'summary str, Vec<(&'summary JavaSummary, &'summary Declaration)>>,
-    caught: HashMap<&'summary str, Vec<(&'summary JavaSummary, &'summary str)>>,
+    caught: HashMap<&'summary str, Vec<Caught<'summary>>>,
+}
+
+struct Caught<'summary> {
+    summary: &'summary JavaSummary,
+    written: &'summary str,
+    origin: &'summary ThrowOrigin,
 }
 
 impl<'summary> ThrowsFacts<'summary> {
     pub fn new(files: &[IndexedSummary<'summary>]) -> Self {
         let mut declaring: HashMap<&str, Vec<(&JavaSummary, &Declaration)>> = HashMap::new();
-        let mut caught: HashMap<&str, Vec<(&JavaSummary, &str)>> = HashMap::new();
+        let mut caught: HashMap<&str, Vec<Caught<'_>>> = HashMap::new();
         for file in files {
             let summary = file.summary;
             for declaration in summary
@@ -50,7 +56,11 @@ impl<'summary> ThrowsFacts<'summary> {
                 caught
                     .entry(call.name.as_str())
                     .or_default()
-                    .extend(call.caught.iter().map(|written| (summary, written.as_str())));
+                    .extend(call.caught.iter().map(|written| Caught {
+                        summary,
+                        written: written.as_str(),
+                        origin: &call.origin,
+                    }));
             }
         }
         Self { declaring, caught }
@@ -67,8 +77,7 @@ fn declaration_at<'summary>(
 }
 
 // Calca RedundantThrows de IntelliJ, que no marca si le queda una llamada sin resolver: kerbo tampoco
-// opina de un método con algo que no sabe resolver. Faltan los constructores, porque pedirían seguir
-// el `super()` implícito y los inicializadores de los campos.
+// opina de un método con algo que no sabe resolver.
 pub fn redundant_throws(
     lookup: &ThrowLookup<'_, '_>,
     facts: &ThrowsFacts<'_>,
@@ -92,14 +101,18 @@ struct Checker<'check, 'query, 'summary> {
     summary: &'check JavaSummary,
 }
 
-type Escaping<'point> = (Resolved, &'point [String]);
+// Lo que sale de un punto del cuerpo. `widened` es una variable relanzada: puede llevar cualquier
+// subtipo de su tipo declarado.
+struct Escaping<'point> {
+    exception: Resolved,
+    caught: &'point [String],
+    widened: bool,
+}
 
 impl Checker<'_, '_, '_> {
     fn method_findings(&self, method: &MethodThrows) -> Vec<LintFinding> {
         let Some(declaration) = declaration_at(self.summary, method).filter(|found| {
-            !found.is_constructor
-                && found.body == Body::Written
-                && !SERIALIZATION_METHODS.contains(&found.name.as_str())
+            found.body == Body::Written && !SERIALIZATION_METHODS.contains(&found.name.as_str())
         }) else {
             return Vec::new();
         };
@@ -127,11 +140,12 @@ impl Checker<'_, '_, '_> {
         let mut escaping = Vec::new();
         for point in points {
             let thrown = self.lookup.thrown_by(self.summary, &point.origin)?;
-            escaping.extend(
-                thrown
-                    .into_iter()
-                    .map(|exception| (exception, point.caught.as_slice())),
-            );
+            let widened = matches!(point.origin, ThrowOrigin::Rethrown(_));
+            escaping.extend(thrown.into_iter().map(|exception| Escaping {
+                exception,
+                caught: point.caught.as_slice(),
+                widened,
+            }));
         }
         Some(escaping)
     }
@@ -145,9 +159,7 @@ impl Checker<'_, '_, '_> {
         let declared = self.lookup.named(self.summary, &clause.written);
         self.is_checked(&declared)
             && declared != Resolved::Library(REMOTE_EXCEPTION.to_owned())
-            && !escaping
-                .iter()
-                .any(|(exception, caught)| self.escapes_as(exception, caught, &declared))
+            && !escaping.iter().any(|point| self.escapes_as(point, &declared))
             && !self.declared_by_overrider(&declared, declaration)
             && !self.caught_by_caller(&declared, declaration)
     }
@@ -169,21 +181,24 @@ impl Checker<'_, '_, '_> {
         })
     }
 
-    fn escapes_as(&self, exception: &Resolved, caught: &[String], declared: &Resolved) -> bool {
+    fn escapes_as(&self, point: &Escaping<'_>, declared: &Resolved) -> bool {
+        let exception = &point.exception;
         if self.is_known_unchecked(exception) {
             return false;
         }
-        let handled = caught.iter().any(|written| {
+        let handled = point.caught.iter().any(|written| {
             let handler = self.lookup.named(self.summary, written);
             self.lookup.is_subclass(exception, &handler) == Some(true)
         });
-        !handled && self.lookup.is_subclass(exception, declared) != Some(false)
+        !handled
+            && (self.lookup.is_subclass(exception, declared) != Some(false)
+                || point.widened && self.lookup.is_subclass(declared, exception) != Some(false))
     }
 
     // Un método que lo redefine y declara ese tipo o uno más chico justifica el `throws`: quien
     // llama por la clase de arriba tiene que poder atraparlo.
     fn declared_by_overrider(&self, declared: &Resolved, declaration: &Declaration) -> bool {
-        if declaration.owner.kind == OwnerKind::Local {
+        if declaration.owner.kind == OwnerKind::Local || declaration.is_constructor {
             return false;
         }
         self.facts
@@ -221,9 +236,27 @@ impl Checker<'_, '_, '_> {
             .get(declaration.name.as_str())
             .into_iter()
             .flatten()
-            .any(|(summary, written)| {
-                let handler = self.lookup.named(summary, written);
+            .filter(|call| self.may_call(call, declaration))
+            .any(|call| {
+                let handler = self.lookup.named(call.summary, call.written);
                 !is_general(&handler) && self.lookup.is_subclass(declared, &handler) != Some(false)
+            })
+    }
+
+    // Como IntelliJ, el `catch` cuenta para el método al que va la llamada y para los que ese
+    // redefine, no para los que lo redefinen. Un método de una clase anónima o local sólo se llama
+    // desde su archivo; si el receptor no se sabe, cuenta.
+    fn may_call(&self, call: &Caught<'_>, declaration: &Declaration) -> bool {
+        if declaration.owner.kind == OwnerKind::Local {
+            return ptr::eq(call.summary, self.summary);
+        }
+        let owner = Resolved::Project(declaration.owner.name.clone());
+        self.lookup
+            .receivers_of(call.summary, call.origin)
+            .is_none_or(|receivers| {
+                receivers
+                    .iter()
+                    .any(|receiver| self.lookup.is_subclass(receiver, &owner) != Some(false))
             })
     }
 }

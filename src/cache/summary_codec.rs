@@ -203,6 +203,9 @@ fn write_declaration(writer: &mut Writer, declaration: &Declaration) {
         Returns::Varied => writer.number(RETURNS_VARIED),
     }
     writer.text(&declaration.returned);
+    writer.list(&declaration.returned_arguments, |writer, argument| {
+        writer.text(argument);
+    });
     writer.number(match declaration.return_type {
         ReturnType::Void => RETURN_TYPE_VOID,
         ReturnType::Primitive => RETURN_TYPE_PRIMITIVE,
@@ -257,6 +260,7 @@ fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
             _ => return Err(Corrupt),
         },
         returned: reader.text()?,
+        returned_arguments: reader.list(Reader::text)?,
         return_type: match reader.number()? {
             RETURN_TYPE_VOID => ReturnType::Void,
             RETURN_TYPE_PRIMITIVE => ReturnType::Primitive,

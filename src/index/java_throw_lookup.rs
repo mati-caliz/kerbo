@@ -1,11 +1,13 @@
 use std::collections::HashSet;
 
 use super::java::{Declaration, JavaSummary};
-use super::java_nullness::{ProjectTypes, Resolved, parents_of, resolve};
+use super::java_nullness::{ProjectTypes, Resolved, resolve};
+use super::java_typed::{Typed, library_parents, library_returned};
 use crate::jvm::class_file::ClassFile;
 use crate::jvm::library::Library;
 use crate::jvm::method::Method;
 use crate::lint::java_calls::{Arity, ReturnType};
+use crate::lint::java_receivers::UNKNOWN_TYPE_ARGUMENT;
 use crate::lint::java_throws::{CallRoot, CallStep, ThrowOrigin};
 
 const JAVA_OBJECT: &str = "java.lang.Object";
@@ -20,7 +22,7 @@ const MAX_RECEIVERS: usize = 64;
 #[derive(Debug, Clone)]
 struct Signature {
     thrown: Vec<Resolved>,
-    returned: Option<Resolved>,
+    returned: Option<Typed>,
 }
 
 #[derive(Default)]
@@ -40,8 +42,8 @@ enum Search {
 // juntan todas las sobrecargas candidatas. Así puede faltar un aviso, nunca sobrar: la sobrecarga
 // que tira hace callar a la regla aunque el compilador hubiera elegido otra.
 pub struct ThrowLookup<'query, 'summary> {
-    types: &'query ProjectTypes<'summary>,
-    library: &'query Library,
+    pub(super) types: &'query ProjectTypes<'summary>,
+    pub(super) library: &'query Library,
 }
 
 impl<'query, 'summary> ThrowLookup<'query, 'summary> {
@@ -71,16 +73,64 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
     pub fn thrown_by(&self, summary: &JavaSummary, origin: &ThrowOrigin) -> Option<Vec<Resolved>> {
         match origin {
             ThrowOrigin::Unknown => None,
-            ThrowOrigin::Thrown(written) => Some(vec![self.named(summary, written)]),
+            ThrowOrigin::Thrown(written) | ThrowOrigin::Rethrown(written) => {
+                Some(vec![self.named(summary, written)])
+            }
             ThrowOrigin::Creation(written, arity) => self
                 .constructors(&self.named(summary, written), *arity)
                 .map(|signatures| all_thrown(&signatures)),
-            ThrowOrigin::Close(written) => match self.members(&self.named(summary, written), CLOSE, 0) {
-                Search::Found(signatures) => Some(all_thrown(&signatures)),
-                Search::Absent | Search::Incomplete => None,
-            },
+            ThrowOrigin::Close(written) => {
+                match self.members(&Typed::raw(self.named(summary, written)), CLOSE, 0) {
+                    Search::Found(signatures) => Some(all_thrown(&signatures)),
+                    Search::Absent | Search::Incomplete => None,
+                }
+            }
             ThrowOrigin::Call(root, steps) => self.call_thrown(summary, root, steps),
         }
+    }
+
+    // Las clases donde se busca el último método de una llamada, o nada si no se sabe.
+    pub fn receivers_of(&self, summary: &JavaSummary, origin: &ThrowOrigin) -> Option<Vec<Resolved>> {
+        let ThrowOrigin::Call(root, steps) = origin else {
+            return None;
+        };
+        let (last, before) = steps.split_last()?;
+        let Some((first, rest)) = before.split_first() else {
+            return match root {
+                CallRoot::Scope(enclosing) => self.scope_owner(summary, enclosing, last),
+                CallRoot::Type(written) => Some(vec![self.root_type(summary, written).class]),
+            };
+        };
+        let mut signatures = match root {
+            CallRoot::Scope(enclosing) => self.in_scope(summary, enclosing, first)?,
+            CallRoot::Type(written) => self.on_receivers(&[self.root_type(summary, written)], first)?,
+        };
+        for step in rest {
+            signatures = self.on_receivers(&returned_by(&signatures)?, step)?;
+        }
+        Some(
+            returned_by(&signatures)?
+                .into_iter()
+                .map(|receiver| receiver.class)
+                .collect(),
+        )
+    }
+
+    fn scope_owner(
+        &self,
+        summary: &JavaSummary,
+        enclosing: &[String],
+        step: &CallStep,
+    ) -> Option<Vec<Resolved>> {
+        for owner in enclosing {
+            let class = self.named(summary, owner);
+            match self.members(&Typed::raw(class.clone()), &step.name, step.arity) {
+                Search::Found(_) => return Some(vec![class]),
+                Search::Incomplete => return None,
+                Search::Absent => {}
+            }
+        }
+        None
     }
 
     fn call_thrown(
@@ -92,7 +142,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         let (first, rest) = steps.split_first()?;
         let mut signatures = match root {
             CallRoot::Scope(enclosing) => self.in_scope(summary, enclosing, first)?,
-            CallRoot::Type(written) => self.on_receivers(&[self.named(summary, written)], first)?,
+            CallRoot::Type(written) => self.on_receivers(&[self.root_type(summary, written)], first)?,
         };
         let mut thrown = all_thrown(&signatures);
         for step in rest {
@@ -103,7 +153,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         Some(thrown)
     }
 
-    fn on_receivers(&self, receivers: &[Resolved], step: &CallStep) -> Option<Vec<Signature>> {
+    fn on_receivers(&self, receivers: &[Typed], step: &CallStep) -> Option<Vec<Signature>> {
         let mut found = Vec::new();
         for receiver in receivers {
             match self.members(receiver, &step.name, step.arity) {
@@ -123,7 +173,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         step: &CallStep,
     ) -> Option<Vec<Signature>> {
         for owner in enclosing {
-            match self.members(&self.named(summary, owner), &step.name, step.arity) {
+            match self.members(&Typed::raw(self.named(summary, owner)), &step.name, step.arity) {
                 Search::Found(signatures) => return Some(signatures),
                 Search::Incomplete => return None,
                 Search::Absent => {}
@@ -137,7 +187,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
             .filter(|(_, member)| *member == step.name || *member == WILDCARD)
             .map(|(class, _)| class)
         {
-            match self.members(&self.named(summary, class), &step.name, step.arity) {
+            match self.members(&Typed::raw(self.named(summary, class)), &step.name, step.arity) {
                 Search::Found(signatures) => found.extend(signatures),
                 Search::Incomplete => return None,
                 Search::Absent => {}
@@ -146,12 +196,12 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         (!found.is_empty()).then_some(found)
     }
 
-    fn members(&self, start: &Resolved, name: &str, arity: usize) -> Search {
+    fn members(&self, start: &Typed, name: &str, arity: usize) -> Search {
         let mut pending = vec![start.clone()];
         let mut seen = HashSet::new();
         let mut collected = Collected::default();
         while let Some(current) = pending.pop() {
-            if !seen.insert(current.clone()) {
+            if !seen.insert(current.class.clone()) {
                 continue;
             }
             let Some(parents) = self.visit(&current, (name, arity), &mut collected) else {
@@ -167,29 +217,24 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
     }
 
     // Junta lo que declara un tipo y devuelve de quién hereda, o nada si no se puede leer.
-    fn visit(
-        &self,
-        current: &Resolved,
-        wanted: (&str, usize),
-        collected: &mut Collected,
-    ) -> Option<Vec<Resolved>> {
+    fn visit(&self, current: &Typed, wanted: (&str, usize), collected: &mut Collected) -> Option<Vec<Typed>> {
         let (name, arity) = wanted;
-        match current {
+        match &current.class {
             Resolved::Project(owner) => {
                 collected.found.extend(self.project_members(owner, name, arity));
-                let mut parents = vec![Resolved::Library(JAVA_OBJECT.to_owned())];
-                parents.extend(parents_of(self.types, self.library, owner));
+                let mut parents = vec![Typed::raw(Resolved::Library(JAVA_OBJECT.to_owned()))];
+                parents.extend(self.project_parents(owner).into_iter().map(Typed::raw));
                 Some(parents)
             }
             Resolved::Library(class) => {
                 let file = self.library.class_or_jdk(class)?;
-                collected
-                    .found
-                    .extend(library_members(&file, name, arity, &mut collected.overridden));
-                let mut parents: Vec<Resolved> =
-                    file.interfaces.iter().cloned().map(Resolved::Library).collect();
-                parents.extend(file.superclass.iter().cloned().map(Resolved::Library));
-                Some(parents)
+                collected.found.extend(library_members(
+                    &file,
+                    current,
+                    (name, arity),
+                    &mut collected.overridden,
+                ));
+                Some(library_parents(&file, current))
             }
         }
     }
@@ -209,8 +254,16 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
             thrown: declared_clauses(summary, declaration)
                 .map(|written| self.named(summary, written))
                 .collect(),
-            returned: (declaration.return_type == ReturnType::Reference)
-                .then(|| self.named(summary, &declaration.returned)),
+            returned: (declaration.return_type == ReturnType::Reference).then(|| Typed {
+                class: self.named(summary, &declaration.returned),
+                arguments: declaration
+                    .returned_arguments
+                    .iter()
+                    .map(|argument| {
+                        (argument != UNKNOWN_TYPE_ARGUMENT).then(|| Typed::raw(self.named(summary, argument)))
+                    })
+                    .collect(),
+            }),
         }
     }
 
@@ -225,7 +278,12 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
                 .collect(),
             Resolved::Library(name) => {
                 let file = self.library.class_or_jdk(name)?;
-                library_members(&file, CONSTRUCTOR_NAME, arity, &mut HashSet::new())
+                library_members(
+                    &file,
+                    &Typed::raw(class.clone()),
+                    (CONSTRUCTOR_NAME, arity),
+                    &mut HashSet::new(),
+                )
             }
         };
         (!found.is_empty() || arity == 0).then_some(found)
@@ -244,7 +302,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
                 continue;
             }
             match &current {
-                Resolved::Project(owner) => pending.extend(parents_of(self.types, self.library, owner)),
+                Resolved::Project(owner) => pending.extend(self.project_parents(owner)),
                 Resolved::Library(name) => match self.library.class_or_jdk(name) {
                     Some(file) => pending.extend(file.superclass.iter().cloned().map(Resolved::Library)),
                     None => complete = false,
@@ -264,7 +322,7 @@ fn all_thrown(signatures: &[Signature]) -> Vec<Resolved> {
 
 // Las clases sobre las que sigue la cadena. Un paso que devuelve un primitivo o `void` no sigue, y
 // demasiadas sobrecargas distintas (`assertThat`) no se persiguen.
-fn returned_by(signatures: &[Signature]) -> Option<Vec<Resolved>> {
+fn returned_by(signatures: &[Signature]) -> Option<Vec<Typed>> {
     let mut receivers = Vec::new();
     for signature in signatures {
         let returned = signature.returned.as_ref()?;
@@ -279,17 +337,18 @@ fn returned_by(signatures: &[Signature]) -> Option<Vec<Resolved>> {
 // no tira lo que tira `OutputStream.close()`.
 fn library_members(
     file: &ClassFile,
-    name: &str,
-    arity: usize,
+    current: &Typed,
+    wanted: (&str, usize),
     overridden: &mut HashSet<String>,
 ) -> Vec<Signature> {
+    let (name, arity) = wanted;
     file.methods
         .iter()
         .filter(|method| method.name == name && method.accepts(arity) && !method.is_private())
         .filter(|method| overridden.insert(parameters_of(method).to_owned()))
         .map(|method| Signature {
             thrown: method.exceptions.iter().cloned().map(Resolved::Library).collect(),
-            returned: method.return_class().map(Resolved::Library),
+            returned: library_returned(file, method, current),
         })
         .collect()
 }

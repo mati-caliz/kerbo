@@ -6,12 +6,14 @@ use super::java_results::result_use;
 use tree_sitter::Node;
 
 use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, PRIVATE, children, modifiers, text};
+use super::java_caught_calls::{CaughtCall, caught_call};
 use super::java_chains::{Chain, NullFacts, chain_of};
 use super::java_constants::{Constants, constant_value, constants_in};
+use super::java_implicit_constructor::implicit_enum_constructor;
 use super::java_null_flow::{NullFlow, null_flows};
 use super::java_owner::{Owner, annotation_names, mentioned_name, owner_of};
 use super::java_receivers::{
-    Receiver, StaticImports, Variables, simple_type_name, supertypes, variable_types,
+    Receiver, StaticImports, Variables, simple_type_name, supertypes, type_arguments, variable_types,
 };
 use super::java_resources::{ResourceCandidate, resource_candidates};
 pub use super::java_returns::{ReturnType, Returns};
@@ -91,6 +93,7 @@ pub struct Callable<'tree> {
     pub returns: Returns,
     pub return_type: ReturnType,
     pub returned: String,
+    pub returned_arguments: Vec<String>,
     pub annotations: Vec<String>,
     pub owner: Owner,
 }
@@ -118,6 +121,7 @@ pub struct Extracted<'tree> {
     pub resources: Vec<ResourceCandidate>,
     pub taints: Vec<TaintMethod>,
     pub method_throws: Vec<MethodThrows>,
+    pub caught_calls: Vec<CaughtCall>,
 }
 
 // Lo que declara y lo que llama una clase de nivel superior, con sus clases anidadas.
@@ -151,19 +155,7 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
         match node.kind() {
             METHOD | CONSTRUCTOR => {
                 facts.enter_method();
-                extracted.callables.extend(callable(node, source));
-                extracted
-                    .method_throws
-                    .extend(method_throws(node, source, variables));
-                if let Some(body) = node.child_by_field_name(BODY_FIELD) {
-                    extracted.null_flows.extend(null_flows(body, source, variables));
-                    extracted
-                        .resources
-                        .extend(resource_candidates(body, source, variables));
-                }
-                extracted
-                    .taints
-                    .extend(taint_method(node, source, variables, &imported));
+                extract_method(node, source, (variables, &imported), &mut extracted);
             }
             ENUM => extracted
                 .callables
@@ -199,8 +191,35 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
             ),
             _ => {}
         }
+        if node.kind() == INVOCATION || node.kind() == METHOD_REFERENCE || node.kind() == CREATION {
+            extracted
+                .caught_calls
+                .extend(caught_call(node, source, variables));
+        }
     }
     extracted
+}
+
+fn extract_method<'tree>(
+    method: Node<'tree>,
+    source: &[u8],
+    context: (&Variables, &StaticImports),
+    extracted: &mut Extracted<'tree>,
+) {
+    let (variables, imported) = context;
+    extracted.callables.extend(callable(method, source));
+    extracted
+        .method_throws
+        .extend(method_throws(method, source, variables));
+    if let Some(body) = method.child_by_field_name(BODY_FIELD) {
+        extracted.null_flows.extend(null_flows(body, source, variables));
+        extracted
+            .resources
+            .extend(resource_candidates(body, source, variables));
+    }
+    extracted
+        .taints
+        .extend(taint_method(method, source, variables, imported));
 }
 
 // Los tipos de las variables vistos desde un método: lo que declara él manda sobre lo del resto
@@ -249,6 +268,10 @@ fn callable<'tree>(declaration: Node<'tree>, source: &[u8]) -> Option<Callable<'
             .child_by_field_name(TYPE_FIELD)
             .map(|written_type| simple_type_name(text(written_type, source)))
             .unwrap_or_default(),
+        returned_arguments: declaration
+            .child_by_field_name(TYPE_FIELD)
+            .map(|written_type| type_arguments(written_type, source))
+            .unwrap_or_default(),
         annotations: annotation_names(declaration, source),
         owner: owner_of(declaration, source),
     })
@@ -272,29 +295,6 @@ fn record_constructor<'tree>(declaration: Node<'tree>, source: &[u8]) -> Option<
     constructor.is_constructor = true;
     constructor.returns = Returns::Nothing;
     Some(constructor)
-}
-
-// Un enum sin constructor escrito tiene uno implícito sin parámetros: no se marca nada, pero
-// cuenta para saber si una constante con argumentos va a otro.
-fn implicit_enum_constructor<'tree>(declaration: Node<'tree>, source: &[u8]) -> Option<Callable<'tree>> {
-    let body = declaration.child_by_field_name(BODY_FIELD)?;
-    let name_node = declaration.child_by_field_name(NAME_FIELD)?;
-    let declares_constructor = descendants(body).iter().any(|node| node.kind() == CONSTRUCTOR);
-    (!declares_constructor).then(|| Callable {
-        name: text(name_node, source).to_owned(),
-        name_node,
-        parameters: Vec::new(),
-        is_constructor: true,
-        visibility: Visibility::Private,
-        overrides: false,
-        body: Body::Abstract,
-        arity: Arity::Fixed,
-        returns: Returns::Nothing,
-        return_type: ReturnType::Void,
-        returned: String::new(),
-        annotations: Vec::new(),
-        owner: owner_of(declaration, source),
-    })
 }
 
 // Los constructores de un enum son privados aunque no lo digan, y lo que declara una interfaz es

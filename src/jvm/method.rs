@@ -20,6 +20,7 @@ pub struct Method {
     pub parameter_annotations: Vec<Vec<String>>,
     pub return_annotations: Vec<String>,
     pub exceptions: Vec<String>,
+    pub signature: Option<String>,
 }
 
 impl Method {

@@ -2,9 +2,10 @@ use std::rc::Rc;
 
 use tree_sitter::Node;
 
-use super::java::{METHOD, NAME_FIELD, text};
+use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, text};
 use super::java_calls::TYPE_DECLARATIONS;
 use super::java_chains::argument_count;
+use super::java_constructor_throws::{constructor_points, explicit_origin};
 use super::java_receivers::{Variables, enclosing_types, simple_type_name};
 use crate::syntax::{descendants, named_children, one_based};
 
@@ -59,10 +60,12 @@ pub struct CallStep {
 
 // Lo que en un cuerpo puede tirar una excepción chequeada. `Unknown` es lo que no se sabe sin
 // compilar: como IntelliJ con una llamada sin resolver, alcanza para no opinar sobre el método.
+// `Rethrown` es un `throw` de una variable, que puede llevar cualquier subtipo del suyo.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ThrowOrigin {
     Unknown,
     Thrown(String),
+    Rethrown(String),
     Creation(String, usize),
     Close(String),
     Call(CallRoot, Vec<CallStep>),
@@ -83,13 +86,6 @@ pub struct MethodThrows {
     pub points: Vec<ThrowPoint>,
 }
 
-// Una llamada adentro de un `try`, con los tipos de sus `catch`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CaughtCall {
-    pub name: String,
-    pub caught: Vec<String>,
-}
-
 pub fn method_throws(method: Node<'_>, source: &[u8], variables: &Variables) -> Option<MethodThrows> {
     let clause_list = named_children(method)
         .into_iter()
@@ -97,8 +93,14 @@ pub fn method_throws(method: Node<'_>, source: &[u8], variables: &Variables) -> 
     let name = method.child_by_field_name(NAME_FIELD)?.start_position();
     let points = method
         .child_by_field_name(BODY_FIELD)
-        .filter(|_| method.kind() == METHOD)
-        .map(|body| throw_points(body, source, &with_catch_parameters(body, source, variables)))
+        .map(|body| {
+            let scoped = with_catch_parameters(body, source, variables);
+            match method.kind() {
+                METHOD => throw_points(body, source, &scoped),
+                CONSTRUCTOR => constructor_points(method, body, source, &scoped),
+                _ => Vec::new(),
+            }
+        })
         .unwrap_or_default();
     Some(MethodThrows {
         line: one_based(name.row),
@@ -147,7 +149,7 @@ fn clause_of(written: Node<'_>, source: &[u8]) -> ThrowsClause {
     }
 }
 
-fn written_type(written: &str) -> String {
+pub(super) fn written_type(written: &str) -> String {
     let without_arguments = written.split(GENERIC_OPEN).next().unwrap_or(written);
     without_arguments
         .split(ARRAY_OPEN)
@@ -158,7 +160,7 @@ fn written_type(written: &str) -> String {
 }
 
 // Una lambda o una clase anónima no tiran al declararse: lo de adentro corre en otro método.
-fn throw_points(body: Node<'_>, source: &[u8], variables: &Variables) -> Vec<ThrowPoint> {
+pub(super) fn throw_points(body: Node<'_>, source: &[u8], variables: &Variables) -> Vec<ThrowPoint> {
     let mut pending: Vec<(Node<'_>, Rc<[String]>)> = vec![(body, Rc::from(Vec::new()))];
     let mut points = Vec::new();
     while let Some((node, caught)) = pending.pop() {
@@ -211,7 +213,7 @@ fn try_parts<'tree>(
         .collect()
 }
 
-fn caught_types(clause: Node<'_>, source: &[u8]) -> Vec<String> {
+pub(super) fn caught_types(clause: Node<'_>, source: &[u8]) -> Vec<String> {
     named_children(clause)
         .into_iter()
         .filter(|child| child.kind() == CATCH_PARAMETER)
@@ -232,9 +234,9 @@ fn origin_of(node: Node<'_>, source: &[u8], variables: &Variables) -> Option<Thr
     match node.kind() {
         INVOCATION => (!is_chain_receiver(node)).then(|| call_origin(node, source, variables)),
         CREATION => Some(creation_origin(node, source)),
-        THROW => Some(thrown_origin(node, source)),
+        THROW => Some(thrown_origin(node, source, variables)),
         RESOURCE => Some(close_origin(node, source, variables)),
-        EXPLICIT_CONSTRUCTOR => Some(ThrowOrigin::Unknown),
+        EXPLICIT_CONSTRUCTOR => explicit_origin(node, source),
         _ => None,
     }
 }
@@ -248,7 +250,7 @@ fn is_chain_receiver(invocation: Node<'_>) -> bool {
         .is_some_and(|object| object.id() == invocation.id())
 }
 
-fn call_origin(invocation: Node<'_>, source: &[u8], variables: &Variables) -> ThrowOrigin {
+pub(super) fn call_origin(invocation: Node<'_>, source: &[u8], variables: &Variables) -> ThrowOrigin {
     let mut steps = Vec::new();
     let mut current = invocation;
     loop {
@@ -321,16 +323,24 @@ fn creation_origin(creation: Node<'_>, source: &[u8]) -> ThrowOrigin {
         })
 }
 
-// `throw e` puede ser el relanzamiento preciso de un `catch`, que pide flujo de datos para saber qué
-// tipo lleva: sólo se entiende el `throw new`.
-fn thrown_origin(statement: Node<'_>, source: &[u8]) -> ThrowOrigin {
-    named_children(statement)
-        .into_iter()
-        .find(|child| child.kind() == CREATION)
-        .and_then(|creation| creation.child_by_field_name(TYPE_FIELD))
-        .map_or(ThrowOrigin::Unknown, |written| {
-            ThrowOrigin::Thrown(written_type(text(written, source)))
-        })
+// `throw new X()` tira un `X`. `throw e` puede ser el relanzamiento preciso de un `catch`, que pide
+// flujo de datos para saber qué lleva: se toma el tipo declarado de la variable como cota.
+fn thrown_origin(statement: Node<'_>, source: &[u8], variables: &Variables) -> ThrowOrigin {
+    let Some(thrown) = named_children(statement).into_iter().next() else {
+        return ThrowOrigin::Unknown;
+    };
+    match thrown.kind() {
+        CREATION => thrown
+            .child_by_field_name(TYPE_FIELD)
+            .map_or(ThrowOrigin::Unknown, |written| {
+                ThrowOrigin::Thrown(written_type(text(written, source)))
+            }),
+        IDENTIFIER => match variables.get(text(thrown, source)) {
+            Some(Some(declared)) => ThrowOrigin::Rethrown(declared.clone()),
+            Some(None) | None => ThrowOrigin::Unknown,
+        },
+        _ => ThrowOrigin::Unknown,
+    }
 }
 
 fn close_origin(resource: Node<'_>, source: &[u8], variables: &Variables) -> ThrowOrigin {
@@ -349,44 +359,4 @@ fn close_origin(resource: Node<'_>, source: &[u8], variables: &Variables) -> Thr
             CallRoot::Type(declared) => ThrowOrigin::Close(declared),
             CallRoot::Scope(_) => ThrowOrigin::Unknown,
         })
-}
-
-// Las llamadas y referencias a métodos que quedan adentro de algún `try` de su clase: IntelliJ no
-// marca un `throws` que un llamador atrapa con un `catch` de ese tipo.
-pub fn caught_calls(nodes: &[Node<'_>], source: &[u8]) -> Vec<CaughtCall> {
-    nodes
-        .iter()
-        .filter_map(|node| {
-            let name = match node.kind() {
-                INVOCATION => node.child_by_field_name(NAME_FIELD)?,
-                METHOD_REFERENCE => *named_children(*node).last()?,
-                _ => return None,
-            };
-            let caught = surrounding_catches(*node, source);
-            (!caught.is_empty()).then(|| CaughtCall {
-                name: text(name, source).to_owned(),
-                caught,
-            })
-        })
-        .collect()
-}
-
-fn surrounding_catches(node: Node<'_>, source: &[u8]) -> Vec<String> {
-    let mut caught = Vec::new();
-    let mut current = node.parent();
-    while let Some(ancestor) = current {
-        if TYPE_DECLARATIONS.contains(&ancestor.kind()) || ancestor.kind() == CLASS_BODY {
-            break;
-        }
-        if TRY_STATEMENTS.contains(&ancestor.kind()) {
-            caught.extend(
-                named_children(ancestor)
-                    .into_iter()
-                    .filter(|part| part.kind() == CATCH_CLAUSE)
-                    .flat_map(|clause| caught_types(clause, source)),
-            );
-        }
-        current = ancestor.parent();
-    }
-    caught
 }

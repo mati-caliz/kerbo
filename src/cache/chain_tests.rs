@@ -45,9 +45,8 @@ fn chains_and_null_flows_survive_the_round_trip() {
 #[test]
 fn what_a_method_can_throw_survives_the_round_trip() {
     use super::throws_codec::{read_caught_call, read_method_throws, write_caught_call, write_method_throws};
-    use crate::lint::java_throws::{
-        CallRoot, CallStep, CaughtCall, MethodThrows, ThrowOrigin, ThrowPoint, ThrowsClause,
-    };
+    use crate::lint::java_caught_calls::CaughtCall;
+    use crate::lint::java_throws::{CallRoot, CallStep, MethodThrows, ThrowOrigin, ThrowPoint, ThrowsClause};
     let step = CallStep {
         name: "leer".to_owned(),
         arity: 2,
@@ -79,6 +78,13 @@ fn what_a_method_can_throw_survives_the_round_trip() {
     let call = CaughtCall {
         name: "leer".to_owned(),
         caught: vec!["IOException".to_owned()],
+        origin: ThrowOrigin::Call(
+            CallRoot::Type("Archivo".to_owned()),
+            vec![CallStep {
+                name: "leer".to_owned(),
+                arity: 0,
+            }],
+        ),
     };
     let mut writer = Writer::default();
     write_method_throws(&mut writer, &method);

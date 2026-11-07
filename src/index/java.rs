@@ -7,6 +7,7 @@ use crate::lint::java::children;
 use crate::lint::java_calls::{
     Arity, Body, Call, Callable, ResultUse, ReturnType, Returns, TYPE_DECLARATIONS, Visibility, extract,
 };
+use crate::lint::java_caught_calls::CaughtCall;
 use crate::lint::java_chains::Chain;
 use crate::lint::java_constants::{Constant, declared_constants};
 use crate::lint::java_fields::{DeclaredField, declared_fields, used_identifiers, written_only_identifiers};
@@ -15,7 +16,7 @@ use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_owner::{Owner, annotation_names};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
-use crate::lint::java_throws::{CaughtCall, MethodThrows, caught_calls};
+use crate::lint::java_throws::MethodThrows;
 use crate::lint::taint::TaintMethod;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::JavaRule;
@@ -73,6 +74,7 @@ pub struct Declaration {
     pub returns: Returns,
     pub return_type: ReturnType,
     pub returned: String,
+    pub returned_arguments: Vec<String>,
     pub parameters: Vec<Parameter>,
     pub annotations: Vec<String>,
     pub owner: Owner,
@@ -188,7 +190,7 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.resources.extend(extracted.resources);
         summary.taints.extend(extracted.taints);
         summary.method_throws.extend(extracted.method_throws);
-        summary.caught_calls.extend(caught_calls(&nodes, source));
+        summary.caught_calls.extend(extracted.caught_calls);
         summary.constants.extend(declared_constants(&nodes, source));
         summary
             .fields
@@ -285,6 +287,7 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
         returns: callable.returns,
         return_type: callable.return_type,
         returned: callable.returned,
+        returned_arguments: callable.returned_arguments,
         annotations: callable.annotations,
         owner: callable.owner,
         parameters: callable

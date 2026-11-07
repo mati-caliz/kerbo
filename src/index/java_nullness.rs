@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use super::java::{Declaration, JavaSummary, lint_at};
+use super::java::{Declaration, Field, JavaSummary, lint_at};
 use super::java_project::IndexedSummary;
 use crate::jvm::class_file::ClassFile;
 use crate::jvm::library::Library;
@@ -58,6 +58,29 @@ impl<'summary> ProjectTypes<'summary> {
                     .filter(move |declaration| declaration.owner.name == owner)
                     .map(move |declaration| (*summary, declaration))
             })
+    }
+
+    // Los padres de un tipo del proyecto como están escritos, con el archivo que los escribe.
+    pub fn written_parents<'query>(
+        &'query self,
+        owner: &'query str,
+    ) -> impl Iterator<Item = (&'summary JavaSummary, &'summary str)> + 'query {
+        self.declared
+            .get(owner)
+            .into_iter()
+            .flatten()
+            .flat_map(|(summary, parents)| parents.iter().map(|parent| (*summary, parent.as_str())))
+    }
+
+    // Un campo de un tipo del proyecto, con el archivo donde está.
+    pub fn field_of(&self, owner: &str, name: &str) -> Option<(&'summary JavaSummary, &'summary Field)> {
+        self.declared.get(owner)?.iter().find_map(|(summary, _)| {
+            summary
+                .fields
+                .iter()
+                .find(|field| field.owner.name == owner && field.name == name)
+                .map(|field| (*summary, field))
+        })
     }
 }
 

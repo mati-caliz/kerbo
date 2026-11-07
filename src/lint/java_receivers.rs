@@ -42,6 +42,12 @@ const STATIC: &str = "static ";
 const GENERIC_OPEN: char = '<';
 const QUALIFIER_SEPARATOR: char = '.';
 const ARRAY_OPEN: char = '[';
+const TYPE_ARGUMENTS: &str = "type_arguments";
+const WILDCARD: &str = "wildcard";
+const EXTENDS_KEYWORD: &str = "extends";
+const ANNOTATION: &str = "annotation";
+const MARKER_ANNOTATION: &str = "marker_annotation";
+pub const UNKNOWN_TYPE_ARGUMENT: &str = "?";
 
 // Dónde empieza a buscarse el método de una llamada: en un tipo conocido (`repo.buscar()` con
 // `Repositorio repo`, o `Clase.metodo()`), en las clases que encierran la llamada (`metodo()` o
@@ -272,4 +278,32 @@ pub fn simple_type_name(written: &str) -> String {
         .unwrap_or(without_arrays)
         .trim()
         .to_owned()
+}
+
+// Los argumentos de primer nivel de un tipo escrito (`Map<String, List<Fallo>>` da `String` y
+// `List`). De `? extends X` se lee `X`; un `?` suelto o un `? super X` no dicen qué sale.
+pub fn type_arguments(written: Node<'_>, source: &[u8]) -> Vec<String> {
+    named_children(written)
+        .into_iter()
+        .filter(|child| child.kind() == TYPE_ARGUMENTS)
+        .flat_map(named_children)
+        .map(|argument| argument_name(argument, source))
+        .collect()
+}
+
+fn argument_name(argument: Node<'_>, source: &[u8]) -> String {
+    if argument.kind() != WILDCARD {
+        return simple_type_name(text(argument, source));
+    }
+    let extends = argument
+        .children(&mut argument.walk())
+        .any(|child| child.kind() == EXTENDS_KEYWORD);
+    named_children(argument)
+        .into_iter()
+        .rfind(|child| child.kind() != ANNOTATION && child.kind() != MARKER_ANNOTATION)
+        .filter(|_| extends)
+        .map_or_else(
+            || UNKNOWN_TYPE_ARGUMENT.to_owned(),
+            |bound| simple_type_name(text(bound, source)),
+        )
 }
