@@ -76,7 +76,7 @@ docker run --rm -i -m "${MEMORY_LIMIT}" --cgroup-parent="${VERIFY_CGROUP}" \
 cargo fmt --all --check
 read -r -d "" -a lint_flags <<<"${LINT_FLAGS}" || true
 cargo clippy --locked --workspace --all-targets --all-features -- "${lint_flags[@]}"
-oversized_files="$(find . -path ./target -prune -o -name '*.rs' -exec awk -v max="${MAX_FILE_LINES}" \
+oversized_files="$(find . \( -path ./target -o -path ./.parity \) -prune -o -name '*.rs' -exec awk -v max="${MAX_FILE_LINES}" \
   'END { if (NR > max) printf "%s: %d líneas (máximo %d)\n", FILENAME, NR, max }' {} \;)"
 if [ -n "${oversized_files}" ]; then
   echo "${oversized_files}" >&2
