@@ -15,7 +15,7 @@
 
 [tools.ruff]
 family = "python"
-version = "0.17.1"
+version = "0.17.4"
 latest = "pypi:ruff"
 cited_as = "ruff {minor}"
 

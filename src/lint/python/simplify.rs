@@ -125,7 +125,7 @@ fn nested_if_candidate<'tree>(statement: Node<'tree>, source: &[u8]) -> Option<N
         Some(clause) => (*clause, clause.child_by_field_name(CONDITION_FIELD)?),
         None => (statement, statement.child_by_field_name(CONDITION_FIELD)?),
     };
-    let body_length = statements(statement.child_by_field_name(CONSEQUENCE_FIELD)).len();
+    let body_length = statements(body_of(candidate)).len();
     let test = unparenthesized(test);
     let unmergeable = body_length > 1 || is_main_check(test, source) || [TRUE, FALSE].contains(&test.kind());
     (!unmergeable).then_some(candidate)

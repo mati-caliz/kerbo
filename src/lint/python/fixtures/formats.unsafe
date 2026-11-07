@@ -24,7 +24,7 @@ b"%s %s" % (a,)
 "{} {}".format(1)
 f"{1} {2}"
 f"{1} {1}"
-f"{1} {1}"
+"{0} {}".format(1, )
 "{".format(1)
 "}".format(1)
 "{:{}}".format(1)
@@ -70,3 +70,14 @@ f"{1}"
 f"{1}", "%s"
 x = "%d items" % len(a)
 f"{1} %"
+"{a.b()}".format(a=x)
+f"{x.b}"
+f"{x['k']}"
+"{a['k']}".format(a=x)
+'{a["k"]}'.format(a=x)
+r"{a[k\z]}".format(a=x)
+f"{x!r} {y!s} {z!a}"
+"{x!d}".format(x=x)
+"{} {1}".format(x, y)
+"{0} {}".format(x, )
+f"{x} {y}"

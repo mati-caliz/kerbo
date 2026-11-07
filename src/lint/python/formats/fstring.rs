@@ -1,10 +1,10 @@
 use tree_sitter::Node;
 
 use super::braces;
-use super::template::{self, FieldType};
+use super::template::{self, FieldPart, FieldType};
 use crate::lint::python::ast::{
     ARGUMENTS_FIELD, ATTRIBUTE, ATTRIBUTE_FIELD, COMMENT, FUNCTION_FIELD, KEYWORD_ARGUMENT, NAME_FIELD,
-    OBJECT_FIELD, STRING, VALUE_FIELD, is_string, named, string_prefix, text, unparenthesized,
+    OBJECT_FIELD, STRING, VALUE_FIELD, is_identifier, is_string, named, string_prefix, text, unparenthesized,
 };
 use crate::lint::python::escapes::text_value;
 
@@ -19,6 +19,17 @@ const QUOTE_LENGTH: usize = 1;
 const UNICODE_PREFIXES: [char; 2] = ['u', 'U'];
 const RAW_PREFIXES: [char; 2] = ['r', 'R'];
 const TEMPLATE_PREFIXES: [char; 2] = ['t', 'T'];
+const BACKSLASH: char = '\\';
+const SINGLE_QUOTE: char = '\'';
+const DOUBLE_QUOTE: char = '"';
+const CONVERSIONS: [char; 3] = ['s', 'r', 'a'];
+
+#[derive(Debug, Default)]
+struct FieldKinds {
+    next_auto: usize,
+    has_auto: bool,
+    has_index: bool,
+}
 
 #[derive(Debug, Default)]
 pub struct Arguments<'tree, 'source> {
@@ -80,10 +91,11 @@ pub fn is_convertible_format_call(
             .filter(|segment| segment.kind() == STRING)
             .collect()
     };
-    let mut next_auto = 0;
-    segments
+    let mut kinds = FieldKinds::default();
+    let all_convertible = segments
         .iter()
-        .all(|segment| is_convertible_segment(text(*segment, source), &arguments, &mut next_auto, has_effect))
+        .all(|segment| is_convertible_segment(text(*segment, source), &arguments, &mut kinds, has_effect));
+    all_convertible && !(kinds.has_auto && kinds.has_index)
 }
 
 pub fn format_object<'tree>(call: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
@@ -147,7 +159,7 @@ fn simple_value<'tree>(value: Node<'tree>, source: &[u8]) -> Option<Node<'tree>>
 fn is_convertible_segment(
     segment: &str,
     arguments: &Arguments<'_, '_>,
-    next_auto: &mut usize,
+    kinds: &mut FieldKinds,
     has_effect: &dyn Fn(Node<'_>) -> bool,
 ) -> bool {
     let unprefixed = segment.strip_prefix(UNICODE_PREFIXES).unwrap_or(segment);
@@ -161,6 +173,14 @@ fn is_convertible_segment(
     let Some(contents) = quoted.get(quote_length..quoted.len().saturating_sub(quote_length)) else {
         return false;
     };
+    let trailing_quote = quoted
+        .get(quoted.len().saturating_sub(quote_length)..)
+        .unwrap_or_default();
+    let fstring_quote = if trailing_quote == "\"" {
+        SINGLE_QUOTE
+    } else {
+        DOUBLE_QUOTE
+    };
     let Some(replacements) = template::replacements(contents, raw) else {
         return false;
     };
@@ -169,7 +189,19 @@ fn is_convertible_segment(
         let Some(field) = template::field_type(&replacement.field_name) else {
             return false;
         };
-        let Some((specifier, value)) = arguments.find(&field, next_auto) else {
+        if !are_accesses_convertible(&replacement.field_name, fstring_quote)
+            || replacement
+                .conversion
+                .is_some_and(|conversion| !CONVERSIONS.contains(&conversion))
+        {
+            return false;
+        }
+        match field {
+            FieldType::Auto => kinds.has_auto = true,
+            FieldType::Index(_) => kinds.has_index = true,
+            FieldType::Keyword(_) => {}
+        }
+        let Some((specifier, value)) = arguments.find(&field, &mut kinds.next_auto) else {
             return false;
         };
         if seen.contains(&specifier) && has_effect(value) {
@@ -178,4 +210,12 @@ fn is_convertible_segment(
         seen.push(specifier);
     }
     true
+}
+
+fn are_accesses_convertible(field_name: &str, fstring_quote: char) -> bool {
+    template::field_parts(field_name).iter().all(|part| match part {
+        FieldPart::Attribute(name) => is_identifier(name),
+        FieldPart::Index(_) => true,
+        FieldPart::StringIndex(key) => !key.contains(fstring_quote) && !key.contains(BACKSLASH),
+    })
 }

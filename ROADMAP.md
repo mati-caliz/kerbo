@@ -1562,9 +1562,16 @@ contra lo último publicado; `scripts/parity/run_all.sh` corre los corpus de tod
 cola y deja la salida en `.parity/logs/<fecha>/`. Qodana quedó fijado en `2026.3-eap`, la imagen con
 que se midió. El criterio de ritmo está en el encabezado de `versions.toml`.
 
+Hecho (2026-11-07): ruff 0.17.1 → 0.17.4. Lo que cambió en el corpus de diez repos: 18 SIM102 que
+faltaban (el `elif` con un `if` adentro ahora mira el cuerpo del `elif` y no el del `if` de arriba) y
+1 UP032 de más (ya no convierte un campo con atributo que no es un identificador, una clave con la
+comilla de la f-string o con barra, una conversión que no sea `s`, `r` o `a`, ni mezcla `{}` con
+`{0}`). Paridad después: 106.635 coinciden, 6 faltan (los mismos de antes: 5 RUF100 y 1 PLE0307),
+0 de más. `test-python.sh` busca la imagen de Rust que hay en vez de una fija.
+
 - Pendientes:
   - Subir lo atrasado al 2026-11-07, con `run_all.sh` antes y después de cada familia: ESLint 10.14,
-    typescript-eslint 8.72.1, ruff 0.17.4, squawk 2.71, tree-sitter 0.27.2 (parches y menores);
+    typescript-eslint 8.72.1, squawk 2.71, tree-sitter 0.27.2 (parches y menores);
     TypeScript 7 y Django 6 (mayores, tanda propia). Checkstyle figura como 14 sin la menor medida.
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.

@@ -69,6 +69,7 @@ nada usa el preset más exigente; para aflojarlo, un `kerbo.toml` en la raíz de
 
 ```toml
 preset = "recommended"            # strict (de fábrica), recommended o minimal
+lang = "es"                       # mensajes en español
 
 [[exceptions]]
 paths = ["src/legacy/**"]

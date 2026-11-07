@@ -124,3 +124,12 @@ def blind_handlers():
         pass
     except ValueError:
         pass
+
+
+def collapsible_elif_after_long_if_body(a, b, c, d):
+    if a:
+        print(a)
+        print(b)
+    elif b:
+        if c:
+            d
