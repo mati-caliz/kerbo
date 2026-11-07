@@ -5,8 +5,11 @@
 # usa cargo-deny para bajar la base de RustSec), cargo-deny y cargo-llvm-cov (los binarios
 # verificados por sha256). La memoria va acotada y el registro de crates y los target/ viven en un
 # volumen compartido, así el repo no se llena de archivos de root. Se llama envuelto en build-lock.sh, como cualquier gate pesado del server.
+# Enlaza con mold, que en un crate grande baja mucho el tiempo de cada binario de tests.
 #
-#   scripts/verify-rust.sh
+#   scripts/verify-rust.sh                   el gate entero: formato, clippy, largo, cobertura y deny
+#   scripts/verify-rust.sh --quick [filtro]  para durante el trabajo: formato, clippy, largo y los
+#                                            tests (los que pasen el filtro), sin cobertura ni deny
 set -euo pipefail
 
 readonly RUST_IMAGE="rust:1.99.1-slim-trixie@sha256:4df2ae8cfdfebdfc13a65da7f253b73d68983dc0339f2719bc17a279c913b13d"
@@ -21,6 +24,13 @@ readonly BUILD_JOBS=1
 readonly CACHE_VOLUME="rust-quality-cache"
 readonly VERIFY_CGROUP="builds.slice"
 readonly MAX_FILE_LINES=400
+readonly LINKER_FLAGS="-C link-arg=-fuse-ld=mold"
+gate_mode="full"
+test_filter=""
+if [ "${1:-}" = "--quick" ]; then
+  gate_mode="quick"
+  test_filter="${2:-}"
+fi
 
 # Todo clippy (pedantic, nursery y cargo) más los de restriction que hacen cumplir el estándar:
 # sin unwrap ni panic fuera de los tests, sin casteos con `as`, sin `allow` (una excepción va con
@@ -51,7 +61,7 @@ readonly LINT_FLAGS="
 
 crate_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && { pwd -W 2>/dev/null || pwd; })"
 recipe="FROM ${RUST_IMAGE}
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/* \\
+RUN apt-get update && apt-get install -y --no-install-recommends git mold && rm -rf /var/lib/apt/lists/* \\
  && rustup component add clippy rustfmt llvm-tools
 ADD --checksum=sha256:${CARGO_DENY_SHA256} ${CARGO_DENY_URL} /tmp/cargo-deny.tar.gz
 ADD --checksum=sha256:${LLVM_COV_SHA256} ${LLVM_COV_URL} /tmp/cargo-llvm-cov.tar.gz
@@ -71,16 +81,26 @@ docker run --rm -i -m "${MEMORY_LIMIT}" --cgroup-parent="${VERIFY_CGROUP}" \
   -v "${CACHE_VOLUME}:/cache" \
   -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR="/cache/target/$(basename "${crate_dir}")" \
   -e CARGO_BUILD_JOBS="${BUILD_JOBS}" -e CARGO_TERM_COLOR=never \
-  -e LINT_FLAGS="${LINT_FLAGS}" -e MAX_FILE_LINES="${MAX_FILE_LINES}" \
+  -e LINT_FLAGS="${LINT_FLAGS}" -e MAX_FILE_LINES="${MAX_FILE_LINES}" -e RUSTFLAGS="${LINKER_FLAGS}" \
+  -e GATE_MODE="${gate_mode}" -e TEST_FILTER="${test_filter}" \
   "${image_tag}" bash -euo pipefail -s <<'GATE'
 cargo fmt --all --check
 read -r -d "" -a lint_flags <<<"${LINT_FLAGS}" || true
 cargo clippy --locked --workspace --all-targets --all-features -- "${lint_flags[@]}"
-oversized_files="$(find . \( -path ./target -o -path ./.parity \) -prune -o -name '*.rs' -exec awk -v max="${MAX_FILE_LINES}" \
-  'END { if (NR > max) printf "%s: %d líneas (máximo %d)\n", FILENAME, NR, max }' {} \;)"
+# Sólo lo que git ve (también lo nuevo sin commitear): lo ignorado, como un corpus de terceros, no cuenta.
+oversized_files="$(git -c safe.directory='*' ls-files --cached --others --exclude-standard -- '*.rs' |
+  while IFS= read -r file; do
+    if [ -f "${file}" ]; then
+      awk -v max="${MAX_FILE_LINES}" 'END { if (NR > max) printf "%s: %d líneas (máximo %d)\n", FILENAME, NR, max }' "${file}"
+    fi
+  done)"
 if [ -n "${oversized_files}" ]; then
   echo "${oversized_files}" >&2
   exit 1
+fi
+if [ "${GATE_MODE}" = "quick" ]; then
+  cargo test --locked --workspace --all-features -- ${TEST_FILTER}
+  exit 0
 fi
 cargo llvm-cov --locked --workspace --all-features --lcov --output-path /tmp/coverage.lcov
 if [ -f scripts/check-rust-coverage.sh ]; then bash scripts/check-rust-coverage.sh /tmp/coverage.lcov; fi

@@ -12,7 +12,8 @@ param(
     [string]$Carril = 'principal',
     [string]$Etapa = '',
     [string]$Modelo = '',
-    [string]$Permisos = 'bypassPermissions'
+    [string]$Permisos = 'bypassPermissions',
+    [string]$Compactar = '150k'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -80,7 +81,7 @@ while (-not (Test-Path $Parada)) {
     $Mensaje = "Seguí la etapa $($Elegida.Numero) del ROADMAP ($($Elegida.Titulo)), carril $Carril. Leé scripts/autopilot/pedido.md y hacé lo que dice."
     Write-Host "== Etapa $($Elegida.Numero): $($Elegida.Titulo) | carril $Carril | $ElModelo" -ForegroundColor Cyan
     Push-Location $Carpeta
-    try { & claude --model $ElModelo --permission-mode $Permisos -n "kerbo $($Elegida.Numero) ($Carril)" $Mensaje }
+    try { & claude --model $ElModelo --permission-mode $Permisos --autocompact $Compactar -n "kerbo $($Elegida.Numero) ($Carril)" $Mensaje }
     finally { Pop-Location; Remove-Item $Toma -ErrorAction SilentlyContinue }
     $Respuesta = Read-Host 'Enter: otra sesión limpia | q: salir'
     if ($Respuesta -eq 'q') { break }

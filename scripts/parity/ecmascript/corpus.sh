@@ -22,9 +22,9 @@ corpus="$(cd "$parity/corpus" && pwd -W)"
 eslint_out="$(pwd -W)"
 MSYS_NO_PATHCONV=1 docker run --rm -m 16g --cpus=8 -v "$repo:/src:ro" -w /src -v rust-quality-cache:/cache \
   -v "$corpus:/c:ro" -v "$eslint_out:/o" \
-  -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR=/cache/target/kerbo-dev -e CARGO_BUILD_JOBS=8 -e CARGO_TERM_COLOR=never \
+  -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR=/cache/target/kerbo-dev -e CARGO_BUILD_JOBS=8 -e CARGO_TERM_COLOR=never -e RUSTFLAGS="-C link-arg=-fuse-ld=mold" \
   "$image" bash -euo pipefail -c '
-    cargo build --release --locked --bin kerbo 2>&1 | tail -1
-    cd /c && /cache/target/kerbo-dev/release/kerbo check --format json --no-cache '"${CORPUS_REPOS[*]}"' > /o/kerbo.json 2> /o/kerbo_err.txt || true
+    cargo build --profile parity --locked --bin kerbo 2>&1 | tail -1
+    cd /c && /cache/target/kerbo-dev/parity/kerbo check --format json --no-cache '"${CORPUS_REPOS[*]}"' > /o/kerbo.json 2> /o/kerbo_err.txt || true
     tail -1 /o/kerbo_err.txt'
 python "$here/compare_rules.py" "$rules" 15

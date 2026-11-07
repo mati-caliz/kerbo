@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compila kerbo en release y lo corre sobre un repo Java del corpus con un JDK real (el volumen jdk21)
+# Compila kerbo con el perfil parity (release sin LTO) y lo corre sobre un repo Java del corpus con un JDK real (el volumen jdk21)
 # y los jars indicados (admite comodines), sacados de la caché de Qodana de ese repo. Deja
 # .parity/qodana/<repo>/kerbo.json.
 #
@@ -26,9 +26,9 @@ MSYS_NO_PATHCONV=1 docker run --rm -m "$MEMORY_LIMIT" --cpus="$CPUS" -v "$crate:
   -v rust-quality-cache:/cache -v "$JDK_VOLUME:/jdk:ro" -v "qodana-cache-$repo_name:/m2:ro" \
   -v "$(cd "$parity/corpus/$repo_name" && pwd -W):/c:ro" -v "$(cd "$parity/qodana/$repo_name" && pwd -W):/o" \
   -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR="/cache/target/$target" -e CARGO_BUILD_JOBS="$BUILD_JOBS" \
-  -e CARGO_TERM_COLOR=never -e JAVA_HOME=/jdk -e JARS="$jars" -e TARGET="$target" \
+  -e CARGO_TERM_COLOR=never -e RUSTFLAGS="-C link-arg=-fuse-ld=mold" -e JAVA_HOME=/jdk -e JARS="$jars" -e TARGET="$target" \
   "$image" bash -euo pipefail -c '
-    cargo build --release --locked --bin kerbo 2>&1 | tail -1
+    cargo build --profile parity --locked --bin kerbo 2>&1 | tail -1
     classpath=""
     for jar in $JARS; do
       for found in $(find /m2 -name "$jar"); do classpath="$classpath:$found"; done
@@ -37,6 +37,6 @@ MSYS_NO_PATHCONV=1 docker run --rm -m "$MEMORY_LIMIT" --cpus="$CPUS" -v "$crate:
     echo "classpath: $KERBO_JAVA_CLASSPATH"
     cd /c
     start=$(date +%s)
-    "/cache/target/$TARGET/release/kerbo" check --format json --no-cache . > /o/kerbo.json 2> /o/kerbo.log || true
+    "/cache/target/$TARGET/parity/kerbo" check --format json --no-cache . > /o/kerbo.json 2> /o/kerbo.log || true
     echo "kerbo tardó $(( $(date +%s) - start )) s"
     tail -2 /o/kerbo.log'

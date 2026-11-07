@@ -15,12 +15,12 @@ image="$(docker images --format '{{.Repository}}:{{.Tag}}' quality-rust | head -
 MSYS_NO_PATHCONV=1 docker run --rm -m 8g --cpus=4 -v "$repo:/src:ro" -w /src -v rust-quality-cache:/cache \
   -v "$(cd "$corpus" && pwd -W):/c:ro" -v "$(cd "$here/testdata" && pwd -W):/t:ro" \
   -v "$(cd "$here/out" && pwd -W):/o:ro" \
-  -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR=/cache/target/kerbo-dev -e CARGO_BUILD_JOBS=4 -e CARGO_TERM_COLOR=never \
+  -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR=/cache/target/kerbo-dev -e CARGO_BUILD_JOBS=4 -e CARGO_TERM_COLOR=never -e RUSTFLAGS="-C link-arg=-fuse-ld=mold" \
   "$image" bash -euo pipefail -c '
-    cargo build --release --locked --example shell_parse_errors 2>&1 | grep -E "^(error|warning)" -A5 || true
+    cargo build --profile parity --locked --example shell_parse_errors 2>&1 | grep -E "^(error|warning)" -A5 || true
     cd "$0"
     if [ "${1:-}" = "--all" ]; then
-      tr -d "\r" < /o/files.txt | tr "\n" "\0" | xargs -0 /cache/target/kerbo-dev/release/examples/shell_parse_errors
+      tr -d "\r" < /o/files.txt | tr "\n" "\0" | xargs -0 /cache/target/kerbo-dev/parity/examples/shell_parse_errors
     else
-      /cache/target/kerbo-dev/release/examples/shell_parse_errors "$@"
+      /cache/target/kerbo-dev/parity/examples/shell_parse_errors "$@"
     fi' "$root" "$@"

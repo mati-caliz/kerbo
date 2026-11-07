@@ -16,9 +16,9 @@ MSYS_NO_PATHCONV=1 docker run --rm -v "$data:/p:ro" -v "$out:/o" "$(python "$ver
 image="$(docker images --format '{{.Repository}}:{{.Tag}}' quality-rust | head -1)"
 MSYS_NO_PATHCONV=1 docker run --rm -m 16g --cpus=8 -v "$repo:/src:ro" -w /src -v rust-quality-cache:/cache \
   -v "$data:/p:ro" -v "$out:/o" \
-  -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR=/cache/target/kerbo-dev -e CARGO_BUILD_JOBS=8 -e CARGO_TERM_COLOR=never \
+  -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR=/cache/target/kerbo-dev -e CARGO_BUILD_JOBS=8 -e CARGO_TERM_COLOR=never -e RUSTFLAGS="-C link-arg=-fuse-ld=mold" \
   "$image" bash -euo pipefail -c '
-    cargo build --release --locked --bin kerbo 2>&1 | grep -E "^(error|warning: unused)" -A5 || true
+    cargo build --profile parity --locked --bin kerbo 2>&1 | grep -E "^(error|warning: unused)" -A5 || true
     rm -rf /tmp/p && cp -r /p /tmp/p && cd /tmp/p
-    /cache/target/kerbo-dev/release/kerbo check --language shell --format json --no-cache . > /o/probe-kerbo.json 2>/dev/null || true'
+    /cache/target/kerbo-dev/parity/kerbo check --language shell --format json --no-cache . > /o/probe-kerbo.json 2>/dev/null || true'
 python "$here/probe_compare.py" "$here/out" "$here/testdata/$folder" "$prefix"

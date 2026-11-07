@@ -29,10 +29,10 @@ if [ -z "$skip_kerbo" ]; then
   corpus="$(cd "$parity/corpus" && pwd -W)"
   MSYS_NO_PATHCONV=1 docker run --rm -m 16g --cpus=8 -v "$repo:/src:ro" -w /src -v rust-quality-cache:/cache \
     -v "$corpus:/c:ro" -v "$(cd "$here/out" && pwd -W):/o" \
-    -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR=/cache/target/kerbo-dev -e CARGO_BUILD_JOBS=8 -e CARGO_TERM_COLOR=never \
+    -e CARGO_HOME=/cache/cargo -e CARGO_TARGET_DIR=/cache/target/kerbo-dev -e CARGO_BUILD_JOBS=8 -e CARGO_TERM_COLOR=never -e RUSTFLAGS="-C link-arg=-fuse-ld=mold" \
     "$image" bash -euo pipefail -c '
-      cargo build --release --locked --bin kerbo 2>&1 | tail -1
-      cd /c && /cache/target/kerbo-dev/release/kerbo check --language python --format json --no-cache '"${CORPUS_PATHS[*]}"' > /o/kerbo.json 2> /o/kerbo.log || true
+      cargo build --profile parity --locked --bin kerbo 2>&1 | tail -1
+      cd /c && /cache/target/kerbo-dev/parity/kerbo check --language python --format json --no-cache '"${CORPUS_PATHS[*]}"' > /o/kerbo.json 2> /o/kerbo.log || true
       tail -1 /o/kerbo.log'
 fi
 python "$here/compare.py" "$@"
