@@ -8,7 +8,7 @@
 #   scripts/parity/run_all.sh python shell    # sólo esas
 #   QODANA=1 scripts/parity/run_all.sh java   # también vuelve a correr Qodana (tarda mucho)
 #
-# HEAVY_LOCK apunta a heavy_lock.py (por defecto, el de dotfiles al lado del repo). Si la corrida
+# HEAVY_LOCK apunta a heavy_lock.py (por defecto, el de infra al lado del repo). Si la corrida
 # entera ya va adentro de heavy_lock.py, PARITY_QUEUED=1 hace que los pasos no pidan otro lugar.
 set -euo pipefail
 
@@ -18,7 +18,7 @@ readonly JAVA_INSPECTIONS=(RedundantThrows AutoCloseableResource DataFlowIssue)
 readonly WAIT_SECONDS=3000
 here="$(cd "$(dirname "$0")" && { pwd -W 2>/dev/null || pwd; })"
 repo="$(cd "$here/../.." && { pwd -W 2>/dev/null || pwd; })"
-heavy_lock="${HEAVY_LOCK:-$(cd "$repo/.." && pwd)/dotfiles/local-bin/heavy_lock.py}"
+heavy_lock="${HEAVY_LOCK:-$(cd "$repo/.." && pwd)/infra/local-bin/heavy_lock.py}"
 logs="${KERBO_PARITY:-$repo/.parity}/logs/$(date +%Y-%m-%d_%H%M)"
 mkdir -p "$logs"
 
