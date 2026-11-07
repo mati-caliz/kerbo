@@ -5,7 +5,7 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../.." && pwd -W)"
-corpus="${SHELL_CORPUS:-$(cd "$here/../../.." \&\& pwd)/.parity/shell-corpus}"
+corpus="${SHELL_CORPUS:-$(cd "$here/../../.." && pwd)/.parity/shell-corpus}"
 root=/c
 if [ "${1:-}" = "--testdata" ]; then
   shift

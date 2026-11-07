@@ -4,7 +4,7 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../.." && pwd -W)"
-corpus="${SHELL_CORPUS:-$(cd "$here/../../.." \&\& pwd)/.parity/shell-corpus}"
+corpus="${SHELL_CORPUS:-$(cd "$here/../../.." && pwd)/.parity/shell-corpus}"
 image="$(docker images --format '{{.Repository}}:{{.Tag}}' quality-rust | head -1)"
 MSYS_NO_PATHCONV=1 docker run --rm -m 16g --cpus=8 -v "$repo:/src:ro" -w /src -v rust-quality-cache:/cache \
   -v "$(cd "$corpus" && pwd -W):/c:ro" -v "$(cd "$here/out" && pwd -W):/o" \

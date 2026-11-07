@@ -6,7 +6,7 @@ set -euo pipefail
 unset MSYS_NO_PATHCONV
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../.." && pwd -W)"
-parity="$(cd "$here/../../.." \&\& pwd)/.parity"
+parity="$(cd "$here/../../.." && pwd)/.parity"
 readonly CORPUS_PATHS=(requests fastapi flask django pydantic sqlalchemy ipython ansible sympy cpython/Lib)
 mkdir -p "$here/out"
 skip_ruff=""
