@@ -187,10 +187,10 @@ se marca.
 | `transaction-nesting`, `ban-uncommitted-transaction`, `ban-concurrent-index-creation-in-transaction`, `prefer-robust-stmts` | `BEGIN`/`COMMIT` dentro de la transacción de la herramienta, transacciones sin cerrar, `CONCURRENTLY` en una transacción y sentencias sin `IF [NOT] EXISTS` fuera de ella |
 | `identifier-too-long`, `ban-duplicate-column-assignments` | nombres de más de 63 bytes y columnas repetidas en una tabla, un `INSERT`, un `SET` o una vista |
 
-Es el conjunto por defecto de squawk 2.70 entero, salvo `prefer-repack`, que squawk sólo corre con
+Es el conjunto por defecto de squawk 2.71 entero, salvo `prefer-repack`, que squawk sólo corre con
 Postgres 19. `recommended` apaga las de preferencia de tipos (`prefer-*` y `ban-char-field`) y
-`minimal`, también los timeouts. Paridad, contra squawk 2.70 con `--assume-in-transaction`: los
-9.612 avisos de squawk, ninguno de más, en 1.858 migraciones de lobe-chat (drizzle), documenso,
+`minimal`, también los timeouts. Paridad, contra squawk 2.71 con `--assume-in-transaction`: los
+9.870 avisos de squawk, ninguno de más, en 1.867 migraciones de lobe-chat (drizzle), documenso,
 trigger.dev y cal.com (Prisma), conductor (Flyway) y awesome-compose. En Alembic, contra squawk sobre
 el SQL que genera el propio Alembic en modo offline (300 revisiones de airflow, superset, mlflow y
 redash; las otras 349 importan la aplicación o consultan la base y no se pueden convertir sin

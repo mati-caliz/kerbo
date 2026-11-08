@@ -1576,13 +1576,17 @@ que no hubo nada que portar.
 Hecho (2026-11-07): tree-sitter 0.27.1 → 0.27.2. Gate verde y la salida de kerbo sobre el corpus de
 JS/TS (21.438 archivos, 171.559 problemas) idéntica byte a byte.
 
+Hecho (2026-11-07): squawk 2.70 → 2.71 y arnés de migraciones rearmado en
+`scripts/parity/migrations/` (entra en `run_all.sh`): squawk en un venv de `.parity` contra kerbo,
+comparados por archivo y regla, sobre las migraciones de seis repos nuevos de `corpus.toml`. Quedan
+afuera los 15 archivos que squawk no parsea (MySQL). Paridad: 9.870 avisos coinciden, 0 de más, 0 de
+menos, en 1.867 migraciones.
+
 - Pendientes:
-  - Subir lo atrasado al 2026-11-07, con `run_all.sh` antes y después de cada familia: squawk 2.71
-    (necesita rearmar su arnés);
-    TypeScript 7 y Django 6 (mayores, tanda propia). Checkstyle figura como 14 sin la menor medida.
+  - Subir lo atrasado al 2026-11-07: TypeScript 7 y Django 6 (mayores, tanda propia). Checkstyle figura como 14 sin la menor medida.
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.
-  - Los arneses de squawk, hadolint, gitleaks y osv-scanner no quedaron en el repo (se perdieron
+  - Los arneses de hadolint, gitleaks y osv-scanner no quedaron en el repo (se perdieron
     con los scratchpads): hay que rearmarlos en `scripts/parity/` para que entren en `run_all.sh`.
   - Cuando entre tsrs (etapas 11 y 16), su commit y la versión de TypeScript que sigue van en
     `versions.toml`.

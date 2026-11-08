@@ -78,7 +78,7 @@ cited_as = "Checkstyle {major}"
 [tools.squawk]
 family = "migrations"
 package = "squawk-cli"
-version = "2.70.0"
+version = "2.71.0"
 latest = "pypi:squawk-cli"
 cited_as = "squawk {minor}"
 

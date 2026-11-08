@@ -111,3 +111,33 @@ uso = "JS/TS contra ESLint, secretos"
 url = "https://github.com/colinhacks/zod.git"
 commit = "afdac65e0f80c0ccf9e8909da97c411567908b57"
 uso = "JS/TS contra ESLint"
+
+[repos.lobe-chat]
+url = "https://github.com/lobehub/lobe-chat.git"
+commit = "e3cd3d1ca2303dacd83cfb16b3c1bd860b44dfad"
+uso = "migraciones (drizzle) contra squawk"
+
+[repos.documenso]
+url = "https://github.com/documenso/documenso.git"
+commit = "fdd0337bdd8f6afac64faf97113c65ed2dd0e2a2"
+uso = "migraciones (Prisma) contra squawk"
+
+[repos.trigger-dev]
+url = "https://github.com/triggerdotdev/trigger.dev.git"
+commit = "41ad1995b30573a9b55cfaab80c3293b7c35c1f8"
+uso = "migraciones (Prisma) contra squawk"
+
+[repos.cal-com]
+url = "https://github.com/calcom/cal.com.git"
+commit = "2eb48eccd8aca8a0c0ffabf28cf92e298b33ecee"
+uso = "migraciones (Prisma) contra squawk"
+
+[repos.conductor]
+url = "https://github.com/conductor-oss/conductor.git"
+commit = "b65a5c9f1c5b125ea19034cc420a35b997214c8f"
+uso = "migraciones (Flyway) contra squawk"
+
+[repos.awesome-compose]
+url = "https://github.com/docker/awesome-compose.git"
+commit = "30f4b7f6a6c3b0c0ecf4d4efb0de203c48d11562"
+uso = "SQL suelto contra squawk"

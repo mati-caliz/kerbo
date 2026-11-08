@@ -12,7 +12,7 @@
 # entera ya va adentro de heavy_lock.py, PARITY_QUEUED=1 hace que los pasos no pidan otro lugar.
 set -euo pipefail
 
-readonly FAMILIES=(python ecmascript shell go java)
+readonly FAMILIES=(python ecmascript shell go java migrations)
 readonly JAVA_REPOS=(junit4 commons-lang)
 readonly JAVA_INSPECTIONS=(RedundantThrows AutoCloseableResource DataFlowIssue)
 readonly WAIT_SECONDS=3000
@@ -84,6 +84,10 @@ run_family() {
         "'$here/go/helper-build.sh' && '$here/go/corpus-golangci.sh' && '$here/go/corpus-helper.sh' && python '$here/go/compare_corpus.py'" \
         "'$here/go/helper-build.sh' && '$here/go/corpus-helper.sh' && python '$here/go/compare_corpus.py'"
       ;;
+    migrations)
+      key="$(fingerprint "$(version_of squawk)" "$(corpus_key)")"
+      reference "$parity/migrations/squawk.json" "$key" "'$here/migrations/corpus.sh'"         "'$here/migrations/corpus.sh' --skip-squawk"
+      ;;
     java)
       for name in "${JAVA_REPOS[@]}"; do
         if [ -n "${QODANA:-}" ]; then
@@ -107,5 +111,5 @@ for family in "${families[@]}"; do
   tail -5 "$logs/$family.txt" | sed 's/^/  /'
 done
 echo
-echo "Sin arnés en el repo todavía: migraciones (squawk), Dockerfile (hadolint), secretos (gitleaks) y"
+echo "Sin arnés en el repo todavía: Dockerfile (hadolint), secretos (gitleaks) y"
 echo "dependencias (osv-scanner). Salida completa en $logs"

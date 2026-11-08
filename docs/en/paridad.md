@@ -187,10 +187,10 @@ on a table created in the same migration is not flagged.
 | `transaction-nesting`, `ban-uncommitted-transaction`, `ban-concurrent-index-creation-in-transaction`, `prefer-robust-stmts` | `BEGIN`/`COMMIT` inside the tool's transaction, unclosed transactions, `CONCURRENTLY` inside a transaction and statements without `IF [NOT] EXISTS` outside one |
 | `identifier-too-long`, `ban-duplicate-column-assignments` | names longer than 63 bytes and repeated columns in a table, an `INSERT`, a `SET` or a view |
 
-It is squawk 2.70's whole default set except `prefer-repack`, which squawk only runs for
+It is squawk 2.71's whole default set except `prefer-repack`, which squawk only runs for
 Postgres 19. `recommended` turns off the type preferences (`prefer-*` and `ban-char-field`) and
-`minimal` also the timeouts. Parity, against squawk 2.70 with `--assume-in-transaction`: all 9,612
-of squawk's reports, none extra, in 1,858 migrations from lobe-chat (drizzle), documenso,
+`minimal` also the timeouts. Parity, against squawk 2.71 with `--assume-in-transaction`: all 9,870
+of squawk's reports, none extra, in 1,867 migrations from lobe-chat (drizzle), documenso,
 trigger.dev and cal.com (Prisma), conductor (Flyway) and awesome-compose. In Alembic, against squawk
 on the SQL Alembic itself generates in offline mode (300 revisions from airflow, superset, mlflow
 and redash; the other 349 import the application or query the database and cannot be converted
