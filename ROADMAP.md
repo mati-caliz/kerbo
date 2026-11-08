@@ -1600,13 +1600,19 @@ historia ni `.gitleaksignore`, contra kerbo en 15 repos de `corpus.toml`, por ar
 (los hallazgos de archivo entero cuentan como línea 1). Paridad: 2.323 de 2.323, 0 de menos, 0 de más.
 `corpus_volume.sh` ya no falla por los enlaces del corpus que `cp` no puede crear en el volumen.
 
+Hecho (2026-11-08): arnés de hadolint 2.15.1 en `scripts/parity/dockerfile/` (familia `dockerfile` de
+`run_all.sh`): hadolint en docker contra kerbo sobre los 71 Dockerfile del corpus, por archivo, línea y
+regla DL. Quedan afuera los 26 archivos que hadolint no parsea (DL1000, casi todos de awesome-compose).
+Paridad: 196 de 196, 0 de menos, 0 de más.
+
 - Pendientes:
   - TypeScript 7 (7.0.2): bloqueado, typescript-eslint 8.72.1 declara `typescript <6.1.0`. Se sube
     cuando typescript-eslint lo soporte, o junto con tsrs (etapas 11 y 16).
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.
-  - Los arneses de hadolint y osv-scanner no quedaron en el repo (se perdieron
+  - El arnés de osv-scanner no quedó en el repo (se perdieron
     con los scratchpads): hay que rearmarlos en `scripts/parity/` para que entren en `run_all.sh`.
+  - Los 26 Dockerfile que hadolint no parsea quedan sin medir: sumar repos con Dockerfile al corpus.
   - Cuando entre tsrs (etapas 11 y 16), su commit y la versión de TypeScript que sigue van en
     `versions.toml`.
 

@@ -12,7 +12,7 @@
 # entera ya va adentro de heavy_lock.py, PARITY_QUEUED=1 hace que los pasos no pidan otro lugar.
 set -euo pipefail
 
-readonly FAMILIES=(python ecmascript shell go java migrations secrets)
+readonly FAMILIES=(python ecmascript shell go java migrations secrets dockerfile)
 readonly JAVA_REPOS=(junit4 commons-lang)
 readonly JAVA_INSPECTIONS=(RedundantThrows AutoCloseableResource DataFlowIssue)
 readonly WAIT_SECONDS=3000
@@ -91,6 +91,10 @@ run_family() {
     secrets)
       key="$(fingerprint "$(version_of gitleaks)" "$(corpus_key)")"
       reference "$parity/secrets/gitleaks.json" "$key" "'$here/secrets/corpus.sh'" "'$here/secrets/corpus.sh' --skip-gitleaks"
+      ;;
+    dockerfile)
+      key="$(fingerprint "$(version_of hadolint)" "$(corpus_key)")"
+      reference "$parity/dockerfile/hadolint.json" "$key" "'$here/dockerfile/corpus.sh'" "'$here/dockerfile/corpus.sh' --skip-hadolint"
       ;;
     java)
       for name in "${JAVA_REPOS[@]}"; do
