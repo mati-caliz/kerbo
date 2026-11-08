@@ -32,7 +32,13 @@ MSYS_NO_PATHCONV=1 docker run --rm --network "$network" --cpus="$CPUS" -m "$MEMO
   -v "$(cd "$parity/corpus/$repo" && pwd -W):/repo:ro" -v "$(cd "$out" && pwd -W):/out" \
   -v "$(cd "$here" && pwd -W):/harness:ro" -v kerbo-django-pip:/root/.cache/pip \
   -e REPO="$repo" -e DATABASE_HOST="$database" "$PYTHON_IMAGE" bash -euo pipefail -c "
-    pip install -q 'django==$DJANGO_VERSION' 'psycopg[binary]' 'asgiref>=3.13' 'squawk-cli==$SQUAWK_VERSION' >/dev/null
-    if [ -f /repo/requirements.txt ] && [ \"\$REPO\" != django ]; then pip install -q -r /repo/requirements.txt >/dev/null || true; fi
+    if [ \"\$REPO\" = django ]; then
+      pip install -q 'django==$DJANGO_VERSION' 'psycopg[binary]' 'asgiref>=3.13' 'squawk-cli==$SQUAWK_VERSION' >/dev/null
+    else
+      apt-get update -qq >/dev/null && apt-get install -y -qq libmagic1 >/dev/null
+      pip install -q uv 'psycopg[binary]' 'squawk-cli==$SQUAWK_VERSION' >/dev/null
+      (cd /repo && uv export --frozen --no-dev --no-hashes --no-emit-project --project /repo) > /tmp/requirements.txt
+      pip install -q -r /tmp/requirements.txt >/dev/null
+    fi
     for attempt in 1 2 3 4 5 6 7 8 9 10; do python -c 'import psycopg; psycopg.connect(\"host=$database user=postgres password=kerbo dbname=kerbo\")' 2>/dev/null && break; sleep 2; done
     cd /harness && python reference.py"

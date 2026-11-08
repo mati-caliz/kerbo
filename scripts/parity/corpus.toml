@@ -27,6 +27,11 @@ url = "https://github.com/django/django.git"
 commit = "a1f2b45ce5a327f42437bdb620a817839d0bd067"
 uso = "Python contra ruff, migraciones de Django"
 
+[repos.saleor]
+url = "https://github.com/saleor/saleor.git"
+commit = "1d707dcf6127b098c187a181e5ee344017cdb064"
+uso = "migraciones de Django contra squawk"
+
 [repos.express]
 url = "https://github.com/expressjs/express.git"
 commit = "43fca52d28a422c8be48fd489cbd4f2d6152bab6"

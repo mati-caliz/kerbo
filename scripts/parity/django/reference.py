@@ -1,7 +1,8 @@
 """Corre adentro del contenedor de reference.sh: configura Django con las apps del repo, saca el SQL de
 `sqlmigrate` de cada migración y lo pasa por squawk.
 
-Cada repo dice en REPOS qué apps instala y qué carpeta agrega al path. Una migración que no se puede
+Cada repo dice en REPOS qué carpeta agrega al path y o bien qué apps instala, o bien qué módulo de
+settings propio usa (el repo se instala con pip y su base sale de DATABASE_URL). Una migración que no se puede
 convertir (importa algo que falta, o consulta la base) queda anotada en errores.txt.
 """
 
@@ -25,13 +26,36 @@ REPOS = {
             "django.contrib.redirects",
         ],
     },
+    "saleor": {
+        "path": "/repo",
+        "settings": "saleor.settings",
+    },
 }
 OUT = pathlib.Path("/out")
+
+
+def temporary_private_key():
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    )
+    return pem.decode("ascii")
 
 
 def configure(repo):
     sys.path.insert(0, REPOS[repo]["path"])
     import django
+
+    if "settings" in REPOS[repo]:
+        os.environ["DJANGO_SETTINGS_MODULE"] = REPOS[repo]["settings"]
+        os.environ["DATABASE_URL"] = f"postgres://postgres:kerbo@{os.environ['DATABASE_HOST']}/kerbo"
+        os.environ["SECRET_KEY"] = "kerbo"
+        os.environ["RSA_PRIVATE_KEY"] = temporary_private_key()
+        django.setup()
+        return
     from django.conf import settings
 
     settings.configure(

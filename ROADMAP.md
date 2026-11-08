@@ -1609,8 +1609,16 @@ menos, sin cambios en kerbo.
 - Django (empezada, 2026-11-07): `sqlmigrate` de Django 5.2 replicado para Postgres y las reglas de
   migraciones sobre su SQL; contra squawk 2.71 en las 23 migraciones de `django.contrib`, 89 de 89
   avisos, ninguno de más (`scripts/parity/django/reference.sh` y `corpus.sh`). Pendientes:
-  - Medir más repos de Django (sentry, saleor, wagtail, zulip): `settings.py` de
-    `scripts/parity/django/` por repo.
+  - Saleor medido (2026-11-08, commit en `corpus.toml`): `reference.sh saleor` instala sus
+    dependencias desde `uv.lock` y usa su `saleor.settings`; 1.454 migraciones, 12 no se pueden
+    convertir (`errores.txt`). Paridad: squawk 4.385 avisos, kerbo 4.070, coinciden 3.847, 501
+    diferencias, casi todas de menos en kerbo. Por regla (squawk menos kerbo): `prefer-bigint-over-int`
+    80, `require-lock-timeout` y `require-statement-timeout` 46 cada una, `prefer-text-field` 40,
+    `prefer-robust-stmts` 35, `require-concurrent-index-creation` 27, `ban-drop-default` 18,
+    `renaming-table` 16, `ban-drop-constraint` y `adding-foreign-key-constraint` 13 cada una,
+    `renaming-object` 10, `renaming-column` y `constraint-missing-not-valid` 9. Hay que juntarlas,
+    arreglarlas en una tanda y volver a medir (`corpus.sh saleor`).
+  - Medir más repos de Django (sentry, wagtail, zulip): entrada en `REPOS` de `reference.py`.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
     `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), el
     renombre de las columnas de las tablas intermedias en `RenameModel`, los borrados que Django
