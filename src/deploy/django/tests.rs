@@ -15,6 +15,7 @@ use crate::rules::{MigrationRule, RuleId};
 
 mod dump;
 mod files;
+mod graph;
 mod operations;
 
 #[derive(Debug, Default)]
@@ -42,6 +43,10 @@ impl MemoryLoader {
 }
 
 impl Loader for MemoryLoader {
+    fn apps(&self) -> Vec<String> {
+        self.apps.keys().cloned().collect()
+    }
+
     fn migrations(&self, app: &str) -> Vec<(String, Arc<Migration>)> {
         self.apps.get(app).cloned().unwrap_or_default()
     }
@@ -144,6 +149,8 @@ const ARTICLES: &str = r#"from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    dependencies = [("sites", "0001_initial")]
+
     operations = [
         migrations.CreateModel(
             name="Article",
@@ -160,6 +167,8 @@ const ARTICLES_REQUIRED_BODY: &str = r#"from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    dependencies = [("blog", "0001_initial")]
+
     operations = [
         migrations.AlterField(
             model_name="article",
@@ -177,9 +186,9 @@ fn foreign_keys_load_the_related_app_and_reference_its_key_type() {
     assert_eq!(
         rules,
         vec![
-            (MigrationRule::PreferBigintOverInt, 6),
-            (MigrationRule::RequireLockTimeout, 6),
-            (MigrationRule::RequireStatementTimeout, 6),
+            (MigrationRule::PreferBigintOverInt, 8),
+            (MigrationRule::RequireLockTimeout, 8),
+            (MigrationRule::RequireStatementTimeout, 8),
         ]
     );
 }
@@ -190,9 +199,9 @@ fn replayed_history_drives_alter_and_remove_field() {
         .with("sites", "0001_initial", SITES_INITIAL)
         .with("blog", "0001_initial", ARTICLES);
     let rules = found(&loader, "blog", "0002_required_body", ARTICLES_REQUIRED_BODY);
-    assert!(rules.contains(&(MigrationRule::BanDropColumn, 11)), "{rules:?}");
+    assert!(rules.contains(&(MigrationRule::BanDropColumn, 13)), "{rules:?}");
     assert!(
-        rules.contains(&(MigrationRule::RequireLockTimeout, 6)),
+        rules.contains(&(MigrationRule::RequireLockTimeout, 8)),
         "{rules:?}"
     );
 }
@@ -275,6 +284,8 @@ from django.utils import timezone
 
 
 class Migration(migrations.Migration):
+    dependencies = [("sites", "0001_initial")]
+
     operations = [
         migrations.AddField(model_name="site", name="metadata", field=models.JSONField(default=dict)),
         migrations.AddField(model_name="site", name="tags", field=models.JSONField(default=[])),
@@ -320,6 +331,8 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    dependencies = [("sites", "0001_initial")]
+
     operations = [
         TrigramExtension(),
         CreateExtension("citext"),

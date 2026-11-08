@@ -85,4 +85,21 @@ pub struct Located {
 pub struct Migration {
     pub operations: Vec<Located>,
     pub atomic: bool,
+    pub dependencies: Vec<MigrationKey>,
+    pub run_before: Vec<MigrationKey>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MigrationKey {
+    pub app: String,
+    pub name: String,
+}
+
+impl MigrationKey {
+    pub fn new(app: &str, name: &str) -> Self {
+        Self {
+            app: app.to_owned(),
+            name: name.to_owned(),
+        }
+    }
 }

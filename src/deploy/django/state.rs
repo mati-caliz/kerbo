@@ -34,19 +34,6 @@ impl State {
         self.models.get(key)
     }
 
-    pub fn contains(&self, key: &ModelKey) -> bool {
-        self.models.contains_key(key)
-    }
-
-    pub fn related_keys(&self) -> Vec<ModelKey> {
-        self.models
-            .values()
-            .flat_map(|model| model.fields.iter())
-            .filter_map(|field| field.relation.as_ref())
-            .map(|relation| relation.to.clone())
-            .collect()
-    }
-
     pub fn resolve(&self, key: &ModelKey) -> Cow<'_, Model> {
         self.models
             .get(key)

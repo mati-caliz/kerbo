@@ -1624,9 +1624,10 @@ Paridad: 196 de 196, 0 de menos, 0 de más.
   - Saleor medido (2026-11-08, commit en `corpus.toml`): `reference.sh saleor` instala sus
     dependencias desde `uv.lock` y usa su `saleor.settings` (Django 5.2); 1.454 migraciones, 12 no
     se pueden convertir (`errores.txt`). Empezó en 501 diferencias y las variables de clase de
-    `Migration` la bajaron a 360; los `settings` y los `default` tipados, a 200. Ahora: squawk
-    4.385 avisos, kerbo 4.307, coinciden 4.196, 180 diferencias por migración y regla; sentencia
-    por sentencia (`dump.sh` + `diff.py`), 74 de 1.454 migraciones con SQL distinto (eran 131).
+    `Migration` la bajaron a 360; los `settings` y los `default` tipados, a 200; el grafo de
+    dependencias, a 142. Ahora: squawk 4.385 avisos, kerbo 4.286, coinciden 4.209, 142 diferencias
+    por migración y regla; sentencia por sentencia (`dump.sh` + `diff.py`), 45 de 1.454
+    migraciones con SQL distinto (eran 131).
     kerbo ya lee de los `settings` del proyecto `AUTH_USER_MODEL`, `DEFAULT_AUTO_FIELD` y las
     constantes numéricas (`max_length=settings.X`); sin `settings` asume el `BigAutoField` de
     `startproject`. Sigue las operaciones guardadas en nombres del módulo o de la clase y las
@@ -1635,18 +1636,19 @@ Paridad: 196 de 196, 0 de menos, 0 de más.
     `condition` a SQL como `WhereNode` (`exact`, `gt`/`gte`/`lt`/`lte`, `isnull`, `in`, `~`, `&`,
     `|`; lo que no entiende sigue saliendo `true`), escribe `NULLS [NOT] DISTINCT` y las
     `CreateExtension`. Lo que falta, por frecuencia:
-    - El estado de las apps relacionadas: `history.rs` (`load_related_apps`) reproduce todas las
-      migraciones en vez de sólo los ancestros de la que se convierte, así que las claves
-      foráneas ven el tipo final (`uuid` en vez de `integer`), el `to_field` final y los nombres
-      de tabla viejos ya renombrados. Es la mayoría de lo que queda (account, discount, invoice,
-      payment, warehouse, product/0169).
+    - Hecho (2026-11-08): el estado se arma con el grafo de dependencias como `sqlmigrate`
+      (`graph.rs`): `dependencies`, `run_before`, `swappable_dependency`, `__first__` y
+      `__latest__`, y se reproducen sólo los ancestros de la migración en el orden del
+      `forwards_plan` de Django. Las claves foráneas ya ven el tipo y la tabla de ese momento.
+      Queda: tomar las apps de `INSTALLED_APPS` en vez de todas las carpetas con `migrations`
+      (saleor tiene `tests`, que no está instalada) y que el grafo no se arme de nuevo por cada
+      archivo.
     - Las apps de terceros (`django_celery_beat`, `sites`, `contenttypes`) no se convierten, y
       `auth/0001` saca de más.
     - `RenameModel` y `AlterModelTable` entre apps (`account/0072`, `permission/0001`) y los
       renombres de columna de product/0007, 0048 y 0072.
-    - `DROP NOT NULL` de más en checkout/0075 y order/0196; los índices de `slug` de
-      product/0017, 0195 y page/0029; product/0062, 0073, 0103 y 0113; el orden de las columnas
-      `jsonb` de checkout/0001.
+    - Los índices de `slug` de product/0001, 0017, 0195 y page/0029; product/0062, 0073, 0103 y
+      0113; los `default` con `Decimal(0)` sin convertir (order/0228).
     - Los `default` invocables del proyecto (`get_default_country`, `zero_weight`,
       `partial(get_random_string)`).
     - Las migraciones con `atomic = False` y `RunSQL` de `CREATE INDEX CONCURRENTLY` (webhook/0014,
@@ -1662,8 +1664,7 @@ Paridad: 196 de 196, 0 de menos, 0 de más.
     renombre de las columnas de las tablas intermedias en `RenameModel`, los borrados que Django
     resuelve por introspección (restricciones sin nombre conocido), `RenameIndex` sin `old_name`,
     los `AlterField` de un `ManyToManyField` a otro, `ExclusionConstraint` y las operaciones de
-    `django.contrib.postgres`, el orden por el grafo de dependencias entre apps, y `db_collation` y
-    `db_comment`.
+    `django.contrib.postgres`, y `db_collation` y `db_comment`.
 - Rails (`add_index` sin `algorithm: :concurrently`, `remove_column`, `change_column`), con
   strong_migrations como referencia. Pide sumar una gramática de Ruby. Viene de la etapa 12.
 

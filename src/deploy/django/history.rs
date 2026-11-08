@@ -7,7 +7,8 @@ use std::time::SystemTime;
 
 use tree_sitter::Parser;
 
-use super::operations::Migration;
+use super::graph::{Graph, Nodes};
+use super::operations::{Migration, MigrationKey};
 use super::parse::{Reader, migration};
 use super::settings::{self, Settings};
 use super::state::State;
@@ -20,6 +21,7 @@ const IMPORT_MARKER: &str = "from django.db import";
 const CLASS_MARKER: &str = "class Migration(";
 
 pub trait Loader {
+    fn apps(&self) -> Vec<String>;
     fn migrations(&self, app: &str) -> Vec<(String, Arc<Migration>)>;
 }
 
@@ -53,42 +55,27 @@ pub fn is_migration_source(source: &[u8]) -> bool {
 
 pub fn state_before(loader: &impl Loader, location: &Location, current: &Migration) -> State {
     let mut state = State::new(settings::project(&location.apps_root).auto_field);
-    for (stem, earlier) in loader.migrations(&location.app) {
-        if stem < location.stem {
-            replay(&mut state, &location.app, &earlier);
-        }
-    }
-    load_related_apps(loader, &mut state, &location.app, current);
-    state
-}
-
-fn replay(state: &mut State, app: &str, migration: &Migration) {
-    for located in &migration.operations {
-        state.apply(app, &located.operation);
-    }
-}
-
-fn load_related_apps(loader: &impl Loader, state: &mut State, app: &str, current: &Migration) {
-    let mut attempted = BTreeSet::from([app.to_owned()]);
-    loop {
-        let mut probe = state.clone();
-        replay(&mut probe, app, current);
-        let missing: BTreeSet<String> = probe
-            .related_keys()
-            .into_iter()
-            .filter(|key| !probe.contains(key) && !attempted.contains(&key.app))
-            .map(|key| key.app)
-            .collect();
-        if missing.is_empty() {
-            return;
-        }
-        for other in missing {
-            for (_, migration) in loader.migrations(&other) {
-                replay(state, &other, &migration);
+    let current_key = MigrationKey::new(&location.app, &location.stem);
+    let mut nodes: Nodes = loader
+        .apps()
+        .iter()
+        .flat_map(|app| {
+            loader
+                .migrations(app)
+                .into_iter()
+                .map(move |(stem, migration)| (MigrationKey::new(app, &stem), migration))
+        })
+        .collect();
+    nodes.insert(current_key.clone(), Arc::new(current.clone()));
+    let graph = Graph::new(&nodes);
+    for key in graph.ancestors(&current_key) {
+        if let Some(ancestor) = nodes.get(key) {
+            for located in &ancestor.operations {
+                state.apply(&key.app, &located.operation);
             }
-            attempted.insert(other);
         }
     }
+    state
 }
 
 #[derive(Debug, Clone)]
@@ -103,6 +90,17 @@ impl FileLoader {
 }
 
 impl Loader for FileLoader {
+    fn apps(&self) -> Vec<String> {
+        let Ok(entries) = fs::read_dir(&self.apps_root) else {
+            return Vec::new();
+        };
+        entries
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().join(MIGRATIONS_DIRECTORY).is_dir())
+            .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
+            .collect()
+    }
+
     fn migrations(&self, app: &str) -> Vec<(String, Arc<Migration>)> {
         let settings = settings::project(&self.apps_root);
         let mut found: Vec<(String, Arc<Migration>)> = migration_files(&self.apps_root.join(app))

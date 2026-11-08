@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::dependencies::keys;
 use super::fields::{Owner, field};
 use super::meta::{constraint, constraints, index, indexes, unique_together};
 use super::model::{Model, ModelKey};
@@ -12,6 +13,8 @@ use crate::syntax::{named_children, one_based};
 const MIGRATION_CLASS: &str = "Migration";
 const OPERATIONS: &str = "operations";
 const ATOMIC: &str = "atomic";
+const DEPENDENCIES: &str = "dependencies";
+const RUN_BEFORE: &str = "run_before";
 const NOOP: &str = "noop";
 const CONCURRENTLY: &str = "Concurrently";
 const ADD_FIELD: &str = "AddField";
@@ -66,11 +69,17 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
     let mut migration = Migration {
         operations: Vec::new(),
         atomic: true,
+        dependencies: Vec::new(),
+        run_before: Vec::new(),
     };
     for (name, value) in class_bindings {
         match name.as_str() {
             OPERATIONS => migration.operations = scope.operations(value),
             ATOMIC => migration.atomic = boolean(value) != Some(false),
+            DEPENDENCIES => {
+                migration.dependencies = keys(scope.resolved(value), reader.source, reader.settings);
+            }
+            RUN_BEFORE => migration.run_before = keys(scope.resolved(value), reader.source, reader.settings),
             _ => {}
         }
     }

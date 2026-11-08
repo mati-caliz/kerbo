@@ -46,6 +46,8 @@ const RENAMES: &str = r#"from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    dependencies = [("library", "0001_initial")]
+
     operations = [
         migrations.RenameModel(old_name="Author", new_name="Writer"),
         migrations.AlterModelTable(name="book", table="library_volume"),
@@ -58,6 +60,8 @@ const FIELDS_AND_META: &str = r#"from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    dependencies = [("library", "0001_initial")]
+
     operations = [
         migrations.AddField(model_name="book", name="pages", field=models.IntegerField(default=0)),
         migrations.AddField(model_name="book", name="readers", field=models.ManyToManyField(to="library.author")),
@@ -80,6 +84,8 @@ const DROPS: &str = r#"from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    dependencies = [("library", "0001_initial")]
+
     atomic = False
 
     operations = [
@@ -121,6 +127,8 @@ const ADD_FIELD_TO_TAG: &str = r#"from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    dependencies = [("library", "0001_initial")]
+
     operations = [
         migrations.AddField(model_name="tag", name="label", field=models.CharField(max_length=20, null=True)),
     ]
@@ -189,7 +197,7 @@ fn drops_and_raw_sql_flag_dropped_tables() {
 fn long_names_are_truncated_like_django() {
     let long_model = "A".repeat(LONG_MODEL_LENGTH);
     let source = format!(
-        "from django.db import migrations, models\n\n\nclass Migration(migrations.Migration):\n    operations = [\n        migrations.CreateModel(\n            name=\"{long_model}\",\n            fields=[\n                (\"id\", models.BigAutoField(primary_key=True)),\n                (\"code\", models.CharField(max_length=10, db_index=True)),\n                (\"tags\", models.ManyToManyField(to=\"library.tag\")),\n            ],\n        ),\n    ]\n"
+        "from django.db import migrations, models\n\n\nclass Migration(migrations.Migration):\n    dependencies = [(\"library\", \"0001_tags\")]\n    operations = [\n        migrations.CreateModel(\n            name=\"{long_model}\",\n            fields=[\n                (\"id\", models.BigAutoField(primary_key=True)),\n                (\"code\", models.CharField(max_length=10, db_index=True)),\n                (\"tags\", models.ManyToManyField(to=\"library.tag\")),\n            ],\n        ),\n    ]\n"
     );
     let loader = MemoryLoader::default().with(APP, "0001_tags", TAGS_ONLY);
     let long_rules = rules(&loader, "0002_long", &source);
