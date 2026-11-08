@@ -119,5 +119,4 @@ for family in "${families[@]}"; do
   tail -5 "$logs/$family.txt" | sed 's/^/  /'
 done
 echo
-echo "Sin arnés en el repo todavía: Dockerfile (hadolint), secretos (gitleaks) y"
-echo "dependencias (osv-scanner). Salida completa en $logs"
+echo "Sin arnés en el repo todavía: dependencias (osv-scanner). Salida completa en $logs"
