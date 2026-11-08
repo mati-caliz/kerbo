@@ -97,7 +97,7 @@ run_family() {
       while read -r name jars; do
         queued "'$here/java/kerbo.sh' $name '$jars'"
       done < "$here/java/classpaths.txt"
-      for name in "${JAVA_REPOS[@]}"; do python "$here/java/compare_all.py" "$name"; done
+      for name in "${JAVA_REPOS[@]}"; do python "$here/java/compare_all.py" "$name"; python "$here/java/checkstyle.py" "$name"; done
       ;;
     *) echo "familia desconocida: $1" >&2; return 1 ;;
   esac

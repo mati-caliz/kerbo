@@ -133,7 +133,7 @@ fn reports_exactly_what_checkstyle_reports_with_sun_checks() {
         assert_eq!(
             rendered(&lints(source, &strict())),
             expected(golden),
-            "{name}.java contra Checkstyle 14.3"
+            "{name}.java contra Checkstyle 14.4"
         );
     }
 }
@@ -219,7 +219,7 @@ fn names_literals_and_empty_statements_match_checkstyle() {
             matches!(rule, RuleId::Java(java) if FIRST_JAVA_RULES.contains(&java))
         }),
         expected(include_str!("fixtures/Names.checkstyle")),
-        "Names.java contra Checkstyle 14.3"
+        "Names.java contra Checkstyle 14.4"
     );
     let fixed = lints(source, &strict())
         .into_iter()
@@ -248,7 +248,7 @@ fn declarations_flow_and_text_match_checkstyle() {
                     && java != JavaRule::SameParameterValue)
         }),
         expected(include_str!("fixtures/Shapes.checkstyle")),
-        "Shapes.java contra Checkstyle 14.3"
+        "Shapes.java contra Checkstyle 14.4"
     );
     let found = lints(source, &strict());
     let chosen = compatible(found.iter().filter_map(|finding| finding.fix.as_ref()));
@@ -271,7 +271,7 @@ fn design_rules_match_checkstyle() {
             matches!(rule, RuleId::Java(java) if DESIGN_JAVA_RULES.contains(&java))
         }),
         expected(include_str!("fixtures/Design.checkstyle")),
-        "Design.java contra Checkstyle 14.3"
+        "Design.java contra Checkstyle 14.4"
     );
 }
 
@@ -285,7 +285,7 @@ fn spacing_rules_match_checkstyle() {
     assert_eq!(
         rendered_where(&lints(source, &strict()), is_spacing_rule),
         expected(include_str!("fixtures/Spacing.checkstyle")),
-        "Spacing.java contra Checkstyle 14.3"
+        "Spacing.java contra Checkstyle 14.4"
     );
 }
 

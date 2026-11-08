@@ -1582,8 +1582,16 @@ comparados por archivo y regla, sobre las migraciones de seis repos nuevos de `c
 afuera los 15 archivos que squawk no parsea (MySQL). Paridad: 9.870 avisos coinciden, 0 de más, 0 de
 menos, en 1.867 migraciones.
 
+Hecho (2026-11-08): Checkstyle 14 → 14.4.0, con arnés nuevo en `scripts/parity/java/checkstyle.py`
+(baja el jar de `versions.toml`, corre `sun_checks.xml` y compara por regla, archivo y línea contra
+`kerbo.json`; entra en `run_all.sh`). Lo que cambió: `WhitespaceAfter` ya no pide blanco después de
+`if`, `for`, `while`, `try`, `catch`, `synchronized`, `do` ni `->` (queda en coma, `;`,
+cast y `...`; lo demás lo cubre `WhitespaceAround`), y kerbo dejó de avisarlos. Paridad en junit4 y
+commons-lang: 10.070 avisos coinciden (4.622 y 5.448), 0 de menos, 0 de más (sin las reglas de Javadoc, `LineLength`,
+`Indentation`, `MagicNumber` y los largos, que kerbo no calca o mide con otro umbral).
+
 - Pendientes:
-  - Subir lo atrasado al 2026-11-07: TypeScript 7 y Django 6 (mayores, tanda propia). Checkstyle figura como 14 sin la menor medida.
+  - Subir lo atrasado al 2026-11-08: TypeScript 7 y Django 6 (mayores, tanda propia).
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.
   - Los arneses de hadolint, gitleaks y osv-scanner no quedaron en el repo (se perdieron

@@ -71,7 +71,7 @@ latest = "dockerhub:jetbrains/qodana-jvm-community"
 
 [tools.checkstyle]
 family = "java"
-version = "14"
+version = "14.4.0"
 latest = "github:checkstyle/checkstyle"
 cited_as = "Checkstyle {major}"
 

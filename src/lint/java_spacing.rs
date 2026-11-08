@@ -28,22 +28,6 @@ const KEYWORDS_AROUND: &[&str] = &[
     "return",
     "assert",
 ];
-const KEYWORDS_AFTER: &[&str] = &[
-    "if",
-    "else",
-    "while",
-    "do",
-    "for",
-    "finally",
-    "return",
-    "yield",
-    "catch",
-    "try",
-    "switch",
-    "synchronized",
-    "case",
-    "when",
-];
 const BITWISE_OR_TYPE_AND: &[&str] = &["&", "|"];
 const BINARY: &str = "binary_expression";
 const TERNARY: &str = "ternary_expression";
@@ -197,15 +181,16 @@ fn last_member(class_body: Node<'_>) -> Option<Node<'_>> {
 fn checked_after(token: &Token<'_>) -> bool {
     let kind = token.kind();
     match kind {
-        COMMA | ELLIPSIS | ARROW => true,
+        COMMA | ELLIPSIS => true,
         SEMICOLON => !token.is_empty_statement(),
         CLOSE_PAREN => token.parent_kind() == CAST,
-        _ => KEYWORDS_AFTER.contains(&kind),
+        _ => false,
     }
 }
 
-// Calca WhitespaceAfter: después de la coma, el `;`, el cierre de un cast, `->`, `...` y las
-// palabras de control va un blanco, salvo al final de la línea o antes de `;` o `)`.
+// Calca WhitespaceAfter de Checkstyle 14.4: después de la coma, el `;`, el cierre de un cast y `...`
+// va un blanco, salvo al final de la línea o antes de `;` o `)`. Las palabras de control y `->` los
+// cubre WhitespaceAround.
 fn after(token: &Token<'_>, lines: &Lines<'_>, source: &[u8]) -> Option<LintFinding> {
     let end = token.end();
     let next = lines.byte(end.row, end.column)?;
