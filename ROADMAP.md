@@ -1573,9 +1573,12 @@ Hecho (2026-11-07): ESLint 10.13 → 10.14 y typescript-eslint 8.72.0 → 8.72.1
 sobre express, zod, react, vscode y juice-shop (88 reglas) es idéntica byte a byte a la de antes, así
 que no hubo nada que portar.
 
+Hecho (2026-11-07): tree-sitter 0.27.1 → 0.27.2. Gate verde y la salida de kerbo sobre el corpus de
+JS/TS (21.438 archivos, 171.559 problemas) idéntica byte a byte.
+
 - Pendientes:
-  - Subir lo atrasado al 2026-11-07, con `run_all.sh` antes y después de cada familia: squawk 2.71,
-    tree-sitter 0.27.2 (parches y menores);
+  - Subir lo atrasado al 2026-11-07, con `run_all.sh` antes y después de cada familia: squawk 2.71
+    (necesita rearmar su arnés);
     TypeScript 7 y Django 6 (mayores, tanda propia). Checkstyle figura como 14 sin la menor medida.
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.

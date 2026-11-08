@@ -107,7 +107,7 @@ latest = "github:google/osv-scanner"
 # grammars/ (con cambios propios) dicen de qué versión de upstream salieron.
 
 [grammars.tree-sitter]
-version = "0.27.1"
+version = "0.27.2"
 latest = "crates:tree-sitter"
 
 [grammars.tree-sitter-java]
