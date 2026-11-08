@@ -27,6 +27,7 @@ impl MemoryLoader {
             Reader {
                 source: source.as_bytes(),
                 app,
+                variables: &[],
             },
         )
         .expect("es una migración");

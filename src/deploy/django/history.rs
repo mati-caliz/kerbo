@@ -165,7 +165,14 @@ fn parse_file(path: &Path, app: &str) -> Option<Migration> {
     let mut parser = Parser::new();
     parser.set_language(&Language::Python.grammar()?).ok()?;
     let tree = parser.parse(&source, None)?;
-    migration(tree.root_node(), Reader { source: &source, app })
+    migration(
+        tree.root_node(),
+        Reader {
+            source: &source,
+            app,
+            variables: &[],
+        },
+    )
 }
 
 pub fn fingerprint(path: &Path) -> Option<u64> {

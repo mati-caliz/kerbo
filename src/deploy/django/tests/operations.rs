@@ -104,6 +104,28 @@ class Migration(migrations.Migration):
     ]
 "#;
 
+const STATE_FROM_VARIABLES: &str = r#"from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    state_operations = [
+        migrations.CreateModel(name="Tag", fields=[("id", models.BigAutoField(primary_key=True))]),
+    ]
+
+    operations = [
+        migrations.SeparateDatabaseAndState(state_operations=state_operations),
+    ]
+"#;
+
+const ADD_FIELD_TO_TAG: &str = r#"from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    operations = [
+        migrations.AddField(model_name="tag", name="label", field=models.CharField(max_length=20, null=True)),
+    ]
+"#;
+
 const LONG_MODEL_LENGTH: usize = 70;
 
 fn rules(loader: &MemoryLoader, stem: &str, source: &str) -> Vec<MigrationRule> {
@@ -174,5 +196,18 @@ fn long_names_are_truncated_like_django() {
     assert_all(
         &long_rules,
         &[MigrationRule::PreferTextField, MigrationRule::IdentifierTooLong],
+    );
+}
+
+#[test]
+fn state_operations_given_as_a_class_variable_build_the_model() {
+    let loader = MemoryLoader::default().with(APP, "0001_initial", STATE_FROM_VARIABLES);
+    let added = rules(&loader, "0002_label", ADD_FIELD_TO_TAG);
+    assert_all(
+        &added,
+        &[
+            MigrationRule::RequireLockTimeout,
+            MigrationRule::RequireStatementTimeout,
+        ],
     );
 }

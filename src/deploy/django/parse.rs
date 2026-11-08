@@ -19,6 +19,7 @@ const ADD_FIELD: &str = "AddField";
 pub struct Reader<'context> {
     pub source: &'context [u8],
     pub app: &'context str,
+    pub variables: &'context [(String, Node<'context>)],
 }
 
 pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
@@ -33,7 +34,13 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
         operations: Vec::new(),
         atomic: true,
     };
-    for (name, value) in class_assignments(class.child_by_field_name("body")?, reader.source) {
+    let assignments = class_assignments(class.child_by_field_name("body")?, reader.source);
+    let reader = Reader {
+        variables: &assignments,
+        ..reader
+    };
+    for (name, value) in &assignments {
+        let value = *value;
         match name.as_str() {
             OPERATIONS => migration.operations = reader.operations(value),
             ATOMIC => migration.atomic = boolean(value) != Some(false),
@@ -67,9 +74,22 @@ fn model_name(call: &Call<'_>, index: usize, name: &str) -> Option<String> {
     string_argument(call, index, name).map(|model| model.to_lowercase())
 }
 
-impl Reader<'_> {
-    pub fn operations(self, node: Node<'_>) -> Vec<Located> {
-        elements(node)
+impl<'context> Reader<'context> {
+    fn resolve(self, node: Node<'context>) -> Node<'context> {
+        if node.kind() != "identifier" {
+            return node;
+        }
+        let Ok(name) = node.utf8_text(self.source) else {
+            return node;
+        };
+        self.variables
+            .iter()
+            .find(|(variable, _)| variable == name)
+            .map_or(node, |(_, value)| *value)
+    }
+
+    pub fn operations(self, node: Node<'context>) -> Vec<Located> {
+        elements(self.resolve(node))
             .into_iter()
             .filter_map(|element| {
                 let call = Call::parse(element, self.source)?;

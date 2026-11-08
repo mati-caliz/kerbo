@@ -41,6 +41,7 @@ fn render(root: Node<'_>, source: &[u8], location: &Location, loader: &impl Load
         Reader {
             source,
             app: &location.app,
+            variables: &[],
         },
     ) else {
         return Vec::new();

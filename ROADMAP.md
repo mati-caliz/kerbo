@@ -1611,13 +1611,13 @@ menos, sin cambios en kerbo.
   avisos, ninguno de más (`scripts/parity/django/reference.sh` y `corpus.sh`). Pendientes:
   - Saleor medido (2026-11-08, commit en `corpus.toml`): `reference.sh saleor` instala sus
     dependencias desde `uv.lock` y usa su `saleor.settings`; 1.454 migraciones, 12 no se pueden
-    convertir (`errores.txt`). Paridad: squawk 4.385 avisos, kerbo 4.070, coinciden 3.847, 501
-    diferencias, casi todas de menos en kerbo. Por regla (squawk menos kerbo): `prefer-bigint-over-int`
-    80, `require-lock-timeout` y `require-statement-timeout` 46 cada una, `prefer-text-field` 40,
-    `prefer-robust-stmts` 35, `require-concurrent-index-creation` 27, `ban-drop-default` 18,
-    `renaming-table` 16, `ban-drop-constraint` y `adding-foreign-key-constraint` 13 cada una,
-    `renaming-object` 10, `renaming-column` y `constraint-missing-not-valid` 9. Hay que juntarlas,
-    arreglarlas en una tanda y volver a medir (`corpus.sh saleor`).
+    convertir (`errores.txt`). Paridad: squawk 4.385 avisos, kerbo 4.070, coinciden 3.847, 501 diferencias.
+    Resolver las variables de clase de `Migration` (`state_operations = [...]` pasado a
+    `SeparateDatabaseAndState`) las bajó a 360 (kerbo 4.268, coinciden 4.045). Quedan, por regla:
+    `prefer-bigint-over-int` 61, `require-lock-timeout` y `require-statement-timeout` 57 cada una,
+    `changing-column-type` 29, `prefer-text-field` 26, `ban-concurrent-index-creation-in-transaction`
+    22, `ban-drop-default` 17, `constraint-missing-not-valid` 13, `prefer-robust-stmts` 12.
+    Falta diagnosticarlas y volver a medir (`corpus.sh saleor`).
   - Medir más repos de Django (sentry, wagtail, zulip): entrada en `REPOS` de `reference.py`.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
     `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), el
