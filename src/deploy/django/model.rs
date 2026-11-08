@@ -44,6 +44,9 @@ pub enum Class {
     Json,
     Inet,
     Duration,
+    HStore,
+    SearchVector,
+    Array,
     ForeignKey,
     OneToOne,
     ManyToMany,
@@ -92,6 +95,7 @@ pub struct Field {
     pub db_default: Option<String>,
     pub db_column: Option<String>,
     pub relation: Option<Relation>,
+    pub element: Option<Box<Self>>,
 }
 
 impl Field {
@@ -107,6 +111,7 @@ impl Field {
             db_default: None,
             db_column: None,
             relation: None,
+            element: None,
         }
     }
 
@@ -166,11 +171,18 @@ pub struct Index {
     pub name: String,
     pub fields: Vec<String>,
     pub conditional: bool,
+    pub method: Option<&'static str>,
+    pub opclasses: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConstraintKind {
-    Unique { fields: Vec<String>, by_index: bool },
+    Unique {
+        fields: Vec<String>,
+        by_index: bool,
+        conditional: bool,
+        opclasses: Vec<String>,
+    },
     Check,
 }
 

@@ -11,6 +11,7 @@ mod names;
 mod operations;
 mod parse;
 mod schema;
+mod settings;
 mod state;
 mod values;
 
@@ -41,13 +42,28 @@ fn render(root: Node<'_>, source: &[u8], location: &Location, loader: &impl Load
         Reader {
             source,
             app: &location.app,
-            variables: &[],
+            settings: &settings::project(&location.apps_root),
         },
     ) else {
         return Vec::new();
     };
     let mut state = history::state_before(loader, location, &migration);
     dispatch::script(&migration, &location.app, &mut state)
+}
+
+#[cfg(test)]
+fn rendered_sql(root: Node<'_>, source: &[u8], location: &Location) -> Option<String> {
+    let migration = parse::migration(
+        root,
+        Reader {
+            source,
+            app: &location.app,
+            settings: &settings::project(&location.apps_root),
+        },
+    )?;
+    let loader = FileLoader::new(location.apps_root.clone());
+    let mut state = history::state_before(&loader, location, &migration);
+    Some(dispatch::sql(&migration, &location.app, &mut state))
 }
 
 #[cfg(test)]

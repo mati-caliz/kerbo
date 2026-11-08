@@ -69,14 +69,18 @@ impl Editor {
         }
     }
 
-    pub fn finish(mut self) -> Vec<Violation> {
+    pub fn finish(self) -> Vec<Violation> {
+        self.into_script().finish()
+    }
+
+    pub fn into_script(mut self) -> Script {
         for (statement, origin) in mem::take(&mut self.deferred) {
             self.script.push(&statement.render(), origin);
         }
         if self.atomic {
             self.script.leave_transaction();
         }
-        self.script.finish()
+        self.script
     }
 
     pub fn create_model(&mut self, model: &Model, state: &State) {
@@ -235,7 +239,7 @@ impl Editor {
         let table = model.table();
         let column = field.column();
         self.execute(&format!(
-            "ALTER TABLE {} DROP COLUMN {}",
+            "ALTER TABLE {} DROP COLUMN {} CASCADE",
             quoted(&table),
             quoted(&column)
         ));
@@ -286,27 +290,47 @@ pub fn named_index(model: &Model, index: &Index, kind: IndexKind) -> Statement {
         columns: index
             .fields
             .iter()
-            .map(|entry| IndexColumn::parse(entry, |name| model.column_of(name)))
+            .enumerate()
+            .map(|(position, entry)| IndexColumn {
+                operator_class: index.opclasses.get(position).cloned(),
+                ..IndexColumn::parse(entry, |name| model.column_of(name))
+            })
             .collect(),
         kind: Kind::Named {
             name: index.name.clone(),
             kind,
             conditional: index.conditional,
+            method: index.method,
         },
     }
 }
 
 pub fn unique_index(model: &Model, constraint: &Constraint) -> Statement {
-    let fields = match &constraint.kind {
-        ConstraintKind::Unique { fields, .. } if !fields.is_empty() => fields.clone(),
-        ConstraintKind::Unique { .. } | ConstraintKind::Check => vec![EXPRESSION_PLACEHOLDER.to_owned()],
+    let (fields, conditional, opclasses) = match &constraint.kind {
+        ConstraintKind::Unique {
+            fields,
+            conditional,
+            opclasses,
+            ..
+        } => (
+            if fields.is_empty() {
+                vec![EXPRESSION_PLACEHOLDER.to_owned()]
+            } else {
+                fields.clone()
+            },
+            *conditional,
+            opclasses.clone(),
+        ),
+        ConstraintKind::Check => (vec![EXPRESSION_PLACEHOLDER.to_owned()], false, Vec::new()),
     };
     named_index(
         model,
         &Index {
             name: constraint.name.clone(),
             fields,
-            conditional: false,
+            conditional,
+            method: None,
+            opclasses,
         },
         IndexKind::Unique,
     )

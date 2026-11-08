@@ -50,6 +50,11 @@ impl Script {
         self.text.push_str(&statement);
     }
 
+    #[cfg(test)]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
     pub fn leave_transaction(&mut self) {
         self.push(COMMIT, Origin::Synthetic);
     }

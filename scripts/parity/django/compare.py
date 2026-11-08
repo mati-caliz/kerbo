@@ -1,7 +1,8 @@
 """kerbo (out/<repo>.json) contra squawk sobre el SQL de `sqlmigrate` (.parity/django/<repo>/squawk.json).
 
-Se compara por migración, regla y cantidad de avisos: squawk marca líneas del SQL generado y kerbo las
-de la operación que lo genera, así que la línea no se puede cruzar.
+Se compara por migración, regla y cantidad de avisos, sólo en las migraciones que `sqlmigrate`
+pudo convertir (las que fallan quedan en errores.txt y no tienen referencia): squawk marca líneas
+del SQL generado y kerbo las de la operación que lo genera, así que la línea no se puede cruzar.
 
 Uso: python compare.py <repo>
      python compare.py --apps-root <repo>
@@ -28,6 +29,11 @@ def reference(repo):
     return counts
 
 
+def converted_migrations(repo):
+    root = PARITY / "django" / repo
+    return {f"{path.parent.name}/{path.stem}" for path in root.glob("*/*.sql")}
+
+
 def kerbo(repo, rules):
     prefix = APPS_ROOTS[repo] + "/"
     counts = collections.Counter()
@@ -44,7 +50,9 @@ def main():
         return
     repo = sys.argv[1]
     expected = reference(repo)
+    converted = converted_migrations(repo)
     found = kerbo(repo, {rule for _, rule in expected} | migration_rules())
+    found = collections.Counter({key: count for key, count in found.items() if key[0] in converted})
     differences = sorted(key for key in expected.keys() | found.keys() if expected[key] != found[key])
     for migration, rule in differences:
         print(f"{migration:45} {rule:40} squawk {expected[(migration, rule)]:3} kerbo {found[(migration, rule)]:3}")

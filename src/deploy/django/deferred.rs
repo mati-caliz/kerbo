@@ -16,6 +16,7 @@ pub enum IndexKind {
 pub struct IndexColumn {
     pub name: String,
     pub descending: bool,
+    pub operator_class: Option<String>,
 }
 
 impl IndexColumn {
@@ -28,10 +29,12 @@ impl IndexColumn {
                     column_of(entry)
                 },
                 descending: false,
+                operator_class: None,
             },
             |name| Self {
                 name: column_of(name),
                 descending: true,
+                operator_class: None,
             },
         )
     }
@@ -41,6 +44,10 @@ impl IndexColumn {
             self.name.clone()
         } else {
             quoted(&self.name)
+        };
+        let name = match &self.operator_class {
+            Some(operator_class) => format!("{name} {operator_class}"),
+            None => name,
         };
         if self.descending {
             format!("{name} DESC")
@@ -63,6 +70,7 @@ pub enum Kind {
         name: String,
         kind: IndexKind,
         conditional: bool,
+        method: Option<&'static str>,
     },
 }
 
@@ -82,6 +90,7 @@ impl Statement {
                 .map(|name| IndexColumn {
                     name: name.clone(),
                     descending: false,
+                    operator_class: None,
                 })
                 .collect(),
             kind,
@@ -127,6 +136,7 @@ impl Statement {
                 name,
                 kind,
                 conditional,
+                method,
             } => {
                 let create = match kind {
                     IndexKind::Plain => "CREATE INDEX",
@@ -134,7 +144,13 @@ impl Statement {
                     IndexKind::Concurrent => "CREATE INDEX CONCURRENTLY",
                 };
                 let condition = if *conditional { " WHERE true" } else { "" };
-                format!("{create} {} ON {table} ({columns}){condition}", quoted(name))
+                let using = method
+                    .map(|method| format!(" USING {method}"))
+                    .unwrap_or_default();
+                format!(
+                    "{create} {} ON {table}{using} ({columns}){condition}",
+                    quoted(name)
+                )
             }
         }
     }

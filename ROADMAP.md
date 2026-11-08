@@ -1610,14 +1610,24 @@ menos, sin cambios en kerbo.
   migraciones sobre su SQL; contra squawk 2.71 en las 23 migraciones de `django.contrib`, 89 de 89
   avisos, ninguno de más (`scripts/parity/django/reference.sh` y `corpus.sh`). Pendientes:
   - Saleor medido (2026-11-08, commit en `corpus.toml`): `reference.sh saleor` instala sus
-    dependencias desde `uv.lock` y usa su `saleor.settings`; 1.454 migraciones, 12 no se pueden
-    convertir (`errores.txt`). Paridad: squawk 4.385 avisos, kerbo 4.070, coinciden 3.847, 501 diferencias.
-    Resolver las variables de clase de `Migration` (`state_operations = [...]` pasado a
-    `SeparateDatabaseAndState`) las bajó a 360 (kerbo 4.268, coinciden 4.045). Quedan, por regla:
-    `prefer-bigint-over-int` 61, `require-lock-timeout` y `require-statement-timeout` 57 cada una,
-    `changing-column-type` 29, `prefer-text-field` 26, `ban-concurrent-index-creation-in-transaction`
-    22, `ban-drop-default` 17, `constraint-missing-not-valid` 13, `prefer-robust-stmts` 12.
-    Falta diagnosticarlas y volver a medir (`corpus.sh saleor`).
+    dependencias desde `uv.lock` y usa su `saleor.settings` (Django 5.2); 1.454 migraciones, 12 no
+    se pueden convertir (`errores.txt`). Empezó en 501 diferencias y las variables de clase de
+    `Migration` la bajaron a 360. Ahora: squawk 4.385 avisos, kerbo 4.285, coinciden 4.174, 200
+    diferencias por migración y regla; sentencia por sentencia (`dump.sh` + `diff.py`), 131 de
+    1.454 migraciones con SQL distinto. kerbo ya lee de los `settings` del proyecto
+    `AUTH_USER_MODEL`, `DEFAULT_AUTO_FIELD` y las constantes numéricas (`max_length=settings.X`);
+    sin `settings` asume el `BigAutoField` de `startproject`. Sigue las operaciones guardadas en
+    nombres del módulo o de la clase y las listas concatenadas, y escribe los `default` como los
+    recibe Postgres (`jsonb`, `uuid`, fechas, `Decimal`). Lo que falta, por frecuencia:
+    `AlterField` de nulo a no nulo (`SET CONSTRAINTS` y `DROP NOT NULL` de más) y con `DEFAULT`
+    más `UPDATE`; `GinIndex` y `opclasses`; `ALTER TYPE` de `varchar` y el `ALTER TYPE integer
+    USING` de más; las expresiones reales de `check` y `condition` (hoy `true`); `to_field` en
+    las claves foráneas; `RenameModel` y `AlterModelTable` entre apps; `CryptoExtension`; los
+    `RunSQL` con `do $$`; `UNIQUE NULLS NOT DISTINCT`; el `DROP TABLE` de las tablas
+    intermedias; los `default` de `interval`.
+  - El `CASCADE` de `DROP COLUMN` depende de la versión: Django 6 lo sacó y kerbo lo pone siempre
+    (en `django.contrib`, con Django 6.1, una sola sentencia distinta; no cambia los avisos). Leer
+    la versión de Django del proyecto (`pyproject.toml`, `uv.lock`, `requirements`).
   - Medir más repos de Django (sentry, wagtail, zulip): entrada en `REPOS` de `reference.py`.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
     `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), el

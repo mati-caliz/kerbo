@@ -4,13 +4,16 @@ use std::sync::Arc;
 
 use tree_sitter::{Parser, Tree};
 
-use super::history::{Loader, Location, location};
+use super::dispatch;
+use super::history::{Loader, Location, location, state_before};
 use super::operations::Migration;
 use super::parse::{Reader, migration};
 use super::render;
+use super::settings::Settings;
 use crate::language::Language;
 use crate::rules::{MigrationRule, RuleId};
 
+mod dump;
 mod files;
 mod operations;
 
@@ -27,7 +30,7 @@ impl MemoryLoader {
             Reader {
                 source: source.as_bytes(),
                 app,
-                variables: &[],
+                settings: &Settings::default(),
             },
         )
         .expect("es una migración");
@@ -205,4 +208,94 @@ fn location_reads_the_app_from_the_migrations_directory() {
     assert_eq!(found_location.stem, "0002_body");
     assert_eq!(found_location.apps_root, PathBuf::from("proyecto"));
     assert!(location(&Path::new("blog").join("migrations").join("__init__.py")).is_none());
+}
+
+const SITES_THROUGH_NAMES: &str = r#"from django.db import migrations, models
+
+CREATE_SITE = migrations.CreateModel(
+    name="Site",
+    fields=[("id", models.AutoField(primary_key=True)), ("domain", models.CharField(max_length=100))],
+)
+
+
+class Migration(migrations.Migration):
+    state_operations = [CREATE_SITE]
+    alias = state_operations
+    operations = alias + [migrations.RemoveField(model_name="site", name="domain")]
+"#;
+
+#[test]
+fn operations_bound_to_names_and_concatenated_are_followed() {
+    let rules = found(
+        &MemoryLoader::default(),
+        "sites",
+        "0001_initial",
+        SITES_THROUGH_NAMES,
+    );
+    assert_eq!(
+        rules,
+        vec![
+            (MigrationRule::BanDropColumn, 12),
+            (MigrationRule::PreferBigintOverInt, 3),
+            (MigrationRule::PreferTextField, 3),
+            (MigrationRule::RequireLockTimeout, 12),
+            (MigrationRule::RequireStatementTimeout, 12),
+        ]
+    );
+}
+
+fn sql(loader: &MemoryLoader, app: &str, stem: &str, source: &str) -> String {
+    let tree = parsed(source);
+    let parsed_migration = migration(
+        tree.root_node(),
+        Reader {
+            source: source.as_bytes(),
+            app,
+            settings: &Settings::default(),
+        },
+    )
+    .expect("es una migración");
+    let current = Location {
+        app: app.to_owned(),
+        stem: stem.to_owned(),
+        apps_root: PathBuf::new(),
+    };
+    let mut state = state_before(loader, &current, &parsed_migration);
+    dispatch::sql(&parsed_migration, app, &mut state)
+}
+
+const TYPED_DEFAULTS: &str = r#"from decimal import Decimal
+import uuid
+
+from django.db import migrations, models
+from django.utils import timezone
+
+
+class Migration(migrations.Migration):
+    operations = [
+        migrations.AddField(model_name="site", name="metadata", field=models.JSONField(default=dict)),
+        migrations.AddField(model_name="site", name="tags", field=models.JSONField(default=[])),
+        migrations.AddField(model_name="site", name="token", field=models.UUIDField(default=uuid.uuid4)),
+        migrations.AddField(model_name="site", name="created", field=models.DateTimeField(default=timezone.now)),
+        migrations.AddField(
+            model_name="site",
+            name="balance",
+            field=models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("0.0")),
+        ),
+    ]
+"#;
+
+#[test]
+fn defaults_are_rendered_with_the_type_postgres_receives() {
+    let loader = MemoryLoader::default().with("sites", "0001_initial", SITES_INITIAL);
+    let rendered = sql(&loader, "sites", "0002_typed_defaults", TYPED_DEFAULTS);
+    for expected in [
+        "\"metadata\" jsonb DEFAULT '{}'::jsonb NOT NULL",
+        "\"tags\" jsonb DEFAULT '[]'::jsonb NOT NULL",
+        "\"token\" uuid DEFAULT '00000000000000000000000000000000'::uuid NOT NULL",
+        "\"created\" timestamp with time zone DEFAULT '2000-01-01 00:00:00+00:00'::timestamptz NOT NULL",
+        "\"balance\" numeric(12, 3) DEFAULT 0.0 NOT NULL",
+    ] {
+        assert!(rendered.contains(expected), "falta {expected} en {rendered}");
+    }
 }

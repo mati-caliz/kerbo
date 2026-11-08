@@ -34,9 +34,21 @@ impl Context<'_> {
 }
 
 pub fn script(migration: &Migration, app: &str, state: &mut State) -> Vec<Violation> {
+    editor_after(migration, app, state).finish()
+}
+
+#[cfg(test)]
+pub fn sql(migration: &Migration, app: &str, state: &mut State) -> String {
+    editor_after(migration, app, state)
+        .into_script()
+        .text()
+        .to_owned()
+}
+
+fn editor_after(migration: &Migration, app: &str, state: &mut State) -> Editor {
     let mut editor = Editor::new(migration.atomic);
     run_all(&mut editor, &migration.operations, app, state);
-    editor.finish()
+    editor
 }
 
 fn run_all(editor: &mut Editor, operations: &[Located], app: &str, state: &mut State) {

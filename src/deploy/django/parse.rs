@@ -4,6 +4,7 @@ use super::fields::{Owner, field};
 use super::meta::{constraint, constraints, index, indexes, unique_together};
 use super::model::{Model, ModelKey};
 use super::operations::{Located, Migration, Operation, SqlChunk};
+use super::settings::Settings;
 use super::values::{boolean, dictionary, elements, is_sequence, text};
 use crate::deploy::python_calls::Call;
 use crate::syntax::{named_children, one_based};
@@ -14,12 +15,23 @@ const ATOMIC: &str = "atomic";
 const NOOP: &str = "noop";
 const CONCURRENTLY: &str = "Concurrently";
 const ADD_FIELD: &str = "AddField";
+const IDENTIFIER: &str = "identifier";
+const CONCATENATION: &str = "binary_operator";
+const MAX_ALIAS_DEPTH: usize = 8;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Reader<'context> {
     pub source: &'context [u8],
     pub app: &'context str,
-    pub variables: &'context [(String, Node<'context>)],
+    pub settings: &'context Settings,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Scope<'context> {
+    source: &'context [u8],
+    app: &'context str,
+    settings: &'context Settings,
+    bindings: &'context [(String, Node<'context>)],
 }
 
 pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
@@ -30,19 +42,23 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
                 .and_then(|name| name.utf8_text(reader.source).ok())
                 == Some(MIGRATION_CLASS)
     })?;
+    let body = class.child_by_field_name("body")?;
+    let class_bindings = assignments(body, reader.source);
+    let mut bindings = assignments(root, reader.source);
+    bindings.extend(class_bindings.iter().cloned());
+    let scope = Scope {
+        source: reader.source,
+        app: reader.app,
+        settings: reader.settings,
+        bindings: &bindings,
+    };
     let mut migration = Migration {
         operations: Vec::new(),
         atomic: true,
     };
-    let assignments = class_assignments(class.child_by_field_name("body")?, reader.source);
-    let reader = Reader {
-        variables: &assignments,
-        ..reader
-    };
-    for (name, value) in &assignments {
-        let value = *value;
+    for (name, value) in class_bindings {
         match name.as_str() {
-            OPERATIONS => migration.operations = reader.operations(value),
+            OPERATIONS => migration.operations = scope.operations(value),
             ATOMIC => migration.atomic = boolean(value) != Some(false),
             _ => {}
         }
@@ -50,7 +66,7 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
     Some(migration)
 }
 
-fn class_assignments<'tree>(body: Node<'tree>, source: &[u8]) -> Vec<(String, Node<'tree>)> {
+fn assignments<'tree>(body: Node<'tree>, source: &[u8]) -> Vec<(String, Node<'tree>)> {
     named_children(body)
         .into_iter()
         .filter_map(|statement| named_children(statement).into_iter().next())
@@ -74,25 +90,50 @@ fn model_name(call: &Call<'_>, index: usize, name: &str) -> Option<String> {
     string_argument(call, index, name).map(|model| model.to_lowercase())
 }
 
-impl<'context> Reader<'context> {
-    fn resolve(self, node: Node<'context>) -> Node<'context> {
-        if node.kind() != "identifier" {
-            return node;
+impl<'context> Scope<'context> {
+    fn resolved(self, node: Node<'context>) -> Node<'context> {
+        let mut current = node;
+        for _ in 0..MAX_ALIAS_DEPTH {
+            let Some(bound) = self.binding(current) else {
+                return current;
+            };
+            current = bound;
         }
-        let Ok(name) = node.utf8_text(self.source) else {
-            return node;
-        };
-        self.variables
-            .iter()
-            .find(|(variable, _)| variable == name)
-            .map_or(node, |(_, value)| *value)
+        current
     }
 
-    pub fn operations(self, node: Node<'context>) -> Vec<Located> {
-        elements(self.resolve(node))
+    fn binding(self, node: Node<'context>) -> Option<Node<'context>> {
+        if node.kind() != IDENTIFIER {
+            return None;
+        }
+        let name = node.utf8_text(self.source).ok()?;
+        self.bindings
+            .iter()
+            .rev()
+            .find(|(bound, _)| bound == name)
+            .map(|(_, value)| *value)
+    }
+
+    fn sequence(self, node: Node<'context>) -> Vec<Node<'context>> {
+        let node = self.resolved(node);
+        if node.kind() == CONCATENATION
+            && let (Some(left), Some(right)) = (
+                node.child_by_field_name("left"),
+                node.child_by_field_name("right"),
+            )
+        {
+            let mut joined = self.sequence(left);
+            joined.extend(self.sequence(right));
+            return joined;
+        }
+        elements(node)
+    }
+
+    fn operations(self, node: Node<'context>) -> Vec<Located> {
+        self.sequence(node)
             .into_iter()
             .filter_map(|element| {
-                let call = Call::parse(element, self.source)?;
+                let call = Call::parse(self.resolved(element), self.source)?;
                 Some(Located {
                     operation: self.operation(&call)?,
                     line: call.line,
@@ -102,7 +143,7 @@ impl<'context> Reader<'context> {
             .collect()
     }
 
-    fn operation(self, call: &Call<'_>) -> Option<Operation> {
+    fn operation(self, call: &Call<'context>) -> Option<Operation> {
         match call.method {
             "CreateModel" => self.create_model(call),
             "DeleteModel" => model_name(call, 0, "name").map(Operation::DeleteModel),
@@ -181,6 +222,7 @@ impl<'context> Reader<'context> {
         let owner = Owner {
             app: self.app,
             model: &model,
+            settings: self.settings,
         };
         let parsed = field(&name, argument(call, 2, "field")?, self.source, owner)?;
         Some(if call.method == ADD_FIELD {
@@ -196,6 +238,7 @@ impl<'context> Reader<'context> {
         let owner = Owner {
             app: self.app,
             model: &name,
+            settings: self.settings,
         };
         model.fields = argument(call, 1, "fields")
             .map(elements)
@@ -236,8 +279,8 @@ impl<'context> Reader<'context> {
         Some(Operation::AlterManaged { model, managed })
     }
 
-    fn run_sql(self, call: &Call<'_>) -> Option<Operation> {
-        let sql = argument(call, 0, "sql")?;
+    fn run_sql(self, call: &Call<'context>) -> Option<Operation> {
+        let sql = self.resolved(argument(call, 0, "sql")?);
         let is_noop = sql.kind() == "attribute"
             && sql
                 .utf8_text(self.source)
@@ -245,8 +288,10 @@ impl<'context> Reader<'context> {
         if is_noop {
             return None;
         }
-        let chunks = sql_literals(sql)
+        let chunks = self
+            .sql_literals(sql)
             .into_iter()
+            .map(|literal| self.resolved(literal))
             .filter_map(|literal| {
                 Some(SqlChunk {
                     sql: text(literal, self.source)?,
@@ -256,20 +301,21 @@ impl<'context> Reader<'context> {
             .collect();
         Some(Operation::RunSql(chunks))
     }
-}
 
-fn sql_literals(sql: Node<'_>) -> Vec<Node<'_>> {
-    if !is_sequence(sql) {
-        return vec![sql];
+    fn sql_literals(self, sql: Node<'context>) -> Vec<Node<'context>> {
+        if !is_sequence(sql) && sql.kind() != CONCATENATION {
+            return vec![sql];
+        }
+        self.sequence(sql)
+            .into_iter()
+            .filter_map(|element| {
+                let element = self.resolved(element);
+                if is_sequence(element) {
+                    elements(element).into_iter().next()
+                } else {
+                    Some(element)
+                }
+            })
+            .collect()
     }
-    elements(sql)
-        .into_iter()
-        .filter_map(|element| {
-            if is_sequence(element) {
-                elements(element).into_iter().next()
-            } else {
-                Some(element)
-            }
-        })
-        .collect()
 }

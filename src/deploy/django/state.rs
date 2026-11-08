@@ -16,12 +16,20 @@ const BUILT_IN_TABLES: &[(&str, &str, &str)] = &[
     ("sites", "site", "django_site"),
 ];
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct State {
     models: BTreeMap<ModelKey, Model>,
+    auto_field: Class,
 }
 
 impl State {
+    pub const fn new(auto_field: Class) -> Self {
+        Self {
+            models: BTreeMap::new(),
+            auto_field,
+        }
+    }
+
     pub fn model(&self, key: &ModelKey) -> Option<&Model> {
         self.models.get(key)
     }
@@ -42,7 +50,7 @@ impl State {
     pub fn resolve(&self, key: &ModelKey) -> Cow<'_, Model> {
         self.models
             .get(key)
-            .map_or_else(|| Cow::Owned(fallback(key)), Cow::Borrowed)
+            .map_or_else(|| Cow::Owned(fallback(key, self.auto_field)), Cow::Borrowed)
     }
 
     pub fn through(&self, owner: &Model, field: &Field) -> Option<Model> {
@@ -65,7 +73,7 @@ impl State {
         );
         let constrained = field.db_constraint();
         through.fields = vec![
-            identity(Class::BigAuto),
+            identity(self.auto_field),
             link(&from, owner.key.clone(), constrained),
             link(&to, relation.to.clone(), constrained),
         ];
@@ -208,7 +216,7 @@ fn link(name: &str, to: ModelKey, constrained: bool) -> Field {
     field
 }
 
-fn fallback(key: &ModelKey) -> Model {
+fn fallback(key: &ModelKey, auto_field: Class) -> Model {
     let built_in = BUILT_IN_TABLES
         .iter()
         .find(|(app, model, _)| *app == key.app && *model == key.model);
@@ -217,7 +225,7 @@ fn fallback(key: &ModelKey) -> Model {
     model.fields = vec![identity(if built_in.is_some() {
         Class::Auto
     } else {
-        Class::BigAuto
+        auto_field
     })];
     model
 }

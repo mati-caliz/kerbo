@@ -148,7 +148,7 @@ fn apply_actions(editor: &mut Editor, change: FieldChange<'_>, mut actions: Acti
             .or_else(|| effective_default(change.new))
             .unwrap_or_else(|| NULL.to_owned());
         editor.execute(&format!(
-            "UPDATE {} SET {column} = {default} WHERE {column} IS NULL",
+            "UPDATE {} SET {column} = {default} WHERE {column} IS NULL; SET CONSTRAINTS ALL IMMEDIATE",
             quoted(change.table),
             column = change.column()
         ));

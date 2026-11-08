@@ -9,6 +9,16 @@ const CHECK_CONSTRAINT: &str = "CheckConstraint";
 const INDEX_ONLY_UNIQUE_KEYWORDS: &[&str] = &["condition", "include", "opclasses", "nulls_distinct"];
 const CONDITION: &str = "condition";
 const EXPRESSION_PLACEHOLDER: &str = "(true)";
+const OPERATOR_CLASSES: &str = "opclasses";
+const INDEX_METHODS: &[(&str, &str)] = &[
+    ("BTreeIndex", "btree"),
+    ("BloomIndex", "bloom"),
+    ("BrinIndex", "brin"),
+    ("GinIndex", "gin"),
+    ("GistIndex", "gist"),
+    ("HashIndex", "hash"),
+    ("SpGistIndex", "spgist"),
+];
 
 pub fn unique_together(node: Node<'_>, source: &[u8]) -> Vec<Vec<String>> {
     let sets = elements(node);
@@ -44,6 +54,11 @@ pub fn index(node: Node<'_>, source: &[u8]) -> Option<Index> {
         name,
         fields,
         conditional: call.keyword(CONDITION).is_some(),
+        method: INDEX_METHODS
+            .iter()
+            .find(|(class, _)| *class == call.method)
+            .map(|(_, method)| *method),
+        opclasses: operator_classes(&call, source),
     })
 }
 
@@ -60,12 +75,23 @@ pub fn constraint(node: Node<'_>, source: &[u8]) -> Option<Constraint> {
                 || INDEX_ONLY_UNIQUE_KEYWORDS
                     .iter()
                     .any(|keyword| call.keyword(keyword).is_some());
-            ConstraintKind::Unique { fields, by_index }
+            ConstraintKind::Unique {
+                fields,
+                by_index,
+                conditional: call.keyword(CONDITION).is_some(),
+                opclasses: operator_classes(&call, source),
+            }
         }
         CHECK_CONSTRAINT => ConstraintKind::Check,
         _ => return None,
     };
     Some(Constraint { name, kind })
+}
+
+fn operator_classes(call: &Call<'_>, source: &[u8]) -> Vec<String> {
+    call.keyword(OPERATOR_CLASSES)
+        .map(|value| strings(value, source))
+        .unwrap_or_default()
 }
 
 pub fn indexes(node: Node<'_>, source: &[u8]) -> Vec<Index> {

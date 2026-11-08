@@ -9,6 +9,7 @@ use tree_sitter::Parser;
 
 use super::operations::Migration;
 use super::parse::{Reader, migration};
+use super::settings::{self, Settings};
 use super::state::State;
 use crate::language::Language;
 
@@ -51,7 +52,7 @@ pub fn is_migration_source(source: &[u8]) -> bool {
 }
 
 pub fn state_before(loader: &impl Loader, location: &Location, current: &Migration) -> State {
-    let mut state = State::default();
+    let mut state = State::new(settings::project(&location.apps_root).auto_field);
     for (stem, earlier) in loader.migrations(&location.app) {
         if stem < location.stem {
             replay(&mut state, &location.app, &earlier);
@@ -103,11 +104,12 @@ impl FileLoader {
 
 impl Loader for FileLoader {
     fn migrations(&self, app: &str) -> Vec<(String, Arc<Migration>)> {
+        let settings = settings::project(&self.apps_root);
         let mut found: Vec<(String, Arc<Migration>)> = migration_files(&self.apps_root.join(app))
             .into_iter()
             .filter_map(|path| {
                 let stem = path.file_stem()?.to_str()?.to_owned();
-                Some((stem, cached(&path, app)?))
+                Some((stem, cached(&path, app, &settings)?))
             })
             .collect();
         found.sort_by(|left, right| left.0.cmp(&right.0));
@@ -137,7 +139,7 @@ fn cache() -> &'static Cache {
     CACHE.get_or_init(Cache::default)
 }
 
-fn cached(path: &Path, app: &str) -> Option<Arc<Migration>> {
+fn cached(path: &Path, app: &str, settings: &Settings) -> Option<Arc<Migration>> {
     let metadata = fs::metadata(path).ok()?;
     let (size, modified) = (metadata.len(), metadata.modified().ok()?);
     let known = cache()
@@ -149,7 +151,7 @@ fn cached(path: &Path, app: &str) -> Option<Arc<Migration>> {
     if let Some(parsed) = known {
         return parsed;
     }
-    let parsed = parse_file(path, app).map(Arc::new);
+    let parsed = parse_file(path, app, settings).map(Arc::new);
     cache()
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
@@ -157,7 +159,7 @@ fn cached(path: &Path, app: &str) -> Option<Arc<Migration>> {
     parsed
 }
 
-fn parse_file(path: &Path, app: &str) -> Option<Migration> {
+fn parse_file(path: &Path, app: &str, settings: &Settings) -> Option<Migration> {
     let source = fs::read(path).ok()?;
     if !is_migration_source(&source) {
         return None;
@@ -170,7 +172,7 @@ fn parse_file(path: &Path, app: &str) -> Option<Migration> {
         Reader {
             source: &source,
             app,
-            variables: &[],
+            settings,
         },
     )
 }
