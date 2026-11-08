@@ -219,3 +219,31 @@ fn state_operations_given_as_a_class_variable_build_the_model() {
         ],
     );
 }
+
+const SWAPPABLE_USER: &str = r#"from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    operations = [
+        migrations.CreateModel(
+            name="User",
+            fields=[("id", models.AutoField(primary_key=True)), ("email", models.CharField(max_length=254))],
+            options={"swappable": "AUTH_USER_MODEL"},
+        ),
+        migrations.AlterField(model_name="user", name="email", field=models.CharField(max_length=320)),
+    ]
+"#;
+
+#[test]
+fn a_model_swapped_out_by_the_settings_emits_no_sql() {
+    let swapped = super::sql(
+        &MemoryLoader::default(),
+        "account",
+        "0001_initial",
+        SWAPPABLE_USER,
+    );
+    assert!(!swapped.contains("CREATE TABLE"), "{swapped}");
+    assert!(!swapped.contains("ALTER TABLE"), "{swapped}");
+    let active = super::sql(&MemoryLoader::default(), "auth", "0001_initial", SWAPPABLE_USER);
+    assert!(active.contains(r#"CREATE TABLE "auth_user""#), "{active}");
+}

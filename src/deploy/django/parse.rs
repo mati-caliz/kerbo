@@ -290,6 +290,10 @@ impl<'context> Scope<'context> {
                 "constraints" => model.constraints = constraints(value, self.source),
                 "managed" => model.managed = boolean(value) != Some(false),
                 "proxy" => model.proxy = boolean(value) == Some(true),
+                "swappable" => {
+                    model.swapped_for = text(value, self.source)
+                        .and_then(|setting| self.settings.replacement(&setting, &model.key));
+                }
                 _ => {}
             }
         }

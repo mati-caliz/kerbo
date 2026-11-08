@@ -61,6 +61,10 @@ impl Settings {
         settings
     }
 
+    pub fn replacement(&self, setting: &str, model: &ModelKey) -> Option<ModelKey> {
+        (setting == USER_MODEL_SETTING && self.user_model != *model).then(|| self.user_model.clone())
+    }
+
     pub fn number<'value>(&'value self, reference: &'value str) -> &'value str {
         reference
             .strip_prefix(SETTINGS_PREFIX)
@@ -183,6 +187,23 @@ CODE_LENGTH = 3
         assert_eq!(settings.number("settings.CODE_LENGTH"), "3");
         assert_eq!(settings.number("settings.INDENTED"), "settings.INDENTED");
         assert_eq!(settings.number("CODE_LENGTH"), "CODE_LENGTH");
+    }
+
+    #[test]
+    fn only_the_configured_user_model_survives_its_swappable_setting() {
+        let settings = Settings::default();
+        assert_eq!(
+            settings.replacement("AUTH_USER_MODEL", &ModelKey::new("auth", "user")),
+            None
+        );
+        assert_eq!(
+            settings.replacement("AUTH_USER_MODEL", &ModelKey::new("account", "user")),
+            Some(ModelKey::new("auth", "user"))
+        );
+        assert_eq!(
+            settings.replacement("OTHER_MODEL", &ModelKey::new("account", "user")),
+            None
+        );
     }
 
     #[test]

@@ -1637,9 +1637,9 @@ averiguó por qué osv-scanner no los informa.
     dependencias desde `uv.lock` y usa su `saleor.settings` (Django 5.2); 1.454 migraciones, 12 no
     se pueden convertir (`errores.txt`). Empezó en 501 diferencias y las variables de clase de
     `Migration` la bajaron a 360; los `settings` y los `default` tipados, a 200; el grafo de
-    dependencias, a 142. Ahora: squawk 4.385 avisos, kerbo 4.286, coinciden 4.209, 142 diferencias
-    por migración y regla; sentencia por sentencia (`dump.sh` + `diff.py`), 45 de 1.454
-    migraciones con SQL distinto (eran 131).
+    dependencias, a 142; el modelo reemplazado por `AUTH_USER_MODEL`, a 121. Ahora: squawk 4.385
+    avisos, kerbo 4.255, coinciden 4.209, 121 diferencias por migración y regla; sentencia por
+    sentencia (`dump.sh` + `diff.py`), 39 de 1.454 migraciones con SQL distinto (eran 131).
     kerbo ya lee de los `settings` del proyecto `AUTH_USER_MODEL`, `DEFAULT_AUTO_FIELD` y las
     constantes numéricas (`max_length=settings.X`); sin `settings` asume el `BigAutoField` de
     `startproject`. Sigue las operaciones guardadas en nombres del módulo o de la clase y las
@@ -1655,8 +1655,11 @@ averiguó por qué osv-scanner no los informa.
       Queda: tomar las apps de `INSTALLED_APPS` en vez de todas las carpetas con `migrations`
       (saleor tiene `tests`, que no está instalada) y que el grafo no se arme de nuevo por cada
       archivo.
-    - Las apps de terceros (`django_celery_beat`, `sites`, `contenttypes`) no se convierten, y
-      `auth/0001` saca de más.
+    - Hecho (2026-11-08): un modelo con `swappable` que los `settings` reemplazan (el `auth.User`
+      de saleor, que usa `account.User`) no saca SQL, como en Django; saleor `auth` pasó de 21
+      diferencias a 0. Sólo se entiende `AUTH_USER_MODEL`, el único `swappable` de Django.
+    - Las apps de terceros (`django_celery_beat`, `sites`, `contenttypes`) no se convierten:
+      sus migraciones no están en el corpus de saleor (vienen del paquete instalado).
     - `RenameModel` y `AlterModelTable` entre apps (`account/0072`, `permission/0001`) y los
       renombres de columna de product/0007, 0048 y 0072.
     - Los índices de `slug` de product/0001, 0017, 0195 y page/0029; product/0062, 0073, 0103 y

@@ -209,6 +209,7 @@ pub struct Model {
     pub constraints: Vec<Constraint>,
     pub managed: bool,
     pub proxy: bool,
+    pub swapped_for: Option<ModelKey>,
 }
 
 impl Model {
@@ -222,6 +223,7 @@ impl Model {
             constraints: Vec::new(),
             managed: true,
             proxy: false,
+            swapped_for: None,
         }
     }
 
@@ -232,7 +234,7 @@ impl Model {
     }
 
     pub const fn emits_sql(&self) -> bool {
-        self.managed && !self.proxy
+        self.managed && !self.proxy && self.swapped_for.is_none()
     }
 
     pub fn field(&self, name: &str) -> Option<&Field> {
