@@ -1569,9 +1569,13 @@ comilla de la f-string o con barra, una conversión que no sea `s`, `r` o `a`, n
 `{0}`). Paridad después: 106.635 coinciden, 6 faltan (los mismos de antes: 5 RUF100 y 1 PLE0307),
 0 de más. `test-python.sh` busca la imagen de Rust que hay en vez de una fija.
 
+Hecho (2026-11-07): ESLint 10.13 → 10.14 y typescript-eslint 8.72.0 → 8.72.1. La salida de ESLint
+sobre express, zod, react, vscode y juice-shop (88 reglas) es idéntica byte a byte a la de antes, así
+que no hubo nada que portar.
+
 - Pendientes:
-  - Subir lo atrasado al 2026-11-07, con `run_all.sh` antes y después de cada familia: ESLint 10.14,
-    typescript-eslint 8.72.1, squawk 2.71, tree-sitter 0.27.2 (parches y menores);
+  - Subir lo atrasado al 2026-11-07, con `run_all.sh` antes y después de cada familia: squawk 2.71,
+    tree-sitter 0.27.2 (parches y menores);
     TypeScript 7 y Django 6 (mayores, tanda propia). Checkstyle figura como 14 sin la menor medida.
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.

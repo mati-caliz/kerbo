@@ -55,7 +55,7 @@ antitrampa.
 | `no-empty`, `no-cond-assign`, `no-case-declarations` | bloques vacíos, asignaciones en condiciones y declaraciones sueltas en un `case` |
 | `no-debugger`, `no-duplicate-case`, `no-dupe-else-if`, `no-dupe-keys` | `debugger` (se arregla solo), casos, ramas y claves repetidas |
 
-Paridad, contra ESLint 10.13 y typescript-eslint 8.72: ninguna diferencia de más por archivo,
+Paridad, contra ESLint 10.14 y typescript-eslint 8.72: ninguna diferencia de más por archivo,
 línea, columna y regla en next.js, react, VS Code, zod y express (42.488 avisos en unos 30.000
 archivos). Faltan 587 avisos, todos de archivos que tree-sitter no entiende (varianza `in`/`out`,
 `let as`, `export type *`, escapes en tipos de template) o de `.js` con argumentos de tipo en

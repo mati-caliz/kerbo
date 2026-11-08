@@ -21,7 +21,7 @@ cited_as = "ruff {minor}"
 
 [tools.eslint]
 family = "ecmascript"
-version = "10.13.0"
+version = "10.14.0"
 latest = "npm:eslint"
 cited_as = "ESLint {minor}"
 
@@ -33,7 +33,7 @@ latest = "npm:@eslint/js"
 
 [tools.typescript-eslint]
 family = "ecmascript"
-version = "8.72.0"
+version = "8.72.1"
 latest = "npm:typescript-eslint"
 cited_as = "typescript-eslint {minor}"
 

@@ -55,7 +55,7 @@ and the anti-cheat flags the comment.
 | `no-empty`, `no-cond-assign`, `no-case-declarations` | empty blocks, assignments in conditions and loose declarations in a `case` |
 | `no-debugger`, `no-duplicate-case`, `no-dupe-else-if`, `no-dupe-keys` | `debugger` (fixes itself), repeated cases, branches and keys |
 
-Parity, against ESLint 10.13 and typescript-eslint 8.72: no extra difference by file, line, column
+Parity, against ESLint 10.14 and typescript-eslint 8.72: no extra difference by file, line, column
 and rule in next.js, react, VS Code, zod and express (42,488 problems in about 30,000 files). 587
 problems are missing, all from files tree-sitter does not understand (`in`/`out` variance,
 `let as`, `export type *`, escapes in template types) or from `.js` files with type arguments in
