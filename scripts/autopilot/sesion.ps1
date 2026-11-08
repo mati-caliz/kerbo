@@ -1,9 +1,7 @@
 ﻿<#
-Corre sesiones de Claude Code sin intervención (claude -p), una detrás de la otra, sobre la
-próxima etapa abierta del ROADMAP, y muestra en vivo lo que dice cada una y qué herramientas usa. Cada sesión arranca limpia con el pedido de pedido.md y, cuando
-termina su avance, se cierra sola y arranca la siguiente. Una etapa que termina sin commits se
-saltea en esta corrida; tres sesiones seguidas sin avanzar cortan el carril. El resumen de cada
-sesión queda en .parity\autopilot\registro\. Un archivo .parity\autopilot\STOP corta todo.
+Abre sesiones interactivas de Claude Code, una detrás de la otra, sobre la próxima etapa abierta
+del ROADMAP. Cada sesión arranca limpia con el pedido de pedido.md; cuando termina su avance,
+escribís /exit y se abre la siguiente. Un archivo .parity\autopilot\STOP corta todo.
 
   .\scripts\autopilot\sesion.ps1                      # carril principal, en la carpeta kerbo
   .\scripts\autopilot\sesion.ps1 -Carril b            # otro carril, en ..\kerbo-b
@@ -25,11 +23,7 @@ $Principal = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $Paridad = Join-Path $Principal '.parity'
 $Tomas = Join-Path $Paridad 'autopilot'
 $Parada = Join-Path $Tomas 'STOP'
-$Registro = Join-Path $Tomas 'registro'
-$EtapasExcluidas = [System.Collections.Generic.List[string]]@('10')
-$MaximoSesionesSinAvance = 3
-$SegundosParaCortarConCtrlC = 10
-$LargoMaximoDeHerramienta = 160
+$EtapasExcluidas = @('10')
 # Mecánico con arnés (versiones, tandas de reglas): Sonnet. Diseño con paridad: Opus en medio.
 # Investigación difícil (tipos, tests inteligentes): Opus en alto.
 $ModeloPorDefecto = 'opus'
@@ -37,7 +31,7 @@ $EsfuerzoPorDefecto = 'medium'
 $ModelosPorEtapa = @{ '17' = 'sonnet' }
 $EsfuerzosPorEtapa = @{ '16' = 'high'; '11' = 'high' }
 
-New-Item -ItemType Directory -Force $Tomas, $Registro | Out-Null
+New-Item -ItemType Directory -Force $Tomas | Out-Null
 # Los scripts de paridad buscan .parity en esta variable: los carriles no la copian ni la enlazan,
 # porque borrar un worktree con un enlace adentro borra también lo enlazado.
 $env:KERBO_PARITY = $Paridad
@@ -80,43 +74,7 @@ function Proxima-Etapa([string]$Carpeta) {
         Select-Object -First 1
 }
 
-function Commiteo-Desde([string]$Carpeta, [datetime]$Inicio) {
-    $Desde = $Inicio.ToString('yyyy-MM-ddTHH:mm:ss')
-    [bool](git -C $Carpeta log -g --format=%gs --since=$Desde HEAD | Where-Object { $_ -like 'commit*' })
-}
-
-function Recortar([string]$Texto) {
-    $Linea = ($Texto -replace '\s+', ' ').Trim()
-    if ($Linea.Length -le $LargoMaximoDeHerramienta) { return $Linea }
-    $Linea.Substring(0, $LargoMaximoDeHerramienta) + '…'
-}
-
-function Detalle-De-Herramienta($Entrada) {
-    foreach ($Campo in 'command', 'file_path', 'pattern', 'description', 'prompt') {
-        if ($Entrada.$Campo) { return Recortar $Entrada.$Campo }
-    }
-    ''
-}
-
-function Mostrar-Evento([string]$Linea, [string]$Resumen) {
-    try { $Evento = $Linea | ConvertFrom-Json } catch { Write-Host $Linea; return }
-    if ($Evento.type -eq 'assistant') {
-        foreach ($Bloque in $Evento.message.content) {
-            if ($Bloque.type -eq 'text') { Write-Host "`n$($Bloque.text)" }
-            elseif ($Bloque.type -eq 'tool_use') {
-                Write-Host "  > $($Bloque.name) $(Detalle-De-Herramienta $Bloque.input)" -ForegroundColor DarkGray
-            }
-        }
-    }
-    elseif ($Evento.type -eq 'result') {
-        Set-Content -Path $Resumen -Value $Evento.result -Encoding UTF8
-        $Minutos = [math]::Round($Evento.duration_ms / 60000)
-        Write-Host "`n== Sesión terminada en $Minutos min (resumen en $Resumen)" -ForegroundColor Cyan
-    }
-}
-
 $Carpeta = Carpeta-Del-Carril
-$SesionesSinAvance = 0
 while (-not (Test-Path $Parada)) {
     Al-Dia $Carpeta
     $Elegida = Proxima-Etapa $Carpeta
@@ -131,27 +89,11 @@ while (-not (Test-Path $Parada)) {
     if (-not $ElEsfuerzo) { $ElEsfuerzo = $EsfuerzoPorDefecto }
     $Mensaje = "Seguí la etapa $($Elegida.Numero) del ROADMAP ($($Elegida.Titulo)), carril $Carril. Leé scripts/autopilot/pedido.md y hacé lo que dice."
     Write-Host "== Etapa $($Elegida.Numero): $($Elegida.Titulo) | carril $Carril | $ElModelo, esfuerzo $ElEsfuerzo" -ForegroundColor Cyan
-    $Inicio = Get-Date
-    $Resumen = Join-Path $Registro ("{0:yyyy-MM-dd_HHmm}-etapa-{1}-{2}.txt" -f $Inicio, $Elegida.Numero, $Carril)
     Push-Location $Carpeta
-    try {
-        & claude -p --output-format stream-json --verbose --model $ElModelo --effort $ElEsfuerzo --permission-mode $Permisos --autocompact $Compactar -n "kerbo $($Elegida.Numero) ($Carril)" $Mensaje |
-            ForEach-Object { Mostrar-Evento $_ $Resumen }
-    }
+    try { & claude --model $ElModelo --effort $ElEsfuerzo --permission-mode $Permisos --autocompact $Compactar -n "kerbo $($Elegida.Numero) ($Carril)" $Mensaje }
     finally { Pop-Location; Remove-Item $Toma -ErrorAction SilentlyContinue }
-
-    if (Commiteo-Desde $Carpeta $Inicio) { $SesionesSinAvance = 0 }
-    else {
-        $SesionesSinAvance++
-        if (-not $Etapa) { $EtapasExcluidas.Add($Elegida.Numero) }
-        Write-Host "La etapa $($Elegida.Numero) terminó sin commits: no la retomo en esta corrida." -ForegroundColor Yellow
-    }
-    if ($SesionesSinAvance -ge $MaximoSesionesSinAvance) {
-        Write-Host "$MaximoSesionesSinAvance sesiones seguidas sin avanzar: corto el carril." -ForegroundColor Red
-        break
-    }
-    Write-Host "Otra sesión limpia en $SegundosParaCortarConCtrlC segundos (Ctrl+C para cortar)." -ForegroundColor DarkGray
-    Start-Sleep -Seconds $SegundosParaCortarConCtrlC
+    $Respuesta = Read-Host 'Enter: otra sesión limpia | q: salir'
+    if ($Respuesta -eq 'q') { break }
 }
 
 if ($Carril -ne 'principal' -and -not (git -C $Carpeta status --porcelain)) {
