@@ -198,7 +198,7 @@ without running it): 297 identical by rule and count, none with fewer reports, a
 reports on paths offline mode does not take (`is_offline_mode()` and a `try` that breaks offline).
 
 For Django, kerbo reads each migration's `operations` list and builds the SQL `sqlmigrate` would
-print for Postgres (Django 5.2): the model state comes from replaying the app's earlier migrations,
+print for Postgres (Django 6.1): the model state comes from replaying the app's earlier migrations,
 with foreign keys into other apps, the through tables of `ManyToManyField`, the `_like` indexes of
 `CharField` and names truncated with Django's hash. `RunSQL` contributes its own SQL and
 `SeparateDatabaseAndState` only its `database_operations`. Against squawk 2.71 on the real

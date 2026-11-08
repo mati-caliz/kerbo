@@ -84,7 +84,7 @@ cited_as = "squawk {minor}"
 
 [tools.django]
 family = "migrations"
-version = "5.2.8"
+version = "6.1.3"
 latest = "pypi:django"
 
 [tools.hadolint]

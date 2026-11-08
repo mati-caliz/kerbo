@@ -1590,8 +1590,13 @@ cast y `...`; lo demás lo cubre `WhitespaceAround`), y kerbo dejó de avisarlos
 commons-lang: 10.070 avisos coinciden (4.622 y 5.448), 0 de menos, 0 de más (sin las reglas de Javadoc, `LineLength`,
 `Indentation`, `MagicNumber` y los largos, que kerbo no calca o mide con otro umbral).
 
+Hecho (2026-11-08): Django 5.2.8 → 6.1.3. `sqlmigrate` de 6.1.3 sobre las 23 migraciones de
+`django.contrib` da el mismo resultado para squawk: 89 de 89 avisos coinciden, 0 de más, 0 de
+menos, sin cambios en kerbo.
+
 - Pendientes:
-  - Subir lo atrasado al 2026-11-08: TypeScript 7 y Django 6 (mayores, tanda propia).
+  - TypeScript 7 (7.0.2): bloqueado, typescript-eslint 8.72.1 declara `typescript <6.1.0`. Se sube
+    cuando typescript-eslint lo soporte, o junto con tsrs (etapas 11 y 16).
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.
   - Los arneses de hadolint, gitleaks y osv-scanner no quedaron en el repo (se perdieron

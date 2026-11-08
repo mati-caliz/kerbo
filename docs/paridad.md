@@ -199,7 +199,7 @@ más en caminos que el modo offline no recorre (`is_offline_mode()` y un `try` q
 corta).
 
 En Django se lee la lista `operations` de cada migración y se arma el SQL que daría `sqlmigrate`
-para Postgres (Django 5.2): el estado de los modelos sale de reproducir las migraciones anteriores
+para Postgres (Django 6.1): el estado de los modelos sale de reproducir las migraciones anteriores
 de cada app, con las claves foráneas a otras apps, las tablas intermedias de los `ManyToManyField`,
 los índices `_like` de los `CharField` y los nombres truncados con el hash de Django. `RunSQL` aporta
 su propio SQL y `SeparateDatabaseAndState` sólo lo de `database_operations`. Contra squawk 2.71
