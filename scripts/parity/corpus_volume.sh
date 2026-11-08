@@ -15,6 +15,6 @@ stored="$(MSYS_NO_PATHCONV=1 docker run --rm -v "$volume:/to" "$HELPER_IMAGE" ca
 if [ "$stored" != "$key" ]; then
   echo "copiando $folder al volumen $volume" >&2
   MSYS_NO_PATHCONV=1 docker run --rm --cpus=2 -v "$(cd "$folder" && pwd -W):/from:ro" -v "$volume:/to" \
-    -e KEY="$key" "$HELPER_IMAGE" sh -c 'find /to -mindepth 1 -delete && cp -a /from/. /to/ && echo "$KEY" > /to/.clave'
+    -e KEY="$key" "$HELPER_IMAGE" sh -c 'find /to -mindepth 1 -delete && cp -a /from/. /to/ 2>/dev/null; echo "$KEY" > /to/.clave'
 fi
 echo "$volume"

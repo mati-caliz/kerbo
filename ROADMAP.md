@@ -1594,12 +1594,18 @@ Hecho (2026-11-08): Django 5.2.8 → 6.1.3. `sqlmigrate` de 6.1.3 sobre las 23 m
 `django.contrib` da el mismo resultado para squawk: 89 de 89 avisos coinciden, 0 de más, 0 de
 menos, sin cambios en kerbo.
 
+Hecho (2026-11-08): arnés de gitleaks 8.30.1 en `scripts/parity/secrets/` (entra en `run_all.sh`
+como familia `secrets`): gitleaks en docker con la configuración de `src/secrets/gitleaks.toml`, sin
+historia ni `.gitleaksignore`, contra kerbo en 15 repos de `corpus.toml`, por archivo, línea y regla
+(los hallazgos de archivo entero cuentan como línea 1). Paridad: 2.323 de 2.323, 0 de menos, 0 de más.
+`corpus_volume.sh` ya no falla por los enlaces del corpus que `cp` no puede crear en el volumen.
+
 - Pendientes:
   - TypeScript 7 (7.0.2): bloqueado, typescript-eslint 8.72.1 declara `typescript <6.1.0`. Se sube
     cuando typescript-eslint lo soporte, o junto con tsrs (etapas 11 y 16).
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.
-  - Los arneses de hadolint, gitleaks y osv-scanner no quedaron en el repo (se perdieron
+  - Los arneses de hadolint y osv-scanner no quedaron en el repo (se perdieron
     con los scratchpads): hay que rearmarlos en `scripts/parity/` para que entren en `run_all.sh`.
   - Cuando entre tsrs (etapas 11 y 16), su commit y la versión de TypeScript que sigue van en
     `versions.toml`.
