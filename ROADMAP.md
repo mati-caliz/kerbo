@@ -1618,19 +1618,35 @@ historia ni `.gitleaksignore`, contra kerbo en 15 repos de `corpus.toml`, por ar
   - Saleor medido (2026-11-08, commit en `corpus.toml`): `reference.sh saleor` instala sus
     dependencias desde `uv.lock` y usa su `saleor.settings` (Django 5.2); 1.454 migraciones, 12 no
     se pueden convertir (`errores.txt`). Empezó en 501 diferencias y las variables de clase de
-    `Migration` la bajaron a 360. Ahora: squawk 4.385 avisos, kerbo 4.285, coinciden 4.174, 200
-    diferencias por migración y regla; sentencia por sentencia (`dump.sh` + `diff.py`), 131 de
-    1.454 migraciones con SQL distinto. kerbo ya lee de los `settings` del proyecto
-    `AUTH_USER_MODEL`, `DEFAULT_AUTO_FIELD` y las constantes numéricas (`max_length=settings.X`);
-    sin `settings` asume el `BigAutoField` de `startproject`. Sigue las operaciones guardadas en
-    nombres del módulo o de la clase y las listas concatenadas, y escribe los `default` como los
-    recibe Postgres (`jsonb`, `uuid`, fechas, `Decimal`). Lo que falta, por frecuencia:
-    `AlterField` de nulo a no nulo (`SET CONSTRAINTS` y `DROP NOT NULL` de más) y con `DEFAULT`
-    más `UPDATE`; `GinIndex` y `opclasses`; `ALTER TYPE` de `varchar` y el `ALTER TYPE integer
-    USING` de más; las expresiones reales de `check` y `condition` (hoy `true`); `to_field` en
-    las claves foráneas; `RenameModel` y `AlterModelTable` entre apps; `CryptoExtension`; los
-    `RunSQL` con `do $$`; `UNIQUE NULLS NOT DISTINCT`; el `DROP TABLE` de las tablas
-    intermedias; los `default` de `interval`.
+    `Migration` la bajaron a 360; los `settings` y los `default` tipados, a 200. Ahora: squawk
+    4.385 avisos, kerbo 4.307, coinciden 4.196, 180 diferencias por migración y regla; sentencia
+    por sentencia (`dump.sh` + `diff.py`), 74 de 1.454 migraciones con SQL distinto (eran 131).
+    kerbo ya lee de los `settings` del proyecto `AUTH_USER_MODEL`, `DEFAULT_AUTO_FIELD` y las
+    constantes numéricas (`max_length=settings.X`); sin `settings` asume el `BigAutoField` de
+    `startproject`. Sigue las operaciones guardadas en nombres del módulo o de la clase y las
+    listas concatenadas, y escribe los `default` como los recibe Postgres (`jsonb`, `uuid`,
+    fechas, `Decimal`, `interval`, arrays, `os.environ.get`). Traduce los `Q` de `check` y
+    `condition` a SQL como `WhereNode` (`exact`, `gt`/`gte`/`lt`/`lte`, `isnull`, `in`, `~`, `&`,
+    `|`; lo que no entiende sigue saliendo `true`), escribe `NULLS [NOT] DISTINCT` y las
+    `CreateExtension`. Lo que falta, por frecuencia:
+    - El estado de las apps relacionadas: `history.rs` (`load_related_apps`) reproduce todas las
+      migraciones en vez de sólo los ancestros de la que se convierte, así que las claves
+      foráneas ven el tipo final (`uuid` en vez de `integer`), el `to_field` final y los nombres
+      de tabla viejos ya renombrados. Es la mayoría de lo que queda (account, discount, invoice,
+      payment, warehouse, product/0169).
+    - Las apps de terceros (`django_celery_beat`, `sites`, `contenttypes`) no se convierten, y
+      `auth/0001` saca de más.
+    - `RenameModel` y `AlterModelTable` entre apps (`account/0072`, `permission/0001`) y los
+      renombres de columna de product/0007, 0048 y 0072.
+    - `DROP NOT NULL` de más en checkout/0075 y order/0196; los índices de `slug` de
+      product/0017, 0195 y page/0029; product/0062, 0073, 0103 y 0113; el orden de las columnas
+      `jsonb` de checkout/0001.
+    - Los `default` invocables del proyecto (`get_default_country`, `zero_weight`,
+      `partial(get_random_string)`).
+    - Las migraciones con `atomic = False` y `RunSQL` de `CREATE INDEX CONCURRENTLY` (webhook/0014,
+      product/0196 y parecidas): el SQL coincide, pero squawk avisa distinto
+      (`ban-concurrent-index-creation-in-transaction`, `prefer-robust-stmts`); ver si kerbo marca
+      la migración como dentro de una transacción.
   - El `CASCADE` de `DROP COLUMN` depende de la versión: Django 6 lo sacó y kerbo lo pone siempre
     (en `django.contrib`, con Django 6.1, una sola sentencia distinta; no cambia los avisos). Leer
     la versión de Django del proyecto (`pyproject.toml`, `uv.lock`, `requirements`).

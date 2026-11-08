@@ -96,7 +96,7 @@ impl State {
                     self.apply(app, &located.operation);
                 }
             }
-            Operation::RunSql(_) => {}
+            Operation::RunSql(_) | Operation::CreateExtension(_) => {}
             Operation::AddField { model, .. }
             | Operation::RemoveField { model, .. }
             | Operation::AlterField { model, .. }
@@ -170,6 +170,7 @@ fn change(model: &mut Model, operation: &Operation) {
         | Operation::DeleteModel(_)
         | Operation::RenameModel { .. }
         | Operation::RunSql(_)
+        | Operation::CreateExtension(_)
         | Operation::Separate { .. } => {}
     }
 }

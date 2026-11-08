@@ -1,12 +1,15 @@
 use tree_sitter::Node;
 
+use super::condition::Condition;
 use super::model::{Constraint, ConstraintKind, Index};
-use super::values::{elements, is_sequence, strings, text};
+use super::values::{boolean, elements, is_sequence, strings, text};
 use crate::deploy::python_calls::Call;
 
 const UNIQUE_CONSTRAINT: &str = "UniqueConstraint";
 const CHECK_CONSTRAINT: &str = "CheckConstraint";
-const INDEX_ONLY_UNIQUE_KEYWORDS: &[&str] = &["condition", "include", "opclasses", "nulls_distinct"];
+const INDEX_ONLY_UNIQUE_KEYWORDS: &[&str] = &["condition", "include", "opclasses"];
+const NULLS_DISTINCT: &str = "nulls_distinct";
+const CHECK_KEYWORDS: &[&str] = &["condition", "check"];
 const CONDITION: &str = "condition";
 const EXPRESSION_PLACEHOLDER: &str = "(true)";
 const OPERATOR_CLASSES: &str = "opclasses";
@@ -53,7 +56,7 @@ pub fn index(node: Node<'_>, source: &[u8]) -> Option<Index> {
     Some(Index {
         name,
         fields,
-        conditional: call.keyword(CONDITION).is_some(),
+        condition: parsed_condition(&call, source),
         method: INDEX_METHODS
             .iter()
             .find(|(class, _)| *class == call.method)
@@ -78,14 +81,25 @@ pub fn constraint(node: Node<'_>, source: &[u8]) -> Option<Constraint> {
             ConstraintKind::Unique {
                 fields,
                 by_index,
-                conditional: call.keyword(CONDITION).is_some(),
+                condition: parsed_condition(&call, source),
                 opclasses: operator_classes(&call, source),
+                nulls_distinct: call.keyword(NULLS_DISTINCT).and_then(boolean),
             }
         }
-        CHECK_CONSTRAINT => ConstraintKind::Check,
+        CHECK_CONSTRAINT => ConstraintKind::Check {
+            condition: CHECK_KEYWORDS
+                .iter()
+                .find_map(|keyword| call.keyword(keyword))
+                .map_or_else(Condition::opaque, |value| Condition::parse(value, source)),
+        },
         _ => return None,
     };
     Some(Constraint { name, kind })
+}
+
+fn parsed_condition(call: &Call<'_>, source: &[u8]) -> Option<Condition> {
+    call.keyword(CONDITION)
+        .map(|value| Condition::parse(value, source))
 }
 
 fn operator_classes(call: &Call<'_>, source: &[u8]) -> Vec<String> {

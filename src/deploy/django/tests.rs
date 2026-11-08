@@ -264,9 +264,12 @@ fn sql(loader: &MemoryLoader, app: &str, stem: &str, source: &str) -> String {
     dispatch::sql(&parsed_migration, app, &mut state)
 }
 
-const TYPED_DEFAULTS: &str = r#"from decimal import Decimal
+const TYPED_DEFAULTS: &str = r#"from datetime import timedelta
+from decimal import Decimal
+import os
 import uuid
 
+from django.contrib.postgres.fields import ArrayField
 from django.db import migrations, models
 from django.utils import timezone
 
@@ -282,6 +285,11 @@ class Migration(migrations.Migration):
             name="balance",
             field=models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("0.0")),
         ),
+        migrations.AddField(model_name="site", name="grace", field=models.DurationField(default=timedelta(days=1, minutes=30))),
+        migrations.AddField(model_name="site", name="limit", field=models.IntegerField(default=Decimal(5))),
+        migrations.AddField(model_name="site", name="region", field=models.TextField(default=os.environ.get("REGION", "ar"))),
+        migrations.AddField(model_name="site", name="codes", field=ArrayField(models.TextField(), size=3, default=list)),
+        migrations.AddField(model_name="site", name="extra", field=models.JSONField(db_default={})),
     ]
 "#;
 
@@ -295,6 +303,77 @@ fn defaults_are_rendered_with_the_type_postgres_receives() {
         "\"token\" uuid DEFAULT '00000000000000000000000000000000'::uuid NOT NULL",
         "\"created\" timestamp with time zone DEFAULT '2000-01-01 00:00:00+00:00'::timestamptz NOT NULL",
         "\"balance\" numeric(12, 3) DEFAULT 0.0 NOT NULL",
+        "\"grace\" interval DEFAULT '1 day 0:30:00'::interval NOT NULL",
+        "\"limit\" integer DEFAULT 5 NOT NULL",
+        "\"region\" text DEFAULT 'ar' NOT NULL",
+        "\"codes\" text[3] DEFAULT '{}' NOT NULL",
+        "\"extra\" jsonb DEFAULT '{}'::jsonb NOT NULL",
+    ] {
+        assert!(rendered.contains(expected), "falta {expected} en {rendered}");
+    }
+}
+
+const CONDITIONS: &str = r#"from decimal import Decimal
+
+from django.contrib.postgres.operations import CreateExtension, TrigramExtension
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    operations = [
+        TrigramExtension(),
+        CreateExtension("citext"),
+        migrations.AddField(model_name="site", name="active", field=models.BooleanField(default=True)),
+        migrations.AddField(model_name="site", name="rank", field=models.IntegerField(null=True)),
+        migrations.AddField(
+            model_name="site",
+            name="parent",
+            field=models.ForeignKey(null=True, on_delete=models.CASCADE, to="sites.site"),
+        ),
+        migrations.AddConstraint(
+            model_name="site",
+            constraint=models.CheckConstraint(
+                condition=models.Q(rank__gte=0) & models.Q(rank__lte=Decimal("10")), name="rank_range"
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name="site",
+            constraint=models.UniqueConstraint(fields=["domain"], condition=~models.Q(active=True), name="inactive_domain"),
+        ),
+        migrations.AddConstraint(
+            model_name="site",
+            constraint=models.UniqueConstraint(
+                fields=["name"], condition=models.Q(rank__in=[1, 2, 2, None]) | models.Q(parent=None), name="ranked_name"
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name="site",
+            constraint=models.CheckConstraint(check=~models.Q(rank=5), name="not_five"),
+        ),
+        migrations.AddConstraint(
+            model_name="site",
+            constraint=models.UniqueConstraint(fields=["domain", "name"], nulls_distinct=False, name="pair"),
+        ),
+        migrations.AddConstraint(
+            model_name="site",
+            constraint=models.CheckConstraint(check=models.Q(domain__startswith="www"), name="opaque_lookup"),
+        ),
+    ]
+"#;
+
+#[test]
+fn conditions_extensions_and_nulls_distinct_render_like_django() {
+    let loader = MemoryLoader::default().with("sites", "0001_initial", SITES_INITIAL);
+    let rendered = sql(&loader, "sites", "0002_conditions", CONDITIONS);
+    for expected in [
+        "CREATE EXTENSION IF NOT EXISTS \"pg_trgm\"",
+        "CREATE EXTENSION IF NOT EXISTS \"citext\"",
+        "ADD CONSTRAINT \"rank_range\" CHECK ((\"rank\" >= 0 AND \"rank\" <= 10))",
+        "CREATE UNIQUE INDEX \"inactive_domain\" ON \"django_site\" (\"domain\") WHERE NOT (\"active\")",
+        "CREATE UNIQUE INDEX \"ranked_name\" ON \"django_site\" (\"name\") WHERE (\"rank\" IN (1, 2) OR \"parent_id\" IS NULL)",
+        "ADD CONSTRAINT \"not_five\" CHECK (NOT (\"rank\" = 5 AND \"rank\" IS NOT NULL))",
+        "ADD CONSTRAINT \"pair\" UNIQUE NULLS NOT DISTINCT (\"domain\", \"name\")",
+        "ADD CONSTRAINT \"opaque_lookup\" CHECK (true)",
     ] {
         assert!(rendered.contains(expected), "falta {expected} en {rendered}");
     }

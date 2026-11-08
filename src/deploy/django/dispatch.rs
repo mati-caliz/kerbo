@@ -1,5 +1,5 @@
 use super::alter::{FieldChange, alter_field as alter_column};
-use super::deferred::{IndexKind, Kind, Statement};
+use super::deferred::{IndexKind, Kind, Statement, nulls_clause};
 use super::model::{Constraint, ConstraintKind, Model, ModelKey};
 use super::names::quoted;
 use super::operations::{Located, Migration, Operation};
@@ -96,6 +96,9 @@ fn render(editor: &mut Editor, context: Context<'_>, operation: &Operation) {
                 editor.execute_raw(&chunk.sql, chunk.line);
             }
         }
+        Operation::CreateExtension(name) => {
+            editor.execute(&format!("CREATE EXTENSION IF NOT EXISTS {}", quoted(name)));
+        }
         Operation::RenameModel { old, new } => rename_model(editor, context, old, new),
         Operation::AlterModelTable { model, .. } => rename_model(editor, context, model, model),
         Operation::AddField { .. }
@@ -159,6 +162,7 @@ fn render_field(editor: &mut Editor, context: Context<'_>, operation: &Operation
         | Operation::AddConstraint { .. }
         | Operation::RemoveConstraint { .. }
         | Operation::RunSql(_)
+        | Operation::CreateExtension(_)
         | Operation::Separate { .. } => {}
     }
 }
@@ -233,6 +237,7 @@ fn render_meta(editor: &mut Editor, context: Context<'_>, operation: &Operation)
         | Operation::AlterModelTable { .. }
         | Operation::AlterManaged { .. }
         | Operation::RunSql(_)
+        | Operation::CreateExtension(_)
         | Operation::Separate { .. } => {}
     }
 }
@@ -256,18 +261,26 @@ fn add_constraint(editor: &mut Editor, owner: &Model, constraint: &Constraint) {
     let name = quoted(&constraint.name);
     match &constraint.kind {
         ConstraintKind::Unique { by_index: true, .. } => editor.run(&unique_index(owner, constraint)),
-        ConstraintKind::Unique { fields, .. } => {
+        ConstraintKind::Unique {
+            fields,
+            nulls_distinct,
+            ..
+        } => {
             let columns = columns_of(owner, fields)
                 .iter()
                 .map(|column| quoted(column))
                 .collect::<Vec<_>>()
                 .join(", ");
             editor.execute(&format!(
-                "ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE ({columns})"
+                "ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE{} ({columns})",
+                nulls_clause(*nulls_distinct)
             ));
         }
-        ConstraintKind::Check => {
-            editor.execute(&format!("ALTER TABLE {table} ADD CONSTRAINT {name} CHECK (true)"));
+        ConstraintKind::Check { condition } => {
+            editor.execute(&format!(
+                "ALTER TABLE {table} ADD CONSTRAINT {name} CHECK ({})",
+                condition.render(owner)
+            ));
         }
     }
 }

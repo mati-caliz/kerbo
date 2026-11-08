@@ -18,6 +18,17 @@ const ADD_FIELD: &str = "AddField";
 const IDENTIFIER: &str = "identifier";
 const CONCATENATION: &str = "binary_operator";
 const MAX_ALIAS_DEPTH: usize = 8;
+const GENERIC_EXTENSION: &str = "CreateExtension";
+const NAMED_EXTENSIONS: &[(&str, &str)] = &[
+    ("BloomExtension", "bloom"),
+    ("BtreeGinExtension", "btree_gin"),
+    ("BtreeGistExtension", "btree_gist"),
+    ("CITextExtension", "citext"),
+    ("CryptoExtension", "pgcrypto"),
+    ("HStoreExtension", "hstore"),
+    ("TrigramExtension", "pg_trgm"),
+    ("UnaccentExtension", "unaccent"),
+];
 
 #[derive(Debug, Clone, Copy)]
 pub struct Reader<'context> {
@@ -173,6 +184,7 @@ impl<'context> Scope<'context> {
             }),
             "AlterModelOptions" => self.alter_options(call),
             "RunSQL" => self.run_sql(call),
+            GENERIC_EXTENSION => string_argument(call, 0, "name").map(Operation::CreateExtension),
             "SeparateDatabaseAndState" => Some(Operation::Separate {
                 database: argument(call, 0, "database_operations")
                     .map(|node| self.operations(node))
@@ -181,7 +193,11 @@ impl<'context> Scope<'context> {
                     .map(|node| self.operations(node))
                     .unwrap_or_default(),
             }),
-            _ => self.index_operation(call),
+            method => NAMED_EXTENSIONS
+                .iter()
+                .find(|(class, _)| *class == method)
+                .map(|(_, name)| Operation::CreateExtension((*name).to_owned()))
+                .or_else(|| self.index_operation(call)),
         }
     }
 

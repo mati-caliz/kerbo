@@ -67,6 +67,7 @@ pub enum Operation {
         name: String,
     },
     RunSql(Vec<SqlChunk>),
+    CreateExtension(String),
     Separate {
         database: Vec<Located>,
         state: Vec<Located>,

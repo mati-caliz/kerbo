@@ -1,7 +1,7 @@
 use std::mem;
 
 use super::columns::{check, definition, effective_default, has_like_index, identity, like_operator_class};
-use super::deferred::{IndexColumn, IndexKind, Kind, Statement, foreign_key_name};
+use super::deferred::{IndexColumn, IndexKind, Kind, Statement, foreign_key_name, nulls_clause};
 use super::model::{Constraint, ConstraintKind, Field, Index, Model};
 use super::names::quoted;
 use super::state::State;
@@ -148,11 +148,18 @@ impl Editor {
                 self.defer(unique_index(model, constraint));
                 None
             }
-            ConstraintKind::Unique { fields, .. } => Some(format!(
-                "CONSTRAINT {name} UNIQUE ({})",
+            ConstraintKind::Unique {
+                fields,
+                nulls_distinct,
+                ..
+            } => Some(format!(
+                "CONSTRAINT {name} UNIQUE{} ({})",
+                nulls_clause(*nulls_distinct),
                 quoted_columns(&columns_of(model, fields))
             )),
-            ConstraintKind::Check => Some(format!("CONSTRAINT {name} CHECK (true)")),
+            ConstraintKind::Check { condition } => {
+                Some(format!("CONSTRAINT {name} CHECK ({})", condition.render(model)))
+            }
         }
     }
 
@@ -299,18 +306,20 @@ pub fn named_index(model: &Model, index: &Index, kind: IndexKind) -> Statement {
         kind: Kind::Named {
             name: index.name.clone(),
             kind,
-            conditional: index.conditional,
+            condition: index.condition.as_ref().map(|condition| condition.render(model)),
+            nulls_distinct: None,
             method: index.method,
         },
     }
 }
 
 pub fn unique_index(model: &Model, constraint: &Constraint) -> Statement {
-    let (fields, conditional, opclasses) = match &constraint.kind {
+    let (fields, condition, opclasses, nulls) = match &constraint.kind {
         ConstraintKind::Unique {
             fields,
-            conditional,
+            condition,
             opclasses,
+            nulls_distinct,
             ..
         } => (
             if fields.is_empty() {
@@ -318,20 +327,25 @@ pub fn unique_index(model: &Model, constraint: &Constraint) -> Statement {
             } else {
                 fields.clone()
             },
-            *conditional,
+            condition.clone(),
             opclasses.clone(),
+            *nulls_distinct,
         ),
-        ConstraintKind::Check => (vec![EXPRESSION_PLACEHOLDER.to_owned()], false, Vec::new()),
+        ConstraintKind::Check { .. } => (vec![EXPRESSION_PLACEHOLDER.to_owned()], None, Vec::new(), None),
     };
-    named_index(
+    let mut statement = named_index(
         model,
         &Index {
             name: constraint.name.clone(),
             fields,
-            conditional,
+            condition,
             method: None,
             opclasses,
         },
         IndexKind::Unique,
-    )
+    );
+    if let Kind::Named { nulls_distinct, .. } = &mut statement.kind {
+        *nulls_distinct = nulls;
+    }
+    statement
 }

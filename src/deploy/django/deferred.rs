@@ -69,7 +69,8 @@ pub enum Kind {
     Named {
         name: String,
         kind: IndexKind,
-        conditional: bool,
+        condition: Option<String>,
+        nulls_distinct: Option<bool>,
         method: Option<&'static str>,
     },
 }
@@ -135,7 +136,8 @@ impl Statement {
             Kind::Named {
                 name,
                 kind,
-                conditional,
+                condition,
+                nulls_distinct,
                 method,
             } => {
                 let create = match kind {
@@ -143,12 +145,16 @@ impl Statement {
                     IndexKind::Unique => "CREATE UNIQUE INDEX",
                     IndexKind::Concurrent => "CREATE INDEX CONCURRENTLY",
                 };
-                let condition = if *conditional { " WHERE true" } else { "" };
+                let nulls = nulls_clause(*nulls_distinct);
+                let condition = condition
+                    .as_ref()
+                    .map(|sql| format!(" WHERE {sql}"))
+                    .unwrap_or_default();
                 let using = method
                     .map(|method| format!(" USING {method}"))
                     .unwrap_or_default();
                 format!(
-                    "{create} {} ON {table}{using} ({columns}){condition}",
+                    "{create} {} ON {table}{using} ({columns}){nulls}{condition}",
                     quoted(name)
                 )
             }
@@ -196,4 +202,12 @@ pub fn foreign_key_name(table: &str, columns: &[&str], to_table: &str, to_column
 
 pub fn like_index_name(table: &str, column: &str) -> String {
     index_name(table, &[column], LIKE_SUFFIX)
+}
+
+pub const fn nulls_clause(nulls_distinct: Option<bool>) -> &'static str {
+    match nulls_distinct {
+        Some(true) => " NULLS DISTINCT",
+        Some(false) => " NULLS NOT DISTINCT",
+        None => "",
+    }
 }

@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use super::condition::Condition;
 use super::names::truncated_table;
 
 const COLUMN_SUFFIX: &str = "_id";
@@ -42,6 +43,7 @@ pub enum Class {
     Decimal,
     Uuid,
     Json,
+    SanitizedJson,
     Inet,
     Duration,
     HStore,
@@ -91,6 +93,7 @@ pub struct Field {
     pub max_length: Option<String>,
     pub max_digits: Option<String>,
     pub decimal_places: Option<String>,
+    pub size: Option<String>,
     pub default: FieldDefault,
     pub db_default: Option<String>,
     pub db_column: Option<String>,
@@ -107,6 +110,7 @@ impl Field {
             max_length: None,
             max_digits: None,
             decimal_places: None,
+            size: None,
             default: FieldDefault::Unset,
             db_default: None,
             db_column: None,
@@ -170,7 +174,7 @@ impl Field {
 pub struct Index {
     pub name: String,
     pub fields: Vec<String>,
-    pub conditional: bool,
+    pub condition: Option<Condition>,
     pub method: Option<&'static str>,
     pub opclasses: Vec<String>,
 }
@@ -180,10 +184,13 @@ pub enum ConstraintKind {
     Unique {
         fields: Vec<String>,
         by_index: bool,
-        conditional: bool,
+        condition: Option<Condition>,
         opclasses: Vec<String>,
+        nulls_distinct: Option<bool>,
     },
-    Check,
+    Check {
+        condition: Condition,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
