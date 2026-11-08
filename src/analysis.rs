@@ -165,7 +165,7 @@ pub fn analyze_unit(
             .get(RuleId::DuplicateCode)
             .and_then(|limit| duplicate_units(root, source, profile.duplicates, limit)),
         violations: if language == Language::Python {
-            deploy::alembic_violations(root, source)
+            deploy::migration_violations(root, source, unit.path)
         } else {
             Vec::new()
         },

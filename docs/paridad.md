@@ -198,6 +198,14 @@ levantarla): 297 idénticas por regla y cantidad, ninguna con avisos de menos, y
 más en caminos que el modo offline no recorre (`is_offline_mode()` y un `try` que en offline se
 corta).
 
+En Django se lee la lista `operations` de cada migración y se arma el SQL que daría `sqlmigrate`
+para Postgres (Django 5.2): el estado de los modelos sale de reproducir las migraciones anteriores
+de cada app, con las claves foráneas a otras apps, las tablas intermedias de los `ManyToManyField`,
+los índices `_like` de los `CharField` y los nombres truncados con el hash de Django. `RunSQL` aporta
+su propio SQL y `SeparateDatabaseAndState` sólo lo de `database_operations`. Contra squawk 2.71
+sobre el `sqlmigrate` real de las 23 migraciones de `django.contrib`: los 89 avisos, por archivo,
+regla y cantidad, ninguno de más (`scripts/parity/django/`).
+
 **Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` y `*.Dockerfile`, contra
 [hadolint](https://github.com/hadolint/hadolint): todas las reglas DL que hadolint trae prendidas
 (59), con su código como nombre (`kerbo explain DL3008`). El shell de cada `RUN` se lee con un

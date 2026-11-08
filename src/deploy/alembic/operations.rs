@@ -1,6 +1,6 @@
 use tree_sitter::Node;
 
-use super::calls::{Call, string_value};
+use super::super::python_calls::{Call, string_value};
 use super::render::{Constants, column, default_sql, quoted, render_column, type_sql};
 use super::tables;
 use crate::syntax::named_children;

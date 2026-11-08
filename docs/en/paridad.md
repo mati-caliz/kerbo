@@ -197,6 +197,14 @@ and redash; the other 349 import the application or query the database and canno
 without running it): 297 identical by rule and count, none with fewer reports, and two with extra
 reports on paths offline mode does not take (`is_offline_mode()` and a `try` that breaks offline).
 
+For Django, kerbo reads each migration's `operations` list and builds the SQL `sqlmigrate` would
+print for Postgres (Django 5.2): the model state comes from replaying the app's earlier migrations,
+with foreign keys into other apps, the through tables of `ManyToManyField`, the `_like` indexes of
+`CharField` and names truncated with Django's hash. `RunSQL` contributes its own SQL and
+`SeparateDatabaseAndState` only its `database_operations`. Against squawk 2.71 on the real
+`sqlmigrate` output of the 23 `django.contrib` migrations: all 89 reports, by file, rule and count,
+none extra (`scripts/parity/django/`).
+
 **Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` and `*.Dockerfile`, against
 [hadolint](https://github.com/hadolint/hadolint): every DL rule hadolint ships turned on (59),
 named by their code (`kerbo explain DL3008`). The shell of each `RUN` goes through an in-house

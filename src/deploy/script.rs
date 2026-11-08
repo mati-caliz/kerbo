@@ -1,5 +1,5 @@
-use super::super::Violation;
-use super::super::sql;
+use super::Violation;
+use super::sql;
 
 const STATEMENT_END: &str = ";\n";
 const BEGIN: &str = "BEGIN";
@@ -23,12 +23,16 @@ pub struct Script {
 
 impl Script {
     pub fn new() -> Self {
-        let mut script = Self {
-            text: String::new(),
-            origins: Vec::new(),
-        };
+        let mut script = Self::without_transaction();
         script.push(BEGIN, Origin::Synthetic);
         script
+    }
+
+    pub const fn without_transaction() -> Self {
+        Self {
+            text: String::new(),
+            origins: Vec::new(),
+        }
     }
 
     pub fn push(&mut self, sql: &str, origin: Origin) {
@@ -54,7 +58,7 @@ impl Script {
         self.push(BEGIN, Origin::Synthetic);
     }
 
-    pub fn violations(mut self, first_revision: bool) -> Vec<Violation> {
+    pub fn alembic_violations(mut self, first_revision: bool) -> Vec<Violation> {
         self.push(
             if first_revision {
                 FIRST_VERSION
@@ -64,6 +68,10 @@ impl Script {
             Origin::Synthetic,
         );
         self.push(COMMIT, Origin::Synthetic);
+        self.finish()
+    }
+
+    pub fn finish(self) -> Vec<Violation> {
         sql::violations(&self.text, 1)
             .into_iter()
             .filter_map(|mut violation| {

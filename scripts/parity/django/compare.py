@@ -1,0 +1,62 @@
+"""kerbo (out/<repo>.json) contra squawk sobre el SQL de `sqlmigrate` (.parity/django/<repo>/squawk.json).
+
+Se compara por migración, regla y cantidad de avisos: squawk marca líneas del SQL generado y kerbo las
+de la operación que lo genera, así que la línea no se puede cruzar.
+
+Uso: python compare.py <repo>
+     python compare.py --apps-root <repo>
+"""
+import collections
+import json
+import os
+import pathlib
+import sys
+
+HERE = pathlib.Path(__file__).resolve().parent
+REPO = HERE.parent.parent.parent
+PARITY = pathlib.Path(os.environ.get("KERBO_PARITY", REPO / ".parity"))
+APPS_ROOTS = {"django": "django/django/contrib"}
+REFERENCE_PREFIX = "/out/"
+MIGRATIONS_DIRECTORY = "migrations"
+
+
+def reference(repo):
+    counts = collections.Counter()
+    for warning in json.loads((PARITY / "django" / repo / "squawk.json").read_text(encoding="utf-8")):
+        app, name = warning["file"].removeprefix(REFERENCE_PREFIX).split("/")
+        counts[(f"{app}/{pathlib.PurePosixPath(name).stem}", warning["rule_name"])] += 1
+    return counts
+
+
+def kerbo(repo, rules):
+    prefix = APPS_ROOTS[repo] + "/"
+    counts = collections.Counter()
+    for finding in json.loads((HERE / "out" / f"{repo}.json").read_text(encoding="utf-8")):
+        path = pathlib.PurePosixPath(finding["path"].removeprefix("./").removeprefix(prefix))
+        if finding["rule"] in rules and path.parent.name == MIGRATIONS_DIRECTORY:
+            counts[(f"{path.parent.parent.name}/{path.stem}", finding["rule"])] += 1
+    return counts
+
+
+def main():
+    if sys.argv[1] == "--apps-root":
+        print(APPS_ROOTS[sys.argv[2]])
+        return
+    repo = sys.argv[1]
+    expected = reference(repo)
+    found = kerbo(repo, {rule for _, rule in expected} | migration_rules())
+    differences = sorted(key for key in expected.keys() | found.keys() if expected[key] != found[key])
+    for migration, rule in differences:
+        print(f"{migration:45} {rule:40} squawk {expected[(migration, rule)]:3} kerbo {found[(migration, rule)]:3}")
+    matched = sum(min(expected[key], found[key]) for key in expected.keys() | found.keys())
+    print(f"squawk {sum(expected.values())}, kerbo {sum(found.values())}, coinciden {matched}, diferencias {len(differences)}")
+
+
+def migration_rules():
+    source = (REPO / "src" / "rules" / "families.rs").read_text(encoding="utf-8")
+    block = source.split("rule_family!(MigrationRule {", 1)[1].split("});", 1)[0]
+    return {line.split('"')[1] for line in block.splitlines() if '"' in line}
+
+
+if __name__ == "__main__":
+    main()

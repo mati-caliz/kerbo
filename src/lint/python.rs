@@ -74,6 +74,7 @@ use std::path::Path;
 use tree_sitter::{Node, Point};
 
 use super::{LintFinding, LintKind, finding_at};
+use crate::deploy::migration_history_fingerprint;
 use crate::fix::Fix;
 use crate::language::Language;
 use crate::limits::{Limits, Preset};
@@ -157,6 +158,7 @@ pub fn analysis_context(language: Language, path: &Path) -> Option<u64> {
         let mut hasher = DefaultHasher::new();
         path.hash(&mut hasher);
         executable_bits::is_executable(path).hash(&mut hasher);
+        migration_history_fingerprint(path).hash(&mut hasher);
         hasher.finish()
     })
 }

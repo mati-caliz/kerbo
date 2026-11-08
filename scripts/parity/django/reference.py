@@ -30,10 +30,10 @@ OUT = pathlib.Path("/out")
 
 
 def configure(repo):
+    sys.path.insert(0, REPOS[repo]["path"])
     import django
     from django.conf import settings
 
-    sys.path.insert(0, REPOS[repo]["path"])
     settings.configure(
         INSTALLED_APPS=REPOS[repo]["apps"],
         DATABASES={

@@ -1,8 +1,6 @@
-mod calls;
 mod dialects;
 mod operations;
 mod render;
-mod script;
 mod tables;
 
 use std::collections::{HashMap, HashSet};
@@ -10,11 +8,11 @@ use std::collections::{HashMap, HashSet};
 use tree_sitter::Node;
 
 use super::Violation;
+use super::python_calls::{Call, string_value};
+use super::script::{Origin, Script};
 use crate::syntax::{named_children, one_based};
-use calls::{Call, string_value};
 use operations::{Context, Target, string_or_binding};
 use render::Constants;
-use script::{Origin, Script};
 
 const ALEMBIC_MARKERS: &[&str] = &["from alembic import", "import alembic"];
 const UPGRADE: &str = "upgrade";
@@ -65,7 +63,7 @@ pub fn violations(root: Node<'_>, source: &[u8]) -> Vec<Violation> {
     if let Some(body) = upgrade.child_by_field_name("body") {
         walker.walk(body);
     }
-    walker.script.violations(is_first_revision(root, source))
+    walker.script.alembic_violations(is_first_revision(root, source))
 }
 
 fn module_constants<'tree>(root: Node<'tree>, source: &'tree [u8]) -> Constants<'tree> {

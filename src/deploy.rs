@@ -1,6 +1,9 @@
 mod alembic;
 mod compose;
+mod django;
 mod dockerfile;
+mod python_calls;
+mod script;
 mod sql;
 
 use std::collections::HashMap;
@@ -165,8 +168,14 @@ pub fn relaxed_by(preset: Preset) -> Vec<RuleId> {
 
 pub use sql::squawk_ignores;
 
-pub fn alembic_violations(root: Node<'_>, source: &[u8]) -> Vec<Violation> {
-    alembic::violations(root, source)
+pub fn migration_violations(root: Node<'_>, source: &[u8], path: Option<&Path>) -> Vec<Violation> {
+    let mut found = alembic::violations(root, source);
+    found.extend(django::violations(root, source, path));
+    found
+}
+
+pub fn migration_history_fingerprint(path: &Path) -> Option<u64> {
+    django::fingerprint(path)
 }
 
 pub fn violation_diagnostics<'analysis>(

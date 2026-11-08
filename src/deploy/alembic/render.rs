@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use tree_sitter::Node;
 
-use super::calls::{Call, string_value};
+use super::super::python_calls::{Call, string_value};
 
 const TYPE_NAMES: &[(&str, &str)] = &[
     ("Integer", "INTEGER"),

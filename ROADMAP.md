@@ -1593,11 +1593,20 @@ menos, en 1.867 migraciones.
 
 ### 14. Más migraciones: Django y Rails
 
-- Migraciones de Django (sobre el árbol de Python que ya existe: `AddIndex` sin
-  `AddIndexConcurrently`, `AddField` con `null=False` sin default, `RemoveField`, `RenameField`) y
-  de Rails (`add_index` sin `algorithm: :concurrently`, `remove_column`, `change_column`), con
-  strong_migrations como referencia de Rails. Rails pide sumar una gramática de Ruby. Viene de la
-  etapa 12.
+- Django (empezada, 2026-11-07): `sqlmigrate` de Django 5.2 replicado para Postgres y las reglas de
+  migraciones sobre su SQL; contra squawk 2.71 en las 23 migraciones de `django.contrib`, 89 de 89
+  avisos, ninguno de más (`scripts/parity/django/reference.sh` y `corpus.sh`). Pendientes:
+  - Medir más repos de Django (sentry, saleor, wagtail, zulip): `settings.py` de
+    `scripts/parity/django/` por repo.
+  - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
+    `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), el
+    renombre de las columnas de las tablas intermedias en `RenameModel`, los borrados que Django
+    resuelve por introspección (restricciones sin nombre conocido), `RenameIndex` sin `old_name`,
+    los `AlterField` de un `ManyToManyField` a otro, `ExclusionConstraint` y las operaciones de
+    `django.contrib.postgres`, el orden por el grafo de dependencias entre apps, y `db_collation` y
+    `db_comment`.
+- Rails (`add_index` sin `algorithm: :concurrently`, `remove_column`, `change_column`), con
+  strong_migrations como referencia. Pide sumar una gramática de Ruby. Viene de la etapa 12.
 
 ### 16. Tipos y firmas completas
 
