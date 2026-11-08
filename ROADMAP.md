@@ -1637,8 +1637,9 @@ averiguó por qué osv-scanner no los informa.
     dependencias desde `uv.lock` y usa su `saleor.settings` (Django 5.2); 1.454 migraciones, 12 no
     se pueden convertir (`errores.txt`). Empezó en 501 diferencias y las variables de clase de
     `Migration` la bajaron a 360; los `settings` y los `default` tipados, a 200; el grafo de
-    dependencias, a 142; el modelo reemplazado por `AUTH_USER_MODEL`, a 121. Ahora: squawk 4.385
-    avisos, kerbo 4.255, coinciden 4.209, 121 diferencias por migración y regla; sentencia por
+    dependencias, a 142; el modelo reemplazado por `AUTH_USER_MODEL`, a 121; las migraciones con
+    `atomic = False`, a 87. Ahora: squawk 4.385 avisos, kerbo 4.248, coinciden 4.243, 87
+    diferencias por migración y regla (59 son de las apps de terceros); sentencia por
     sentencia (`dump.sh` + `diff.py`), 39 de 1.454 migraciones con SQL distinto (eran 131).
     kerbo ya lee de los `settings` del proyecto `AUTH_USER_MODEL`, `DEFAULT_AUTO_FIELD` y las
     constantes numéricas (`max_length=settings.X`); sin `settings` asume el `BigAutoField` de
@@ -1666,10 +1667,11 @@ averiguó por qué osv-scanner no los informa.
       0113; los `default` con `Decimal(0)` sin convertir (order/0228).
     - Los `default` invocables del proyecto (`get_default_country`, `zero_weight`,
       `partial(get_random_string)`).
-    - Las migraciones con `atomic = False` y `RunSQL` de `CREATE INDEX CONCURRENTLY` (webhook/0014,
-      product/0196 y parecidas): el SQL coincide, pero squawk avisa distinto
-      (`ban-concurrent-index-creation-in-transaction`, `prefer-robust-stmts`); ver si kerbo marca
-      la migración como dentro de una transacción.
+    - Hecho (2026-11-08): una migración con `atomic = False` se analiza fuera de una transacción,
+      como squawk sobre el `sqlmigrate` sin `BEGIN`: el script arranca con un `COMMIT` sintético
+      (el linter de SQL supone una transacción abierta, por `--assume-in-transaction`). Se fueron
+      las 34 diferencias de `CREATE INDEX CONCURRENTLY` y `prefer-robust-stmts` (webhook/0014,
+      product/0196, discount/0053 y parecidas).
   - El `CASCADE` de `DROP COLUMN` depende de la versión: Django 6 lo sacó y kerbo lo pone siempre
     (en `django.contrib`, con Django 6.1, una sola sentencia distinta; no cambia los avisos). Leer
     la versión de Django del proyecto (`pyproject.toml`, `uv.lock`, `requirements`).

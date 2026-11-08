@@ -23,12 +23,18 @@ pub struct Script {
 
 impl Script {
     pub fn new() -> Self {
-        let mut script = Self::without_transaction();
-        script.push(BEGIN, Origin::Synthetic);
+        let mut script = Self::empty();
+        script.enter_transaction();
         script
     }
 
-    pub const fn without_transaction() -> Self {
+    pub fn without_transaction() -> Self {
+        let mut script = Self::empty();
+        script.leave_transaction();
+        script
+    }
+
+    const fn empty() -> Self {
         Self {
             text: String::new(),
             origins: Vec::new(),

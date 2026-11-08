@@ -247,3 +247,40 @@ fn a_model_swapped_out_by_the_settings_emits_no_sql() {
     let active = super::sql(&MemoryLoader::default(), "auth", "0001_initial", SWAPPABLE_USER);
     assert!(active.contains(r#"CREATE TABLE "auth_user""#), "{active}");
 }
+
+const CONCURRENT_UNIQUE_INDEX: &str = r#"from django.db import migrations
+
+
+class Migration(migrations.Migration):
+    atomic = False
+
+    dependencies = [("library", "0001_initial")]
+
+    operations = [
+        migrations.RunSQL("CREATE UNIQUE INDEX CONCURRENTLY tag_label ON library_tag (label)"),
+        migrations.RunSQL("ALTER TABLE library_tag ADD CONSTRAINT tag_label UNIQUE USING INDEX tag_label"),
+    ]
+"#;
+
+#[test]
+fn a_non_atomic_migration_runs_outside_a_transaction() {
+    let outside = rules(&initial(), "0002_concurrent", CONCURRENT_UNIQUE_INDEX);
+    assert!(
+        !outside.contains(&MigrationRule::BanConcurrentIndexCreationInTransaction),
+        "{outside:?}"
+    );
+    let unguarded = outside
+        .iter()
+        .filter(|rule| **rule == MigrationRule::PreferRobustStmts)
+        .count();
+    assert_eq!(unguarded, 2, "{outside:?}");
+    let inside = rules(
+        &initial(),
+        "0002_concurrent",
+        &CONCURRENT_UNIQUE_INDEX.replace("atomic = False", "atomic = True"),
+    );
+    assert!(
+        inside.contains(&MigrationRule::BanConcurrentIndexCreationInTransaction),
+        "{inside:?}"
+    );
+}
