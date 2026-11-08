@@ -1,6 +1,6 @@
 ﻿<#
 Corre sesiones de Claude Code sin intervención (claude -p), una detrás de la otra, sobre la
-próxima etapa abierta del ROADMAP. Cada sesión arranca limpia con el pedido de pedido.md y, cuando
+próxima etapa abierta del ROADMAP, y muestra en vivo lo que dice cada una y qué herramientas usa. Cada sesión arranca limpia con el pedido de pedido.md y, cuando
 termina su avance, se cierra sola y arranca la siguiente. Una etapa que termina sin commits se
 saltea en esta corrida; tres sesiones seguidas sin avanzar cortan el carril. El resumen de cada
 sesión queda en .parity\autopilot\registro\. Un archivo .parity\autopilot\STOP corta todo.
@@ -29,6 +29,7 @@ $Registro = Join-Path $Tomas 'registro'
 $EtapasExcluidas = [System.Collections.Generic.List[string]]@('10')
 $MaximoSesionesSinAvance = 3
 $SegundosParaCortarConCtrlC = 10
+$LargoMaximoDeHerramienta = 160
 # Mecánico con arnés (versiones, tandas de reglas): Sonnet. Diseño con paridad: Opus en medio.
 # Investigación difícil (tipos, tests inteligentes): Opus en alto.
 $ModeloPorDefecto = 'opus'
@@ -84,6 +85,36 @@ function Commiteo-Desde([string]$Carpeta, [datetime]$Inicio) {
     [bool](git -C $Carpeta log -g --format=%gs --since=$Desde HEAD | Where-Object { $_ -like 'commit*' })
 }
 
+function Recortar([string]$Texto) {
+    $Linea = ($Texto -replace '\s+', ' ').Trim()
+    if ($Linea.Length -le $LargoMaximoDeHerramienta) { return $Linea }
+    $Linea.Substring(0, $LargoMaximoDeHerramienta) + '…'
+}
+
+function Detalle-De-Herramienta($Entrada) {
+    foreach ($Campo in 'command', 'file_path', 'pattern', 'description', 'prompt') {
+        if ($Entrada.$Campo) { return Recortar $Entrada.$Campo }
+    }
+    ''
+}
+
+function Mostrar-Evento([string]$Linea, [string]$Resumen) {
+    try { $Evento = $Linea | ConvertFrom-Json } catch { Write-Host $Linea; return }
+    if ($Evento.type -eq 'assistant') {
+        foreach ($Bloque in $Evento.message.content) {
+            if ($Bloque.type -eq 'text') { Write-Host "`n$($Bloque.text)" }
+            elseif ($Bloque.type -eq 'tool_use') {
+                Write-Host "  > $($Bloque.name) $(Detalle-De-Herramienta $Bloque.input)" -ForegroundColor DarkGray
+            }
+        }
+    }
+    elseif ($Evento.type -eq 'result') {
+        Set-Content -Path $Resumen -Value $Evento.result -Encoding UTF8
+        $Minutos = [math]::Round($Evento.duration_ms / 60000)
+        Write-Host "`n== Sesión terminada en $Minutos min (resumen en $Resumen)" -ForegroundColor Cyan
+    }
+}
+
 $Carpeta = Carpeta-Del-Carril
 $SesionesSinAvance = 0
 while (-not (Test-Path $Parada)) {
@@ -104,8 +135,8 @@ while (-not (Test-Path $Parada)) {
     $Resumen = Join-Path $Registro ("{0:yyyy-MM-dd_HHmm}-etapa-{1}-{2}.txt" -f $Inicio, $Elegida.Numero, $Carril)
     Push-Location $Carpeta
     try {
-        & claude -p --model $ElModelo --effort $ElEsfuerzo --permission-mode $Permisos --autocompact $Compactar -n "kerbo $($Elegida.Numero) ($Carril)" $Mensaje |
-            Tee-Object -FilePath $Resumen
+        & claude -p --output-format stream-json --verbose --model $ElModelo --effort $ElEsfuerzo --permission-mode $Permisos --autocompact $Compactar -n "kerbo $($Elegida.Numero) ($Carril)" $Mensaje |
+            ForEach-Object { Mostrar-Evento $_ $Resumen }
     }
     finally { Pop-Location; Remove-Item $Toma -ErrorAction SilentlyContinue }
 
