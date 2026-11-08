@@ -12,7 +12,7 @@
 # entera ya va adentro de heavy_lock.py, PARITY_QUEUED=1 hace que los pasos no pidan otro lugar.
 set -euo pipefail
 
-readonly FAMILIES=(python ecmascript shell go java migrations secrets dockerfile)
+readonly FAMILIES=(python ecmascript shell go java migrations secrets dockerfile dependencies)
 readonly JAVA_REPOS=(junit4 commons-lang)
 readonly JAVA_INSPECTIONS=(RedundantThrows AutoCloseableResource DataFlowIssue)
 readonly WAIT_SECONDS=3000
@@ -96,6 +96,10 @@ run_family() {
       key="$(fingerprint "$(version_of hadolint)" "$(corpus_key)")"
       reference "$parity/dockerfile/hadolint.json" "$key" "'$here/dockerfile/corpus.sh'" "'$here/dockerfile/corpus.sh' --skip-hadolint"
       ;;
+    dependencies)
+      key="$(fingerprint "$(version_of osv-scanner)" "$(corpus_key)")"
+      reference "$parity/dependencies/osv-scanner.json" "$key" "'$here/dependencies/corpus.sh'" "'$here/dependencies/corpus.sh' --skip-osv-scanner"
+      ;;
     java)
       for name in "${JAVA_REPOS[@]}"; do
         if [ -n "${QODANA:-}" ]; then
@@ -119,4 +123,4 @@ for family in "${families[@]}"; do
   tail -5 "$logs/$family.txt" | sed 's/^/  /'
 done
 echo
-echo "Sin arnés en el repo todavía: dependencias (osv-scanner). Salida completa en $logs"
+echo "Salida completa en $logs"

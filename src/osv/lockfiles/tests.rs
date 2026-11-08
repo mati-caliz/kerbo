@@ -223,3 +223,18 @@ fn counts_lines_from_one() {
     assert_eq!(first_line_containing("a\nb\nc", "b"), 2);
     assert_eq!(first_line_containing("a", "z"), 1);
 }
+
+#[test]
+fn reads_pnpm_packages_installed_from_a_tarball_url_with_their_declared_version() {
+    let lockfile = "lockfileVersion: '9.0'\n\npackages:\n\n  xlsx@https://cdn.example.com/xlsx-0.20.3.tgz:\n    resolution: {tarball: https://cdn.example.com/xlsx-0.20.3.tgz}\n    version: 0.20.3\n\n  lodash@4.17.20:\n    resolution: {integrity: sha512-x}\n";
+    assert_eq!(
+        parse("pnpm-lock.yaml", lockfile),
+        [found("xlsx", "0.20.3", 5), found("lodash", "4.17.20", 9)]
+    );
+}
+
+#[test]
+fn reads_yarn_aliases_under_the_name_of_the_aliased_package() {
+    let lockfile = "\"eslint-v7@npm:eslint@^7.7.0\", eslint@^7.7.0:\n  version \"7.32.0\"\n";
+    assert_eq!(parse("yarn.lock", lockfile), [found("eslint", "7.32.0", 1)]);
+}

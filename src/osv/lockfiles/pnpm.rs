@@ -13,6 +13,7 @@ const LEGACY_PEERS_START: char = '_';
 const SCOPE_MARK: char = '@';
 const PATH_SEPARATOR: char = '/';
 const KEY_END: char = ':';
+const ENTRY_VERSION_KEY: &str = "version:";
 
 pub fn lockfile(text: &str) -> Vec<Dependency> {
     let legacy = numbered_lines(text)
@@ -21,9 +22,25 @@ pub fn lockfile(text: &str) -> Vec<Dependency> {
     let mut inside = false;
     let mut seen = HashSet::new();
     let mut found = Vec::new();
+    let mut pending: Option<(String, usize)> = None;
     for (number, line) in numbered_lines(text) {
         if !line.starts_with(' ') && !line.trim().is_empty() {
             inside = line.trim_end() == PACKAGES_SECTION;
+            pending = None;
+            continue;
+        }
+        if inside
+            && let Some(version) = line.trim().strip_prefix(ENTRY_VERSION_KEY).map(str::trim)
+            && let Some((name, header)) =
+                pending.take_if(|_| version.starts_with(|first: char| first.is_ascii_digit()))
+            && seen.insert((name.clone(), version.to_owned()))
+        {
+            found.push(Dependency {
+                ecosystem: Ecosystem::Npm,
+                name,
+                version: version.to_owned(),
+                line: header,
+            });
             continue;
         }
         let Some(key) = entry_key(line).filter(|_| inside) else {
@@ -32,9 +49,11 @@ pub fn lockfile(text: &str) -> Vec<Dependency> {
         let Some((name, version)) = split_key(key, legacy) else {
             continue;
         };
-        if version.starts_with(|first: char| first.is_ascii_digit())
-            && seen.insert((name.clone(), version.clone()))
-        {
+        if !version.starts_with(|first: char| first.is_ascii_digit()) {
+            pending = Some((name, number));
+            continue;
+        }
+        if seen.insert((name.clone(), version.clone())) {
             found.push(Dependency {
                 ecosystem: Ecosystem::Npm,
                 name,

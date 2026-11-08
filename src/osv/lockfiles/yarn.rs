@@ -9,6 +9,7 @@ const SPEC_SEPARATOR: char = ',';
 const QUOTES: &[char] = &['\'', '"'];
 const SCOPE_MARK: char = '@';
 const VERSION_PREFIXES: [&str; 2] = ["version:", "version "];
+const NPM_ALIAS: &str = "npm:";
 const LOCAL_PROTOCOLS: [&str; 4] = ["@workspace:", "@link:", "@portal:", "@file:"];
 
 pub fn lockfile(text: &str) -> Vec<Dependency> {
@@ -49,12 +50,19 @@ fn package_name(header: &str) -> Option<String> {
     if LOCAL_PROTOCOLS.iter().any(|protocol| first.contains(protocol)) {
         return None;
     }
-    let separator = first
-        .char_indices()
+    let separator = scope_mark_index(first)?;
+    let target = first.get(separator + SCOPE_MARK.len_utf8()..)?;
+    let aliased_name = target
+        .strip_prefix(NPM_ALIAS)
+        .and_then(|aliased| aliased.get(..scope_mark_index(aliased)?));
+    aliased_name.or_else(|| first.get(..separator)).map(str::to_owned)
+}
+
+fn scope_mark_index(text: &str) -> Option<usize> {
+    text.char_indices()
         .skip(1)
         .find(|&(_, character)| character == SCOPE_MARK)
-        .map(|(index, _)| index)?;
-    first.get(..separator).map(str::to_owned)
+        .map(|(index, _)| index)
 }
 
 fn version_of(line: &str) -> Option<String> {

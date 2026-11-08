@@ -1605,13 +1605,25 @@ Hecho (2026-11-08): arnés de hadolint 2.15.1 en `scripts/parity/dockerfile/` (f
 regla DL. Quedan afuera los 26 archivos que hadolint no parsea (DL1000, casi todos de awesome-compose).
 Paridad: 196 de 196, 0 de menos, 0 de más.
 
+Hecho (2026-11-08): arnés de osv-scanner 2.7.0 en `scripts/parity/dependencies/` (familia `dependencies`
+de `run_all.sh`): osv-scanner en docker contra `kerbo check --osv` sobre los 121 lockfiles del corpus,
+comparados por carpeta, paquete y versión (osv-scanner informa una sola vez un paquete que está en dos
+lockfiles de la misma carpeta). Los dos consultan api.osv.dev, así que la cifra depende del día; la imagen
+del gate no trae `curl` y el script lo instala. Arreglos en kerbo: los alias de yarn (`eslint-v7@npm:eslint`)
+se leen con el nombre del paquete real, y los paquetes de pnpm instalados desde una URL de tarball toman la
+versión que declara la entrada.
+Paridad: 7.283 de 7.284 grupos de avisos, 1 de menos y 19 de más. El que falta es un `link:` de yarn que
+osv-scanner marca como `MAL-` por el nombre y kerbo salta a propósito. Los de más: 17 son de
+`react/fixtures/ssr2` (de su `package-lock.json` v2 osv-scanner lee sólo 5 paquetes y kerbo todos), uno de
+`awesome-compose/react-express-mysql/backend` (lockfile v1) y uno de `vscode/build/rspack`; no se
+averiguó por qué osv-scanner no los informa.
+
 - Pendientes:
   - TypeScript 7 (7.0.2): bloqueado, typescript-eslint 8.72.1 declara `typescript <6.1.0`. Se sube
     cuando typescript-eslint lo soporte, o junto con tsrs (etapas 11 y 16).
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.
-  - El arnés de osv-scanner no quedó en el repo (se perdieron
-    con los scratchpads): hay que rearmarlos en `scripts/parity/` para que entren en `run_all.sh`.
+  - Dependencias: entender los 19 avisos de más contra osv-scanner (ssr2, awesome-compose, rspack).
   - Los 26 Dockerfile que hadolint no parsea quedan sin medir: sumar repos con Dockerfile al corpus.
   - Cuando entre tsrs (etapas 11 y 16), su commit y la versión de TypeScript que sigue van en
     `versions.toml`.
