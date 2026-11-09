@@ -1609,7 +1609,8 @@ cerrarse se borra de acá.
     - Los `default` invocables del proyecto, que ya sólo cambian el SQL y no los avisos:
       `get_default_country` (checkout/0023, da `'US'`), `zero_weight` (order/0052,
       product/0068, da `0.0`), `partial(get_random_string)` (account/0046, aleatorio en la
-      referencia) y la expresión condicional sobre `settings` de site/0041.
+      referencia). La expresión condicional sobre `settings` de site/0041 ya sale igual
+      (2026-11-09): quedan 19 de 1.454 migraciones con SQL distinto.
     - Hecho (2026-11-08): una migración con `atomic = False` se analiza fuera de una transacción,
       como squawk sobre el `sqlmigrate` sin `BEGIN`: el script arranca con un `COMMIT` sintético
       (el linter de SQL supone una transacción abierta, por `--assume-in-transaction`). Se fueron
@@ -1638,11 +1639,21 @@ cerrarse se borra de acá.
       `else` del cuerpo se resuelven con los `settings` booleanos (`True`/`False` literales, el
       último gana) y `not`. `atomic` también se evalúa así (`atomic = not settings.X`). Si la
       condición no se sabe, la llamada no saca nada, como antes.
-    - Sentencia por sentencia (`dump.sh` + `diff.py`), 37 de 302 migraciones con SQL distinto:
-      además de las de terceros, los índices por expresión (`F("x")`, `Upper("x")`,
-      `F("id").desc(nulls_last=True)`) salen `(true)` en vez de la expresión, y los `condition`
-      con operadores de bits (`flags__andnz`, zerver 0742) salen `WHERE true`. No cambian los
-      avisos.
+    - Hecho (2026-11-09): sentencia por sentencia (`dump.sh` + `diff.py`), de 37 a 26 de 302
+      migraciones con SQL distinto, todas de apps de terceros. Los índices y `UniqueConstraint`
+      por expresión salen como en Django (`F("x")`, `Upper`/`Lower`, `OrderBy` y
+      `F("x").desc(nulls_last=True)` con `DESC NULLS LAST`, la columna sola sin paréntesis y el
+      resto entre paréntesis); los parámetros de almacenamiento (`fastupdate=False` da
+      `WITH (fastupdate = off)`, también `fillfactor`, `deduplicate_items` y los demás de
+      `django.contrib.postgres`); los `Q` con `_connector="OR"`/`"AND"` y `_negated`, y los
+      lookups de bits de django-bitfield (`andnz` da `"x" & N != 0`, `andz` da `"x" & N = 0`);
+      `BitField` es `bigint`. Las constantes de la clase `Migration` y de las clases del módulo
+      (también los miembros de un `Enum` con `.value`) se resuelven en `default`, `db_default` y
+      en los `Q`, y un `default` condicional (`x if settings.Y else z`) se elige con los
+      `settings` booleanos. Los avisos no cambiaron.
+    - Lo que queda sin traducir en los `Q` (sale `true`, como antes): `_connector="XOR"` y los
+      valores aritméticos (`2**32 - 1`). Funciones fuera de `Upper`/`Lower` en un índice por
+      expresión salen `(true)`.
   - Medir más repos de Django (sentry, wagtail): entrada en `REPOS` de `reference.py`.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
     `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), los

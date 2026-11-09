@@ -14,6 +14,7 @@ use crate::language::Language;
 use crate::rules::{MigrationRule, RuleId};
 
 mod dump;
+mod expressions;
 mod files;
 mod graph;
 mod operations;

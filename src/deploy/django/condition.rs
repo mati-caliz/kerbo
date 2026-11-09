@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::constants::Constants;
 use super::model::{Class, Field, Model};
 use super::names::quoted;
 use super::values::{boolean, elements, is_sequence, quoted_literal, raw, text};
@@ -22,6 +23,12 @@ const OPAQUE_SQL: &str = "true";
 const EXACT: &str = "exact";
 const IS_NULL: &str = "isnull";
 const IN: &str = "in";
+const BITS_SET: &str = "andnz";
+const BITS_CLEAR: &str = "andz";
+const CONNECTOR_KEYWORD: &str = "_connector";
+const NEGATED_KEYWORD: &str = "_negated";
+const AND_CONNECTOR: &str = "AND";
+const OR_CONNECTOR: &str = "OR";
 const COMPARISONS: &[(&str, &str)] = &[("gt", ">"), ("gte", ">="), ("lt", "<"), ("lte", "<=")];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,8 +81,8 @@ enum Where {
 }
 
 impl Condition {
-    pub fn parse<'tree>(node: Node<'tree>, source: &'tree [u8]) -> Self {
-        Self(expression(node, source))
+    pub fn parse<'tree>(node: Node<'tree>, constants: Constants<'tree>) -> Self {
+        Self(expression(node, constants))
     }
 
     pub const fn opaque() -> Self {
@@ -91,25 +98,25 @@ impl Condition {
     }
 }
 
-fn expression<'tree>(node: Node<'tree>, source: &'tree [u8]) -> Option<Tree> {
+fn expression<'tree>(node: Node<'tree>, constants: Constants<'tree>) -> Option<Tree> {
     match node.kind() {
-        PARENTHESIZED => expression(node.named_child(0)?, source),
-        UNARY if operator(node, source)? == INVERT => {
-            let mut inverted = expression(node.child_by_field_name("argument")?, source)?;
+        PARENTHESIZED => expression(node.named_child(0)?, constants),
+        UNARY if operator(node, constants.source)? == INVERT => {
+            let mut inverted = expression(node.child_by_field_name("argument")?, constants)?;
             inverted.negated = !inverted.negated;
             Some(inverted)
         }
         BINARY => {
-            let connector = match operator(node, source)? {
+            let connector = match operator(node, constants.source)? {
                 OR_OPERATOR => Connector::Or,
                 AND_OPERATOR => Connector::And,
                 _ => return None,
             };
-            let left = expression(node.child_by_field_name("left")?, source)?;
-            let right = expression(node.child_by_field_name("right")?, source)?;
+            let left = expression(node.child_by_field_name("left")?, constants)?;
+            let right = expression(node.child_by_field_name("right")?, constants)?;
             Some(combine(left, right, connector))
         }
-        _ => q_call(node, source),
+        _ => q_call(node, constants),
     }
 }
 
@@ -117,11 +124,16 @@ fn operator<'source>(node: Node<'_>, source: &'source [u8]) -> Option<&'source s
     node.child_by_field_name("operator")?.utf8_text(source).ok()
 }
 
-fn q_call<'tree>(node: Node<'tree>, source: &'tree [u8]) -> Option<Tree> {
+fn q_call<'tree>(node: Node<'tree>, constants: Constants<'tree>) -> Option<Tree> {
+    let source = constants.source;
     let call = Call::parse(node, source).filter(|call| call.method == Q_CLASS)?;
-    let mut children = Vec::new();
+    let mut tree = Tree {
+        connector: Connector::And,
+        negated: false,
+        children: Vec::new(),
+    };
     for argument in call.all_positional() {
-        children.push(positional_child(argument, source)?);
+        tree.children.push(positional_child(argument, constants)?);
     }
     let mut keywords = Vec::new();
     for argument in call
@@ -130,39 +142,47 @@ fn q_call<'tree>(node: Node<'tree>, source: &'tree [u8]) -> Option<Tree> {
         .filter(|argument| argument.kind() == KEYWORD_ARGUMENT)
     {
         let name = argument.child_by_field_name("name")?.utf8_text(source).ok()?;
-        keywords.push((
-            name.to_owned(),
-            value(argument.child_by_field_name("value")?, source)?,
-        ));
+        let rhs = constants.resolve(argument.child_by_field_name("value")?);
+        match name {
+            CONNECTOR_KEYWORD => tree.connector = connector_named(&text(rhs, source)?)?,
+            NEGATED_KEYWORD => tree.negated = boolean(rhs)?,
+            path => keywords.push((path.to_owned(), value(rhs, constants)?)),
+        }
     }
     keywords.sort_by(|left, right| left.0.cmp(&right.0));
-    children.extend(
+    tree.children.extend(
         keywords
             .into_iter()
             .map(|(path, value)| Child::Lookup { path, value }),
     );
-    Some(Tree {
-        connector: Connector::And,
-        negated: false,
-        children,
-    })
+    Some(tree)
 }
 
-fn positional_child<'tree>(node: Node<'tree>, source: &'tree [u8]) -> Option<Child> {
+fn connector_named(name: &str) -> Option<Connector> {
+    match name {
+        AND_CONNECTOR => Some(Connector::And),
+        OR_CONNECTOR => Some(Connector::Or),
+        _ => None,
+    }
+}
+
+fn positional_child<'tree>(node: Node<'tree>, constants: Constants<'tree>) -> Option<Child> {
     if is_sequence(node) {
         let parts = elements(node);
         let [path, rhs] = parts.as_slice() else {
             return None;
         };
         return Some(Child::Lookup {
-            path: text(*path, source)?,
-            value: value(*rhs, source)?,
+            path: text(*path, constants.source)?,
+            value: value(*rhs, constants)?,
         });
     }
-    expression(node, source).map(Child::Node)
+    expression(node, constants).map(Child::Node)
 }
 
-fn value<'tree>(node: Node<'tree>, source: &'tree [u8]) -> Option<Value> {
+fn value<'tree>(node: Node<'tree>, constants: Constants<'tree>) -> Option<Value> {
+    let node = constants.resolve(node);
+    let source = constants.source;
     if node.kind() == "none" {
         return Some(Value::Null);
     }
@@ -175,14 +195,14 @@ fn value<'tree>(node: Node<'tree>, source: &'tree [u8]) -> Option<Value> {
     if is_sequence(node) {
         return elements(node)
             .into_iter()
-            .map(|element| value(element, source))
+            .map(|element| value(element, constants))
             .collect::<Option<Vec<_>>>()
             .map(Value::List);
     }
     numeric(node, source).map(Value::Literal)
 }
 
-fn numeric<'tree>(node: Node<'tree>, source: &'tree [u8]) -> Option<String> {
+fn numeric(node: Node<'_>, source: &[u8]) -> Option<String> {
     if let Some(call) = Call::parse(node, source).filter(|call| call.method == DECIMAL_CONSTRUCTOR) {
         let argument = call.positional(0)?;
         return text(argument, source).or_else(|| numeric(argument, source));
@@ -298,6 +318,8 @@ fn lookup_sql(field: &Field, column: &str, lookup: &str, value: &Value) -> Optio
             }
             (!rendered.is_empty()).then(|| format!("{column} IN ({})", rendered.join(", ")))
         }
+        (BITS_SET, rhs) => Some(format!("{column} & {} != 0", scalar(rhs)?)),
+        (BITS_CLEAR, rhs) => Some(format!("{column} & {} = 0", scalar(rhs)?)),
         (comparison, rhs) => {
             let (_, symbol) = COMPARISONS.iter().find(|(name, _)| *name == comparison)?;
             Some(format!("{column} {symbol} {}", scalar(rhs)?))

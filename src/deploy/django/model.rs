@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use super::condition::Condition;
+use super::expression::Expression;
 use super::names::truncated_table;
 
 const COLUMN_SUFFIX: &str = "_id";
@@ -178,15 +179,18 @@ impl Field {
 pub struct Index {
     pub name: String,
     pub fields: Vec<String>,
+    pub expressions: Vec<Expression>,
     pub condition: Option<Condition>,
     pub method: Option<&'static str>,
     pub opclasses: Vec<String>,
+    pub storage: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConstraintKind {
     Unique {
         fields: Vec<String>,
+        expressions: Vec<Expression>,
         by_index: bool,
         condition: Option<Condition>,
         opclasses: Vec<String>,

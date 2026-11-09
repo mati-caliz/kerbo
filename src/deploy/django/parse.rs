@@ -5,6 +5,7 @@ use tree_sitter::Node;
 
 mod raw_sql;
 
+use super::constants::{Constants, assignments, class_attributes};
 use super::dependencies::keys;
 use super::factories::{Factory, imported};
 use super::fields::{Owner, field};
@@ -14,7 +15,7 @@ use super::operations::{Located, Migration, Operation};
 use super::run_python::functions;
 use super::settings::Settings;
 use super::truth::truth;
-use super::values::{boolean, dictionary, elements, parenthesized_content, text};
+use super::values::{boolean, dictionary, elements, text};
 use crate::deploy::python_calls::Call;
 use crate::syntax::named_children;
 use raw_sql::{run_python, run_sql};
@@ -26,10 +27,8 @@ const DEPENDENCIES: &str = "dependencies";
 const RUN_BEFORE: &str = "run_before";
 const CONCURRENTLY: &str = "Concurrently";
 const ADD_FIELD: &str = "AddField";
-const IDENTIFIER: &str = "identifier";
 const CONCATENATION: &str = "binary_operator";
 const RUN_PYTHON: &str = "RunPython";
-const MAX_ALIAS_DEPTH: usize = 8;
 const GENERIC_EXTENSION: &str = "CreateExtension";
 const NAMED_EXTENSIONS: &[(&str, &str)] = &[
     ("BloomExtension", "bloom"),
@@ -55,7 +54,7 @@ struct Scope<'context> {
     source: &'context [u8],
     app: &'context str,
     settings: &'context Settings,
-    bindings: &'context [(String, Node<'context>)],
+    constants: Constants<'context>,
     functions: &'context [(String, Node<'context>)],
     factories: &'context [(String, Arc<Factory>)],
 }
@@ -70,7 +69,8 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
     })?;
     let body = class.child_by_field_name("body")?;
     let class_bindings = assignments(body, reader.source);
-    let mut bindings = assignments(root, reader.source);
+    let mut bindings = class_attributes(root, reader.source);
+    bindings.extend(assignments(root, reader.source));
     bindings.extend(class_bindings.iter().cloned());
     let module_functions = functions(root, reader.source);
     let factories = reader
@@ -81,7 +81,7 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
         source: reader.source,
         app: reader.app,
         settings: reader.settings,
-        bindings: &bindings,
+        constants: Constants::new(reader.source, &bindings),
         functions: &module_functions,
         factories: &factories,
     };
@@ -108,18 +108,6 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
     Some(migration)
 }
 
-fn assignments<'tree>(body: Node<'tree>, source: &[u8]) -> Vec<(String, Node<'tree>)> {
-    named_children(body)
-        .into_iter()
-        .filter_map(|statement| named_children(statement).into_iter().next())
-        .filter(|assignment| assignment.kind() == "assignment")
-        .filter_map(|assignment| {
-            let name = assignment.child_by_field_name("left")?.utf8_text(source).ok()?;
-            Some((name.to_owned(), assignment.child_by_field_name("right")?))
-        })
-        .collect()
-}
-
 fn argument<'tree>(call: &Call<'tree>, index: usize, name: &str) -> Option<Node<'tree>> {
     call.keyword(name).or_else(|| call.positional(index))
 }
@@ -134,26 +122,7 @@ fn model_name(call: &Call<'_>, index: usize, name: &str) -> Option<String> {
 
 impl<'context> Scope<'context> {
     fn resolved(self, node: Node<'context>) -> Node<'context> {
-        let mut current = node;
-        for _ in 0..MAX_ALIAS_DEPTH {
-            let Some(bound) = self.binding(current).or_else(|| parenthesized_content(current)) else {
-                return current;
-            };
-            current = bound;
-        }
-        current
-    }
-
-    fn binding(self, node: Node<'context>) -> Option<Node<'context>> {
-        if node.kind() != IDENTIFIER {
-            return None;
-        }
-        let name = node.utf8_text(self.source).ok()?;
-        self.bindings
-            .iter()
-            .rev()
-            .find(|(bound, _)| bound == name)
-            .map(|(_, value)| *value)
+        self.constants.resolve(node)
     }
 
     fn sequence(self, node: Node<'context>) -> Vec<Node<'context>> {
@@ -286,7 +255,7 @@ impl<'context> Scope<'context> {
         match call.method.trim_end_matches(CONCURRENTLY) {
             "AddIndex" => Some(Operation::AddIndex {
                 model,
-                index: argument(call, 1, "index").and_then(|node| index(node, self.source))?,
+                index: argument(call, 1, "index").and_then(|node| index(node, self.constants))?,
                 concurrently,
             }),
             "RemoveIndex" => Some(Operation::RemoveIndex {
@@ -301,7 +270,8 @@ impl<'context> Scope<'context> {
             }),
             "AddConstraint" => Some(Operation::AddConstraint {
                 model,
-                constraint: argument(call, 1, "constraint").and_then(|node| constraint(node, self.source))?,
+                constraint: argument(call, 1, "constraint")
+                    .and_then(|node| constraint(node, self.constants))?,
             }),
             "RemoveConstraint" => Some(Operation::RemoveConstraint {
                 model,
@@ -318,6 +288,7 @@ impl<'context> Scope<'context> {
             app: self.app,
             model: &model,
             settings: self.settings,
+            constants: self.constants,
         };
         let parsed = field(&name, argument(call, 2, "field")?, self.source, owner)?;
         Some(if call.method == ADD_FIELD {
@@ -334,6 +305,7 @@ impl<'context> Scope<'context> {
             app: self.app,
             model: &name,
             settings: self.settings,
+            constants: self.constants,
         };
         model.fields = argument(call, 1, "fields")
             .map(elements)
@@ -356,8 +328,8 @@ impl<'context> Scope<'context> {
             match key.as_str() {
                 "db_table" => model.db_table = text(value, self.source),
                 "unique_together" => model.unique_together = unique_together(value, self.source),
-                "indexes" => model.indexes = indexes(value, self.source),
-                "constraints" => model.constraints = constraints(value, self.source),
+                "indexes" => model.indexes = indexes(value, self.constants),
+                "constraints" => model.constraints = constraints(value, self.constants),
                 "managed" => model.managed = boolean(value) != Some(false),
                 "proxy" => model.proxy = boolean(value) == Some(true),
                 "swappable" => {

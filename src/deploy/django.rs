@@ -1,10 +1,12 @@
 mod alter;
 mod columns;
 mod condition;
+mod constants;
 mod deferred;
 mod dependencies;
 mod dispatch;
 mod django_version;
+mod expression;
 mod factories;
 mod fields;
 mod graph;

@@ -4,6 +4,7 @@ const EXPRESSION_START: char = '(';
 const DESCENDING_PREFIX: char = '-';
 const UNIQUE_SUFFIX: &str = "_uniq";
 const LIKE_SUFFIX: &str = "_like";
+const DESCENDING_ORDER: &str = "DESC";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexKind {
@@ -15,7 +16,7 @@ pub enum IndexKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexColumn {
     pub name: String,
-    pub descending: bool,
+    pub ordering: Option<String>,
     pub operator_class: Option<String>,
 }
 
@@ -28,12 +29,12 @@ impl IndexColumn {
                 } else {
                     column_of(entry)
                 },
-                descending: false,
+                ordering: None,
                 operator_class: None,
             },
             |name| Self {
                 name: column_of(name),
-                descending: true,
+                ordering: Some(DESCENDING_ORDER.to_owned()),
                 operator_class: None,
             },
         )
@@ -49,10 +50,9 @@ impl IndexColumn {
             Some(operator_class) => format!("{name} {operator_class}"),
             None => name,
         };
-        if self.descending {
-            format!("{name} DESC")
-        } else {
-            name
+        match &self.ordering {
+            Some(ordering) => format!("{name} {ordering}"),
+            None => name,
         }
     }
 }
@@ -72,6 +72,7 @@ pub enum Kind {
         condition: Option<String>,
         nulls_distinct: Option<bool>,
         method: Option<&'static str>,
+        storage: Vec<String>,
     },
 }
 
@@ -90,7 +91,7 @@ impl Statement {
                 .iter()
                 .map(|name| IndexColumn {
                     name: name.clone(),
-                    descending: false,
+                    ordering: None,
                     operator_class: None,
                 })
                 .collect(),
@@ -139,6 +140,7 @@ impl Statement {
                 condition,
                 nulls_distinct,
                 method,
+                storage,
             } => {
                 let create = match kind {
                     IndexKind::Plain => "CREATE INDEX",
@@ -153,8 +155,13 @@ impl Statement {
                 let using = method
                     .map(|method| format!(" USING {method}"))
                     .unwrap_or_default();
+                let storage = if storage.is_empty() {
+                    String::new()
+                } else {
+                    format!(" WITH ({})", storage.join(", "))
+                };
                 format!(
-                    "{create} {} ON {table}{using} ({columns}){nulls}{condition}",
+                    "{create} {} ON {table}{using} ({columns}){nulls}{storage}{condition}",
                     quoted(name)
                 )
             }

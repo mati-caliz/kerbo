@@ -1,7 +1,9 @@
 use tree_sitter::Node;
 
+use super::constants::Constants;
 use super::model::{Class, Field, FieldDefault, Flag, ModelKey, Relation};
 use super::settings::Settings;
+use super::truth::truth;
 use super::values::{boolean, quoted_literal, raw, sql_literal, text};
 use crate::deploy::python_calls::Call;
 
@@ -11,6 +13,10 @@ const APP_SEPARATOR: char = '.';
 const DB_VALUE_WRAPPER: &str = "Value";
 const ARRAY_ELEMENT: &str = "base_field";
 const NONE: &str = "none";
+const CONDITIONAL: &str = "conditional_expression";
+const CONDITIONAL_BODY: u32 = 0;
+const CONDITIONAL_TEST: u32 = 1;
+const CONDITIONAL_ALTERNATIVE: u32 = 2;
 const DECIMAL_CONSTRUCTOR: &str = "Decimal";
 const DURATION_CONSTRUCTOR: &str = "timedelta";
 const ENVIRONMENT_RECEIVERS: &[&str] = &["os.environ", "environ"];
@@ -63,6 +69,7 @@ const CLASSES: &[(&str, Class)] = &[
     ("BinaryField", Class::Binary),
     ("IntegerField", Class::Integer),
     ("BigIntegerField", Class::BigInteger),
+    ("BitField", Class::BigInteger),
     ("SmallIntegerField", Class::SmallInteger),
     ("PositiveIntegerField", Class::PositiveInteger),
     ("PositiveBigIntegerField", Class::PositiveBigInteger),
@@ -98,6 +105,7 @@ pub struct Owner<'context> {
     pub app: &'context str,
     pub model: &'context str,
     pub settings: &'context Settings,
+    pub constants: Constants<'context>,
 }
 
 pub fn class_of(method: &str) -> Class {
@@ -107,7 +115,12 @@ pub fn class_of(method: &str) -> Class {
         .map_or(Class::Other, |(_, class)| *class)
 }
 
-pub fn field(name: &str, node: Node<'_>, source: &[u8], owner: Owner<'_>) -> Option<Field> {
+pub fn field<'tree>(
+    name: &str,
+    node: Node<'tree>,
+    source: &'tree [u8],
+    owner: Owner<'tree>,
+) -> Option<Field> {
     let call = Call::parse(node, source)?;
     let mut field = Field::new(name, class_of(call.method));
     for (keyword, flag) in FLAG_KEYWORDS {
@@ -137,12 +150,12 @@ pub fn field(name: &str, node: Node<'_>, source: &[u8], owner: Owner<'_>) -> Opt
     field.decimal_places = number("decimal_places");
     field.size = number("size");
     field.db_column = call.keyword("db_column").and_then(|value| text(value, source));
-    field.default = call
-        .keyword("default")
-        .map_or(FieldDefault::Unset, |value| default(value, source, field.class));
+    field.default = call.keyword("default").map_or(FieldDefault::Unset, |value| {
+        default(constant_value(value, owner), source, field.class)
+    });
     field.db_default = call
         .keyword("db_default")
-        .and_then(|value| database_default(value, source, field.class));
+        .and_then(|value| database_default(constant_value(value, owner), source, field.class));
     field.relation = relation(&call, field.class, owner);
     field.element = call
         .keyword(ARRAY_ELEMENT)
@@ -151,6 +164,30 @@ pub fn field(name: &str, node: Node<'_>, source: &[u8], owner: Owner<'_>) -> Opt
         .and_then(|element| self::field(name, element, source, owner))
         .map(Box::new);
     Some(field)
+}
+
+fn constant_value<'tree>(node: Node<'tree>, owner: Owner<'tree>) -> Node<'tree> {
+    let resolved = owner.constants.resolve(node);
+    if resolved.kind() != CONDITIONAL {
+        return resolved;
+    }
+    let branch = resolved
+        .named_child(CONDITIONAL_TEST)
+        .and_then(|condition| {
+            truth(
+                owner.constants.resolve(condition),
+                owner.constants.source,
+                owner.settings,
+            )
+        })
+        .and_then(|holds| {
+            resolved.named_child(if holds {
+                CONDITIONAL_BODY
+            } else {
+                CONDITIONAL_ALTERNATIVE
+            })
+        });
+    branch.map_or(resolved, |chosen| constant_value(chosen, owner))
 }
 
 fn default(node: Node<'_>, source: &[u8], class: Class) -> FieldDefault {
