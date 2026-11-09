@@ -18,7 +18,7 @@ readonly JAVA_INSPECTIONS=(RedundantThrows AutoCloseableResource DataFlowIssue)
 readonly WAIT_SECONDS=3000
 here="$(cd "$(dirname "$0")" && { pwd -W 2>/dev/null || pwd; })"
 repo="$(cd "$here/../.." && { pwd -W 2>/dev/null || pwd; })"
-heavy_lock="${HEAVY_LOCK:-$(cd "$repo/.." && pwd)/infra/local-bin/heavy_lock.py}"
+heavy_lock="${HEAVY_LOCK:-$(cd "$repo/.." && { pwd -W 2>/dev/null || pwd; })/infra/local-bin/heavy_lock.py}"
 logs="${KERBO_PARITY:-$repo/.parity}/logs/$(date +%Y-%m-%d_%H%M)"
 mkdir -p "$logs"
 

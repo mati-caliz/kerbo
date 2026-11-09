@@ -100,7 +100,7 @@ latest = "github:gitleaks/gitleaks"
 
 [tools.osv-scanner]
 family = "dependencies"
-version = "2.7.0"
+version = "2.7.1"
 latest = "github:google/osv-scanner"
 
 # Las gramáticas de tree-sitter: las de crates.io van por su versión en Cargo.toml; las copiadas en

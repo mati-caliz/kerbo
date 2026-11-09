@@ -23,6 +23,7 @@ if [ "${1:-}" != "--skip-osv-scanner" ]; then
   while read -r lockfile; do arguments+=(-L "/c/$lockfile"); done < "$out/files.txt"
   MSYS_NO_PATHCONV=1 docker run --rm --cpus=4 -v "$corpus:/c:ro" "ghcr.io/google/osv-scanner:v$version" \
     scan source --format json "${arguments[@]}" > "$out/osv-scanner.json" 2> "$out/osv-scanner.err" || true
+  [ -s "$out/osv-scanner.json" ] || { echo "osv-scanner no dejó resultados: ver $out/osv-scanner.err" >&2; rm -f "$out/osv-scanner.json"; exit 1; }
 fi
 image="$(docker images --format '{{.Repository}}:{{.Tag}}' quality-rust | head -1)"
 MSYS_NO_PATHCONV=1 docker run --rm -m 16g --cpus=8 -v "$repo:/src:ro" -w /src -v rust-quality-cache:/cache \

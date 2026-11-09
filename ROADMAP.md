@@ -1618,7 +1618,19 @@ osv-scanner marca como `MAL-` por el nombre y kerbo salta a propósito. Los de m
 `awesome-compose/react-express-mysql/backend` (lockfile v1) y uno de `vscode/build/rspack`; no se
 averiguó por qué osv-scanner no los informa.
 
+Hecho (2026-11-09): osv-scanner 2.7.0 → 2.7.1. Paridad: 7.302 de 7.303 grupos de avisos, 1 de menos
+(el `link:` de yarn marcado `MAL-`) y 0 de más; los 19 de más de antes ya no aparecen. Dos arreglos
+del arnés: `run_all.sh` armaba la ruta de `heavy_lock.py` en formato POSIX y Python de Windows no la
+encontraba, y `dependencies/corpus.sh` ahora falla si osv-scanner no deja resultados (antes la
+referencia quedaba como al día con un JSON vacío). `corpus_volume.sh` usa un volumen por carril
+(`kerbo-corpus-principal`, `kerbo-corpus-b`): con uno compartido, la copia de un carril vaciaba el
+volumen en medio de la medición del otro. El volumen viejo `kerbo-corpus` ya no se usa y se puede
+borrar cuando ningún carril lo necesite.
+
 - Pendientes:
+  - Los demás scripts de `scripts/parity` que comparten otros volúmenes (`kerbo-shell-corpus`) pasan
+    por el mismo `corpus_volume.sh`, así que también quedan por carril; falta una corrida completa de
+    `run_all.sh` con dos carriles a la vez para confirmarlo.
   - TypeScript 7 (7.0.2): bloqueado, typescript-eslint 8.72.1 declara `typescript <6.1.0`. Se sube
     cuando typescript-eslint lo soporte, o junto con tsrs (etapas 11 y 16).
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
