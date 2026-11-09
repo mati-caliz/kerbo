@@ -83,3 +83,12 @@ fn reads_flags_like_hadolint() {
 fn keeps_variables_inside_words() {
     assert_eq!(words("A=$B C=\"d e\" F=${G}"), vec!["A=${B}", "C=d e", "F=${G}"]);
 }
+
+#[test]
+fn flags_a_parenthesis_that_follows_two_words_as_a_syntax_error() {
+    assert!(parse("powershell if ((Get-Item a).Name -ne b) { Throw x }").has_syntax_error);
+    assert!(parse("Function Install-Tool() { go install x }").has_syntax_error);
+    assert!(!parse("cd /tmp && (make; make install)").has_syntax_error);
+    assert!(!parse("case $x in (a) echo a ;; esac").has_syntax_error);
+    assert!(!parse("build() { make; }").has_syntax_error);
+}

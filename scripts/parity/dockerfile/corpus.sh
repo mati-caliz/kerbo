@@ -13,7 +13,7 @@ version="$(python "$here/../versions.py" version hadolint)"
 corpus="$("$here/../corpus_volume.sh" "$parity/corpus" kerbo-corpus)"
 out="$(cd "$parity/dockerfile" && pwd -W)"
 MSYS_NO_PATHCONV=1 docker run --rm -v "$corpus:/c:ro" -v "$out:/o" alpine:3.22 sh -c \
-  'cd /c && find . \( -iname "Dockerfile" -o -iname "Dockerfile.*" -o -iname "*.dockerfile" \) -not -path "*/node_modules/*" | sed "s|^\./||" | sort > /o/files.txt'
+  'cd /c && find . -type f \( -iname "Dockerfile" -o -iname "Dockerfile.*" -o -iname "*.dockerfile" \) -not -path "*/node_modules/*" | sed "s|^\./||" | sort > /o/files.txt'
 if [ "${1:-}" != "--skip-hadolint" ]; then
   mapfile -t dockerfiles < "$out/files.txt"
   MSYS_NO_PATHCONV=1 docker run --rm --cpus=4 -v "$corpus:/c:ro" -w /c "hadolint/hadolint:v$version"     hadolint --no-fail --format json "${dockerfiles[@]}" > "$out/hadolint.json" || true

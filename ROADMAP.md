@@ -1632,6 +1632,13 @@ vscode y juice-shop (87 reglas) es idéntica byte a byte a la de antes, la lib d
 `typescript_lib.txt` conserva los mismos 193 nombres y sigue el tope `typescript <6.1.0`. Con esto
 sólo queda atrasada TypeScript 7, bloqueada.
 
+Hecho (2026-11-09): corpus de hadolint ampliado con docker-library/python, docker-library/node, moby y
+grafana (de 71 a 181 Dockerfile medidos; el `find` ahora pide `-type f` porque moby tiene una carpeta
+`dockerfile`). Salieron cuatro DL3059 de menos, todos de Dockerfile de Windows, por cómo hadolint cuenta
+los comandos de un `RUN`: un script que el shell no parsea (un `(` después de dos palabras, como
+`if ((Get-Item ...)` o `Function Nombre() {`) cuenta cero, y un comando cuyo nombre es una expansión
+(`%{$nul`) no cuenta. Paridad: 593 de 593, 0 de menos, 0 de más.
+
 - Pendientes:
   - Los demás scripts de `scripts/parity` que comparten otros volúmenes (`kerbo-shell-corpus`) pasan
     por el mismo `corpus_volume.sh`, así que también quedan por carril; falta una corrida completa de
@@ -1641,7 +1648,7 @@ sólo queda atrasada TypeScript 7, bloqueada.
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.
   - Dependencias: entender los 19 avisos de más contra osv-scanner (ssr2, awesome-compose, rspack).
-  - Los 26 Dockerfile que hadolint no parsea quedan sin medir: sumar repos con Dockerfile al corpus.
+  - Los Dockerfile que hadolint no parsea (31, casi todos de awesome-compose) quedan sin medir.
   - Cuando entre tsrs (etapas 11 y 16), su commit y la versión de TypeScript que sigue van en
     `versions.toml`.
 

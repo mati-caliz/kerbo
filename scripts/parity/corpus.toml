@@ -146,3 +146,23 @@ uso = "migraciones (Flyway) contra squawk"
 url = "https://github.com/docker/awesome-compose.git"
 commit = "30f4b7f6a6c3b0c0ecf4d4efb0de203c48d11562"
 uso = "SQL suelto contra squawk"
+
+[repos.docker-library-python]
+url = "https://github.com/docker-library/python.git"
+commit = "f4c67ece208dead594e43628d22e3c6027dd97ab"
+uso = "Dockerfile contra hadolint"
+
+[repos.docker-library-node]
+url = "https://github.com/docker-library/node.git"
+commit = "a672ac6b898963aae94f25c5fb5cb64efd6c1ba4"
+uso = "Dockerfile contra hadolint"
+
+[repos.moby]
+url = "https://github.com/moby/moby.git"
+commit = "b40ad2123f4d2e2cb182d7f27d9b91aa64bc304e"
+uso = "Dockerfile contra hadolint"
+
+[repos.grafana]
+url = "https://github.com/grafana/grafana.git"
+commit = "58cc33fcc665da3d869076bb943aea07b927d137"
+uso = "Dockerfile contra hadolint"

@@ -9,6 +9,7 @@ use super::{StageFlags, environment_pairs};
 use crate::rules::DockerfileRule;
 
 const SINGLE_COMMAND: usize = 1;
+const EXPANSION_OPENING: &str = "${";
 const PIPEFAIL_SHELLS: &[&str] = &["/bin/bash", "/bin/zsh", "/bin/ash", "bash", "zsh", "ash"];
 const NON_POSIX_SHELLS: &[&str] = &["pwsh", "powershell", "cmd"];
 const PIPEFAIL: &str = "pipefail";
@@ -88,7 +89,17 @@ fn enter_stage(state: &mut RunState<'_>, image: BaseImage) {
 }
 
 fn consecutive_runs<'steps>(state: &mut RunState<'steps>, step: &'steps Step, findings: &mut Findings) {
-    let commands = step.script.as_ref().map_or(0, |script| script.commands.len());
+    let commands = step
+        .script
+        .as_ref()
+        .filter(|script| !script.has_syntax_error)
+        .map_or(0, |script| {
+            script
+                .commands
+                .iter()
+                .filter(|command| !command.name.contains(EXPANSION_OPENING))
+                .count()
+        });
     let flags = step.instruction.flags.as_slice();
     let consolidable = state
         .previous_run

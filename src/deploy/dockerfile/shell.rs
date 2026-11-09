@@ -10,6 +10,8 @@ const CONDITIONS: &[&str] = &["[", "[["];
 const LONG_FLAG: &str = "--";
 const SHORT_FLAG: &str = "-";
 const FLAG_VALUE: char = '=';
+const MIN_WORDS_BEFORE_INVALID_PARENTHESIS: usize = 2;
+const PARENTHESIS_FRIENDLY_PREFIXES: &[&str] = &["case", "function", "[[", "["];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Command {
@@ -21,6 +23,7 @@ pub struct Command {
 pub struct Script {
     pub commands: Vec<Command>,
     pub has_pipe: bool,
+    pub has_syntax_error: bool,
 }
 
 impl Script {
@@ -49,6 +52,10 @@ pub fn parse(script: &str) -> Script {
                 nested.extend(inner.commands);
             }
             Piece::Separator => flush(&mut words, &mut nested, &mut parsed.commands),
+            Piece::OpenParenthesis => {
+                parsed.has_syntax_error |= opens_outside_function_or_case(&words);
+                flush(&mut words, &mut nested, &mut parsed.commands);
+            }
             Piece::Pipe => {
                 parsed.has_pipe = true;
                 flush(&mut words, &mut nested, &mut parsed.commands);
@@ -64,9 +71,15 @@ pub fn words(text: &str) -> Vec<String> {
         .into_iter()
         .filter_map(|piece| match piece {
             Piece::Word(word) => Some(word),
-            Piece::Nested(_) | Piece::Separator | Piece::Pipe => None,
+            Piece::Nested(_) | Piece::Separator | Piece::OpenParenthesis | Piece::Pipe => None,
         })
         .collect()
+}
+
+fn opens_outside_function_or_case(words: &[String]) -> bool {
+    let first = words.first().map(String::as_str);
+    words.len() >= MIN_WORDS_BEFORE_INVALID_PARENTHESIS
+        && !first.is_some_and(|word| PARENTHESIS_FRIENDLY_PREFIXES.contains(&word))
 }
 
 fn flush(words: &mut Vec<String>, nested: &mut Vec<Command>, commands: &mut Vec<Command>) {

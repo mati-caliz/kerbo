@@ -188,3 +188,28 @@ fn the_fixture_matches_hadolint() {
     expected.sort();
     assert_eq!(found, expected);
 }
+
+#[test]
+fn does_not_count_commands_of_a_script_the_shell_cannot_parse() {
+    let dockerfile = "FROM scratch
+RUN powershell \\
+    if ((Get-Item a).Name -ne b) { \\
+        Throw x \\
+    }
+RUN setx /M PATH x
+";
+    assert_eq!(codes(dockerfile), expected(&[(6, "DL3059")]));
+}
+
+#[test]
+fn does_not_count_commands_whose_name_is_an_expansion() {
+    let dockerfile = "FROM scratch
+RUN a
+RUN b ^|%{$n = c /c x}
+RUN d
+";
+    assert_eq!(
+        codes(dockerfile),
+        expected(&[(3, "DL3059"), (3, "DL4006"), (4, "DL3059")])
+    );
+}

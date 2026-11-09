@@ -19,6 +19,7 @@ pub enum Piece {
     Word(String),
     Nested(Script),
     Separator,
+    OpenParenthesis,
     Pipe,
 }
 
@@ -114,6 +115,9 @@ impl Reader {
             .is_some_and(|next| next == character && SEPARATORS.contains(&next))
         {
             self.bump();
+        }
+        if character == '(' {
+            return Some(Piece::OpenParenthesis);
         }
         Some(Piece::Separator)
     }
