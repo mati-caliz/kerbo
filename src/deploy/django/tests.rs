@@ -55,7 +55,7 @@ impl Loader for MemoryLoader {
     }
 }
 
-fn parsed(source: &str) -> Tree {
+pub fn parsed(source: &str) -> Tree {
     let mut parser = Parser::new();
     parser
         .set_language(&Language::Python.grammar().expect("tiene gramática"))
@@ -69,6 +69,7 @@ fn found(loader: &MemoryLoader, app: &str, stem: &str, source: &str) -> Vec<(Mig
         app: app.to_owned(),
         stem: stem.to_owned(),
         apps_root: PathBuf::new(),
+        source_root: PathBuf::new(),
     };
     let mut rules: Vec<(MigrationRule, usize)> =
         render(tree.root_node(), source.as_bytes(), &current, loader)
@@ -272,6 +273,7 @@ fn sql(loader: &MemoryLoader, app: &str, stem: &str, source: &str) -> String {
         app: app.to_owned(),
         stem: stem.to_owned(),
         apps_root: PathBuf::new(),
+        source_root: PathBuf::new(),
     };
     let mut state = state_before(loader, &current, &parsed_migration);
     dispatch::sql(&parsed_migration, app, &mut state)

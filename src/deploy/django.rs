@@ -1,9 +1,11 @@
 mod alter;
 mod columns;
+mod computed_names;
 mod condition;
 mod constants;
 mod deferred;
 mod dependencies;
+mod discovery;
 mod dispatch;
 mod django_version;
 mod expression;
@@ -18,6 +20,7 @@ mod model;
 mod names;
 mod operations;
 mod parse;
+mod project_fields;
 mod rename;
 mod run_python;
 mod schema;
@@ -43,7 +46,7 @@ pub fn violations(root: Node<'_>, source: &[u8], path: Option<&Path>) -> Vec<Vio
     if !history::is_migration_source(source) {
         return Vec::new();
     }
-    let loader = FileLoader::new(location.apps_root.clone());
+    let loader = FileLoader::new(location.source_root.clone());
     render(root, source, &location, &loader)
 }
 
@@ -53,7 +56,7 @@ fn render(root: Node<'_>, source: &[u8], location: &Location, loader: &impl Load
         Reader {
             source,
             app: &location.app,
-            settings: &settings::project(&location.apps_root),
+            settings: &settings::project(&location.source_root),
             apps_root: Some(&location.apps_root),
         },
     ) else {
@@ -70,11 +73,11 @@ fn rendered_sql(root: Node<'_>, source: &[u8], location: &Location) -> Option<St
         Reader {
             source,
             app: &location.app,
-            settings: &settings::project(&location.apps_root),
+            settings: &settings::project(&location.source_root),
             apps_root: Some(&location.apps_root),
         },
     )?;
-    let loader = FileLoader::new(location.apps_root.clone());
+    let loader = FileLoader::new(location.source_root.clone());
     let mut state = history::state_before(&loader, location, &migration);
     Some(dispatch::sql(&migration, &location.app, &mut state))
 }

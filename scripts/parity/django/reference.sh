@@ -27,6 +27,11 @@ case "$repo" in
     database_driver=""
     system_packages="git build-essential pkg-config libpq-dev libldap2-dev libsasl2-dev libxml2-dev libxmlsec1-dev libicu-dev libvips42"
     ;;
+  wagtail)
+    dependency_groups="--no-dev"
+    database_driver="psycopg[binary] Jinja2"
+    system_packages=""
+    ;;
   *)
     dependency_groups="--no-dev"
     database_driver="psycopg[binary]"

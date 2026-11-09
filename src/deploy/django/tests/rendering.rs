@@ -238,3 +238,33 @@ fn schema_editor_renames_inside_separate_database_and_state_are_rendered() {
         &["library_note", "library_same"],
     );
 }
+
+const SWAPPABLE_PAGE: &str = r#"import swapper
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    operations = [
+        migrations.CreateModel(name="Page", fields=[("id", models.AutoField(primary_key=True))]),
+        migrations.CreateModel(
+            name="Site",
+            fields=[
+                ("id", models.AutoField(primary_key=True)),
+                ("root", models.ForeignKey(on_delete=models.CASCADE, to=swapper.get_model_name("library", "Page"))),
+            ],
+        ),
+    ]
+"#;
+
+#[test]
+fn a_swapper_reference_points_to_the_default_model() {
+    let loader = MemoryLoader::default();
+    assert_rendered(
+        &sql(&loader, APP, "0001_initial", SWAPPABLE_PAGE),
+        &[
+            r#""root_id" integer NOT NULL"#,
+            r#"REFERENCES "library_page" ("id")"#,
+        ],
+        &["text_pattern_ops"],
+    );
+}

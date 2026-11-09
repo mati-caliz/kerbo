@@ -1,5 +1,6 @@
 """kerbo (out/<repo>.json) contra squawk sobre el SQL de `sqlmigrate` (.parity/django/<repo>/squawk.json).
 
+Las migraciones se nombran por el label de su app (el de apps.py, como en sqlmigrate), no por su carpeta.
 Se compara por migración, regla y cantidad de avisos, sólo en las migraciones que `sqlmigrate`
 pudo convertir (las que fallan quedan en errores.txt y no tienen referencia): squawk marca líneas
 del SQL generado y kerbo las de la operación que lo genera, así que la línea no se puede cruzar.
@@ -11,14 +12,22 @@ import collections
 import json
 import os
 import pathlib
+import re
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent.parent.parent
 PARITY = pathlib.Path(os.environ.get("KERBO_PARITY", REPO / ".parity"))
-APPS_ROOTS = {"django": "django/django/contrib", "saleor": "saleor/saleor", "zulip": "zulip"}
+APPS_ROOTS = {"django": "django/django/contrib", "saleor": "saleor/saleor", "zulip": "zulip", "wagtail": "wagtail"}
 REFERENCE_PREFIX = "/out/"
 MIGRATIONS_DIRECTORY = "migrations"
+LABEL = re.compile(r"""^\s*label\s*=\s*["']([^"']+)["']""", re.MULTILINE)
+
+
+def label(repo, app_directory):
+    config = PARITY / "corpus" / APPS_ROOTS[repo] / app_directory / "apps.py"
+    found = LABEL.search(config.read_text(encoding="utf-8")) if config.exists() else None
+    return found.group(1) if found else app_directory.name
 
 
 def reference(repo):
@@ -40,7 +49,7 @@ def kerbo(repo, rules):
     for finding in json.loads((HERE / "out" / f"{repo}.json").read_text(encoding="utf-8")):
         path = pathlib.PurePosixPath(finding["path"].removeprefix("./").removeprefix(prefix))
         if finding["rule"] in rules and path.parent.name == MIGRATIONS_DIRECTORY:
-            counts[(f"{path.parent.parent.name}/{path.stem}", finding["rule"])] += 1
+            counts[(f"{label(repo, path.parent.parent)}/{path.stem}", finding["rule"])] += 1
     return counts
 
 

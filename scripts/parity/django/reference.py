@@ -29,10 +29,21 @@ REPOS = {
     "saleor": {
         "path": "/repo",
         "settings": "saleor.settings",
+        "private_key": True,
     },
     "zulip": {
         "path": "/repo",
         "settings": "zulip_settings",
+    },
+    "wagtail": {
+        "path": "/repo",
+        "settings": "wagtail.test.settings",
+        "environment": {
+            "DATABASE_ENGINE": "django.db.backends.postgresql",
+            "DATABASE_NAME": "kerbo",
+            "DATABASE_USER": "postgres",
+            "DATABASE_PASSWORD": "kerbo",
+        },
     },
 }
 OUT = pathlib.Path("/out")
@@ -57,7 +68,9 @@ def configure(repo):
         os.environ["DJANGO_SETTINGS_MODULE"] = REPOS[repo]["settings"]
         os.environ["DATABASE_URL"] = f"postgres://postgres:kerbo@{os.environ['DATABASE_HOST']}/kerbo"
         os.environ["SECRET_KEY"] = "kerbo"
-        os.environ["RSA_PRIVATE_KEY"] = temporary_private_key()
+        if REPOS[repo].get("private_key"):
+            os.environ["RSA_PRIVATE_KEY"] = temporary_private_key()
+        os.environ.update(REPOS[repo].get("environment", {}))
         django.setup()
         return
     from django.conf import settings

@@ -13,6 +13,8 @@ const CLOSERS: [char; 2] = [']', ')'];
 const MAXIMUM_INDIRECTION: usize = 8;
 const NEWLINE: char = '\n';
 const INLINE_WHITESPACE: [char; 2] = [' ', '\t'];
+const LIST_ADDITIONS: [&str; 2] = [".append(", ".insert("];
+const CALL_OPENER: char = '(';
 
 pub fn installed_apps(sources: &[String]) -> Option<BTreeSet<String>> {
     let text = sources
@@ -29,7 +31,21 @@ pub fn installed_apps(sources: &[String]) -> Option<BTreeSet<String>> {
         }
         found = true;
     }
+    apps.extend(added(&text).iter().map(|module| app_directory(module)));
     found.then_some(apps)
+}
+
+fn added(text: &str) -> Vec<String> {
+    let mut modules = Vec::new();
+    for method in LIST_ADDITIONS {
+        let call = format!("{SETTING}{method}");
+        for (start, _) in text.match_indices(&call) {
+            if let Some((inside, _)) = bracketed(&text[start + call.len() - 1..], CALL_OPENER) {
+                modules.extend(strings(inside));
+            }
+        }
+    }
+    modules
 }
 
 fn without_comment(line: &str) -> &str {
@@ -191,6 +207,24 @@ mod tests {
                 "corporate".to_owned(),
                 "zerver".to_owned(),
                 "zilencer".to_owned()
+            ])
+        );
+    }
+
+    #[test]
+    fn counts_the_apps_appended_or_inserted_later() {
+        let source = "INSTALLED_APPS = [\"cms\"]
+if LEGACY:
+    INSTALLED_APPS.insert(0, \"pages\")
+else:
+    INSTALLED_APPS.append(\"cms.customuser\")
+";
+        assert_eq!(
+            read(source),
+            Some(vec![
+                "cms".to_owned(),
+                "customuser".to_owned(),
+                "pages".to_owned()
             ])
         );
     }

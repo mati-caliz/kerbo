@@ -11,14 +11,29 @@ const MIGRATIONS_DIRECTORY: &str = "migrations";
 const SQL_EXTENSION: &str = "sql";
 
 fn migration_paths(apps_root: &Path) -> Vec<PathBuf> {
-    let mut paths: Vec<PathBuf> = fs::read_dir(apps_root)
-        .expect("se lee la carpeta de apps")
-        .filter_map(Result::ok)
-        .filter_map(|app| fs::read_dir(app.path().join(MIGRATIONS_DIRECTORY)).ok())
-        .flatten()
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .collect();
+    let mut paths = Vec::new();
+    let mut pending = vec![apps_root.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        let Ok(entries) = fs::read_dir(&directory) else {
+            continue;
+        };
+        for path in entries.filter_map(Result::ok).map(|entry| entry.path()) {
+            if !path.is_dir() {
+                continue;
+            }
+            if path.file_name().is_some_and(|name| name == MIGRATIONS_DIRECTORY) {
+                paths.extend(
+                    fs::read_dir(&path)
+                        .into_iter()
+                        .flatten()
+                        .filter_map(Result::ok)
+                        .map(|entry| entry.path()),
+                );
+            } else {
+                pending.push(path);
+            }
+        }
+    }
     paths.sort();
     paths
 }

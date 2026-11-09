@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::constants::Constants;
+use super::dependencies::swappable_default;
 use super::model::{Class, Field, FieldDefault, Flag, ModelKey, Relation};
 use super::settings::Settings;
 use super::truth::truth;
@@ -96,6 +97,11 @@ const CLASSES: &[(&str, Class)] = &[
     ("SanitizedJSONField", Class::SanitizedJson),
     ("MeasurementField", Class::Float),
     ("ForeignKey", Class::ForeignKey),
+    ("ParentalKey", Class::ForeignKey),
+    ("ParentalManyToManyField", Class::ManyToMany),
+    ("StreamField", Class::Json),
+    ("TaggableManager", Class::ManyToMany),
+    ("ClusterTaggableManager", Class::ManyToMany),
     ("OneToOneField", Class::OneToOne),
     ("ManyToManyField", Class::ManyToMany),
 ];
@@ -122,7 +128,11 @@ pub fn field<'tree>(
     owner: Owner<'tree>,
 ) -> Option<Field> {
     let call = Call::parse(node, source)?;
-    let mut field = Field::new(name, class_of(call.method));
+    let class = Some(class_of(call.method))
+        .filter(|known| *known != Class::Other)
+        .or_else(|| owner.settings.field_classes.get(call.method).copied())
+        .unwrap_or(Class::Other);
+    let mut field = Field::new(name, class);
     for (keyword, flag) in FLAG_KEYWORDS {
         if call.keyword_is_true(keyword) {
             field.flags.insert(*flag);
@@ -364,6 +374,9 @@ fn relation(call: &Call<'_>, class: Class, owner: Owner<'_>) -> Option<Relation>
 pub fn model_reference(node: Node<'_>, source: &[u8], owner: Owner<'_>) -> Option<ModelKey> {
     if raw(node, source).ends_with(USER_MODEL_SETTING) {
         return Some(owner.settings.user_model.clone());
+    }
+    if let Some(swappable) = swappable_default(node, source) {
+        return Some(swappable);
     }
     let reference = text(node, source)?;
     if reference == SELF_REFERENCE {

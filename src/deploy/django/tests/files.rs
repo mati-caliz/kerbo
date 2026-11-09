@@ -2,6 +2,8 @@ use std::path::Path;
 
 use super::parsed;
 use crate::deploy::django::history::location;
+use crate::deploy::django::model::Class;
+use crate::deploy::django::settings::{Settings, project};
 use crate::deploy::django::{fingerprint, rendered_sql, violations};
 use crate::test_support::TempTree;
 
@@ -154,4 +156,36 @@ fn project_factories_build_the_operation_their_settings_choose() {
         dropped.contains("DROP INDEX CONCURRENTLY IF EXISTS \"note_body_idx\""),
         "{dropped}"
     );
+}
+
+const FIVE_LOCK: &str = "[[package]]\nname = \"django\"\nversion = \"5.2.19\"\n";
+const SIX_LOCK: &str = "[[package]]\nname = \"django\"\nversion = \"6.0.1\"\n";
+const PLAIN_SETTINGS: &str = "DEBUG = True\n";
+
+fn settings_of(name: &str, lock: &str, settings: &str) -> Settings {
+    let tree = TempTree::new(name);
+    tree.write("uv.lock", lock);
+    tree.write("project/__init__.py", "");
+    tree.write("project/settings.py", settings);
+    project(tree.path())
+}
+
+#[test]
+fn django_six_makes_the_automatic_key_big_unless_the_settings_say_otherwise() {
+    let implicit = settings_of("django-six-default", SIX_LOCK, PLAIN_SETTINGS);
+    let explicit = settings_of(
+        "django-six-explicit",
+        SIX_LOCK,
+        "DEFAULT_AUTO_FIELD = \"django.db.models.AutoField\"\n",
+    );
+    assert_eq!(implicit.auto_field, Class::BigAuto);
+    assert_eq!(explicit.auto_field, Class::Auto);
+    assert!(!implicit.column_drops_cascade);
+}
+
+#[test]
+fn a_project_locked_before_django_six_drops_columns_in_cascade() {
+    let settings = settings_of("django-five-cascade", FIVE_LOCK, PLAIN_SETTINGS);
+    assert!(settings.column_drops_cascade);
+    assert_eq!(settings.auto_field, Class::Auto);
 }

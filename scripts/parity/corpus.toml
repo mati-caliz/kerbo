@@ -37,6 +37,11 @@ url = "https://github.com/zulip/zulip.git"
 commit = "5ce3cba6ec4fd07814367bc9227eec55557e4ad0"
 uso = "migraciones de Django contra squawk"
 
+[repos.wagtail]
+url = "https://github.com/wagtail/wagtail.git"
+commit = "dd43152109a5b033eb0ee0c34519093c3fbd4e10"
+uso = "migraciones de Django contra squawk"
+
 [repos.express]
 url = "https://github.com/expressjs/express.git"
 commit = "43fca52d28a422c8be48fd489cbd4f2d6152bab6"

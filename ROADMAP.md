@@ -1654,7 +1654,30 @@ cerrarse se borra de acá.
     - Lo que queda sin traducir en los `Q` (sale `true`, como antes): `_connector="XOR"` y los
       valores aritméticos (`2**32 - 1`). Funciones fuera de `Upper`/`Lower` en un índice por
       expresión salen `(true)`.
-  - Medir más repos de Django (sentry, wagtail): entrada en `REPOS` de `reference.py`.
+  - Wagtail medido (2026-11-09, commit en `corpus.toml`): 213 migraciones con su proyecto de
+    pruebas (`wagtail.test.settings`, Django 6.0). Squawk 1.370 avisos, kerbo 1.190, coinciden
+    1.190, 50 diferencias, ninguna de más (eran 96); sentencia por sentencia, de 40 a 16
+    migraciones con SQL distinto. Para llegar: las apps se descubren anidadas y con el `label` de
+    su `AppConfig`; los `settings` toman la primera asignación de nivel superior (si no hay, la
+    última indentada); la versión de Django es la más nueva que fija el lock; con Django 6 el
+    `DEFAULT_AUTO_FIELD` por defecto es `BigAutoField`; `INSTALLED_APPS.append(...)`/`.insert(...)`
+    suman apps; se entienden `swapper.get_model_name`/`swapper.dependency` con el modelo por
+    defecto y el `AUTH_USER_MODEL` condicional; `ParentalKey`, `ParentalManyToManyField`,
+    `StreamField` (`jsonb`), `TaggableManager` y `ClusterTaggableManager` (sin columna); las
+    clases de campo del proyecto (`fields.py`) toman la clase de Django que extienden, y el
+    nombre de campo `parent_rel_name` (f-string sobre `swapper.split(...)[1].lower()`) se evalúa.
+    Lo que queda:
+    - Apps de terceros fuera del corpus: `admin`, `auth`, `contenttypes`, `sessions`, `taggit`
+      (y las claves foráneas a `taggit.Tag`, que kerbo tipa `bigint` porque no ve su `AutoField`,
+      como en demosite).
+    - streamfield_migration_tests/0001: el `page_ptr_id` sale `bigint`; depende de
+      `wagtailcore` 0069 y las demás apps de prueba que dependen de otras migraciones de
+      `wagtailcore` lo sacan `integer` bien. Falta ver por qué no encuentra la página ahí.
+    - testapp (`tests/0001_squashed_0065`), wagtailsearch 0006 (`tsvector`) y 0010 (`if` por
+      motor de base), snippetstests 0009 (el `default` de un `DateField`).
+    - Errores de la referencia (no convierte): wagtailcore 0087, taggit 0006, wagtaildocs 0005,
+      wagtailembeds 0008, wagtailsearch 0008.
+  - Medir sentry: entrada en `REPOS` de `reference.py`.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
     `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), los
     borrados que Django resuelve por introspección (restricciones sin nombre conocido),

@@ -5,6 +5,7 @@ use tree_sitter::Node;
 
 mod raw_sql;
 
+use super::computed_names::name_text;
 use super::constants::{Constants, assignments, class_attributes};
 use super::dependencies::keys;
 use super::factories::{Factory, imported};
@@ -313,7 +314,7 @@ impl<'context> Scope<'context> {
             .into_iter()
             .filter_map(|pair| {
                 let parts = elements(pair);
-                let field_name = text(*parts.first()?, self.source)?;
+                let field_name = name_text(*parts.first()?, self.constants)?;
                 field(&field_name, *parts.get(1)?, self.source, owner)
             })
             .collect();

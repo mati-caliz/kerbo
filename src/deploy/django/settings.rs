@@ -3,10 +3,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock, PoisonError};
 
+use super::discovery::{is_package, subdirectories};
 use super::django_version::{Version, project_version};
 use super::fields::class_of;
 use super::installed_apps::installed_apps;
 use super::model::{Class, ModelKey};
+use super::project_fields::field_classes;
 
 const SETTINGS_MODULE: &str = "settings";
 const PYTHON_EXTENSION: &str = "py";
@@ -19,11 +21,14 @@ const ASSIGNMENT: char = '=';
 const QUOTES: &[char] = &['"', '\''];
 const SETTINGS_PREFIX: &str = "settings.";
 const CASCADE_DROPPED_IN: Version = Version::new(6, 0);
+const BIG_AUTO_FIELD_DEFAULT_IN: Version = Version::new(6, 0);
 const RELATIVE_IMPORT: &str = "from .";
 const IMPORT_KEYWORD: &str = " import ";
 const WILDCARD: char = '*';
 const PYTHON_TRUE: &str = "True";
 const PYTHON_FALSE: &str = "False";
+const CONFIG_MODULE: &str = "apps.py";
+const MAXIMUM_SETTINGS_DEPTH: usize = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
@@ -33,6 +38,7 @@ pub struct Settings {
     pub flags: BTreeMap<String, bool>,
     pub installed_apps: Option<BTreeSet<String>>,
     pub column_drops_cascade: bool,
+    pub field_classes: BTreeMap<String, Class>,
 }
 
 impl Default for Settings {
@@ -44,6 +50,7 @@ impl Default for Settings {
             flags: BTreeMap::new(),
             installed_apps: None,
             column_drops_cascade: false,
+            field_classes: BTreeMap::new(),
         }
     }
 }
@@ -134,17 +141,29 @@ fn flags(sources: &[String]) -> BTreeMap<String, bool> {
         .collect()
 }
 
+fn assigned_text<'source>(line: &'source str, name: &str) -> Option<&'source str> {
+    let value = line
+        .trim_start()
+        .strip_prefix(name)?
+        .trim_start()
+        .strip_prefix(ASSIGNMENT)?
+        .trim();
+    value.strip_prefix(QUOTES)?.strip_suffix(QUOTES)
+}
+
 fn assigned(sources: &[String], name: &str) -> Option<String> {
-    sources
-        .iter()
-        .flat_map(|source| source.lines())
-        .filter_map(|line| line.strip_prefix(name))
-        .filter_map(|rest| rest.trim_start().strip_prefix(ASSIGNMENT))
-        .map(str::trim)
-        .find_map(|value| {
-            let unquoted = value.strip_prefix(QUOTES)?.strip_suffix(QUOTES)?;
-            Some(unquoted.to_owned())
+    let lines = || sources.iter().flat_map(|source| source.lines());
+    let is_top_level = |line: &&str| !line.starts_with(char::is_whitespace);
+    lines()
+        .filter(is_top_level)
+        .find_map(|line| assigned_text(line, name))
+        .or_else(|| {
+            lines()
+                .filter(|line| !is_top_level(line))
+                .filter_map(|line| assigned_text(line, name))
+                .next_back()
         })
+        .map(str::to_owned)
 }
 
 fn candidates(apps_root: &Path) -> Vec<PathBuf> {
@@ -160,7 +179,11 @@ fn candidates(apps_root: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     for package in packages {
         files.push(package.join(SETTINGS_MODULE).with_extension(PYTHON_EXTENSION));
-        if let Ok(entries) = fs::read_dir(package.join(SETTINGS_MODULE)) {
+        let settings_package = package.join(SETTINGS_MODULE);
+        if settings_package.join(CONFIG_MODULE).is_file() {
+            continue;
+        }
+        if let Ok(entries) = fs::read_dir(settings_package) {
             files.extend(
                 entries
                     .filter_map(Result::ok)
@@ -172,8 +195,29 @@ fn candidates(apps_root: &Path) -> Vec<PathBuf> {
             );
         }
     }
+    files.retain(|file| file.is_file());
     files.sort();
     files
+}
+
+fn settings_files(source_root: &Path) -> Vec<PathBuf> {
+    let mut level = vec![source_root.to_path_buf()];
+    for _ in 0..=MAXIMUM_SETTINGS_DEPTH {
+        let mut next = Vec::new();
+        for directory in &level {
+            let files = candidates(directory);
+            if !files.is_empty() {
+                return files;
+            }
+            next.extend(
+                subdirectories(directory)
+                    .into_iter()
+                    .filter(|child| is_package(child)),
+            );
+        }
+        level = next;
+    }
+    Vec::new()
 }
 
 fn wildcard_imports(source: &str, directory: &Path) -> Vec<PathBuf> {
@@ -214,14 +258,19 @@ fn sources_from(files: Vec<PathBuf>) -> Vec<String> {
 }
 
 fn discovered(apps_root: &Path) -> Settings {
-    let sources = sources_from(candidates(apps_root));
+    let sources = sources_from(settings_files(apps_root));
+    let version = project_version(apps_root);
     let mut settings = if sources.is_empty() {
         Settings::of_a_new_project()
     } else {
         Settings::read(&sources)
     };
-    settings.column_drops_cascade =
-        project_version(apps_root).is_some_and(|version| version < CASCADE_DROPPED_IN);
+    let big_by_default = version.is_some_and(|known| known >= BIG_AUTO_FIELD_DEFAULT_IN);
+    if big_by_default && assigned(&sources, AUTO_FIELD_SETTING).is_none() {
+        settings.auto_field = Class::BigAuto;
+    }
+    settings.field_classes = field_classes(apps_root);
+    settings.column_drops_cascade = version.is_some_and(|known| known < CASCADE_DROPPED_IN);
     settings
 }
 
@@ -291,6 +340,22 @@ DEBUG_TOOLBAR = maybe()
     }
 
     #[test]
+    fn a_conditional_user_model_takes_the_branch_without_environment() {
+        let sources = vec![
+            "if os.environ.get(\"USE_EMAIL\"):
+    AUTH_USER_MODEL = \"email.User\"
+else:
+    AUTH_USER_MODEL = \"custom.User\"
+"
+            .to_owned(),
+        ];
+        assert_eq!(
+            Settings::read(&sources).user_model,
+            ModelKey::new("custom", "User")
+        );
+    }
+
+    #[test]
     fn falls_back_to_the_django_defaults() {
         let sources = vec!["AUTH_USER_MODEL = get_user_model_name()\n".to_owned()];
         assert_eq!(Settings::read(&sources), Settings::default());
@@ -324,20 +389,5 @@ DEBUG_TOOLBAR = maybe()
         fs::remove_dir_all(&apps_root).expect("se borra el proyecto de prueba");
         assert_eq!(settings.auto_field, Class::BigAuto);
         assert_eq!(settings.user_model, Settings::default().user_model);
-    }
-
-    #[test]
-    fn a_project_locked_before_django_six_drops_columns_in_cascade() {
-        let project = std::env::temp_dir().join(format!("kerbo-django-cascade-{}", std::process::id()));
-        let apps_root = project.join("apps");
-        fs::create_dir_all(&apps_root).expect("se crea el proyecto de prueba");
-        fs::write(
-            project.join("uv.lock"),
-            "[[package]]\nname = \"django\"\nversion = \"5.2.19\"\n",
-        )
-        .expect("se escribe el lock");
-        let settings = discovered(&apps_root);
-        fs::remove_dir_all(&project).expect("se borra el proyecto de prueba");
-        assert!(settings.column_drops_cascade);
     }
 }

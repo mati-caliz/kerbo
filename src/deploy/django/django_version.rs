@@ -83,19 +83,21 @@ fn requirement_sources(directory: &Path) -> Vec<String> {
 
 fn locked(source: &str) -> Option<Version> {
     let mut lines = source.lines();
+    let mut newest = None;
     while let Some(line) = lines.next() {
         let is_django = line
             .strip_prefix(LOCK_NAME_PREFIX)
             .and_then(|rest| rest.strip_suffix(QUOTE))
             .is_some_and(|name| name.eq_ignore_ascii_case(PACKAGE));
         if is_django {
-            return lines
+            let version = lines
                 .next()
                 .and_then(|next| next.strip_prefix(LOCK_VERSION_PREFIX))
                 .and_then(parsed);
+            newest = newest.max(version);
         }
     }
-    None
+    newest
 }
 
 fn required(source: &str) -> Option<Version> {
@@ -145,8 +147,12 @@ version = \"25.1\"
 [[package]]
 name = \"django\"
 version = \"5.2.19\"
+
+[[package]]
+name = \"django\"
+version = \"6.1.2\"
 ";
-        assert_eq!(locked(lock), Some(Version::new(5, 2)));
+        assert_eq!(locked(lock), Some(Version::new(6, 1)));
     }
 
     #[test]

@@ -7,6 +7,7 @@ use std::time::SystemTime;
 
 use tree_sitter::Parser;
 
+use super::discovery::{self, App};
 use super::graph::{Graph, Nodes, Parents, ancestors};
 use super::operations::{Migration, MigrationKey};
 use super::parse::{Reader, migration};
@@ -24,6 +25,9 @@ const CLASS_MARKER: &str = "class Migration(";
 pub trait Loader {
     fn apps(&self) -> Vec<String>;
     fn migrations(&self, app: &str) -> Vec<(String, Arc<Migration>)>;
+    fn directory_name(&self, app: &str) -> String {
+        app.to_owned()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,6 +35,7 @@ pub struct Location {
     pub app: String,
     pub stem: String,
     pub apps_root: PathBuf,
+    pub source_root: PathBuf,
 }
 
 pub fn location(path: &Path) -> Option<Location> {
@@ -43,10 +48,12 @@ pub fn location(path: &Path) -> Option<Location> {
         return None;
     }
     let app_directory = directory.parent()?;
+    let source_root = discovery::source_root(app_directory);
     Some(Location {
-        app: app_directory.file_name()?.to_str()?.to_owned(),
+        app: discovery::app_label(&source_root, app_directory),
         stem: stem.to_owned(),
         apps_root: app_directory.parent()?.to_path_buf(),
+        source_root,
     })
 }
 
@@ -55,7 +62,7 @@ pub fn is_migration_source(source: &[u8]) -> bool {
 }
 
 pub fn state_before(loader: &impl Loader, location: &Location, current: &Migration) -> State {
-    let settings = settings::project(&location.apps_root);
+    let settings = settings::project(&location.source_root);
     let mut state = State::new(settings.auto_field, settings.column_drops_cascade);
     let current_key = MigrationKey::new(&location.app, &location.stem);
     let mut nodes: Nodes = installed(loader, &settings, &location.app)
@@ -68,7 +75,7 @@ pub fn state_before(loader: &impl Loader, location: &Location, current: &Migrati
         })
         .collect();
     nodes.insert(current_key.clone(), Arc::new(current.clone()));
-    let project = project(&location.apps_root, nodes);
+    let project = project(&location.source_root, nodes);
     for key in ancestors(&project.parents, &current_key) {
         if let Some(ancestor) = project.nodes.get(key) {
             for located in &ancestor.operations {
@@ -83,7 +90,7 @@ fn installed(loader: &impl Loader, settings: &Settings, current_app: &str) -> Ve
     let apps = loader.apps();
     let mut included: Vec<String> = apps
         .iter()
-        .filter(|app| settings.includes_app(app))
+        .filter(|app| settings.includes_app(&loader.directory_name(app)))
         .cloned()
         .collect();
     if included.is_empty() {
@@ -133,30 +140,41 @@ fn project(apps_root: &Path, nodes: Nodes) -> Arc<Project> {
 
 #[derive(Debug, Clone)]
 pub struct FileLoader {
-    apps_root: PathBuf,
+    source_root: PathBuf,
 }
 
 impl FileLoader {
-    pub const fn new(apps_root: PathBuf) -> Self {
-        Self { apps_root }
+    pub const fn new(source_root: PathBuf) -> Self {
+        Self { source_root }
+    }
+
+    fn app(&self, label: &str) -> Option<App> {
+        discovery::apps(&self.source_root)
+            .iter()
+            .find(|app| app.label == label)
+            .cloned()
     }
 }
 
 impl Loader for FileLoader {
     fn apps(&self) -> Vec<String> {
-        let Ok(entries) = fs::read_dir(&self.apps_root) else {
-            return Vec::new();
-        };
-        entries
-            .filter_map(Result::ok)
-            .filter(|entry| entry.path().join(MIGRATIONS_DIRECTORY).is_dir())
-            .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
+        discovery::apps(&self.source_root)
+            .iter()
+            .map(|app| app.label.clone())
             .collect()
     }
 
+    fn directory_name(&self, app: &str) -> String {
+        self.app(app)
+            .map_or_else(|| app.to_owned(), |found| found.directory_name())
+    }
+
     fn migrations(&self, app: &str) -> Vec<(String, Arc<Migration>)> {
-        let settings = settings::project(&self.apps_root);
-        let mut found: Vec<(String, Arc<Migration>)> = migration_files(&self.apps_root.join(app))
+        let Some(directory) = self.app(app).map(|found| found.directory) else {
+            return Vec::new();
+        };
+        let settings = settings::project(&self.source_root);
+        let mut found: Vec<(String, Arc<Migration>)> = migration_files(&directory)
             .into_iter()
             .filter_map(|path| {
                 let stem = path.file_stem()?.to_str()?.to_owned();
@@ -232,10 +250,9 @@ fn parse_file(path: &Path, app: &str, settings: &Settings) -> Option<Migration> 
 pub fn fingerprint(path: &Path) -> Option<u64> {
     let location = location(path)?;
     let mut hasher = DefaultHasher::new();
-    fs::read_dir(&location.apps_root)
-        .ok()?
-        .filter_map(Result::ok)
-        .flat_map(|entry| migration_files(&entry.path()))
+    discovery::apps(&location.source_root)
+        .iter()
+        .flat_map(|app| migration_files(&app.directory))
         .filter_map(|file| {
             let metadata = fs::metadata(&file).ok()?;
             Some((file, metadata.len(), metadata.modified().ok()?))
