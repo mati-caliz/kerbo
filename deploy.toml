@@ -1,0 +1,22 @@
+# Cómo se despliega: lo común lo hace infra/server-bin/deploy-all.sh; acá va sólo lo propio.
+# Publica site/ de origin/main en el directorio que sirve proxy-nginx. Una versión nueva del
+# binario no es parte del deploy: se publica a mano (ver release/).
+publish = ["/home/deploy/bin/kerbo-publish-site.sh"]
+
+[[check]]
+url = "https://kerbo.matiascaliz.com.ar/"
+
+[[check]]
+url = "https://kerbo.matiascaliz.com.ar/en/"
+
+[[check]]
+url = "https://kerbo.matiascaliz.com.ar/styles.css"
+content_type = "text/css"
+
+[[check]]
+url = "https://kerbo.matiascaliz.com.ar/install.sh"
+content_type = "text/plain; charset=utf-8"
+
+[[check]]
+url = "https://kerbo.matiascaliz.com.ar/install.ps1"
+content_type = "text/plain; charset=utf-8"
