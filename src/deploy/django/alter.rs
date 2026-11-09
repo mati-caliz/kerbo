@@ -1,5 +1,6 @@
 use super::columns::{
-    check, db_type, effective_default, has_like_index, identity, is_auto, like_operator_class, type_template,
+    check, check_ignoring_column, db_type, effective_default, has_like_index, identity, is_auto,
+    like_operator_class, type_template,
 };
 use super::deferred::{Kind, Statement, like_index_name};
 use super::model::{Class, Field, FieldDefault};
@@ -191,8 +192,7 @@ fn add_field_constraints(editor: &mut Editor, change: FieldChange<'_>) {
             Kind::ForeignKey { to_table, to_column },
         ));
     }
-    let new_check = check(new);
-    if let Some(condition) = new_check.as_ref().filter(|_| check(old) != new_check) {
+    if let Some(condition) = check(new).filter(|_| check_ignoring_column(old) != check_ignoring_column(new)) {
         let name = index_name(change.table, &[&new.column()], CHECK_SUFFIX);
         editor.execute(&change.alter_table(&format!("ADD CONSTRAINT {} CHECK ({condition})", quoted(&name))));
     }

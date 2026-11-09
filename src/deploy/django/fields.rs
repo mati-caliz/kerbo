@@ -129,6 +129,7 @@ pub fn field(name: &str, node: Node<'_>, source: &[u8], owner: Owner<'_>) -> Opt
     }
     let number = |keyword: &str| {
         call.keyword(keyword)
+            .filter(|value| value.kind() != NONE)
             .map(|value| owner.settings.number(&raw(value, source)).to_owned())
     };
     field.max_length = number("max_length");

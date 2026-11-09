@@ -154,3 +154,87 @@ fn decimal_database_defaults_render_their_number() {
         &[],
     );
 }
+
+const POSITIVE_ORDER: &str = r#"from django.contrib.postgres.fields import ArrayField
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    operations = [
+        migrations.CreateModel(
+            name="Image",
+            fields=[
+                ("id", models.BigAutoField(primary_key=True)),
+                ("order", models.PositiveIntegerField(editable=False)),
+                ("actions", ArrayField(base_field=models.CharField(max_length=128), size=None)),
+            ],
+        ),
+    ]
+"#;
+
+const RENAMED_ORDER: &str = r#"from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [("library", "0001_initial")]
+
+    operations = [
+        migrations.RenameField(model_name="image", old_name="order", new_name="sort_order"),
+        migrations.AlterField(
+            model_name="image",
+            name="sort_order",
+            field=models.PositiveIntegerField(db_index=True, editable=False),
+        ),
+    ]
+"#;
+
+#[test]
+fn renaming_a_positive_field_keeps_its_check_and_unsized_arrays_have_no_size() {
+    let loader = MemoryLoader::default().with(APP, "0001_initial", POSITIVE_ORDER);
+    assert_rendered(
+        &sql(&loader, APP, "0001_initial", POSITIVE_ORDER),
+        &[r#""actions" varchar(128)[] NOT NULL"#],
+        &["[None]"],
+    );
+    assert_rendered(
+        &sql(&loader, APP, "0002_sort_order", RENAMED_ORDER),
+        &[
+            r#"RENAME COLUMN "order" TO "sort_order""#,
+            r#"CREATE INDEX "library_image_sort_order_"#,
+        ],
+        &["CHECK"],
+    );
+}
+
+const TABLE_MOVED_BY_PYTHON: &str = r#"from django.db import migrations, models
+
+
+def rename_tables(apps, schema_editor):
+    Tag = apps.get_model("library", "Tag")
+    schema_editor.alter_db_table(Tag, "library_tag", "catalog_tag")
+    schema_editor.alter_db_table(Tag, "library_same", "library_same")
+
+
+def forget_tables(apps, schema_editor):
+    schema_editor.alter_db_table(None, "library_note", "catalog_note")
+
+
+class Migration(migrations.Migration):
+    operations = [
+        migrations.RunPython(forget_tables, migrations.RunPython.noop),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[migrations.RunPython(rename_tables, migrations.RunPython.noop)],
+            state_operations=[],
+        ),
+    ]
+"#;
+
+#[test]
+fn schema_editor_renames_inside_separate_database_and_state_are_rendered() {
+    let loader = MemoryLoader::default();
+    assert_rendered(
+        &sql(&loader, APP, "0001_initial", TABLE_MOVED_BY_PYTHON),
+        &[r#"ALTER TABLE "library_tag" RENAME TO "catalog_tag""#],
+        &["library_note", "library_same"],
+    );
+}

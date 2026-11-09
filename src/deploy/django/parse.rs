@@ -5,6 +5,7 @@ use super::fields::{Owner, field};
 use super::meta::{constraint, constraints, index, indexes, unique_together};
 use super::model::{Model, ModelKey};
 use super::operations::{Located, Migration, Operation, SqlChunk};
+use super::run_python::{functions, schema_editor_sql};
 use super::settings::Settings;
 use super::values::{boolean, dictionary, elements, is_sequence, text};
 use crate::deploy::python_calls::Call;
@@ -22,6 +23,7 @@ const IDENTIFIER: &str = "identifier";
 const CONCATENATION: &str = "binary_operator";
 const PARENTHESIZED: &str = "parenthesized_expression";
 const COMMENT: &str = "comment";
+const RUN_PYTHON: &str = "RunPython";
 const MAX_ALIAS_DEPTH: usize = 8;
 const GENERIC_EXTENSION: &str = "CreateExtension";
 const NAMED_EXTENSIONS: &[(&str, &str)] = &[
@@ -48,6 +50,7 @@ struct Scope<'context> {
     app: &'context str,
     settings: &'context Settings,
     bindings: &'context [(String, Node<'context>)],
+    functions: &'context [(String, Node<'context>)],
 }
 
 pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
@@ -62,11 +65,13 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
     let class_bindings = assignments(body, reader.source);
     let mut bindings = assignments(root, reader.source);
     bindings.extend(class_bindings.iter().cloned());
+    let module_functions = functions(root, reader.source);
     let scope = Scope {
         source: reader.source,
         app: reader.app,
         settings: reader.settings,
         bindings: &bindings,
+        functions: &module_functions,
     };
     let mut migration = Migration {
         operations: Vec::new(),
@@ -152,17 +157,47 @@ impl<'context> Scope<'context> {
     }
 
     fn operations(self, node: Node<'context>) -> Vec<Located> {
+        self.located(node, |call| self.operation(call))
+    }
+
+    fn database_operations(self, node: Node<'context>) -> Vec<Located> {
+        self.located(node, |call| {
+            if call.method == RUN_PYTHON {
+                self.run_python(call)
+            } else {
+                self.operation(call)
+            }
+        })
+    }
+
+    fn located(
+        self,
+        node: Node<'context>,
+        read: impl Fn(&Call<'context>) -> Option<Operation>,
+    ) -> Vec<Located> {
         self.sequence(node)
             .into_iter()
             .filter_map(|element| {
                 let call = Call::parse(self.resolved(element), self.source)?;
                 Some(Located {
-                    operation: self.operation(&call)?,
+                    operation: read(&call)?,
                     line: call.line,
                     column: call.column,
                 })
             })
             .collect()
+    }
+
+    fn run_python(self, call: &Call<'context>) -> Option<Operation> {
+        let name = argument(call, 0, "code")?.utf8_text(self.source).ok()?;
+        let function = self
+            .functions
+            .iter()
+            .rev()
+            .find(|(defined, _)| defined == name)
+            .map(|(_, function)| *function)?;
+        let chunks = schema_editor_sql(function, self.source);
+        (!chunks.is_empty()).then_some(Operation::RunSql(chunks))
     }
 
     fn operation(self, call: &Call<'context>) -> Option<Operation> {
@@ -198,7 +233,7 @@ impl<'context> Scope<'context> {
             GENERIC_EXTENSION => string_argument(call, 0, "name").map(Operation::CreateExtension),
             "SeparateDatabaseAndState" => Some(Operation::Separate {
                 database: argument(call, 0, "database_operations")
-                    .map(|node| self.operations(node))
+                    .map(|node| self.database_operations(node))
                     .unwrap_or_default(),
                 state: argument(call, 1, "state_operations")
                     .map(|node| self.operations(node))

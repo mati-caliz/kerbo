@@ -14,6 +14,7 @@ mod names;
 mod operations;
 mod parse;
 mod rename;
+mod run_python;
 mod schema;
 mod settings;
 mod state;

@@ -1656,10 +1656,11 @@ sólo queda atrasada TypeScript 7, bloqueada.
     `Migration` la bajaron a 360; los `settings` y los `default` tipados, a 200; el grafo de
     dependencias, a 142; el modelo reemplazado por `AUTH_USER_MODEL`, a 121; las migraciones con
     `atomic = False`, a 87; las operaciones entre paréntesis, los índices de `SlugField`, los
-    `default` de JSON, las tablas intermedias en `RenameModel` y `Decimal(0)`, a 62. Ahora:
-    squawk 4.385 avisos, kerbo 4.294, coinciden 4.293, 62 diferencias por migración y regla (59
-    son de las apps de terceros; del proyecto quedan account/0072, permission/0001 y
-    product/0062); sentencia por sentencia (`dump.sh` + `diff.py`), 24 de 1.454 migraciones con
+    `default` de JSON, las tablas intermedias en `RenameModel` y `Decimal(0)`, a 62; el
+    `RunPython` dentro de `SeparateDatabaseAndState` y el `CHECK` comparado sin la columna, a 59.
+    Ahora: squawk 4.385 avisos, kerbo 4.296, coinciden 4.296, 59 diferencias por migración y
+    regla, todas de las apps de terceros (del proyecto no queda ninguna, y kerbo no saca ningún
+    aviso de más); sentencia por sentencia (`dump.sh` + `diff.py`), 20 de 1.454 migraciones con
     SQL distinto (eran 131).
     kerbo ya lee de los `settings` del proyecto `AUTH_USER_MODEL`, `DEFAULT_AUTO_FIELD` y las
     constantes numéricas (`max_length=settings.X`); sin `settings` asume el `BigAutoField` de
@@ -1686,12 +1687,18 @@ sólo queda atrasada TypeScript 7, bloqueada.
       `NOT NULL` (el `Jsonb` de psycopg no tiene `__eq__`, así que Django nunca ve iguales los
       `default`); `RenameModel` renombra las tablas intermedias automáticas y sus columnas
       `<modelo>_id`, sea el dueño del `ManyToManyField` o su destino; `db_default=Decimal(0)`.
-    - `RenameModel` y `AlterModelTable` entre apps (`account/0072`, `permission/0001`: el
-      `SeparateDatabaseAndState` mueve el modelo de app y squawk ve el `RENAME` de la tabla).
-    - product/0062 saca un `CHECK` de más (`constraint-missing-not-valid`); payment/0035 tiene
-      SQL distinto sin cambiar los avisos.
-    - Los `default` invocables del proyecto (`get_default_country`, `zero_weight`,
-      `partial(get_random_string)`).
+    - Hecho (2026-11-09): dentro de `SeparateDatabaseAndState`, Django ejecuta los `RunPython`
+      de `database_operations` al hacer `sqlmigrate`; kerbo busca la función en el módulo y
+      escribe sus `schema_editor.alter_db_table` como `ALTER TABLE ... RENAME TO` (account/0072,
+      permission/0001). Un `RunPython` suelto no se ejecuta, igual que en Django. Sólo se
+      entiende `alter_db_table` con nombres literales.
+    - Hecho (2026-11-09): el `CHECK` de un `PositiveIntegerField` se compara con la columna de
+      relleno `__column_name__`, como `_field_db_check`, así que renombrar el campo no lo vuelve
+      a crear (product/0062); `ArrayField(size=None)` no lleva tamaño (payment/0035).
+    - Los `default` invocables del proyecto, que ya sólo cambian el SQL y no los avisos:
+      `get_default_country` (checkout/0023, da `'US'`), `zero_weight` (order/0052,
+      product/0068, da `0.0`), `partial(get_random_string)` (account/0046, aleatorio en la
+      referencia) y la expresión condicional sobre `settings` de site/0041.
     - Hecho (2026-11-08): una migración con `atomic = False` se analiza fuera de una transacción,
       como squawk sobre el `sqlmigrate` sin `BEGIN`: el script arranca con un `COMMIT` sintético
       (el linter de SQL supone una transacción abierta, por `--assume-in-transaction`). Se fueron
