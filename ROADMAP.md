@@ -1646,8 +1646,14 @@ los comandos de un `RUN`: un script que el shell no parsea (un `(` después de d
   - TypeScript 7 (7.0.2): bloqueado, typescript-eslint 8.72.2 declara `typescript <6.1.0`. Se sube
     cuando typescript-eslint lo soporte, o junto con tsrs (etapas 11 y 16).
   - `run_all.sh` corrido entero (2026-11-09, las ocho familias): Go falló por las rutas de Windows y se
-    arregló con `pwd -W` en los scripts de Go y shell. El comparador de Go sólo mira staticcheck, así que
-    `stdmethods`, errcheck y unused aparecen como "sobran" sin ser regresión.
+    arregló con `pwd -W` en los scripts de Go y shell.
+    Hecho (2026-11-09): el comparador de Go (`compare_corpus.py`) mira ahora también `stdmethods` (de
+    govet) y `unused`, y la referencia corre golangci-lint sin las exclusiones de archivos generados
+    ni los presets. Paridad sobre los 12 repos: 1.379 coinciden, 0 de menos y 487 de más, todos
+    explicados por el código fuente: staticcheck no avisa en archivos `Code generated ... DO NOT EDIT`
+    y golangci-lint respeta `//nolint` (que vale para la declaración que sigue); el comparador
+    cuenta los "sobran" que no tienen ninguna de las dos causas y dan 0. errcheck se mide aparte
+    (`errcheck_options.sh`).
     Aclarado (2026-11-09): en `juice-shop/frontend/src/assets/private` kerbo no avisa porque el
     `.gitignore` de juice-shop tiene `frontend/src/**/*.js` y esos archivos están versionados a la fuerza:
     kerbo respeta `.gitignore` y ESLint no. Son las diferencias "de menos" de `no-var` en esa carpeta (no
