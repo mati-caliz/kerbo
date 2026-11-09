@@ -21,6 +21,18 @@ here="$(cd "$(dirname "$0")" && pwd)"
 parity="$(cd "${KERBO_PARITY:-$here/../../../.parity}" && pwd)"
 out="$parity/django/$repo"
 network="kerbo-django-$repo"
+case "$repo" in
+  zulip)
+    dependency_groups="--only-group prod"
+    database_driver=""
+    system_packages="git build-essential pkg-config libpq-dev libldap2-dev libsasl2-dev libxml2-dev libxmlsec1-dev libicu-dev libvips42"
+    ;;
+  *)
+    dependency_groups="--no-dev"
+    database_driver="psycopg[binary]"
+    system_packages=""
+    ;;
+esac
 database="kerbo-django-db-$repo"
 mkdir -p "$out"
 docker network create "$network" >/dev/null 2>&1 || true
@@ -31,14 +43,16 @@ trap 'docker rm -f "$database" >/dev/null 2>&1 || true' EXIT
 MSYS_NO_PATHCONV=1 docker run --rm --network "$network" --cpus="$CPUS" -m "$MEMORY_LIMIT" \
   -v "$(cd "$parity/corpus/$repo" && pwd -W):/repo:ro" -v "$(cd "$out" && pwd -W):/out" \
   -v "$(cd "$here" && pwd -W):/harness:ro" -v kerbo-django-pip:/root/.cache/pip \
-  -e REPO="$repo" -e DATABASE_HOST="$database" "$PYTHON_IMAGE" bash -euo pipefail -c "
+  -e REPO="$repo" -e DATABASE_HOST="$database" \
+  -e DEPENDENCY_GROUPS="$dependency_groups" -e SYSTEM_PACKAGES="$system_packages" \
+  -e DATABASE_DRIVER="$database_driver" "$PYTHON_IMAGE" bash -euo pipefail -c "
     if [ \"\$REPO\" = django ]; then
       pip install -q 'django==$DJANGO_VERSION' 'psycopg[binary]' 'asgiref>=3.13' 'squawk-cli==$SQUAWK_VERSION' >/dev/null
     else
-      apt-get update -qq >/dev/null && apt-get install -y -qq libmagic1 >/dev/null
-      pip install -q uv 'psycopg[binary]' 'squawk-cli==$SQUAWK_VERSION' >/dev/null
-      (cd /repo && uv export --frozen --no-dev --no-hashes --no-emit-project --project /repo) > /tmp/requirements.txt
+      apt-get update -qq >/dev/null && apt-get install -y -qq libmagic1 \$SYSTEM_PACKAGES >/dev/null
+      pip install -q uv \$DATABASE_DRIVER 'squawk-cli==$SQUAWK_VERSION' >/dev/null
+      (cd /repo && uv export --frozen --no-hashes --no-emit-project \$DEPENDENCY_GROUPS --project /repo) > /tmp/requirements.txt
       pip install -q -r /tmp/requirements.txt >/dev/null
     fi
-    for attempt in 1 2 3 4 5 6 7 8 9 10; do python -c 'import psycopg; psycopg.connect(\"host=$database user=postgres password=kerbo dbname=kerbo\")' 2>/dev/null && break; sleep 2; done
+    for attempt in 1 2 3 4 5 6 7 8 9 10; do python -c 'import socket; socket.create_connection((\"$database\", 5432), 1)' 2>/dev/null && break; sleep 2; done
     cd /harness && python reference.py"

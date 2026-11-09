@@ -19,6 +19,9 @@ const ASSIGNMENT: char = '=';
 const QUOTES: &[char] = &['"', '\''];
 const SETTINGS_PREFIX: &str = "settings.";
 const CASCADE_DROPPED_IN: Version = Version::new(6, 0);
+const RELATIVE_IMPORT: &str = "from .";
+const IMPORT_KEYWORD: &str = " import ";
+const WILDCARD: char = '*';
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
@@ -149,11 +152,45 @@ fn candidates(apps_root: &Path) -> Vec<PathBuf> {
     files
 }
 
+fn wildcard_imports(source: &str, directory: &Path) -> Vec<PathBuf> {
+    source
+        .lines()
+        .filter_map(|line| line.trim_start().strip_prefix(RELATIVE_IMPORT))
+        .filter_map(|rest| rest.split_once(IMPORT_KEYWORD))
+        .filter(|(_, imported)| imported.trim_start().starts_with(WILDCARD))
+        .map(|(module, _)| {
+            module
+                .split(APP_SEPARATOR)
+                .fold(directory.to_path_buf(), |path, segment| path.join(segment))
+                .with_extension(PYTHON_EXTENSION)
+        })
+        .collect()
+}
+
+fn sources_from(files: Vec<PathBuf>) -> Vec<String> {
+    let mut pending = files;
+    pending.reverse();
+    let mut visited = BTreeSet::new();
+    let mut sources = Vec::new();
+    while let Some(path) = pending.pop() {
+        if !visited.insert(path.clone()) {
+            continue;
+        }
+        let Ok(source) = fs::read_to_string(&path) else {
+            continue;
+        };
+        if let Some(directory) = path.parent() {
+            let mut imported = wildcard_imports(&source, directory);
+            imported.reverse();
+            pending.extend(imported);
+        }
+        sources.push(source);
+    }
+    sources
+}
+
 fn discovered(apps_root: &Path) -> Settings {
-    let sources: Vec<String> = candidates(apps_root)
-        .iter()
-        .filter_map(|path| fs::read_to_string(path).ok())
-        .collect();
+    let sources = sources_from(candidates(apps_root));
     let mut settings = if sources.is_empty() {
         Settings::of_a_new_project()
     } else {
@@ -233,6 +270,29 @@ CODE_LENGTH = 3
         let settings = discovered(Path::new("no-existe"));
         assert_eq!(settings.auto_field, Class::BigAuto);
         assert!(!settings.column_drops_cascade);
+    }
+
+    #[test]
+    fn follows_the_wildcard_imports_of_the_settings_module() {
+        let apps_root = std::env::temp_dir().join(format!("kerbo-django-wildcard-{}", std::process::id()));
+        let package = apps_root.join("project");
+        fs::create_dir_all(&package).expect("se crea el proyecto de prueba");
+        fs::write(
+            package.join("settings.py"),
+            "from .computed import *  # isort: skip\nfrom .missing import *\nfrom .config import DEBUG\n",
+        )
+        .expect("se escriben los settings");
+        fs::write(
+            package.join("computed.py"),
+            "from .settings import *\nDEFAULT_AUTO_FIELD = \"django.db.models.BigAutoField\"\n",
+        )
+        .expect("se escribe el módulo importado");
+        fs::write(package.join("config.py"), "AUTH_USER_MODEL = \"shop.Customer\"\n")
+            .expect("se escribe el módulo que no se importa entero");
+        let settings = discovered(&apps_root);
+        fs::remove_dir_all(&apps_root).expect("se borra el proyecto de prueba");
+        assert_eq!(settings.auto_field, Class::BigAuto);
+        assert_eq!(settings.user_model, Settings::default().user_model);
     }
 
     #[test]

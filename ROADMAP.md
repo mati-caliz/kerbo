@@ -1722,7 +1722,24 @@ los comandos de un `RUN`: un script que el shell no parsea (un `(` después de d
     subiendo hasta la raíz del repo. Antes de Django 6 va `CASCADE`; si la versión no se sabe,
     se toma la actual, sin `CASCADE` (era la única sentencia distinta de `django.contrib` con 6.1;
     saleor, con 5.2, lo mantiene).
-  - Medir más repos de Django (sentry, wagtail, zulip): entrada en `REPOS` de `reference.py`.
+  - Zulip medido (2026-11-09, commit en `corpus.toml`): `reference.sh zulip` instala el grupo
+    `prod` de su `uv.lock` (con psycopg2, que pide django-bitfield) y los paquetes de sistema que
+    compilan sus dependencias; usa `scripts/parity/django/zulip_settings.py`, que toma los
+    `settings` de desarrollo sin el archivo de secretos y manda los logs a `/tmp`. 302
+    migraciones, 5 no se pueden convertir (consultan la base). Squawk 1.160 avisos, kerbo 979,
+    coinciden 979, 123 diferencias, ninguna de más. Empezó en 125: kerbo ahora sigue los
+    `from .modulo import *` de los `settings` (el `DEFAULT_AUTO_FIELD` de zulip vive en
+    `zproject/computed_settings.py`) y, cuando `INSTALLED_APPS` suma una lista con nombre, junta
+    todas sus definiciones (`EXTRA_INSTALLED_APPS` cambia en `dev_settings.py`). Lo que queda:
+    - 96 de apps de terceros (`social_django`, `otp_*`, `auth`, `contenttypes`, `sessions`,
+      `phonenumber`), igual que en saleor.
+    - 27 de 10 migraciones (zerver 0679, 0693, 0694, 0741, 0742, 0755, 0807, 0808, 0809;
+      zilencer 0070) que arman la operación con funciones propias del proyecto
+      (`zerver.lib.migrate.add_index`/`remove_index`, que devuelven `AddIndex` o
+      `AddIndexConcurrently` según `settings.MIGRATIONS_ADD_REMOVE_INDEXES_CONCURRENTLY`, con el
+      mismo `settings` en `atomic`). kerbo no saca nada de esas llamadas: haría falta seguir la
+      función importada y evaluar el `if` sobre un `settings` booleano.
+  - Medir más repos de Django (sentry, wagtail): entrada en `REPOS` de `reference.py`.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
     `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), los
     borrados que Django resuelve por introspección (restricciones sin nombre conocido),

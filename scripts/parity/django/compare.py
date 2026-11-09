@@ -16,7 +16,7 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent.parent.parent
 PARITY = pathlib.Path(os.environ.get("KERBO_PARITY", REPO / ".parity"))
-APPS_ROOTS = {"django": "django/django/contrib", "saleor": "saleor/saleor"}
+APPS_ROOTS = {"django": "django/django/contrib", "saleor": "saleor/saleor", "zulip": "zulip"}
 REFERENCE_PREFIX = "/out/"
 MIGRATIONS_DIRECTORY = "migrations"
 

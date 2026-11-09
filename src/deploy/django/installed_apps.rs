@@ -89,8 +89,13 @@ fn modules(text: &str, expression: &str, depth: usize) -> Option<Vec<String>> {
             if length == 0 {
                 return None;
             }
-            let definition = assignments(text, &rest[..length]).into_iter().next()?;
-            found.extend(modules(text, definition, depth + 1)?);
+            let definitions = assignments(text, &rest[..length]);
+            if definitions.is_empty() {
+                return None;
+            }
+            for definition in definitions {
+                found.extend(modules(text, definition, depth + 1)?);
+            }
             rest = &rest[length..];
         }
         let trimmed = rest.trim_start_matches(INLINE_WHITESPACE);
@@ -173,6 +178,20 @@ mod tests {
         assert_eq!(
             read(source),
             Some(vec!["admin".to_owned(), "extra".to_owned(), "users".to_owned()])
+        );
+    }
+
+    #[test]
+    fn joins_every_definition_of_a_concatenated_list() {
+        let source = "EXTRA_APPS = [\"analytics\"]\nINSTALLED_APPS = [\"zerver\"]\nINSTALLED_APPS += EXTRA_APPS\nEXTRA_APPS = [\"zilencer\", \"corporate\"]\n";
+        assert_eq!(
+            read(source),
+            Some(vec![
+                "analytics".to_owned(),
+                "corporate".to_owned(),
+                "zerver".to_owned(),
+                "zilencer".to_owned()
+            ])
         );
     }
 

@@ -30,6 +30,10 @@ REPOS = {
         "path": "/repo",
         "settings": "saleor.settings",
     },
+    "zulip": {
+        "path": "/repo",
+        "settings": "zulip_settings",
+    },
 }
 OUT = pathlib.Path("/out")
 
