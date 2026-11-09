@@ -2,7 +2,7 @@
 # Corre el helper (helper-build.sh) en cada módulo de los 12 repos del volumen go-parity y deja la
 # salida en /w/helper; después la copia a out/helper para compare_corpus.py.
 set -euo pipefail
-versions="$(cd "$(dirname "$0")/.." && pwd)/versions.py"
+versions="$(cd "$(dirname "$0")/.." && pwd -W)/versions.py"
 out="$(cd "$(dirname "$0")" && pwd)/out"
 mkdir -p "$out/helper"
 MSYS_NO_PATHCONV=1 docker run --rm -v go-parity:/w -v gocache:/root/.cache/go-build -v gomodcache:/go/pkg/mod \

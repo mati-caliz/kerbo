@@ -3,7 +3,7 @@
 # repos del volumen go-parity y deja la salida en /w/default (un .json y un .log por módulo), que
 # corpus-helper.sh copia a out/default para compare_corpus.py.
 set -euo pipefail
-versions="$(cd "$(dirname "$0")/.." && pwd)/versions.py"
+versions="$(cd "$(dirname "$0")/.." && pwd -W)/versions.py"
 here="$(cd "$(dirname "$0")" && pwd -W)"
 MSYS_NO_PATHCONV=1 docker run --rm --cpus=4 -m 8g -v go-parity:/w -v "$here:/p:ro" -v gocache:/root/.cache/go-build \
   -v gomodcache:/go/pkg/mod "$(python "$versions" image golangci-lint)" bash -c '

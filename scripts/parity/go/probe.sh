@@ -3,7 +3,7 @@
 # muestra los avisos de staticcheck de cada uno como `regla línea:columna archivo`, ordenados.
 # Antes: helper-build.sh.
 set -euo pipefail
-versions="$(cd "$(dirname "$0")/.." && pwd)/versions.py"
+versions="$(cd "$(dirname "$0")/.." && pwd -W)/versions.py"
 here="$(cd "$(dirname "$0")" && pwd -W)"
 out="$(cd "$(dirname "$0")" && pwd)/out"
 mkdir -p "$out"

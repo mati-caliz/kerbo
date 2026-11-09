@@ -3,7 +3,7 @@
 # avisos cuyo código empieza con el prefijo (por defecto, todos).
 # Uso: scripts/parity/shell/probe.sh bashisms [sc30]
 set -euo pipefail
-versions="$(cd "$(dirname "$0")/.." && pwd)/versions.py"
+versions="$(cd "$(dirname "$0")/.." && pwd -W)/versions.py"
 here="$(cd "$(dirname "$0")" && pwd)"
 folder="$1"
 prefix="${2:-sc}"

@@ -2,7 +2,7 @@
 # Corre ShellCheck 0.11.0 sobre los scripts de list_files.py y deja out/shellcheck.json (json1).
 # Con --no-directives, antes borra las directivas `# shellcheck` de una copia del corpus.
 set -euo pipefail
-versions="$(cd "$(dirname "$0")/.." && pwd)/versions.py"
+versions="$(cd "$(dirname "$0")/.." && pwd -W)/versions.py"
 here="$(cd "$(dirname "$0")" && pwd)"
 corpus="${SHELL_CORPUS:-${KERBO_PARITY:-$(cd "$here/../../.." && pwd)/.parity}/shell-corpus}"
 mkdir -p "$here/out"

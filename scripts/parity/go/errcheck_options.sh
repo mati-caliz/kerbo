@@ -4,7 +4,7 @@
 # go-parity y testdata/errcheck_options. Deja la salida en out/errcheck_options para el comparador.
 # uso: errcheck_options.sh [repos...]
 set -euo pipefail
-versions="$(cd "$(dirname "$0")/.." && pwd)/versions.py"
+versions="$(cd "$(dirname "$0")/.." && pwd -W)/versions.py"
 here="$(cd "$(dirname "$0")" && pwd -W)"
 out="$(cd "$(dirname "$0")" && pwd)/out/errcheck_options"
 repos="${*:-chi cobra gin fzf caddy}"

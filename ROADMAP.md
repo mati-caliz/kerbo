@@ -1645,9 +1645,12 @@ los comandos de un `RUN`: un script que el shell no parsea (un `(` después de d
     `run_all.sh` con dos carriles a la vez para confirmarlo.
   - TypeScript 7 (7.0.2): bloqueado, typescript-eslint 8.72.2 declara `typescript <6.1.0`. Se sube
     cuando typescript-eslint lo soporte, o junto con tsrs (etapas 11 y 16).
-  - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
-    siempre pero falta una corrida completa.
-  - Dependencias: entender los 19 avisos de más contra osv-scanner (ssr2, awesome-compose, rspack).
+  - `run_all.sh` corrido entero (2026-11-09, las ocho familias): Go falló por las rutas de Windows y se
+    arregló con `pwd -W` en los scripts de Go y shell. El comparador de Go sólo mira staticcheck, así que
+    `stdmethods`, errcheck y unused aparecen como "sobran" sin ser regresión.
+    Falta mirar por qué JS/TS no da avisos en `juice-shop/frontend/src/assets/private` y por qué hadolint
+    midió 606 y no 593.
+  - Dependencias: ya sólo queda 1 aviso de más contra osv-scanner (`eslint-plugin-react-internal`).
   - Los Dockerfile que hadolint no parsea (31) quedan sin medir, y no se replica su error (DL1000): 23 son de
     awesome-compose y fallan por un comentario justo después del `EOF` de un heredoc, un defecto del parser de
     hadolint. kerbo sí los analiza y avisa lo que corresponde (588 avisos en esos archivos).

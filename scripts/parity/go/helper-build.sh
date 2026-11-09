@@ -2,7 +2,7 @@
 # Compila el helper de tipos de Go (src/go_types) en la imagen de Go de versions.toml y lo deja en el volumen go-parity
 # como /w/bin/helper. Las cachés de Go viven en los volúmenes gocache y gomodcache.
 set -euo pipefail
-versions="$(cd "$(dirname "$0")/.." && pwd)/versions.py"
+versions="$(cd "$(dirname "$0")/.." && pwd -W)/versions.py"
 repo="$(cd "$(dirname "$0")/../../.." && pwd -W)"
 MSYS_NO_PATHCONV=1 docker run --rm \
   -v go-parity:/w -v gocache:/root/.cache/go-build -v gomodcache:/go/pkg/mod \
