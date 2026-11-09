@@ -1654,7 +1654,9 @@ los comandos de un `RUN`: un script que el shell no parsea (un `(` después de d
     son un defecto de reglas); si se quisiera analizar lo versionado aunque esté ignorado, habría que leer
     el índice de git al recorrer. Hadolint midió 606 y no 593 porque el corpus ya tiene 184 Dockerfile
     (eran 181); la comparación da 606 de 606, 0 de menos, 0 de más.
-  - Dependencias: ya sólo queda 1 aviso de más contra osv-scanner (`eslint-plugin-react-internal`).
+  - Dependencias: contra osv-scanner queda 1 aviso de menos y 0 de más. Es `eslint-plugin-react-internal`
+    (`link:./scripts/eslint-rules` en el `yarn.lock` de react): osv-scanner lo marca `MAL-` por el nombre
+    aunque sea una carpeta local, y kerbo lo salta a propósito. No se replica.
   - Los Dockerfile que hadolint no parsea (31) quedan sin medir, y no se replica su error (DL1000): 23 son de
     awesome-compose y fallan por un comentario justo después del `EOF` de un heredoc, un defecto del parser de
     hadolint. kerbo sí los analiza y avisa lo que corresponde (588 avisos en esos archivos).
