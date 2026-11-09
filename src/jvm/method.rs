@@ -28,6 +28,10 @@ impl Method {
         self.access & ACCESS_PRIVATE != 0
     }
 
+    pub const fn is_varargs(&self) -> bool {
+        self.access & ACCESS_VARARGS != 0
+    }
+
     pub const fn is_static(&self) -> bool {
         self.access & ACCESS_STATIC != 0
     }
@@ -47,6 +51,14 @@ impl Method {
     // `Long.class`, como lo hace el compilador.
     pub fn takes_class_at(&self, position: usize) -> bool {
         self.parameter_descriptors().get(position) == Some(&CLASS_DESCRIPTOR)
+    }
+
+    // Si el compilador no podría mandar un argumento de ese tipo a ese parámetro: sólo se descarta lo
+    // seguro (`String` y `Charset` no se pasan a un primitivo, un arreglo ni a otra clase final).
+    pub fn rejects_argument(&self, position: usize, accepted: &[&str]) -> bool {
+        self.parameter_descriptors()
+            .get(position)
+            .is_some_and(|parameter| !accepted.contains(parameter))
     }
 
     fn parameter_descriptors(&self) -> Vec<&str> {

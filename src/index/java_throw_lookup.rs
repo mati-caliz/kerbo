@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use super::java::{Declaration, JavaSummary};
 use super::java_nullness::{ProjectTypes, Resolved, resolve};
+use super::java_throw_wanted::Wanted;
 use super::java_typed::{Typed, library_parents, library_returned};
 use crate::jvm::class_file::ClassFile;
 use crate::jvm::library::Library;
@@ -80,7 +81,10 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
                 .constructors(&self.named(summary, written), *arity)
                 .map(|signatures| all_thrown(&signatures)),
             ThrowOrigin::Close(written) => {
-                match self.members(&Typed::raw(self.named(summary, written)), CLOSE, 0) {
+                match self.members(
+                    &Typed::raw(self.named(summary, written)),
+                    Wanted::by_arity(CLOSE, 0),
+                ) {
                     Search::Found(signatures) => Some(all_thrown(&signatures)),
                     Search::Absent | Search::Incomplete => None,
                 }
@@ -126,7 +130,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
     ) -> Option<Vec<Resolved>> {
         for owner in enclosing {
             let class = self.named(summary, owner);
-            match self.members(&Typed::raw(class.clone()), &step.name, step.arity) {
+            match self.members(&Typed::raw(class.clone()), Wanted::of_step(step)) {
                 Search::Found(_) => return Some(vec![class]),
                 Search::Incomplete => return None,
                 Search::Absent => {}
@@ -160,7 +164,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
     fn on_receivers(&self, receivers: &[Typed], step: &CallStep) -> Option<Vec<Signature>> {
         let mut found = Vec::new();
         for receiver in receivers {
-            match self.members(receiver, &step.name, step.arity) {
+            match self.members(receiver, Wanted::of_step(step)) {
                 Search::Found(signatures) => found.extend(signatures),
                 Search::Absent | Search::Incomplete => return None,
             }
@@ -177,7 +181,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         step: &CallStep,
     ) -> Option<Vec<Signature>> {
         for owner in enclosing {
-            match self.members(&Typed::raw(self.named(summary, owner)), &step.name, step.arity) {
+            match self.members(&Typed::raw(self.named(summary, owner)), Wanted::of_step(step)) {
                 Search::Found(signatures) => return Some(signatures),
                 Search::Incomplete => return None,
                 Search::Absent => {}
@@ -191,7 +195,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
             .filter(|(_, member)| *member == step.name || *member == WILDCARD)
             .map(|(class, _)| class)
         {
-            match self.members(&Typed::raw(self.named(summary, class)), &step.name, step.arity) {
+            match self.members(&Typed::raw(self.named(summary, class)), Wanted::of_step(step)) {
                 Search::Found(signatures) => found.extend(signatures),
                 Search::Incomplete => return None,
                 Search::Absent => {}
@@ -200,7 +204,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         (!found.is_empty()).then_some(found)
     }
 
-    fn members(&self, start: &Typed, name: &str, arity: usize) -> Search {
+    fn members(&self, start: &Typed, wanted: Wanted<'_>) -> Search {
         let mut pending = vec![start.clone()];
         let mut seen = HashSet::new();
         let mut collected = Collected::default();
@@ -208,7 +212,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
             if !seen.insert(current.class.clone()) {
                 continue;
             }
-            let Some(parents) = self.visit(&current, (name, arity), &mut collected) else {
+            let Some(parents) = self.visit(&current, wanted, &mut collected) else {
                 return Search::Incomplete;
             };
             pending.extend(parents);
@@ -221,23 +225,21 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
     }
 
     // Junta lo que declara un tipo y devuelve de quién hereda, o nada si no se puede leer.
-    fn visit(&self, current: &Typed, wanted: (&str, usize), collected: &mut Collected) -> Option<Vec<Typed>> {
-        let (name, arity) = wanted;
+    fn visit(&self, current: &Typed, wanted: Wanted<'_>, collected: &mut Collected) -> Option<Vec<Typed>> {
         match &current.class {
             Resolved::Project(owner) => {
-                collected.found.extend(self.project_members(owner, name, arity));
+                collected
+                    .found
+                    .extend(self.project_members(owner, wanted.name, wanted.arity));
                 let mut parents = vec![Typed::raw(Resolved::Library(JAVA_OBJECT.to_owned()))];
                 parents.extend(self.project_parents(owner).into_iter().map(Typed::raw));
                 Some(parents)
             }
             Resolved::Library(class) => {
                 let file = self.library.class_or_jdk(class)?;
-                collected.found.extend(library_members(
-                    &file,
-                    current,
-                    (name, arity),
-                    &mut collected.overridden,
-                ));
+                collected
+                    .found
+                    .extend(library_members(&file, current, wanted, &mut collected.overridden));
                 Some(library_parents(&file, current))
             }
         }
@@ -285,7 +287,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
                 library_members(
                     &file,
                     &Typed::raw(class.clone()),
-                    (CONSTRUCTOR_NAME, arity),
+                    Wanted::by_arity(CONSTRUCTOR_NAME, arity),
                     &mut HashSet::new(),
                 )
             }
@@ -342,13 +344,17 @@ fn returned_by(signatures: &[Signature]) -> Option<Vec<Typed>> {
 fn library_members(
     file: &ClassFile,
     current: &Typed,
-    wanted: (&str, usize),
+    wanted: Wanted<'_>,
     overridden: &mut HashSet<String>,
 ) -> Vec<Signature> {
-    let (name, arity) = wanted;
     file.methods
         .iter()
-        .filter(|method| method.name == name && method.accepts(arity) && !method.is_private())
+        .filter(|method| {
+            method.name == wanted.name
+                && method.accepts(wanted.arity)
+                && !method.is_private()
+                && !wanted.rules_out(method)
+        })
         .filter(|method| overridden.insert(parameters_of(method).to_owned()))
         .map(|method| Signature {
             thrown: method.exceptions.iter().cloned().map(Resolved::Library).collect(),

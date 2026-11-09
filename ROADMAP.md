@@ -1676,12 +1676,14 @@ Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y 
 contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/java/`
 (`qodana.sh <repo> <inspección>`, `kerbo.sh`, `compare_all.py`), 2026-11-07.
 
-- `RedundantThrows` (`redundant-throws`): junit4 216 de 219, commons-lang 112 de 125, **ninguno de
+- `RedundantThrows` (`redundant-throws`): junit4 216 de 219, commons-lang 114 de 125, **ninguno de
   más**. Faltan medir Guava y spring-boot, más grandes.
   - Pendientes, por lo que falta: los genéricos en las clases del proyecto (los builders
     `X.<I, T>builder().get()` de commons-lang); los parámetros de una lambda (`(k, v) -> v.get()`)
     no tienen tipo, así que su `catch` cuenta para cualquier `get`; la sobrecarga se elige por
-    cantidad de argumentos y no por tipo (`getBytes(Charset)` calla por `getBytes(String)`); las
+    cantidad y por tipo sólo cuando el argumento es un literal de texto o un `Charset` conocido
+    (`getBytes(StandardCharsets.UTF_8)` ya no calla por `getBytes(String)`); con cualquier otro
+    argumento sigue juntando todas las sobrecargas; las
     excepciones genéricas (`FailableConsumer<T, E>` tira `E`); `values()` y `valueOf()` de un enum
     (el índice no sabe qué tipo es un enum); los arreglos como receptor
     (`excepciones[0].getMessage()`). Un método del proyecto que redefine a uno de librería suma lo

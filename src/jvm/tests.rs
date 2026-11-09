@@ -334,3 +334,20 @@ fn generic_signatures_keep_the_type_parameters_and_what_each_parent_receives() {
     );
     assert_eq!(method_signature("(I"), None);
 }
+
+#[test]
+fn a_fixed_method_rejects_only_the_arguments_that_cannot_fit() {
+    let method = Method {
+        name: "getBytes".to_owned(),
+        descriptor: "(Ljava/lang/String;)[B".to_owned(),
+        access: 0,
+        parameter_annotations: vec![Vec::new()],
+        return_annotations: Vec::new(),
+        exceptions: Vec::new(),
+        signature: None,
+    };
+    assert!(method.rejects_argument(0, &["Ljava/nio/charset/Charset;"]));
+    assert!(!method.rejects_argument(0, &["Ljava/lang/String;"]));
+    assert!(!method.rejects_argument(1, &[]));
+    assert!(!method.is_varargs());
+}

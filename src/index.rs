@@ -13,6 +13,7 @@ mod java_rules;
 mod java_taint;
 mod java_throw_lookup;
 mod java_throw_roots;
+mod java_throw_wanted;
 mod java_throws;
 mod java_typed;
 mod java_unused;

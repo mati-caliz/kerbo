@@ -1,6 +1,8 @@
 use super::codec::{Corrupt, Reader, Writer};
 use crate::lint::java_caught_calls::CaughtCall;
-use crate::lint::java_throws::{CallRoot, CallStep, MethodThrows, ThrowOrigin, ThrowPoint, ThrowsClause};
+use crate::lint::java_throws::{
+    ArgumentKind, CallRoot, CallStep, MethodThrows, ThrowOrigin, ThrowPoint, ThrowsClause,
+};
 
 const ORIGIN_UNKNOWN: u64 = 0;
 const ORIGIN_THROWN: u64 = 1;
@@ -8,6 +10,9 @@ const ORIGIN_CREATION: u64 = 2;
 const ORIGIN_CLOSE: u64 = 3;
 const ORIGIN_CALL: u64 = 4;
 const ORIGIN_RETHROWN: u64 = 5;
+const ARGUMENT_UNKNOWN: u64 = 0;
+const ARGUMENT_TEXT: u64 = 1;
+const ARGUMENT_CHARSET: u64 = 2;
 const ROOT_SCOPE: u64 = 0;
 const ROOT_TYPE: u64 = 1;
 const ROOT_GENERIC: u64 = 2;
@@ -86,6 +91,9 @@ fn write_origin(writer: &mut Writer, origin: &ThrowOrigin) {
             writer.list(steps, |writer, step| {
                 writer.text(&step.name);
                 writer.size(step.arity);
+                writer.list(&step.arguments, |writer, kind| {
+                    writer.number(argument_code(*kind));
+                });
             });
         }
     }
@@ -104,6 +112,7 @@ fn read_origin(reader: &mut Reader<'_>) -> Result<ThrowOrigin, Corrupt> {
                 Ok(CallStep {
                     name: reader.text()?,
                     arity: reader.size()?,
+                    arguments: reader.list(|reader| argument_kind(reader.number()?))?,
                 })
             })?,
         )),
@@ -134,6 +143,23 @@ fn read_root(reader: &mut Reader<'_>) -> Result<CallRoot, Corrupt> {
         ROOT_SCOPE => Ok(CallRoot::Scope(reader.list(Reader::text)?)),
         ROOT_TYPE => Ok(CallRoot::Type(reader.text()?)),
         ROOT_GENERIC => Ok(CallRoot::Generic(reader.text()?, reader.list(Reader::text)?)),
+        _ => Err(Corrupt),
+    }
+}
+
+const fn argument_code(kind: ArgumentKind) -> u64 {
+    match kind {
+        ArgumentKind::Unknown => ARGUMENT_UNKNOWN,
+        ArgumentKind::Text => ARGUMENT_TEXT,
+        ArgumentKind::Charset => ARGUMENT_CHARSET,
+    }
+}
+
+const fn argument_kind(code: u64) -> Result<ArgumentKind, Corrupt> {
+    match code {
+        ARGUMENT_UNKNOWN => Ok(ArgumentKind::Unknown),
+        ARGUMENT_TEXT => Ok(ArgumentKind::Text),
+        ARGUMENT_CHARSET => Ok(ArgumentKind::Charset),
         _ => Err(Corrupt),
     }
 }

@@ -4,6 +4,7 @@ use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_receivers::{Variables, enclosing_types};
+use super::java_throws::ArgumentKind;
 use crate::syntax::{named_children, one_based};
 
 const INVOCATION: &str = "method_invocation";
@@ -25,6 +26,9 @@ const NON_NULL_CHECKS: &[&str] = &["assertNotNull", "requireNonNull", "notNull"]
 const PARENTHESIZED: &str = "parenthesized_expression";
 const CLASS_LITERAL: &str = "class_literal";
 const STRING_LITERAL: &str = "string_literal";
+const STANDARD_CHARSETS: &str = "StandardCharsets";
+const CHARSET_TYPE: &str = "Charset";
+const CHARSET_FACTORIES: &[&str] = &["defaultCharset", "forName"];
 const QUOTE: char = '"';
 const RETURN: &str = "return_statement";
 const LAMBDA: &str = "lambda_expression";
@@ -272,6 +276,47 @@ fn text_arguments(invocation: Node<'_>, source: &[u8]) -> Vec<String> {
         .filter(|argument| argument.kind() == STRING_LITERAL)
         .map(|literal| text(literal, source).trim_matches(QUOTE).to_owned())
         .collect()
+}
+
+pub(super) fn argument_kinds(invocation: Node<'_>, source: &[u8]) -> Vec<ArgumentKind> {
+    invocation
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .iter()
+        .filter(|argument| !COMMENTS.contains(&argument.kind()))
+        .map(|argument| argument_kind(*argument, source))
+        .collect()
+}
+
+fn argument_kind(argument: Node<'_>, source: &[u8]) -> ArgumentKind {
+    match argument.kind() {
+        STRING_LITERAL => ArgumentKind::Text,
+        FIELD_ACCESS if names_standard_charsets(argument.child_by_field_name(OBJECT_FIELD), source) => {
+            ArgumentKind::Charset
+        }
+        INVOCATION if is_charset_factory(argument, source) => ArgumentKind::Charset,
+        _ => ArgumentKind::Unknown,
+    }
+}
+
+fn names_standard_charsets(object: Option<Node<'_>>, source: &[u8]) -> bool {
+    object.is_some_and(|node| {
+        text(node, source)
+            .rsplit(QUALIFIER_SEPARATOR)
+            .next()
+            .is_some_and(|last| last == STANDARD_CHARSETS)
+    })
+}
+
+fn is_charset_factory(invocation: Node<'_>, source: &[u8]) -> bool {
+    let named = invocation
+        .child_by_field_name(NAME_FIELD)
+        .is_some_and(|name| CHARSET_FACTORIES.contains(&text(name, source)));
+    named
+        && invocation
+            .child_by_field_name(OBJECT_FIELD)
+            .is_some_and(|object| text(object, source) == CHARSET_TYPE)
 }
 
 pub(super) fn argument_count(invocation: Node<'_>) -> usize {

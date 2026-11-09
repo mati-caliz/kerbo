@@ -4,7 +4,7 @@ use tree_sitter::Node;
 
 use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, text};
 use super::java_calls::TYPE_DECLARATIONS;
-use super::java_chains::argument_count;
+use super::java_chains::{argument_count, argument_kinds};
 use super::java_constructor_throws::{constructor_points, explicit_origin, super_type};
 use super::java_receivers::{Variables, declared_arguments, enclosing_types, simple_type_name};
 use crate::syntax::{descendants, named_children, one_based};
@@ -58,6 +58,17 @@ pub enum CallRoot {
 pub struct CallStep {
     pub name: String,
     pub arity: usize,
+    pub arguments: Vec<ArgumentKind>,
+}
+
+// El tipo de un argumento cuando se ve en el propio texto de la llamada: un literal de texto o una
+// codificación de caracteres. Sirve para elegir entre sobrecargas como `getBytes(String)` y
+// `getBytes(Charset)`; lo demás no se sabe sin compilar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArgumentKind {
+    Unknown,
+    Text,
+    Charset,
 }
 
 // Lo que en un cuerpo puede tirar una excepción chequeada. `Unknown` es lo que no se sabe sin
@@ -262,6 +273,7 @@ pub(super) fn call_origin(invocation: Node<'_>, source: &[u8], variables: &Varia
         steps.push(CallStep {
             name: text(name, source).to_owned(),
             arity: argument_count(current),
+            arguments: argument_kinds(current, source),
         });
         let Some(object) = current.child_by_field_name(OBJECT_FIELD) else {
             steps.reverse();

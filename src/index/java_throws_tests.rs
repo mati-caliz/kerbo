@@ -304,3 +304,29 @@ fn constants_generics_and_super_are_followed_by_their_types() {
 fn without_a_jdk_nothing_can_be_resolved_and_nothing_is_reported() {
     assert_eq!(redundant_with(&Library::load(&[])), Vec::<String>::new());
 }
+
+const OVERLOADS: &str = r#"package app;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+class Encoder {
+    byte[] byCharset(String text) throws IOException {
+        return text.getBytes(StandardCharsets.UTF_8);
+    }
+
+    byte[] byName(String text) throws IOException {
+        return text.getBytes("UTF-8");
+    }
+
+    byte[] byUnknown(String text, String name) throws IOException {
+        return text.getBytes(name);
+    }
+}
+"#;
+
+#[test]
+fn an_overload_is_chosen_by_the_kind_of_the_argument_when_it_is_certain() {
+    let library = Library::load(&[]).with_jdk(fixture_jdk());
+    assert_eq!(redundant_in(OVERLOADS, &library), ["7:42 IOException"]);
+}
