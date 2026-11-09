@@ -27,7 +27,7 @@ readonly MAX_FILE_LINES=400
 readonly LINKER_FLAGS="-C link-arg=-fuse-ld=mold"
 gate_mode="full"
 test_filter=""
-if [ "${1:-}" = "--quick" ]; then
+if [[ "${1:-}" = "--quick" ]]; then
   gate_mode="quick"
   test_filter="${2:-}"
 fi
