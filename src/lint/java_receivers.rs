@@ -155,7 +155,7 @@ fn declared_by(node: Node<'_>) -> Vec<(Node<'_>, Option<Node<'_>>)> {
 }
 
 // Los parámetros de una lambda sin tipo escrito (`x -> ...`, `(a, b) -> ...`).
-fn inferred_parameters(lambda: Node<'_>) -> Vec<Node<'_>> {
+pub fn inferred_parameters(lambda: Node<'_>) -> Vec<Node<'_>> {
     let Some(parameters) = lambda.child_by_field_name(PARAMETERS_FIELD) else {
         return Vec::new();
     };
@@ -234,6 +234,13 @@ pub fn enclosing_types(node: Node<'_>, source: &[u8]) -> Vec<String> {
 // Los padres que declara un tipo: la clase que extiende y las interfaces que implementa o
 // extiende, por nombre simple.
 pub fn supertypes(declaration: Node<'_>, source: &[u8]) -> Vec<String> {
+    supertype_nodes(declaration)
+        .into_iter()
+        .map(|written| simple_type_name(text(written, source)))
+        .collect()
+}
+
+pub fn supertype_nodes(declaration: Node<'_>) -> Vec<Node<'_>> {
     [SUPERCLASS, INTERFACES_FIELD]
         .iter()
         .filter_map(|field| declaration.child_by_field_name(field))
@@ -251,7 +258,6 @@ pub fn supertypes(declaration: Node<'_>, source: &[u8]) -> Vec<String> {
                 }
             })
         })
-        .map(|written| simple_type_name(text(written, source)))
         .collect()
 }
 

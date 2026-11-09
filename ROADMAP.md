@@ -1699,18 +1699,21 @@ Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y 
 contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/java/`
 (`qodana.sh <repo> <inspección>`, `kerbo.sh`, `compare_all.py`), 2026-11-07.
 
-- `RedundantThrows` (`redundant-throws`): junit4 216 de 219, commons-lang 114 de 125, **ninguno de
-  más**. Faltan medir Guava y spring-boot, más grandes.
-  - Pendientes, por lo que falta: los genéricos en las clases del proyecto (los builders
-    `X.<I, T>builder().get()` de commons-lang); los parámetros de una lambda (`(k, v) -> v.get()`)
-    no tienen tipo, así que su `catch` cuenta para cualquier `get`; la sobrecarga se elige por
-    cantidad y por tipo sólo cuando el argumento es un literal de texto o un `Charset` conocido
-    (`getBytes(StandardCharsets.UTF_8)` ya no calla por `getBytes(String)`); con cualquier otro
-    argumento sigue juntando todas las sobrecargas; las
-    excepciones genéricas (`FailableConsumer<T, E>` tira `E`); `values()` y `valueOf()` de un enum
-    (el índice no sabe qué tipo es un enum); los arreglos como receptor
-    (`excepciones[0].getMessage()`). Un método del proyecto que redefine a uno de librería suma lo
-    que tira el de arriba: calla de más.
+- `RedundantThrows` (`redundant-throws`): junit4 218 de 219, commons-lang 121 de 125, **ninguno de
+  más** (2026-11-09). Faltan medir Guava y spring-boot, más grandes.
+  - Ya se siguen: los genéricos de las clases del proyecto (`Opening<T> extends Source<T,
+    IOException>` hace que el `get() throws E` heredado tire `IOException`; crudo, con otra cantidad
+    de argumentos o tapado por un `<E>` del método, no liga), los casteos, paréntesis y elementos de
+    arreglo como receptor, los parámetros de la lambda de un `forEach` de colección o de mapa, y una
+    clase anónima que redefine un método no hereda su `throws`.
+  - Pendientes, por lo que falta: la referencia a método como argumento (`FailableConsumerTest`
+    119 y 126, `FailableTest` 656: hay que inferir el tipo funcional del parámetro); el calificador
+    de `GetField` en junit4 (`Result.java` 191); `ClassUtilsOssFuzzTest` tiene bytes NUL que cortan
+    el texto. La sobrecarga se elige por cantidad y por tipo sólo cuando el argumento es un literal
+    de texto o un `Charset` conocido; con cualquier otro sigue juntando todas. `values()` y
+    `valueOf()` de un enum (el índice no sabe qué tipo es un enum). Un método del proyecto que
+    redefine a uno de librería suma lo que tira el de arriba: calla de más. Un parámetro de tipo
+    que se llama igual que una clase en algún lugar del archivo no se resuelve como clase.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
   commons-lang 0 de 2, ninguno de más. Pendientes: los dos de commons-lang son un recurso que se
   crea con una clase del proyecto en un test y un `OutputStream` que vuelve de un método.

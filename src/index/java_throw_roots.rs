@@ -1,6 +1,7 @@
 use super::java::JavaSummary;
 use super::java_nullness::Resolved;
 use super::java_throw_lookup::ThrowLookup;
+use super::java_throw_project::is_type_parameter;
 use super::java_typed::{Typed, library_field};
 use crate::lint::java_receivers::UNKNOWN_TYPE_ARGUMENT;
 use crate::lint::java_throws::CallRoot;
@@ -24,7 +25,8 @@ impl ThrowLookup<'_, '_> {
                 arguments: arguments
                     .iter()
                     .map(|argument| {
-                        (argument != UNKNOWN_TYPE_ARGUMENT).then(|| Typed::raw(self.named(summary, argument)))
+                        (argument != UNKNOWN_TYPE_ARGUMENT && !is_type_parameter(summary, argument))
+                            .then(|| Typed::raw(self.named(summary, argument)))
                     })
                     .collect(),
             }),
@@ -68,7 +70,7 @@ impl ThrowLookup<'_, '_> {
 
     // Un padre se escribe sin calificar aunque sea una clase anidada de lo importado: `Map.Entry`
     // queda como `Entry` con `import java.util.Map`.
-    fn parent_named(&self, summary: &JavaSummary, written: &str) -> Resolved {
+    pub(super) fn parent_named(&self, summary: &JavaSummary, written: &str) -> Resolved {
         let found = self.named(summary, written);
         let Resolved::Library(name) = &found else {
             return found;

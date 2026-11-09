@@ -2,16 +2,15 @@ use std::collections::HashSet;
 
 use super::java::{Declaration, JavaSummary};
 use super::java_nullness::{ProjectTypes, Resolved, resolve};
+use super::java_throw_project::{raw_signature, visit_project};
 use super::java_throw_wanted::Wanted;
 use super::java_typed::{Typed, library_parents, library_returned};
 use crate::jvm::class_file::ClassFile;
 use crate::jvm::library::Library;
 use crate::jvm::method::Method;
-use crate::lint::java_calls::{Arity, ReturnType};
-use crate::lint::java_receivers::UNKNOWN_TYPE_ARGUMENT;
+use crate::lint::java_calls::Arity;
 use crate::lint::java_throws::{CallRoot, CallStep, ThrowOrigin};
 
-const JAVA_OBJECT: &str = "java.lang.Object";
 const CONSTRUCTOR_NAME: &str = "<init>";
 const CLOSE: &str = "close";
 const WILDCARD: &str = "*";
@@ -21,9 +20,9 @@ const MAX_RECEIVERS: usize = 64;
 
 // Lo que una firma candidata dice de una llamada.
 #[derive(Debug, Clone)]
-struct Signature {
-    thrown: Vec<Resolved>,
-    returned: Option<Typed>,
+pub(super) struct Signature {
+    pub(super) thrown: Vec<Resolved>,
+    pub(super) returned: Option<Typed>,
 }
 
 #[derive(Default)]
@@ -228,11 +227,8 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
     fn visit(&self, current: &Typed, wanted: Wanted<'_>, collected: &mut Collected) -> Option<Vec<Typed>> {
         match &current.class {
             Resolved::Project(owner) => {
-                collected
-                    .found
-                    .extend(self.project_members(owner, wanted.name, wanted.arity));
-                let mut parents = vec![Typed::raw(Resolved::Library(JAVA_OBJECT.to_owned()))];
-                parents.extend(self.project_parents(owner).into_iter().map(Typed::raw));
+                let (found, parents) = visit_project(self, owner, current, wanted);
+                collected.found.extend(found);
                 Some(parents)
             }
             Resolved::Library(class) => {
@@ -245,34 +241,6 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         }
     }
 
-    fn project_members(&self, owner: &str, name: &str, arity: usize) -> Vec<Signature> {
-        self.types
-            .declarations_of(owner)
-            .filter(|(_, declaration)| {
-                !declaration.is_constructor && declaration.name == name && accepts(declaration, arity)
-            })
-            .map(|(summary, declaration)| self.project_signature(summary, declaration))
-            .collect()
-    }
-
-    fn project_signature(&self, summary: &JavaSummary, declaration: &Declaration) -> Signature {
-        Signature {
-            thrown: declared_clauses(summary, declaration)
-                .map(|written| self.named(summary, written))
-                .collect(),
-            returned: (declaration.return_type == ReturnType::Reference).then(|| Typed {
-                class: self.named(summary, &declaration.returned),
-                arguments: declaration
-                    .returned_arguments
-                    .iter()
-                    .map(|argument| {
-                        (argument != UNKNOWN_TYPE_ARGUMENT).then(|| Typed::raw(self.named(summary, argument)))
-                    })
-                    .collect(),
-            }),
-        }
-    }
-
     // Una clase sin constructores escritos tiene el implícito; una interfaz, en `new X() { }`, nada.
     fn constructors(&self, class: &Resolved, arity: usize) -> Option<Vec<Signature>> {
         let found = match class {
@@ -280,7 +248,7 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
                 .types
                 .declarations_of(owner)
                 .filter(|(_, declaration)| declaration.is_constructor && accepts(declaration, arity))
-                .map(|(summary, declaration)| self.project_signature(summary, declaration))
+                .map(|(summary, declaration)| raw_signature(self, summary, declaration))
                 .collect(),
             Resolved::Library(name) => {
                 let file = self.library.class_or_jdk(name)?;
@@ -371,7 +339,7 @@ fn parameters_of(method: &Method) -> &str {
         .unwrap_or(&method.descriptor)
 }
 
-const fn accepts(declaration: &Declaration, arity: usize) -> bool {
+pub(super) const fn accepts(declaration: &Declaration, arity: usize) -> bool {
     let parameters = declaration.parameters.len();
     match declaration.arity {
         Arity::Fixed => arity == parameters,
@@ -380,7 +348,7 @@ const fn accepts(declaration: &Declaration, arity: usize) -> bool {
 }
 
 // Los tipos que la declaración escribió en su `throws`.
-pub fn declared_clauses<'summary>(
+pub(super) fn declared_clauses<'summary>(
     summary: &'summary JavaSummary,
     declaration: &'summary Declaration,
 ) -> impl Iterator<Item = &'summary str> {

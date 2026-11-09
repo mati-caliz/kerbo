@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_calls::TYPE_DECLARATIONS;
+use super::java_lambda_parameters::with_lambda_parameters;
 use super::java_receivers::{Variables, simple_type_name};
 use super::java_throws::{ThrowOrigin, call_origin, caught_types};
 use crate::syntax::named_children;
@@ -28,7 +29,7 @@ pub fn caught_call(node: Node<'_>, source: &[u8], variables: &Variables) -> Opti
     let (name, origin) = match node.kind() {
         INVOCATION => (
             node.child_by_field_name(NAME_FIELD)?,
-            call_origin(node, source, variables),
+            call_origin(node, source, &with_lambda_parameters(node, source, variables)),
         ),
         METHOD_REFERENCE => (*named_children(node).last()?, ThrowOrigin::Unknown),
         CREATION => (node.child_by_field_name(TYPE_FIELD)?, ThrowOrigin::Unknown),

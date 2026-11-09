@@ -254,7 +254,7 @@ fn redundant_with(library: &Library) -> Vec<String> {
     redundant_in(SERVICE, library)
 }
 
-fn redundant_in(source: &str, library: &Library) -> Vec<String> {
+pub(super) fn redundant_in(source: &str, library: &Library) -> Vec<String> {
     let summary = summary_of(source);
     let files = [IndexedSummary {
         summary: &summary,

@@ -72,6 +72,14 @@ impl<'summary> ProjectTypes<'summary> {
             .flat_map(|(summary, parents)| parents.iter().map(|parent| (*summary, parent.as_str())))
     }
 
+    // Cada archivo que declara un tipo con ese nombre, con los padres que le escribe ahí.
+    pub fn declared_in<'query>(
+        &'query self,
+        owner: &'query str,
+    ) -> impl Iterator<Item = (&'summary JavaSummary, &'summary [String])> + 'query {
+        self.declared.get(owner).into_iter().flatten().copied()
+    }
+
     // Un campo de un tipo del proyecto, con el archivo donde está.
     pub fn field_of(&self, owner: &str, name: &str) -> Option<(&'summary JavaSummary, &'summary Field)> {
         self.declared.get(owner)?.iter().find_map(|(summary, _)| {

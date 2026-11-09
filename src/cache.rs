@@ -3,6 +3,7 @@ mod budget;
 mod chain_codec;
 mod codec;
 mod declaration_codec;
+mod generics_codec;
 mod go_package_codec;
 mod key;
 mod lint_codec;

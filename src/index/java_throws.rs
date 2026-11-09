@@ -196,7 +196,8 @@ impl Checker<'_, '_, '_> {
     }
 
     // Un método que lo redefine y declara ese tipo o uno más chico justifica el `throws`: quien
-    // llama por la clase de arriba tiene que poder atraparlo.
+    // llama por la clase de arriba tiene que poder atraparlo. IntelliJ los busca en el índice de
+    // nombres de métodos, que no tiene los de clases anónimas ni locales.
     fn declared_by_overrider(&self, declared: &Resolved, declaration: &Declaration) -> bool {
         if declaration.owner.kind == OwnerKind::Local || declaration.is_constructor {
             return false;
@@ -220,13 +221,11 @@ impl Checker<'_, '_, '_> {
     }
 
     fn may_override(&self, other: &Declaration, declaration: &Declaration) -> bool {
-        if other.owner.kind == OwnerKind::Local && other.owner.name == declaration.owner.name {
-            return true;
-        }
-        self.lookup.is_subclass(
-            &Resolved::Project(other.owner.name.clone()),
-            &Resolved::Project(declaration.owner.name.clone()),
-        ) != Some(false)
+        other.owner.kind != OwnerKind::Local
+            && self.lookup.is_subclass(
+                &Resolved::Project(other.owner.name.clone()),
+                &Resolved::Project(declaration.owner.name.clone()),
+            ) != Some(false)
             && other.owner.name != declaration.owner.name
     }
 
