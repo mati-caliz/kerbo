@@ -5,6 +5,7 @@ mod deferred;
 mod dependencies;
 mod dispatch;
 mod django_version;
+mod factories;
 mod fields;
 mod graph;
 mod history;
@@ -20,6 +21,7 @@ mod run_python;
 mod schema;
 mod settings;
 mod state;
+mod truth;
 mod values;
 
 use std::path::Path;
@@ -50,6 +52,7 @@ fn render(root: Node<'_>, source: &[u8], location: &Location, loader: &impl Load
             source,
             app: &location.app,
             settings: &settings::project(&location.apps_root),
+            apps_root: Some(&location.apps_root),
         },
     ) else {
         return Vec::new();
@@ -66,6 +69,7 @@ fn rendered_sql(root: Node<'_>, source: &[u8], location: &Location) -> Option<St
             source,
             app: &location.app,
             settings: &settings::project(&location.apps_root),
+            apps_root: Some(&location.apps_root),
         },
     )?;
     let loader = FileLoader::new(location.apps_root.clone());

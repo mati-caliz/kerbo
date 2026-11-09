@@ -1,28 +1,33 @@
+use std::path::Path;
+use std::sync::Arc;
+
 use tree_sitter::Node;
 
+mod raw_sql;
+
 use super::dependencies::keys;
+use super::factories::{Factory, imported};
 use super::fields::{Owner, field};
 use super::meta::{constraint, constraints, index, indexes, unique_together};
 use super::model::{Model, ModelKey};
-use super::operations::{Located, Migration, Operation, SqlChunk};
-use super::run_python::{functions, schema_editor_sql};
+use super::operations::{Located, Migration, Operation};
+use super::run_python::functions;
 use super::settings::Settings;
-use super::values::{boolean, dictionary, elements, is_sequence, text};
+use super::truth::truth;
+use super::values::{boolean, dictionary, elements, parenthesized_content, text};
 use crate::deploy::python_calls::Call;
-use crate::syntax::{named_children, one_based};
+use crate::syntax::named_children;
+use raw_sql::{run_python, run_sql};
 
 const MIGRATION_CLASS: &str = "Migration";
 const OPERATIONS: &str = "operations";
 const ATOMIC: &str = "atomic";
 const DEPENDENCIES: &str = "dependencies";
 const RUN_BEFORE: &str = "run_before";
-const NOOP: &str = "noop";
 const CONCURRENTLY: &str = "Concurrently";
 const ADD_FIELD: &str = "AddField";
 const IDENTIFIER: &str = "identifier";
 const CONCATENATION: &str = "binary_operator";
-const PARENTHESIZED: &str = "parenthesized_expression";
-const COMMENT: &str = "comment";
 const RUN_PYTHON: &str = "RunPython";
 const MAX_ALIAS_DEPTH: usize = 8;
 const GENERIC_EXTENSION: &str = "CreateExtension";
@@ -42,6 +47,7 @@ pub struct Reader<'context> {
     pub source: &'context [u8],
     pub app: &'context str,
     pub settings: &'context Settings,
+    pub apps_root: Option<&'context Path>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -51,6 +57,7 @@ struct Scope<'context> {
     settings: &'context Settings,
     bindings: &'context [(String, Node<'context>)],
     functions: &'context [(String, Node<'context>)],
+    factories: &'context [(String, Arc<Factory>)],
 }
 
 pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
@@ -66,12 +73,17 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
     let mut bindings = assignments(root, reader.source);
     bindings.extend(class_bindings.iter().cloned());
     let module_functions = functions(root, reader.source);
+    let factories = reader
+        .apps_root
+        .map(|apps_root| imported(root, reader.source, apps_root, reader.settings))
+        .unwrap_or_default();
     let scope = Scope {
         source: reader.source,
         app: reader.app,
         settings: reader.settings,
         bindings: &bindings,
         functions: &module_functions,
+        factories: &factories,
     };
     let mut migration = Migration {
         operations: Vec::new(),
@@ -82,7 +94,10 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
     for (name, value) in class_bindings {
         match name.as_str() {
             OPERATIONS => migration.operations = scope.operations(value),
-            ATOMIC => migration.atomic = boolean(value) != Some(false),
+            ATOMIC => {
+                migration.atomic =
+                    truth(scope.resolved(value), reader.source, reader.settings) != Some(false);
+            }
             DEPENDENCIES => {
                 migration.dependencies = keys(scope.resolved(value), reader.source, reader.settings);
             }
@@ -163,7 +178,7 @@ impl<'context> Scope<'context> {
     fn database_operations(self, node: Node<'context>) -> Vec<Located> {
         self.located(node, |call| {
             if call.method == RUN_PYTHON {
-                self.run_python(call)
+                run_python(self, call)
             } else {
                 self.operation(call)
             }
@@ -188,19 +203,37 @@ impl<'context> Scope<'context> {
             .collect()
     }
 
-    fn run_python(self, call: &Call<'context>) -> Option<Operation> {
-        let name = argument(call, 0, "code")?.utf8_text(self.source).ok()?;
-        let function = self
-            .functions
-            .iter()
-            .rev()
-            .find(|(defined, _)| defined == name)
-            .map(|(_, function)| *function)?;
-        let chunks = schema_editor_sql(function, self.source);
-        (!chunks.is_empty()).then_some(Operation::RunSql(chunks))
+    fn operation(self, call: &Call<'context>) -> Option<Operation> {
+        self.declared_operation(call)
+            .or_else(|| self.factory_operation(call))
     }
 
-    fn operation(self, call: &Call<'context>) -> Option<Operation> {
+    fn factory_operation(self, call: &Call<'context>) -> Option<Operation> {
+        if !call.receiver.is_empty() {
+            return None;
+        }
+        let factory = self
+            .factories
+            .iter()
+            .rev()
+            .find(|(name, _)| name == call.method)
+            .map(|(_, factory)| factory)?;
+        let arguments = factory
+            .forwarded
+            .iter()
+            .map(|parameter| argument(call, parameter.position, &parameter.name))
+            .collect::<Option<Vec<_>>>()?;
+        self.declared_operation(&Call {
+            receiver: "",
+            method: &factory.method,
+            line: call.line,
+            column: call.column,
+            arguments,
+            source: call.source,
+        })
+    }
+
+    fn declared_operation(self, call: &Call<'context>) -> Option<Operation> {
         match call.method {
             "CreateModel" => self.create_model(call),
             "DeleteModel" => model_name(call, 0, "name").map(Operation::DeleteModel),
@@ -229,7 +262,7 @@ impl<'context> Scope<'context> {
                     .unwrap_or_default(),
             }),
             "AlterModelOptions" => self.alter_options(call),
-            "RunSQL" => self.run_sql(call),
+            "RunSQL" => run_sql(self, call),
             GENERIC_EXTENSION => string_argument(call, 0, "name").map(Operation::CreateExtension),
             "SeparateDatabaseAndState" => Some(Operation::Separate {
                 database: argument(call, 0, "database_operations")
@@ -344,53 +377,4 @@ impl<'context> Scope<'context> {
             .and_then(|(_, value)| boolean(value))?;
         Some(Operation::AlterManaged { model, managed })
     }
-
-    fn run_sql(self, call: &Call<'context>) -> Option<Operation> {
-        let sql = self.resolved(argument(call, 0, "sql")?);
-        let is_noop = sql.kind() == "attribute"
-            && sql
-                .utf8_text(self.source)
-                .is_ok_and(|reference| reference.ends_with(NOOP));
-        if is_noop {
-            return None;
-        }
-        let chunks = self
-            .sql_literals(sql)
-            .into_iter()
-            .map(|literal| self.resolved(literal))
-            .filter_map(|literal| {
-                Some(SqlChunk {
-                    sql: text(literal, self.source)?,
-                    line: one_based(literal.start_position().row),
-                })
-            })
-            .collect();
-        Some(Operation::RunSql(chunks))
-    }
-
-    fn sql_literals(self, sql: Node<'context>) -> Vec<Node<'context>> {
-        if !is_sequence(sql) && sql.kind() != CONCATENATION {
-            return vec![sql];
-        }
-        self.sequence(sql)
-            .into_iter()
-            .filter_map(|element| {
-                let element = self.resolved(element);
-                if is_sequence(element) {
-                    elements(element).into_iter().next()
-                } else {
-                    Some(element)
-                }
-            })
-            .collect()
-    }
-}
-
-fn parenthesized_content(node: Node<'_>) -> Option<Node<'_>> {
-    if node.kind() != PARENTHESIZED {
-        return None;
-    }
-    named_children(node)
-        .into_iter()
-        .find(|child| child.kind() != COMMENT)
 }

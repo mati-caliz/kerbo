@@ -33,6 +33,7 @@ impl MemoryLoader {
                 source: source.as_bytes(),
                 app,
                 settings: &Settings::default(),
+                apps_root: None,
             },
         )
         .expect("es una migración");
@@ -262,6 +263,7 @@ fn sql(loader: &MemoryLoader, app: &str, stem: &str, source: &str) -> String {
             source: source.as_bytes(),
             app,
             settings: &Settings::default(),
+            apps_root: None,
         },
     )
     .expect("es una migración");

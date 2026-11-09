@@ -17,6 +17,7 @@ use crate::language::Language;
 const MIGRATIONS_DIRECTORY: &str = "migrations";
 const PYTHON_EXTENSION: &str = "py";
 const PACKAGE_STEM: &str = "__init__";
+const APPS_ROOT_DEPTH: usize = 3;
 const IMPORT_MARKER: &str = "from django.db import";
 const CLASS_MARKER: &str = "class Migration(";
 
@@ -223,6 +224,7 @@ fn parse_file(path: &Path, app: &str, settings: &Settings) -> Option<Migration> 
             source: &source,
             app,
             settings,
+            apps_root: path.ancestors().nth(APPS_ROOT_DEPTH),
         },
     )
 }

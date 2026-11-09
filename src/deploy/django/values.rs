@@ -4,6 +4,7 @@ use crate::deploy::python_calls::string_value;
 use crate::syntax::named_children;
 
 const COMMENT: &str = "comment";
+const PARENTHESIZED: &str = "parenthesized_expression";
 const SEQUENCES: &[&str] = &["list", "tuple", "set"];
 const RAW_LITERALS: &[&str] = &["integer", "float", "unary_operator", "true", "false"];
 const STRINGS: &[&str] = &["string", "concatenated_string"];
@@ -82,4 +83,13 @@ pub fn sql_literal(node: Node<'_>, source: &[u8]) -> Option<String> {
         });
     }
     Some(quoted_literal(&raw(node, source)))
+}
+
+pub fn parenthesized_content(node: Node<'_>) -> Option<Node<'_>> {
+    if node.kind() != PARENTHESIZED {
+        return None;
+    }
+    named_children(node)
+        .into_iter()
+        .find(|child| child.kind() != COMMENT)
 }

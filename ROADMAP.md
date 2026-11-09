@@ -1735,19 +1735,25 @@ los comandos de un `RUN`: un script que el shell no parsea (un `(` después de d
     `prod` de su `uv.lock` (con psycopg2, que pide django-bitfield) y los paquetes de sistema que
     compilan sus dependencias; usa `scripts/parity/django/zulip_settings.py`, que toma los
     `settings` de desarrollo sin el archivo de secretos y manda los logs a `/tmp`. 302
-    migraciones, 5 no se pueden convertir (consultan la base). Squawk 1.160 avisos, kerbo 979,
-    coinciden 979, 123 diferencias, ninguna de más. Empezó en 125: kerbo ahora sigue los
-    `from .modulo import *` de los `settings` (el `DEFAULT_AUTO_FIELD` de zulip vive en
-    `zproject/computed_settings.py`) y, cuando `INSTALLED_APPS` suma una lista con nombre, junta
-    todas sus definiciones (`EXTRA_INSTALLED_APPS` cambia en `dev_settings.py`). Lo que queda:
-    - 96 de apps de terceros (`social_django`, `otp_*`, `auth`, `contenttypes`, `sessions`,
-      `phonenumber`), igual que en saleor.
-    - 27 de 10 migraciones (zerver 0679, 0693, 0694, 0741, 0742, 0755, 0807, 0808, 0809;
-      zilencer 0070) que arman la operación con funciones propias del proyecto
-      (`zerver.lib.migrate.add_index`/`remove_index`, que devuelven `AddIndex` o
-      `AddIndexConcurrently` según `settings.MIGRATIONS_ADD_REMOVE_INDEXES_CONCURRENTLY`, con el
-      mismo `settings` en `atomic`). kerbo no saca nada de esas llamadas: haría falta seguir la
-      función importada y evaluar el `if` sobre un `settings` booleano.
+    migraciones, 5 no se pueden convertir (consultan la base). Squawk 1.160 avisos, kerbo 1.016,
+    coinciden 1.016, 96 diferencias, ninguna de más, todas de apps de terceros (`social_django`,
+    `otp_*`, `auth`, `contenttypes`, `sessions`, `phonenumber`), igual que en saleor. Empezó en
+    125: kerbo ahora sigue los `from .modulo import *` de los `settings` (el `DEFAULT_AUTO_FIELD`
+    de zulip vive en `zproject/computed_settings.py`) y, cuando `INSTALLED_APPS` suma una lista
+    con nombre, junta todas sus definiciones (`EXTRA_INSTALLED_APPS` cambia en `dev_settings.py`).
+    - Hecho (2026-11-09): las 27 diferencias de zerver 0679, 0693, 0694, 0741, 0742, 0755, 0807,
+      0808, 0809 y zilencer 0070, que arman la operación con `zerver.lib.migrate.add_index` y
+      `remove_index`. kerbo sigue las funciones del proyecto importadas con `from x.y import f`
+      (también `as`), buscando el módulo desde la raíz de las apps y su carpeta padre, cuando
+      devuelven una operación conocida con argumentos que son sus parámetros; los `if`/`elif`/
+      `else` del cuerpo se resuelven con los `settings` booleanos (`True`/`False` literales, el
+      último gana) y `not`. `atomic` también se evalúa así (`atomic = not settings.X`). Si la
+      condición no se sabe, la llamada no saca nada, como antes.
+    - Sentencia por sentencia (`dump.sh` + `diff.py`), 37 de 302 migraciones con SQL distinto:
+      además de las de terceros, los índices por expresión (`F("x")`, `Upper("x")`,
+      `F("id").desc(nulls_last=True)`) salen `(true)` en vez de la expresión, y los `condition`
+      con operadores de bits (`flags__andnz`, zerver 0742) salen `WHERE true`. No cambian los
+      avisos.
   - Medir más repos de Django (sentry, wagtail): entrada en `REPOS` de `reference.py`.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
     `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), los

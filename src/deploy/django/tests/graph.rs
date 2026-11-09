@@ -26,6 +26,7 @@ fn nodes(declared: &[(&str, &str, &str)]) -> Nodes {
                     source: source.as_bytes(),
                     app,
                     settings: &settings,
+                    apps_root: None,
                 },
             )
             .expect("es una migración");

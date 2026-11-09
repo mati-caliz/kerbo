@@ -22,12 +22,15 @@ const CASCADE_DROPPED_IN: Version = Version::new(6, 0);
 const RELATIVE_IMPORT: &str = "from .";
 const IMPORT_KEYWORD: &str = " import ";
 const WILDCARD: char = '*';
+const PYTHON_TRUE: &str = "True";
+const PYTHON_FALSE: &str = "False";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
     pub user_model: ModelKey,
     pub auto_field: Class,
     pub numbers: BTreeMap<String, String>,
+    pub flags: BTreeMap<String, bool>,
     pub installed_apps: Option<BTreeSet<String>>,
     pub column_drops_cascade: bool,
 }
@@ -38,6 +41,7 @@ impl Default for Settings {
             user_model: ModelKey::new(DEFAULT_USER_APP, DEFAULT_USER_MODEL),
             auto_field: Class::Auto,
             numbers: BTreeMap::new(),
+            flags: BTreeMap::new(),
             installed_apps: None,
             column_drops_cascade: false,
         }
@@ -68,6 +72,7 @@ impl Settings {
             settings.auto_field = class;
         }
         settings.numbers = numbers(sources);
+        settings.flags = flags(sources);
         settings.installed_apps = installed_apps(sources);
         settings
     }
@@ -86,6 +91,10 @@ impl Settings {
             .and_then(|name| self.numbers.get(name))
             .map_or(reference, String::as_str)
     }
+
+    pub fn flag(&self, name: &str) -> Option<bool> {
+        self.flags.get(name).copied()
+    }
 }
 
 fn is_constant_name(name: &str) -> bool {
@@ -99,14 +108,29 @@ fn is_integer(value: &str) -> bool {
     !value.is_empty() && value.chars().all(|character| character.is_ascii_digit())
 }
 
-fn numbers(sources: &[String]) -> BTreeMap<String, String> {
+fn constant_assignments(sources: &[String]) -> impl Iterator<Item = (&str, &str)> {
     sources
         .iter()
         .flat_map(|source| source.lines())
         .filter_map(|line| line.split_once(ASSIGNMENT))
         .map(|(name, value)| (name.trim_end(), value.trim()))
-        .filter(|(name, value)| is_constant_name(name) && is_integer(value))
+        .filter(|(name, _)| is_constant_name(name))
+}
+
+fn numbers(sources: &[String]) -> BTreeMap<String, String> {
+    constant_assignments(sources)
+        .filter(|(_, value)| is_integer(value))
         .map(|(name, value)| (name.to_owned(), value.to_owned()))
+        .collect()
+}
+
+fn flags(sources: &[String]) -> BTreeMap<String, bool> {
+    constant_assignments(sources)
+        .filter_map(|(name, value)| match value {
+            PYTHON_TRUE => Some((name.to_owned(), true)),
+            PYTHON_FALSE => Some((name.to_owned(), false)),
+            _ => None,
+        })
         .collect()
 }
 
@@ -231,6 +255,10 @@ AUTH_USER_MODEL = \"account.User\"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CODE_LENGTH = 3
     INDENTED = 4
+CONCURRENTLY = True
+DEBUG = False
+CONCURRENTLY = False
+DEBUG_TOOLBAR = maybe()
 "
             .to_owned(),
         ];
@@ -240,6 +268,9 @@ CODE_LENGTH = 3
         assert_eq!(settings.number("settings.CODE_LENGTH"), "3");
         assert_eq!(settings.number("settings.INDENTED"), "settings.INDENTED");
         assert_eq!(settings.number("CODE_LENGTH"), "CODE_LENGTH");
+        assert_eq!(settings.flag("CONCURRENTLY"), Some(false));
+        assert_eq!(settings.flag("DEBUG"), Some(false));
+        assert_eq!(settings.flag("DEBUG_TOOLBAR"), None);
     }
 
     #[test]
