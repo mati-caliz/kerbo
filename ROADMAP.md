@@ -1552,123 +1552,6 @@ cerrarse se borra de acá.
 - Código muerto entre archivos: exports que nadie importa y dependencias declaradas que nadie
   usa, con paridad contra knip, vulture y depcheck donde las haya.
 
-### 17. Versiones de referencia al día
-
-Hecho (2026-11-07): las versiones contra las que se mide cada familia están en
-`scripts/parity/versions.toml`, y los scripts de paridad las leen con `scripts/parity/versions.py`
-(`version`, `image`). `versions.py check` verifica que `Cargo.toml`, las gramáticas copiadas, el
-ESLint de `.parity/eslint` y el README digan lo mismo; `versions.py outdated` muestra el atraso
-contra lo último publicado; `scripts/parity/run_all.sh` corre los corpus de todas las familias por la
-cola y deja la salida en `.parity/logs/<fecha>/`. Qodana quedó fijado en `2026.3-eap`, la imagen con
-que se midió. El criterio de ritmo está en el encabezado de `versions.toml`.
-
-Hecho (2026-11-07): ruff 0.17.1 → 0.17.4. Lo que cambió en el corpus de diez repos: 18 SIM102 que
-faltaban (el `elif` con un `if` adentro ahora mira el cuerpo del `elif` y no el del `if` de arriba) y
-1 UP032 de más (ya no convierte un campo con atributo que no es un identificador, una clave con la
-comilla de la f-string o con barra, una conversión que no sea `s`, `r` o `a`, ni mezcla `{}` con
-`{0}`). Paridad después: 106.635 coinciden, 6 faltan (los mismos de antes: 5 RUF100 y 1 PLE0307),
-0 de más. `test-python.sh` busca la imagen de Rust que hay en vez de una fija.
-
-Hecho (2026-11-07): ESLint 10.13 → 10.14 y typescript-eslint 8.72.0 → 8.72.1. La salida de ESLint
-sobre express, zod, react, vscode y juice-shop (88 reglas) es idéntica byte a byte a la de antes, así
-que no hubo nada que portar.
-
-Hecho (2026-11-07): tree-sitter 0.27.1 → 0.27.2. Gate verde y la salida de kerbo sobre el corpus de
-JS/TS (21.438 archivos, 171.559 problemas) idéntica byte a byte.
-
-Hecho (2026-11-07): squawk 2.70 → 2.71 y arnés de migraciones rearmado en
-`scripts/parity/migrations/` (entra en `run_all.sh`): squawk en un venv de `.parity` contra kerbo,
-comparados por archivo y regla, sobre las migraciones de seis repos nuevos de `corpus.toml`. Quedan
-afuera los 15 archivos que squawk no parsea (MySQL). Paridad: 9.870 avisos coinciden, 0 de más, 0 de
-menos, en 1.867 migraciones.
-
-Hecho (2026-11-08): Checkstyle 14 → 14.4.0, con arnés nuevo en `scripts/parity/java/checkstyle.py`
-(baja el jar de `versions.toml`, corre `sun_checks.xml` y compara por regla, archivo y línea contra
-`kerbo.json`; entra en `run_all.sh`). Lo que cambió: `WhitespaceAfter` ya no pide blanco después de
-`if`, `for`, `while`, `try`, `catch`, `synchronized`, `do` ni `->` (queda en coma, `;`,
-cast y `...`; lo demás lo cubre `WhitespaceAround`), y kerbo dejó de avisarlos. Paridad en junit4 y
-commons-lang: 10.070 avisos coinciden (4.622 y 5.448), 0 de menos, 0 de más (sin las reglas de Javadoc, `LineLength`,
-`Indentation`, `MagicNumber` y los largos, que kerbo no calca o mide con otro umbral).
-
-Hecho (2026-11-08): Django 5.2.8 → 6.1.3. `sqlmigrate` de 6.1.3 sobre las 23 migraciones de
-`django.contrib` da el mismo resultado para squawk: 89 de 89 avisos coinciden, 0 de más, 0 de
-menos, sin cambios en kerbo.
-
-Hecho (2026-11-08): arnés de gitleaks 8.30.1 en `scripts/parity/secrets/` (entra en `run_all.sh`
-como familia `secrets`): gitleaks en docker con la configuración de `src/secrets/gitleaks.toml`, sin
-historia ni `.gitleaksignore`, contra kerbo en 15 repos de `corpus.toml`, por archivo, línea y regla
-(los hallazgos de archivo entero cuentan como línea 1). Paridad: 2.323 de 2.323, 0 de menos, 0 de más.
-`corpus_volume.sh` ya no falla por los enlaces del corpus que `cp` no puede crear en el volumen.
-
-Hecho (2026-11-08): arnés de hadolint 2.15.1 en `scripts/parity/dockerfile/` (familia `dockerfile` de
-`run_all.sh`): hadolint en docker contra kerbo sobre los 71 Dockerfile del corpus, por archivo, línea y
-regla DL. Quedan afuera los 26 archivos que hadolint no parsea (DL1000, casi todos de awesome-compose).
-Paridad: 196 de 196, 0 de menos, 0 de más.
-
-Hecho (2026-11-08): arnés de osv-scanner 2.7.0 en `scripts/parity/dependencies/` (familia `dependencies`
-de `run_all.sh`): osv-scanner en docker contra `kerbo check --osv` sobre los 121 lockfiles del corpus,
-comparados por carpeta, paquete y versión (osv-scanner informa una sola vez un paquete que está en dos
-lockfiles de la misma carpeta). Los dos consultan api.osv.dev, así que la cifra depende del día; la imagen
-del gate no trae `curl` y el script lo instala. Arreglos en kerbo: los alias de yarn (`eslint-v7@npm:eslint`)
-se leen con el nombre del paquete real, y los paquetes de pnpm instalados desde una URL de tarball toman la
-versión que declara la entrada.
-Paridad: 7.283 de 7.284 grupos de avisos, 1 de menos y 19 de más. El que falta es un `link:` de yarn que
-osv-scanner marca como `MAL-` por el nombre y kerbo salta a propósito. Los de más: 17 son de
-`react/fixtures/ssr2` (de su `package-lock.json` v2 osv-scanner lee sólo 5 paquetes y kerbo todos), uno de
-`awesome-compose/react-express-mysql/backend` (lockfile v1) y uno de `vscode/build/rspack`; no se
-averiguó por qué osv-scanner no los informa.
-
-Hecho (2026-11-09): osv-scanner 2.7.0 → 2.7.1. Paridad: 7.302 de 7.303 grupos de avisos, 1 de menos
-(el `link:` de yarn marcado `MAL-`) y 0 de más; los 19 de más de antes ya no aparecen. Dos arreglos
-del arnés: `run_all.sh` armaba la ruta de `heavy_lock.py` en formato POSIX y Python de Windows no la
-encontraba, y `dependencies/corpus.sh` ahora falla si osv-scanner no deja resultados (antes la
-referencia quedaba como al día con un JSON vacío). `corpus_volume.sh` usa un volumen por carril
-(`kerbo-corpus-principal`, `kerbo-corpus-b`): con uno compartido, la copia de un carril vaciaba el
-volumen en medio de la medición del otro. El volumen viejo `kerbo-corpus` ya no se usa y se puede
-borrar cuando ningún carril lo necesite.
-
-Hecho (2026-11-09): typescript-eslint 8.72.1 → 8.72.2. La salida de ESLint sobre express, zod, react,
-vscode y juice-shop (87 reglas) es idéntica byte a byte a la de antes, la lib de tipos de
-`typescript_lib.txt` conserva los mismos 193 nombres y sigue el tope `typescript <6.1.0`. Con esto
-sólo queda atrasada TypeScript 7, bloqueada.
-
-Hecho (2026-11-09): corpus de hadolint ampliado con docker-library/python, docker-library/node, moby y
-grafana (de 71 a 181 Dockerfile medidos; el `find` ahora pide `-type f` porque moby tiene una carpeta
-`dockerfile`). Salieron cuatro DL3059 de menos, todos de Dockerfile de Windows, por cómo hadolint cuenta
-los comandos de un `RUN`: un script que el shell no parsea (un `(` después de dos palabras, como
-`if ((Get-Item ...)` o `Function Nombre() {`) cuenta cero, y un comando cuyo nombre es una expansión
-(`%{$nul`) no cuenta. Paridad: 593 de 593, 0 de menos, 0 de más.
-
-- Pendientes:
-  - Los demás scripts de `scripts/parity` que comparten otros volúmenes (`kerbo-shell-corpus`) pasan
-    por el mismo `corpus_volume.sh`, así que también quedan por carril; falta una corrida completa de
-    `run_all.sh` con dos carriles a la vez para confirmarlo.
-  - TypeScript 7 (7.0.2): bloqueado, typescript-eslint 8.72.2 declara `typescript <6.1.0`. Se sube
-    cuando typescript-eslint lo soporte, o junto con tsrs (etapas 11 y 16).
-  - `run_all.sh` corrido entero (2026-11-09, las ocho familias): Go falló por las rutas de Windows y se
-    arregló con `pwd -W` en los scripts de Go y shell.
-    Hecho (2026-11-09): el comparador de Go (`compare_corpus.py`) mira ahora también `stdmethods` (de
-    govet) y `unused`, y la referencia corre golangci-lint sin las exclusiones de archivos generados
-    ni los presets. Paridad sobre los 12 repos: 1.379 coinciden, 0 de menos y 487 de más, todos
-    explicados por el código fuente: staticcheck no avisa en archivos `Code generated ... DO NOT EDIT`
-    y golangci-lint respeta `//nolint` (que vale para la declaración que sigue); el comparador
-    cuenta los "sobran" que no tienen ninguna de las dos causas y dan 0. errcheck se mide aparte
-    (`errcheck_options.sh`).
-    Aclarado (2026-11-09): en `juice-shop/frontend/src/assets/private` kerbo no avisa porque el
-    `.gitignore` de juice-shop tiene `frontend/src/**/*.js` y esos archivos están versionados a la fuerza:
-    kerbo respeta `.gitignore` y ESLint no. Son las diferencias "de menos" de `no-var` en esa carpeta (no
-    son un defecto de reglas); si se quisiera analizar lo versionado aunque esté ignorado, habría que leer
-    el índice de git al recorrer. Hadolint midió 606 y no 593 porque el corpus ya tiene 184 Dockerfile
-    (eran 181); la comparación da 606 de 606, 0 de menos, 0 de más.
-  - Dependencias: contra osv-scanner queda 1 aviso de menos y 0 de más. Es `eslint-plugin-react-internal`
-    (`link:./scripts/eslint-rules` en el `yarn.lock` de react): osv-scanner lo marca `MAL-` por el nombre
-    aunque sea una carpeta local, y kerbo lo salta a propósito. No se replica.
-  - Los Dockerfile que hadolint no parsea (31) quedan sin medir, y no se replica su error (DL1000): 23 son de
-    awesome-compose y fallan por un comentario justo después del `EOF` de un heredoc, un defecto del parser de
-    hadolint. kerbo sí los analiza y avisa lo que corresponde (588 avisos en esos archivos).
-  - Cuando entre tsrs (etapas 11 y 16), su commit y la versión de TypeScript que sigue van en
-    `versions.toml`.
-
 ### 14. Más migraciones: Django y Rails
 
 - Django (empezada, 2026-11-07): `sqlmigrate` de Django 5.2 replicado para Postgres y las reglas de
@@ -1771,6 +1654,12 @@ los comandos de un `RUN`: un script que el shell no parsea (un `(` después de d
   strong_migrations como referencia. Pide sumar una gramática de Ruby. Viene de la etapa 12.
 
 ### 16. Tipos y firmas completas
+
+Versiones de referencia (etapa 17, cerrada): todo al día salvo TypeScript 7.0.2, bloqueado porque
+typescript-eslint 8.72.2 declara `typescript <6.1.0`. Cuando entre tsrs, su commit y la versión de
+TypeScript que sigue van en `scripts/parity/versions.toml`. Qodana queda en `2026.3-eap`, más nueva que
+la estable 2026.2. Falta una corrida de `run_all.sh` con dos carriles a la vez para confirmar los
+volúmenes por carril (`kerbo-shell-corpus` incluido).
 
 Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y el índice. Paridad
 contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/java/`
