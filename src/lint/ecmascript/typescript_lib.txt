@@ -1,4 +1,4 @@
-# La lib esnext de @typescript-eslint/scope-manager 8.72.1 (MIT): type es sólo tipo, value también es valor.
+# La lib esnext de @typescript-eslint/scope-manager 8.72.2 (MIT): type es sólo tipo, value también es valor.
 value AggregateError
 type AggregateErrorConstructor
 value Array

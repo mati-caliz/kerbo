@@ -1627,11 +1627,16 @@ referencia quedaba como al día con un JSON vacío). `corpus_volume.sh` usa un v
 volumen en medio de la medición del otro. El volumen viejo `kerbo-corpus` ya no se usa y se puede
 borrar cuando ningún carril lo necesite.
 
+Hecho (2026-11-09): typescript-eslint 8.72.1 → 8.72.2. La salida de ESLint sobre express, zod, react,
+vscode y juice-shop (87 reglas) es idéntica byte a byte a la de antes, la lib de tipos de
+`typescript_lib.txt` conserva los mismos 193 nombres y sigue el tope `typescript <6.1.0`. Con esto
+sólo queda atrasada TypeScript 7, bloqueada.
+
 - Pendientes:
   - Los demás scripts de `scripts/parity` que comparten otros volúmenes (`kerbo-shell-corpus`) pasan
     por el mismo `corpus_volume.sh`, así que también quedan por carril; falta una corrida completa de
     `run_all.sh` con dos carriles a la vez para confirmarlo.
-  - TypeScript 7 (7.0.2): bloqueado, typescript-eslint 8.72.1 declara `typescript <6.1.0`. Se sube
+  - TypeScript 7 (7.0.2): bloqueado, typescript-eslint 8.72.2 declara `typescript <6.1.0`. Se sube
     cuando typescript-eslint lo soporte, o junto con tsrs (etapas 11 y 16).
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.
