@@ -1648,8 +1648,12 @@ los comandos de un `RUN`: un script que el shell no parsea (un `(` después de d
   - `run_all.sh` corrido entero (2026-11-09, las ocho familias): Go falló por las rutas de Windows y se
     arregló con `pwd -W` en los scripts de Go y shell. El comparador de Go sólo mira staticcheck, así que
     `stdmethods`, errcheck y unused aparecen como "sobran" sin ser regresión.
-    Falta mirar por qué JS/TS no da avisos en `juice-shop/frontend/src/assets/private` y por qué hadolint
-    midió 606 y no 593.
+    Aclarado (2026-11-09): en `juice-shop/frontend/src/assets/private` kerbo no avisa porque el
+    `.gitignore` de juice-shop tiene `frontend/src/**/*.js` y esos archivos están versionados a la fuerza:
+    kerbo respeta `.gitignore` y ESLint no. Son las diferencias "de menos" de `no-var` en esa carpeta (no
+    son un defecto de reglas); si se quisiera analizar lo versionado aunque esté ignorado, habría que leer
+    el índice de git al recorrer. Hadolint midió 606 y no 593 porque el corpus ya tiene 184 Dockerfile
+    (eran 181); la comparación da 606 de 606, 0 de menos, 0 de más.
   - Dependencias: ya sólo queda 1 aviso de más contra osv-scanner (`eslint-plugin-react-internal`).
   - Los Dockerfile que hadolint no parsea (31) quedan sin medir, y no se replica su error (DL1000): 23 son de
     awesome-compose y fallan por un comentario justo después del `EOF` de un heredoc, un defecto del parser de
