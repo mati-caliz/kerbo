@@ -136,7 +136,11 @@ impl Field {
     }
 
     pub fn db_index(&self) -> bool {
-        self.has(Flag::IndexOn) || (self.is_foreign_key() && !self.has(Flag::IndexOff))
+        self.has(Flag::IndexOn) || (self.indexed_by_default() && !self.has(Flag::IndexOff))
+    }
+
+    const fn indexed_by_default(&self) -> bool {
+        self.is_foreign_key() || matches!(self.class, Class::Slug)
     }
 
     pub fn db_constraint(&self) -> bool {

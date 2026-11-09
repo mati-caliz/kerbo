@@ -34,6 +34,10 @@ impl State {
         self.models.get(key)
     }
 
+    pub fn models(&self) -> impl Iterator<Item = &Model> {
+        self.models.values()
+    }
+
     pub fn resolve(&self, key: &ModelKey) -> Cow<'_, Model> {
         self.models
             .get(key)

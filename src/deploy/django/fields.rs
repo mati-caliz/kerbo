@@ -294,9 +294,13 @@ fn database_default(node: Node<'_>, source: &[u8], class: Class) -> Option<Strin
         .filter(|call| call.method == DB_VALUE_WRAPPER)
         .and_then(|call| call.positional(0));
     let value = wrapped.unwrap_or(node);
-    let typed = (class == Class::Json)
-        .then(|| json_default(value, source))
-        .flatten();
+    let typed = if class == Class::Json {
+        json_default(value, source)
+    } else if class == Class::Decimal {
+        decimal_argument(value, source)
+    } else {
+        None
+    };
     typed.or_else(|| sql_literal(value, source))
 }
 

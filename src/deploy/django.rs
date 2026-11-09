@@ -13,6 +13,7 @@ mod model;
 mod names;
 mod operations;
 mod parse;
+mod rename;
 mod schema;
 mod settings;
 mod state;

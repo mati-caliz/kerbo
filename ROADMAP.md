@@ -1638,9 +1638,12 @@ averiguó por qué osv-scanner no los informa.
     se pueden convertir (`errores.txt`). Empezó en 501 diferencias y las variables de clase de
     `Migration` la bajaron a 360; los `settings` y los `default` tipados, a 200; el grafo de
     dependencias, a 142; el modelo reemplazado por `AUTH_USER_MODEL`, a 121; las migraciones con
-    `atomic = False`, a 87. Ahora: squawk 4.385 avisos, kerbo 4.248, coinciden 4.243, 87
-    diferencias por migración y regla (59 son de las apps de terceros); sentencia por
-    sentencia (`dump.sh` + `diff.py`), 39 de 1.454 migraciones con SQL distinto (eran 131).
+    `atomic = False`, a 87; las operaciones entre paréntesis, los índices de `SlugField`, los
+    `default` de JSON, las tablas intermedias en `RenameModel` y `Decimal(0)`, a 62. Ahora:
+    squawk 4.385 avisos, kerbo 4.294, coinciden 4.293, 62 diferencias por migración y regla (59
+    son de las apps de terceros; del proyecto quedan account/0072, permission/0001 y
+    product/0062); sentencia por sentencia (`dump.sh` + `diff.py`), 24 de 1.454 migraciones con
+    SQL distinto (eran 131).
     kerbo ya lee de los `settings` del proyecto `AUTH_USER_MODEL`, `DEFAULT_AUTO_FIELD` y las
     constantes numéricas (`max_length=settings.X`); sin `settings` asume el `BigAutoField` de
     `startproject`. Sigue las operaciones guardadas en nombres del módulo o de la clase y las
@@ -1661,10 +1664,15 @@ averiguó por qué osv-scanner no los informa.
       diferencias a 0. Sólo se entiende `AUTH_USER_MODEL`, el único `swappable` de Django.
     - Las apps de terceros (`django_celery_beat`, `sites`, `contenttypes`) no se convierten:
       sus migraciones no están en el corpus de saleor (vienen del paquete instalado).
-    - `RenameModel` y `AlterModelTable` entre apps (`account/0072`, `permission/0001`) y los
-      renombres de columna de product/0007, 0048 y 0072.
-    - Los índices de `slug` de product/0001, 0017, 0195 y page/0029; product/0062, 0073, 0103 y
-      0113; los `default` con `Decimal(0)` sin convertir (order/0228).
+    - Hecho (2026-11-09): `operations = (...)` entre paréntesis (product/0103); el `db_index`
+      por defecto de `SlugField`; el `SET DEFAULT`/`DROP DEFAULT` de un `JSONField` que pasa a
+      `NOT NULL` (el `Jsonb` de psycopg no tiene `__eq__`, así que Django nunca ve iguales los
+      `default`); `RenameModel` renombra las tablas intermedias automáticas y sus columnas
+      `<modelo>_id`, sea el dueño del `ManyToManyField` o su destino; `db_default=Decimal(0)`.
+    - `RenameModel` y `AlterModelTable` entre apps (`account/0072`, `permission/0001`: el
+      `SeparateDatabaseAndState` mueve el modelo de app y squawk ve el `RENAME` de la tabla).
+    - product/0062 saca un `CHECK` de más (`constraint-missing-not-valid`); payment/0035 tiene
+      SQL distinto sin cambiar los avisos.
     - Los `default` invocables del proyecto (`get_default_country`, `zero_weight`,
       `partial(get_random_string)`).
     - Hecho (2026-11-08): una migración con `atomic = False` se analiza fuera de una transacción,
@@ -1677,11 +1685,11 @@ averiguó por qué osv-scanner no los informa.
     la versión de Django del proyecto (`pyproject.toml`, `uv.lock`, `requirements`).
   - Medir más repos de Django (sentry, wagtail, zulip): entrada en `REPOS` de `reference.py`.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
-    `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), el
-    renombre de las columnas de las tablas intermedias en `RenameModel`, los borrados que Django
-    resuelve por introspección (restricciones sin nombre conocido), `RenameIndex` sin `old_name`,
-    los `AlterField` de un `ManyToManyField` a otro, `ExclusionConstraint` y las operaciones de
-    `django.contrib.postgres`, y `db_collation` y `db_comment`.
+    `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), los
+    borrados que Django resuelve por introspección (restricciones sin nombre conocido),
+    `RenameIndex` sin `old_name`, los `AlterField` de un `ManyToManyField` a otro,
+    `ExclusionConstraint` y las operaciones de `django.contrib.postgres`, y `db_collation` y
+    `db_comment`.
 - Rails (`add_index` sin `algorithm: :concurrently`, `remove_column`, `change_column`), con
   strong_migrations como referencia. Pide sumar una gramática de Ruby. Viene de la etapa 12.
 

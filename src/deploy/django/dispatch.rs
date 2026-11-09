@@ -3,6 +3,7 @@ use super::deferred::{IndexKind, Kind, Statement, nulls_clause};
 use super::model::{Constraint, ConstraintKind, Model, ModelKey};
 use super::names::quoted;
 use super::operations::{Located, Migration, Operation};
+use super::rename;
 use super::schema::{Editor, columns_of, named_index, unique_index};
 use super::state::State;
 use crate::deploy::Violation;
@@ -117,18 +118,8 @@ fn render(editor: &mut Editor, context: Context<'_>, operation: &Operation) {
 }
 
 fn rename_model(editor: &mut Editor, context: Context<'_>, old: &str, new: &str) {
-    let (Some(old_model), Some(new_model)) = (context.old_model(old), context.new_model(new)) else {
-        return;
-    };
-    editor.rename_table(&old_model.table(), &new_model.table());
-    for field in old_model.fields.iter().filter(|field| field.auto_through()) {
-        let old_through = context.before.through(old_model, field);
-        let new_through = new_model
-            .field(&field.name)
-            .and_then(|new_field| context.after.through(new_model, new_field));
-        if let (Some(old_through), Some(new_through)) = (old_through, new_through) {
-            editor.rename_table(&old_through.table(), &new_through.table());
-        }
+    if let (Some(old_model), Some(new_model)) = (context.old_model(old), context.new_model(new)) {
+        rename::rename_model(editor, context.before, context.after, (old_model, new_model));
     }
 }
 

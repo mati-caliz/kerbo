@@ -63,7 +63,13 @@ impl Editor {
         self.deferred.push((statement, self.origin));
     }
 
-    pub fn rename_deferred_column(&mut self, table: &str, old: &str, new: &str) {
+    pub fn rename_column(&mut self, table: &str, old: &str, new: &str) {
+        self.execute(&format!(
+            "ALTER TABLE {} RENAME COLUMN {} TO {}",
+            quoted(table),
+            quoted(old),
+            quoted(new)
+        ));
         for (statement, _) in &mut self.deferred {
             statement.rename_column(table, old, new);
         }

@@ -17,6 +17,7 @@ mod dump;
 mod files;
 mod graph;
 mod operations;
+mod rendering;
 
 #[derive(Debug, Default)]
 struct MemoryLoader {

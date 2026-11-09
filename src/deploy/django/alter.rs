@@ -2,7 +2,7 @@ use super::columns::{
     check, db_type, effective_default, has_like_index, identity, is_auto, like_operator_class, type_template,
 };
 use super::deferred::{Kind, Statement, like_index_name};
-use super::model::{Field, FieldDefault};
+use super::model::{Class, Field, FieldDefault};
 use super::names::{index_name, quoted};
 use super::schema::{Editor, constrained_target};
 use super::state::State;
@@ -61,8 +61,14 @@ impl FieldChange<'_> {
         self.old.null()
             && !self.new.null()
             && self.new.db_default.is_none()
-            && effective_default(self.old) != new_default
             && new_default.is_some()
+            && (self.compares_json_adapters() || effective_default(self.old) != new_default)
+    }
+
+    fn compares_json_adapters(&self) -> bool {
+        [self.old.class, self.new.class]
+            .iter()
+            .any(|class| matches!(class, Class::Json | Class::SanitizedJson))
     }
 
     fn four_way(&self) -> bool {
@@ -102,8 +108,7 @@ fn rename_column(editor: &mut Editor, change: FieldChange<'_>) {
     if old == new {
         return;
     }
-    editor.execute(&change.alter_table(&format!("RENAME COLUMN {} TO {}", quoted(&old), quoted(&new))));
-    editor.rename_deferred_column(change.table, &old, &new);
+    editor.rename_column(change.table, &old, &new);
 }
 
 fn type_actions(editor: &mut Editor, change: FieldChange<'_>) -> Actions {

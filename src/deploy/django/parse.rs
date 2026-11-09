@@ -20,6 +20,8 @@ const CONCURRENTLY: &str = "Concurrently";
 const ADD_FIELD: &str = "AddField";
 const IDENTIFIER: &str = "identifier";
 const CONCATENATION: &str = "binary_operator";
+const PARENTHESIZED: &str = "parenthesized_expression";
+const COMMENT: &str = "comment";
 const MAX_ALIAS_DEPTH: usize = 8;
 const GENERIC_EXTENSION: &str = "CreateExtension";
 const NAMED_EXTENSIONS: &[(&str, &str)] = &[
@@ -114,7 +116,7 @@ impl<'context> Scope<'context> {
     fn resolved(self, node: Node<'context>) -> Node<'context> {
         let mut current = node;
         for _ in 0..MAX_ALIAS_DEPTH {
-            let Some(bound) = self.binding(current) else {
+            let Some(bound) = self.binding(current).or_else(|| parenthesized_content(current)) else {
                 return current;
             };
             current = bound;
@@ -347,4 +349,13 @@ impl<'context> Scope<'context> {
             })
             .collect()
     }
+}
+
+fn parenthesized_content(node: Node<'_>) -> Option<Node<'_>> {
+    if node.kind() != PARENTHESIZED {
+        return None;
+    }
+    named_children(node)
+        .into_iter()
+        .find(|child| child.kind() != COMMENT)
 }
