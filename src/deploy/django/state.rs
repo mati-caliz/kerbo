@@ -20,14 +20,20 @@ const BUILT_IN_TABLES: &[(&str, &str, &str)] = &[
 pub struct State {
     models: BTreeMap<ModelKey, Model>,
     auto_field: Class,
+    column_drops_cascade: bool,
 }
 
 impl State {
-    pub const fn new(auto_field: Class) -> Self {
+    pub const fn new(auto_field: Class, column_drops_cascade: bool) -> Self {
         Self {
             models: BTreeMap::new(),
             auto_field,
+            column_drops_cascade,
         }
+    }
+
+    pub const fn column_drops_cascade(&self) -> bool {
+        self.column_drops_cascade
     }
 
     pub fn model(&self, key: &ModelKey) -> Option<&Model> {

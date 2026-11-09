@@ -10,6 +10,7 @@ use crate::deploy::script::{Origin, Script};
 
 const EXPRESSION_PLACEHOLDER: &str = "(true)";
 const STATEMENT_TERMINATOR: char = ';';
+const CASCADE_SUFFIX: &str = " CASCADE";
 
 #[derive(Debug)]
 pub struct Editor {
@@ -251,8 +252,13 @@ impl Editor {
         }
         let table = model.table();
         let column = field.column();
+        let cascade = if state.column_drops_cascade() {
+            CASCADE_SUFFIX
+        } else {
+            ""
+        };
         self.execute(&format!(
-            "ALTER TABLE {} DROP COLUMN {} CASCADE",
+            "ALTER TABLE {} DROP COLUMN {}{cascade}",
             quoted(&table),
             quoted(&column)
         ));

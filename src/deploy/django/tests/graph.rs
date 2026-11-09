@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use super::parsed;
-use crate::deploy::django::graph::{Graph, Nodes};
+use crate::deploy::django::graph::{Graph, Nodes, ancestors};
 use crate::deploy::django::model::ModelKey;
 use crate::deploy::django::operations::MigrationKey;
 use crate::deploy::django::parse::{Reader, migration};
@@ -35,8 +35,8 @@ fn nodes(declared: &[(&str, &str, &str)]) -> Nodes {
 }
 
 fn plan(nodes: &Nodes, app: &str, name: &str) -> Vec<String> {
-    Graph::new(nodes)
-        .ancestors(&MigrationKey::new(app, name))
+    let parents = Graph::new(nodes).into_parents();
+    ancestors(&parents, &MigrationKey::new(app, name))
         .into_iter()
         .map(|key| format!("{}.{}", key.app, key.name))
         .collect()

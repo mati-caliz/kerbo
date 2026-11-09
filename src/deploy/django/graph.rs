@@ -5,6 +5,7 @@ use super::dependencies::{FIRST, LATEST};
 use super::operations::{Migration, MigrationKey};
 
 pub type Nodes = BTreeMap<MigrationKey, Arc<Migration>>;
+pub type Parents = BTreeMap<MigrationKey, BTreeSet<MigrationKey>>;
 
 pub struct Graph<'nodes> {
     nodes: &'nodes Nodes,
@@ -89,30 +90,37 @@ impl<'nodes> Graph<'nodes> {
         found
     }
 
-    pub fn ancestors(&self, start: &MigrationKey) -> Vec<&'nodes MigrationKey> {
-        let Some((start, _)) = self.nodes.get_key_value(start) else {
-            return Vec::new();
-        };
-        let mut visited = Vec::new();
-        let mut seen = HashSet::new();
-        let mut stack = vec![(start, false)];
-        while let Some((node, processed)) = stack.pop() {
-            if seen.contains(node) {
-                continue;
-            }
-            if processed {
-                seen.insert(node);
-                visited.push(node);
-                continue;
-            }
-            stack.push((node, true));
-            if let Some(parents) = self.parents.get(node) {
-                stack.extend(parents.iter().map(|parent| (*parent, false)));
-            }
-        }
-        visited.retain(|node| *node != start);
-        visited
+    pub fn into_parents(self) -> Parents {
+        self.parents
+            .into_iter()
+            .map(|(child, parents)| (child.clone(), parents.into_iter().cloned().collect()))
+            .collect()
     }
+}
+
+pub fn ancestors<'parents>(parents: &'parents Parents, start: &MigrationKey) -> Vec<&'parents MigrationKey> {
+    let Some((start, _)) = parents.get_key_value(start) else {
+        return Vec::new();
+    };
+    let mut visited = Vec::new();
+    let mut seen = HashSet::new();
+    let mut stack = vec![(start, false)];
+    while let Some((node, processed)) = stack.pop() {
+        if seen.contains(node) {
+            continue;
+        }
+        if processed {
+            seen.insert(node);
+            visited.push(node);
+            continue;
+        }
+        stack.push((node, true));
+        if let Some(node_parents) = parents.get(node) {
+            stack.extend(node_parents.iter().map(|parent| (parent, false)));
+        }
+    }
+    visited.retain(|node| *node != start);
+    visited
 }
 
 fn is_internal(key: &MigrationKey, dependency: &MigrationKey) -> bool {

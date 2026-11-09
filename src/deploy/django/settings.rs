@@ -1,9 +1,11 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock, PoisonError};
 
+use super::django_version::{Version, project_version};
 use super::fields::class_of;
+use super::installed_apps::installed_apps;
 use super::model::{Class, ModelKey};
 
 const SETTINGS_MODULE: &str = "settings";
@@ -16,12 +18,15 @@ const APP_SEPARATOR: char = '.';
 const ASSIGNMENT: char = '=';
 const QUOTES: &[char] = &['"', '\''];
 const SETTINGS_PREFIX: &str = "settings.";
+const CASCADE_DROPPED_IN: Version = Version::new(6, 0);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
     pub user_model: ModelKey,
     pub auto_field: Class,
     pub numbers: BTreeMap<String, String>,
+    pub installed_apps: Option<BTreeSet<String>>,
+    pub column_drops_cascade: bool,
 }
 
 impl Default for Settings {
@@ -30,6 +35,8 @@ impl Default for Settings {
             user_model: ModelKey::new(DEFAULT_USER_APP, DEFAULT_USER_MODEL),
             auto_field: Class::Auto,
             numbers: BTreeMap::new(),
+            installed_apps: None,
+            column_drops_cascade: false,
         }
     }
 }
@@ -58,11 +65,16 @@ impl Settings {
             settings.auto_field = class;
         }
         settings.numbers = numbers(sources);
+        settings.installed_apps = installed_apps(sources);
         settings
     }
 
     pub fn replacement(&self, setting: &str, model: &ModelKey) -> Option<ModelKey> {
         (setting == USER_MODEL_SETTING && self.user_model != *model).then(|| self.user_model.clone())
+    }
+
+    pub fn includes_app(&self, app: &str) -> bool {
+        self.installed_apps.as_ref().is_none_or(|apps| apps.contains(app))
     }
 
     pub fn number<'value>(&'value self, reference: &'value str) -> &'value str {
@@ -142,10 +154,14 @@ fn discovered(apps_root: &Path) -> Settings {
         .iter()
         .filter_map(|path| fs::read_to_string(path).ok())
         .collect();
-    if sources.is_empty() {
-        return Settings::of_a_new_project();
-    }
-    Settings::read(&sources)
+    let mut settings = if sources.is_empty() {
+        Settings::of_a_new_project()
+    } else {
+        Settings::read(&sources)
+    };
+    settings.column_drops_cascade =
+        project_version(apps_root).is_some_and(|version| version < CASCADE_DROPPED_IN);
+    settings
 }
 
 pub fn project(apps_root: &Path) -> Settings {
@@ -216,5 +232,21 @@ CODE_LENGTH = 3
     fn without_settings_files_assumes_the_project_template() {
         let settings = discovered(Path::new("no-existe"));
         assert_eq!(settings.auto_field, Class::BigAuto);
+        assert!(!settings.column_drops_cascade);
+    }
+
+    #[test]
+    fn a_project_locked_before_django_six_drops_columns_in_cascade() {
+        let project = std::env::temp_dir().join(format!("kerbo-django-cascade-{}", std::process::id()));
+        let apps_root = project.join("apps");
+        fs::create_dir_all(&apps_root).expect("se crea el proyecto de prueba");
+        fs::write(
+            project.join("uv.lock"),
+            "[[package]]\nname = \"django\"\nversion = \"5.2.19\"\n",
+        )
+        .expect("se escribe el lock");
+        let settings = discovered(&apps_root);
+        fs::remove_dir_all(&project).expect("se borra el proyecto de prueba");
+        assert!(settings.column_drops_cascade);
     }
 }

@@ -7,7 +7,7 @@ use std::time::SystemTime;
 
 use tree_sitter::Parser;
 
-use super::graph::{Graph, Nodes};
+use super::graph::{Graph, Nodes, Parents, ancestors};
 use super::operations::{Migration, MigrationKey};
 use super::parse::{Reader, migration};
 use super::settings::{self, Settings};
@@ -54,10 +54,10 @@ pub fn is_migration_source(source: &[u8]) -> bool {
 }
 
 pub fn state_before(loader: &impl Loader, location: &Location, current: &Migration) -> State {
-    let mut state = State::new(settings::project(&location.apps_root).auto_field);
+    let settings = settings::project(&location.apps_root);
+    let mut state = State::new(settings.auto_field, settings.column_drops_cascade);
     let current_key = MigrationKey::new(&location.app, &location.stem);
-    let mut nodes: Nodes = loader
-        .apps()
+    let mut nodes: Nodes = installed(loader, &settings, &location.app)
         .iter()
         .flat_map(|app| {
             loader
@@ -67,15 +67,67 @@ pub fn state_before(loader: &impl Loader, location: &Location, current: &Migrati
         })
         .collect();
     nodes.insert(current_key.clone(), Arc::new(current.clone()));
-    let graph = Graph::new(&nodes);
-    for key in graph.ancestors(&current_key) {
-        if let Some(ancestor) = nodes.get(key) {
+    let project = project(&location.apps_root, nodes);
+    for key in ancestors(&project.parents, &current_key) {
+        if let Some(ancestor) = project.nodes.get(key) {
             for located in &ancestor.operations {
                 state.apply(&key.app, &located.operation);
             }
         }
     }
     state
+}
+
+fn installed(loader: &impl Loader, settings: &Settings, current_app: &str) -> Vec<String> {
+    let apps = loader.apps();
+    let mut included: Vec<String> = apps
+        .iter()
+        .filter(|app| settings.includes_app(app))
+        .cloned()
+        .collect();
+    if included.is_empty() {
+        included = apps;
+    }
+    if !included.iter().any(|app| app == current_app) {
+        included.push(current_app.to_owned());
+    }
+    included
+}
+
+struct Project {
+    nodes: Nodes,
+    parents: Parents,
+}
+
+fn same_nodes(known: &Nodes, nodes: &Nodes) -> bool {
+    known.len() == nodes.len()
+        && known
+            .iter()
+            .zip(nodes)
+            .all(|((known_key, known_migration), (key, migration))| {
+                known_key == key && (Arc::ptr_eq(known_migration, migration) || known_migration == migration)
+            })
+}
+
+fn project(apps_root: &Path, nodes: Nodes) -> Arc<Project> {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, Arc<Project>>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(Mutex::default);
+    let known = cache
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .get(apps_root)
+        .filter(|known| same_nodes(&known.nodes, &nodes))
+        .cloned();
+    if let Some(known) = known {
+        return known;
+    }
+    let parents = Graph::new(&nodes).into_parents();
+    let built = Arc::new(Project { nodes, parents });
+    cache
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .insert(apps_root.to_path_buf(), Arc::clone(&built));
+    built
 }
 
 #[derive(Debug, Clone)]

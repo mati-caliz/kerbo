@@ -1681,9 +1681,13 @@ los comandos de un `RUN`: un script que el shell no parsea (un `(` después de d
       (`graph.rs`): `dependencies`, `run_before`, `swappable_dependency`, `__first__` y
       `__latest__`, y se reproducen sólo los ancestros de la migración en el orden del
       `forwards_plan` de Django. Las claves foráneas ya ven el tipo y la tabla de ese momento.
-      Queda: tomar las apps de `INSTALLED_APPS` en vez de todas las carpetas con `migrations`
-      (saleor tiene `tests`, que no está instalada) y que el grafo no se arme de nuevo por cada
-      archivo.
+    - Hecho (2026-11-09): las apps salen de `INSTALLED_APPS` de los `settings` (listas
+      literales, `+=` y nombres concatenados con `+`; `pkg.apps.XConfig` cuenta como `pkg`).
+      Si la lista se arma con código, o ninguna carpeta coincide, siguen valiendo todas las
+      carpetas con `migrations`; la app del archivo analizado entra siempre. El grafo se arma
+      una vez por proyecto y se reusa mientras las migraciones sean las mismas (saleor: de
+      11,1 s a 10,3 s en 4.372 archivos; el resto es leer los metadatos de cada migración en
+      cada archivo).
     - Hecho (2026-11-08): un modelo con `swappable` que los `settings` reemplazan (el `auth.User`
       de saleor, que usa `account.User`) no saca SQL, como en Django; saleor `auth` pasó de 21
       diferencias a 0. Sólo se entiende `AUTH_USER_MODEL`, el único `swappable` de Django.
@@ -1711,9 +1715,11 @@ los comandos de un `RUN`: un script que el shell no parsea (un `(` después de d
       (el linter de SQL supone una transacción abierta, por `--assume-in-transaction`). Se fueron
       las 34 diferencias de `CREATE INDEX CONCURRENTLY` y `prefer-robust-stmts` (webhook/0014,
       product/0196, discount/0053 y parecidas).
-  - El `CASCADE` de `DROP COLUMN` depende de la versión: Django 6 lo sacó y kerbo lo pone siempre
-    (en `django.contrib`, con Django 6.1, una sola sentencia distinta; no cambia los avisos). Leer
-    la versión de Django del proyecto (`pyproject.toml`, `uv.lock`, `requirements`).
+  - Hecho (2026-11-09): el `CASCADE` de `DROP COLUMN` sigue la versión de Django del proyecto,
+    leída de `uv.lock`, `poetry.lock`, `requirements*.txt`/`requirements/` o `pyproject.toml`
+    subiendo hasta la raíz del repo. Antes de Django 6 va `CASCADE`; si la versión no se sabe,
+    se toma la actual, sin `CASCADE` (era la única sentencia distinta de `django.contrib` con 6.1;
+    saleor, con 5.2, lo mantiene).
   - Medir más repos de Django (sentry, wagtail, zulip): entrada en `REPOS` de `reference.py`.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
     `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), los
