@@ -1648,7 +1648,9 @@ los comandos de un `RUN`: un script que el shell no parsea (un `(` después de d
   - `run_all.sh` sólo se probó entero con Java; Python, JS/TS, shell y Go corren sus scripts de
     siempre pero falta una corrida completa.
   - Dependencias: entender los 19 avisos de más contra osv-scanner (ssr2, awesome-compose, rspack).
-  - Los Dockerfile que hadolint no parsea (31, casi todos de awesome-compose) quedan sin medir.
+  - Los Dockerfile que hadolint no parsea (31) quedan sin medir, y no se replica su error (DL1000): 23 son de
+    awesome-compose y fallan por un comentario justo después del `EOF` de un heredoc, un defecto del parser de
+    hadolint. kerbo sí los analiza y avisa lo que corresponde (588 avisos en esos archivos).
   - Cuando entre tsrs (etapas 11 y 16), su commit y la versión de TypeScript que sigue van en
     `versions.toml`.
 
