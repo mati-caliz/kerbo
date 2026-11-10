@@ -9,7 +9,8 @@ use tree_sitter::Parser;
 
 use super::discovery::{self, App};
 use super::graph::{Graph, Nodes, Parents, ancestors};
-use super::operations::{Migration, MigrationKey};
+use super::model::ModelKey;
+use super::operations::{Migration, MigrationKey, Operation};
 use super::parse::{Reader, migration};
 use super::settings::{self, Settings};
 use super::state::State;
@@ -63,7 +64,6 @@ pub fn is_migration_source(source: &[u8]) -> bool {
 
 pub fn state_before(loader: &impl Loader, location: &Location, current: &Migration) -> State {
     let settings = settings::project(&location.source_root);
-    let mut state = State::new(settings.auto_field, settings.column_drops_cascade);
     let current_key = MigrationKey::new(&location.app, &location.stem);
     let mut nodes: Nodes = installed(loader, &settings, &location.app)
         .iter()
@@ -76,6 +76,8 @@ pub fn state_before(loader: &impl Loader, location: &Location, current: &Migrati
         .collect();
     nodes.insert(current_key.clone(), Arc::new(current.clone()));
     let project = project(&location.source_root, nodes);
+    let mut state = State::new(settings.auto_field, settings.column_drops_cascade)
+        .with_declared_swappables(project.declared_swappables.clone());
     for key in ancestors(&project.parents, &current_key) {
         if let Some(ancestor) = project.nodes.get(key) {
             for located in &ancestor.operations {
@@ -105,6 +107,23 @@ fn installed(loader: &impl Loader, settings: &Settings, current_app: &str) -> Ve
 struct Project {
     nodes: Nodes,
     parents: Parents,
+    declared_swappables: Vec<(String, ModelKey)>,
+}
+
+fn declared_swappables(nodes: &Nodes) -> Vec<(String, ModelKey)> {
+    nodes
+        .values()
+        .flat_map(|migration| &migration.operations)
+        .filter_map(|located| {
+            let Operation::CreateModel(model) = &located.operation else {
+                return None;
+            };
+            model
+                .swappable_setting
+                .clone()
+                .map(|setting| (setting, model.key.clone()))
+        })
+        .collect()
 }
 
 fn same_nodes(known: &Nodes, nodes: &Nodes) -> bool {
@@ -130,7 +149,12 @@ fn project(apps_root: &Path, nodes: Nodes) -> Arc<Project> {
         return known;
     }
     let parents = Graph::new(&nodes).into_parents();
-    let built = Arc::new(Project { nodes, parents });
+    let declared_swappables = declared_swappables(&nodes);
+    let built = Arc::new(Project {
+        nodes,
+        parents,
+        declared_swappables,
+    });
     cache
         .lock()
         .unwrap_or_else(PoisonError::into_inner)

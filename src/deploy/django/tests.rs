@@ -18,6 +18,7 @@ mod expressions;
 mod files;
 mod graph;
 mod operations;
+mod references;
 mod rendering;
 
 #[derive(Debug, Default)]

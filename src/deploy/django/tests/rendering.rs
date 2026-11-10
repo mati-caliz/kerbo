@@ -1,6 +1,6 @@
 use super::{MemoryLoader, sql};
 
-fn assert_rendered(rendered: &str, present: &[&str], absent: &[&str]) {
+pub(super) fn assert_rendered(rendered: &str, present: &[&str], absent: &[&str]) {
     for expected in present {
         assert!(rendered.contains(expected), "falta {expected} en {rendered}");
     }
@@ -9,7 +9,7 @@ fn assert_rendered(rendered: &str, present: &[&str], absent: &[&str]) {
     }
 }
 
-const APP: &str = "library";
+pub(super) const APP: &str = "library";
 
 const PARENTHESIZED_SLUGS: &str = r#"from django.db import migrations, models
 
@@ -239,36 +239,6 @@ fn schema_editor_renames_inside_separate_database_and_state_are_rendered() {
     );
 }
 
-const SWAPPABLE_PAGE: &str = r#"import swapper
-from django.db import migrations, models
-
-
-class Migration(migrations.Migration):
-    operations = [
-        migrations.CreateModel(name="Page", fields=[("id", models.AutoField(primary_key=True))]),
-        migrations.CreateModel(
-            name="Site",
-            fields=[
-                ("id", models.AutoField(primary_key=True)),
-                ("root", models.ForeignKey(on_delete=models.CASCADE, to=swapper.get_model_name("library", "Page"))),
-            ],
-        ),
-    ]
-"#;
-
-#[test]
-fn a_swapper_reference_points_to_the_default_model() {
-    let loader = MemoryLoader::default();
-    assert_rendered(
-        &sql(&loader, APP, "0001_initial", SWAPPABLE_PAGE),
-        &[
-            r#""root_id" integer NOT NULL"#,
-            r#"REFERENCES "library_page" ("id")"#,
-        ],
-        &["text_pattern_ops"],
-    );
-}
-
 const AUTOMATIC_NOW: &str = r#"from django.db import migrations, models
 
 
@@ -313,42 +283,5 @@ fn class_body_branches_follow_the_postgres_vendor() {
         &sql(&loader, APP, "0001_initial", VENDOR_BRANCHES),
         &[r#"CREATE TABLE "library_chosen""#],
         &["library_other"],
-    );
-}
-
-const SETTING_PAGE: &str = r#"import swapper
-from django.conf import settings
-from django.db import migrations, models
-
-
-class Migration(migrations.Migration):
-    dependencies = [migrations.swappable_dependency(settings.LIBRARY_PAGE_MODEL)]
-
-    operations = [
-        migrations.CreateModel(
-            name="Page",
-            fields=[("id", models.AutoField(primary_key=True))],
-            options={"swappable": swapper.swappable_setting("library", "Page")},
-        ),
-        migrations.CreateModel(
-            name="Site",
-            fields=[
-                ("id", models.AutoField(primary_key=True)),
-                ("root", models.ForeignKey(on_delete=models.CASCADE, to=settings.LIBRARY_PAGE_MODEL)),
-            ],
-        ),
-    ]
-"#;
-
-#[test]
-fn an_unset_swappable_setting_points_to_the_model_that_declares_it() {
-    let loader = MemoryLoader::default();
-    assert_rendered(
-        &sql(&loader, APP, "0001_initial", SETTING_PAGE),
-        &[
-            r#""root_id" integer NOT NULL"#,
-            r#"REFERENCES "library_page" ("id")"#,
-        ],
-        &["settings"],
     );
 }

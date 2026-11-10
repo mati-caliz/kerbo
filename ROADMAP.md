@@ -1655,9 +1655,9 @@ cerrarse se borra de acá.
       valores aritméticos (`2**32 - 1`). Funciones fuera de `Upper`/`Lower` en un índice por
       expresión salen `(true)`.
   - Wagtail medido (2026-11-09, commit en `corpus.toml`): 213 migraciones con su proyecto de
-    pruebas (`wagtail.test.settings`, Django 6.0). Squawk 1.370 avisos, kerbo 1.203, coinciden
-    1.203, 42 diferencias, ninguna de más (eran 96); sentencia por sentencia, de 40 a 12
-    migraciones con SQL distinto (2026-11-10). Para llegar: las apps se descubren anidadas y con el `label` de
+    pruebas (`wagtail.test.settings`, Django 6.0). Squawk 1.370 avisos, kerbo 1.315, coinciden
+    1.315, 40 diferencias, ninguna de más (eran 96); sentencia por sentencia, de 40 a 10
+    migraciones con SQL distinto (2026-11-10), todas de apps de terceros. Para llegar: las apps se descubren anidadas y con el `label` de
     su `AppConfig`; los `settings` toman la primera asignación de nivel superior (si no hay, la
     última indentada); la versión de Django es la más nueva que fija el lock; con Django 6 el
     `DEFAULT_AUTO_FIELD` por defecto es `BigAutoField`; `INSTALLED_APPS.append(...)`/`.insert(...)`
@@ -1667,14 +1667,14 @@ cerrarse se borra de acá.
     clases de campo del proyecto (`fields.py`) toman la clase de Django que extienden, y el
     nombre de campo `parent_rel_name` (f-string sobre `swapper.split(...)[1].lower()`) se evalúa;
     una app con `apps.py` dentro de un paquete sin `__init__.py` cuelga del proyecto entero; un
-    `settings.X_MODEL` sin definir apunta al modelo que se declara `swappable` con ese setting;
+    `settings.X_MODEL` sin definir apunta al modelo que se declara `swappable` con ese setting,
+    aunque lo declare sólo una migración que no es ancestro (una squashed: `sqlmigrate` carga el
+    grafo con `replace_migrations=False`); `taggit.Tag` tiene clave `integer`;
     los `if`/`elif` del cuerpo de la clase por `connection.vendor` siguen la rama de PostgreSQL, y
     el `auto_now` de un `DateField`/`TimeField` toma el default de su tipo.
     Lo que queda:
-    - Apps de terceros fuera del corpus: `admin`, `auth`, `contenttypes`, `sessions`, `taggit`
-      (y las claves foráneas a `taggit.Tag`, que kerbo tipa `bigint` porque no ve su `AutoField`,
-      como en demosite).
-    - testapp (`tests/0001_squashed_0065`) y demosite (las claves a `taggit.Tag`).
+    - Las migraciones propias de apps de terceros fuera del corpus: `admin`, `auth`,
+      `contenttypes`, `sessions`, `taggit`. Las 40 diferencias que quedan son todas de ahí.
     - Errores de la referencia (no convierte): wagtailcore 0087, taggit 0006, wagtaildocs 0005,
       wagtailembeds 0008, wagtailsearch 0008.
   - Medir sentry: entrada en `REPOS` de `reference.py`.

@@ -15,6 +15,7 @@ const BUILT_IN_TABLES: &[(&str, &str, &str)] = &[
     ("auth", "permission", "auth_permission"),
     ("contenttypes", "contenttype", "django_content_type"),
     ("sites", "site", "django_site"),
+    ("taggit", "tag", "taggit_tag"),
 ];
 
 #[derive(Debug, Clone)]
@@ -22,6 +23,7 @@ pub struct State {
     models: BTreeMap<ModelKey, Model>,
     auto_field: Class,
     column_drops_cascade: bool,
+    declared_swappables: Vec<(String, ModelKey)>,
 }
 
 impl State {
@@ -30,7 +32,13 @@ impl State {
             models: BTreeMap::new(),
             auto_field,
             column_drops_cascade,
+            declared_swappables: Vec::new(),
         }
+    }
+
+    pub fn with_declared_swappables(mut self, declared: Vec<(String, ModelKey)>) -> Self {
+        self.declared_swappables = declared;
+        self
     }
 
     pub const fn column_drops_cascade(&self) -> bool {
@@ -56,12 +64,20 @@ impl State {
         if key.app != SWAPPABLE_SETTING_APP {
             return None;
         }
-        self.models.values().find(|model| {
-            model
-                .swappable_setting
-                .as_ref()
-                .is_some_and(|setting| key.model.ends_with(setting.as_str()))
-        })
+        self.models
+            .values()
+            .find(|model| {
+                model
+                    .swappable_setting
+                    .as_ref()
+                    .is_some_and(|setting| key.model.ends_with(setting.as_str()))
+            })
+            .or_else(|| {
+                self.declared_swappables
+                    .iter()
+                    .find(|(setting, _)| key.model.ends_with(setting.as_str()))
+                    .and_then(|(_, declaring)| self.models.get(declaring))
+            })
     }
 
     pub fn through(&self, owner: &Model, field: &Field) -> Option<Model> {
