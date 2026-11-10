@@ -1,2 +1,3 @@
 junit4 hamcrest-core-1.3.jar
 commons-lang opentest4j-*.jar apiguardian-api-*.jar junit-pioneer-*.jar jmh-core-*.jar commons-math3-*.jar commons-text-*.jar easymock-*.jar objenesis-3.4.jar junit-jupiter-params-*.jar junit-jupiter-api-*.jar junit-platform-commons-*.jar mockito-core-*.jar
+guava failureaccess-1.0.3.jar jspecify-1.0.1.jar error_prone_annotations-2.52.0.jar j2objc-annotations-3.1.jar jsr305-3.0.2.jar junit-4.13.2.jar hamcrest-core-1.3.jar truth-1.4.5.jar mockito-core-4.11.0.jar jimfs-1.3.1.jar test-parameter-injector-*.jar caliper-1.0-beta-3.jar caliper-api-1.0-beta-3.jar

@@ -1700,14 +1700,25 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
 (`qodana.sh <repo> <inspección>`, `kerbo.sh`, `compare_all.py`), 2026-11-07.
 
 - `RedundantThrows` (`redundant-throws`): junit4 218 de 219, commons-lang 121 de 125, **ninguno de
-  más** (2026-11-09). Faltan medir Guava y spring-boot, más grandes.
+  más** (2026-11-10). Guava 15 de 28 con 6 de más (sin `android/`, que Qodana no analiza porque
+  sólo mira el proyecto Maven raíz). Falta medir spring-boot.
+  - Guava, de más: `AbstractIdleServiceTest` 158, 166, 185 y 188 (Qodana reporta sólo 2 en todo
+    `guava-tests`: probablemente resolvió mal ese módulo, hay que confirmarlo), `CacheLoader` 126 y
+    el `@BeforeExperiment` de `ExecutionListBenchmark` 223. Faltan: los "never thrown in any method
+    implementation" de interfaces y abstractos (`ByteProcessor`, `LineProcessor`, `LineBuffer`,
+    `SloppyTearDown`, `ClosingFuture` 1553, 1743 y 1949), `AbstractCache` 51, `ClassSanityTesterTest`
+    92, 141 y 452, `ExecutionSequencerTest` 391 y 430.
+  - Ya se siguen las referencias a método y las lambdas pasadas a un método genérico del proyecto
+    cuyo `throws E` lo decide la interfaz funcional, y un `throws X` con `X` parámetro de tipo sin
+    ligar (`Class<X>`) no se toma como una clase.
   - Ya se siguen: los genéricos de las clases del proyecto (`Opening<T> extends Source<T,
     IOException>` hace que el `get() throws E` heredado tire `IOException`; crudo, con otra cantidad
     de argumentos o tapado por un `<E>` del método, no liga), los casteos, paréntesis y elementos de
     arreglo como receptor, los parámetros de la lambda de un `forEach` de colección o de mapa, y una
     clase anónima que redefine un método no hereda su `throws`.
-  - Pendientes, por lo que falta: la referencia a método como argumento (`FailableConsumerTest`
-    119 y 126, `FailableTest` 656: hay que inferir el tipo funcional del parámetro); el calificador
+  - Pendientes, por lo que falta: `FailableConsumerTest` 119 y 126 y `FailableTest` 656 siguen
+    faltando aunque ya se sigue la referencia a método como argumento: falta ver qué la corta; el
+    calificador
     de `GetField` en junit4 (`Result.java` 191); `ClassUtilsOssFuzzTest` tiene bytes NUL que cortan
     el texto. La sobrecarga se elige por cantidad y por tipo sólo cuando el argumento es un literal
     de texto o un `Charset` conocido; con cualquier otro sigue juntando todas. `values()` y

@@ -14,6 +14,8 @@ import sys
 PARITY = pathlib.Path(os.environ.get("KERBO_PARITY", pathlib.Path(__file__).resolve().parents[3] / ".parity")) / "qodana"
 DEFAULT_RULES = ("RedundantThrows", "redundant-throws")
 SHOWN = 40
+# Qodana sólo abre el proyecto Maven de la raíz: las carpetas con un proyecto aparte no las analiza.
+UNANALYZED = {"guava": ("android/",)}
 
 
 def qodana_findings(repo, rule):
@@ -32,7 +34,7 @@ def kerbo_findings(repo, rule):
     return {
         (item["path"].removeprefix("./"), item["line"], item["column"]): item["message"]
         for item in report
-        if item["rule"] == rule
+        if item["rule"] == rule and not item["path"].removeprefix("./").startswith(UNANALYZED.get(repo, ()))
     }
 
 

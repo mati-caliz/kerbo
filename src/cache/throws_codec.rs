@@ -13,6 +13,8 @@ const ORIGIN_RETHROWN: u64 = 5;
 const ARGUMENT_UNKNOWN: u64 = 0;
 const ARGUMENT_TEXT: u64 = 1;
 const ARGUMENT_CHARSET: u64 = 2;
+const ARGUMENT_LAMBDA: u64 = 3;
+const ARGUMENT_REFERENCE: u64 = 4;
 const ROOT_SCOPE: u64 = 0;
 const ROOT_TYPE: u64 = 1;
 const ROOT_GENERIC: u64 = 2;
@@ -25,10 +27,23 @@ pub fn write_method_throws(writer: &mut Writer, method: &MethodThrows) {
         writer.size(clause.line);
         writer.size(clause.column);
     });
-    writer.list(&method.points, |writer, point| {
+    write_points(writer, &method.points);
+}
+
+fn write_points(writer: &mut Writer, points: &[ThrowPoint]) {
+    writer.list(points, |writer, point| {
         write_origin(writer, &point.origin);
         writer.list(&point.caught, |writer, name| writer.text(name));
     });
+}
+
+fn read_points(reader: &mut Reader<'_>) -> Result<Vec<ThrowPoint>, Corrupt> {
+    reader.list(|reader| {
+        Ok(ThrowPoint {
+            origin: read_origin(reader)?,
+            caught: reader.list(Reader::text)?,
+        })
+    })
 }
 
 pub fn read_method_throws(reader: &mut Reader<'_>) -> Result<MethodThrows, Corrupt> {
@@ -42,12 +57,7 @@ pub fn read_method_throws(reader: &mut Reader<'_>) -> Result<MethodThrows, Corru
                 column: reader.size()?,
             })
         })?,
-        points: reader.list(|reader| {
-            Ok(ThrowPoint {
-                origin: read_origin(reader)?,
-                caught: reader.list(Reader::text)?,
-            })
-        })?,
+        points: read_points(reader)?,
     })
 }
 
@@ -91,9 +101,7 @@ fn write_origin(writer: &mut Writer, origin: &ThrowOrigin) {
             writer.list(steps, |writer, step| {
                 writer.text(&step.name);
                 writer.size(step.arity);
-                writer.list(&step.arguments, |writer, kind| {
-                    writer.number(argument_code(*kind));
-                });
+                writer.list(&step.arguments, write_argument);
             });
         }
     }
@@ -112,7 +120,7 @@ fn read_origin(reader: &mut Reader<'_>) -> Result<ThrowOrigin, Corrupt> {
                 Ok(CallStep {
                     name: reader.text()?,
                     arity: reader.size()?,
-                    arguments: reader.list(|reader| argument_kind(reader.number()?))?,
+                    arguments: reader.list(read_argument)?,
                 })
             })?,
         )),
@@ -147,19 +155,30 @@ fn read_root(reader: &mut Reader<'_>) -> Result<CallRoot, Corrupt> {
     }
 }
 
-const fn argument_code(kind: ArgumentKind) -> u64 {
+fn write_argument(writer: &mut Writer, kind: &ArgumentKind) {
     match kind {
-        ArgumentKind::Unknown => ARGUMENT_UNKNOWN,
-        ArgumentKind::Text => ARGUMENT_TEXT,
-        ArgumentKind::Charset => ARGUMENT_CHARSET,
+        ArgumentKind::Unknown => writer.number(ARGUMENT_UNKNOWN),
+        ArgumentKind::Text => writer.number(ARGUMENT_TEXT),
+        ArgumentKind::Charset => writer.number(ARGUMENT_CHARSET),
+        ArgumentKind::Lambda(points) => {
+            writer.number(ARGUMENT_LAMBDA);
+            write_points(writer, points);
+        }
+        ArgumentKind::Reference(root, name) => {
+            writer.number(ARGUMENT_REFERENCE);
+            write_root(writer, root);
+            writer.text(name);
+        }
     }
 }
 
-const fn argument_kind(code: u64) -> Result<ArgumentKind, Corrupt> {
-    match code {
+fn read_argument(reader: &mut Reader<'_>) -> Result<ArgumentKind, Corrupt> {
+    match reader.number()? {
         ARGUMENT_UNKNOWN => Ok(ArgumentKind::Unknown),
         ARGUMENT_TEXT => Ok(ArgumentKind::Text),
         ARGUMENT_CHARSET => Ok(ArgumentKind::Charset),
+        ARGUMENT_LAMBDA => Ok(ArgumentKind::Lambda(read_points(reader)?)),
+        ARGUMENT_REFERENCE => Ok(ArgumentKind::Reference(read_root(reader)?, reader.text()?)),
         _ => Err(Corrupt),
     }
 }

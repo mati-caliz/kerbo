@@ -15,6 +15,7 @@ mod java_design;
 pub mod java_fields;
 mod java_final_fields;
 mod java_flow;
+mod java_functional_arguments;
 pub mod java_generics;
 mod java_hidden;
 mod java_implicit_constructor;

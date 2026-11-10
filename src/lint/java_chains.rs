@@ -278,18 +278,17 @@ fn text_arguments(invocation: Node<'_>, source: &[u8]) -> Vec<String> {
         .collect()
 }
 
-pub(super) fn argument_kinds(invocation: Node<'_>, source: &[u8]) -> Vec<ArgumentKind> {
+pub(super) fn call_arguments(invocation: Node<'_>) -> Vec<Node<'_>> {
     invocation
         .child_by_field_name(ARGUMENTS_FIELD)
         .map(named_children)
         .unwrap_or_default()
-        .iter()
+        .into_iter()
         .filter(|argument| !COMMENTS.contains(&argument.kind()))
-        .map(|argument| argument_kind(*argument, source))
         .collect()
 }
 
-fn argument_kind(argument: Node<'_>, source: &[u8]) -> ArgumentKind {
+pub(super) fn argument_kind(argument: Node<'_>, source: &[u8]) -> ArgumentKind {
     match argument.kind() {
         STRING_LITERAL => ArgumentKind::Text,
         FIELD_ACCESS if names_standard_charsets(argument.child_by_field_name(OBJECT_FIELD), source) => {

@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use super::java::{Declaration, JavaSummary};
 use super::java_nullness::Resolved;
-use super::java_throw_lookup::{Signature, ThrowLookup, accepts, declared_clauses};
+use super::java_throw_lookup::{Signature, ThrowLookup, declared_clauses};
 use super::java_throw_wanted::Wanted;
 use super::java_typed::Typed;
-use crate::lint::java_calls::ReturnType;
-use crate::lint::java_generics::{GenericParent, TypeGenerics};
+use crate::lint::java_calls::{Body, ReturnType};
+use crate::lint::java_generics::{Carrier, GenericParent, MethodGenerics, TypeGenerics};
 use crate::lint::java_receivers::UNKNOWN_TYPE_ARGUMENT;
 
 const JAVA_OBJECT: &str = "java.lang.Object";
@@ -37,7 +37,7 @@ pub(super) fn visit_project(
                     declaration.owner.name == owner
                         && !declaration.is_constructor
                         && declaration.name == wanted.name
-                        && accepts(declaration, wanted.arity)
+                        && wanted.admits(declaration)
                 })
                 .map(|declaration| project_signature(lookup, summary, declaration, &bindings)),
         );
@@ -75,18 +75,75 @@ fn project_signature(
     declaration: &Declaration,
     bindings: &Bindings,
 ) -> Signature {
+    let generics = method_generics(summary, declaration);
     let substitution = Substitution {
         lookup,
         summary,
         bindings,
-        hidden: method_parameters(summary, declaration),
+        hidden: generics.map_or(&[], |method| method.parameters.as_slice()),
     };
-    Signature {
-        thrown: declared_clauses(summary, declaration)
-            .map(|written| substitution.thrown(written))
-            .collect(),
-        returned: substitution.returned(declaration),
+    let mut thrown = Vec::new();
+    let mut carried = Vec::new();
+    let mut unresolved = false;
+    for written in declared_clauses(summary, declaration) {
+        match generics.and_then(|method| carried_positions(lookup, summary, method, written)) {
+            Some(positions) => carried.push(positions),
+            None if substitution.is_unbound_parameter(written) => unresolved = true,
+            None => thrown.push(substitution.thrown(written)),
+        }
     }
+    Signature {
+        thrown,
+        returned: substitution.returned(declaration),
+        carried,
+        unresolved,
+    }
+}
+
+// Las posiciones de los argumentos que dicen qué es el `E` de un `throws E` del método, si todos
+// los que lo llevan son interfaces funcionales del proyecto cuyo único método abstracto lo tira.
+fn carried_positions(
+    lookup: &ThrowLookup<'_, '_>,
+    summary: &JavaSummary,
+    method: &MethodGenerics,
+    written: &str,
+) -> Option<Vec<usize>> {
+    let carriers: Vec<&Carrier> = method
+        .carriers
+        .iter()
+        .filter(|carrier| carrier.parameter == written)
+        .collect();
+    (!carriers.is_empty()
+        && carriers
+            .iter()
+            .all(|carrier| throws_argument(lookup, summary, carrier)))
+    .then(|| carriers.iter().map(|carrier| carrier.position).collect())
+}
+
+fn throws_argument(lookup: &ThrowLookup<'_, '_>, summary: &JavaSummary, carrier: &Carrier) -> bool {
+    let Resolved::Project(interface) = lookup.named(summary, &carrier.interface) else {
+        return false;
+    };
+    let mut files = lookup.types.declared_in(&interface);
+    let (Some((file, _)), None) = (files.next(), files.next()) else {
+        return false;
+    };
+    let Some(thrown_parameter) =
+        generics_in(file, &interface).and_then(|declared| declared.parameters.get(carrier.argument))
+    else {
+        return false;
+    };
+    let abstract_methods: Vec<(&JavaSummary, &Declaration)> = lookup
+        .types
+        .declarations_of(&interface)
+        .filter(|(_, declaration)| !declaration.is_constructor && declaration.body == Body::Abstract)
+        .collect();
+    matches!(
+        abstract_methods.as_slice(),
+        [(owner_file, abstract_method)]
+            if !method_parameters(owner_file, abstract_method).contains(thrown_parameter)
+                && declared_clauses(owner_file, abstract_method).any(|clause| clause == thrown_parameter)
+    )
 }
 
 // Lo que vale un nombre escrito en un archivo con los parámetros de tipo ya ligados; los del método
@@ -103,6 +160,12 @@ impl Substitution<'_, '_, '_> {
         (!self.hidden.iter().any(|parameter| parameter == written))
             .then(|| self.bindings.get(written))
             .flatten()
+    }
+
+    // Un `throws X` con `X` parámetro de tipo sin ligar lo decide quien llama (`Class<X>`, otro
+    // genérico): no es una clase que se llame `X`.
+    fn is_unbound_parameter(&self, written: &str) -> bool {
+        self.bound(written).is_none() && is_type_parameter(self.summary, written)
     }
 
     fn thrown(&self, written: &str) -> Resolved {
@@ -186,16 +249,18 @@ fn bindings_of(generics: Option<&TypeGenerics>, arguments: &[Option<Typed>]) -> 
         .unwrap_or_default()
 }
 
+fn method_generics<'summary>(
+    summary: &'summary JavaSummary,
+    declaration: &Declaration,
+) -> Option<&'summary MethodGenerics> {
+    summary.generics.methods.iter().find(|method| {
+        method.line == declaration.position.line && method.column == declaration.position.column
+    })
+}
+
 fn method_parameters<'summary>(
     summary: &'summary JavaSummary,
     declaration: &Declaration,
 ) -> &'summary [String] {
-    summary
-        .generics
-        .methods
-        .iter()
-        .find(|method| {
-            method.line == declaration.position.line && method.column == declaration.position.column
-        })
-        .map_or(&[], |method| method.parameters.as_slice())
+    method_generics(summary, declaration).map_or(&[], |method| method.parameters.as_slice())
 }

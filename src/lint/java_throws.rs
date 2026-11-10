@@ -5,8 +5,9 @@ use tree_sitter::Node;
 use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, text};
 use super::java_call_roots::{root_of, with_arguments};
 use super::java_calls::TYPE_DECLARATIONS;
-use super::java_chains::{argument_count, argument_kinds};
+use super::java_chains::argument_count;
 use super::java_constructor_throws::{constructor_points, explicit_origin};
+use super::java_functional_arguments::argument_kinds;
 use super::java_receivers::{Variables, enclosing_types, simple_type_name};
 use crate::syntax::{descendants, named_children, one_based};
 
@@ -16,8 +17,9 @@ const CREATION: &str = "object_creation_expression";
 const EXPLICIT_CONSTRUCTOR: &str = "explicit_constructor_invocation";
 const THROW: &str = "throw_statement";
 const RESOURCE: &str = "resource";
-const LAMBDA: &str = "lambda_expression";
-const METHOD_REFERENCE: &str = "method_reference";
+pub(super) const LAMBDA: &str = "lambda_expression";
+pub(super) const METHOD_REFERENCE: &str = "method_reference";
+pub const CONSTRUCTOR_REFERENCE: &str = "new";
 const CLASS_BODY: &str = "class_body";
 const TRY_STATEMENTS: &[&str] = &["try_statement", "try_with_resources_statement"];
 const CATCH_CLAUSE: &str = "catch_clause";
@@ -26,7 +28,7 @@ const CATCH_TYPE: &str = "catch_type";
 const FINALLY: &str = "finally_clause";
 const IDENTIFIER: &str = "identifier";
 const INFERRED: &str = "var";
-const BODY_FIELD: &str = "body";
+pub(super) const BODY_FIELD: &str = "body";
 const TYPE_FIELD: &str = "type";
 const OBJECT_FIELD: &str = "object";
 const GENERIC_OPEN: char = '<';
@@ -54,13 +56,16 @@ pub struct CallStep {
 }
 
 // El tipo de un argumento cuando se ve en el propio texto de la llamada: un literal de texto o una
-// codificación de caracteres. Sirve para elegir entre sobrecargas como `getBytes(String)` y
-// `getBytes(Charset)`; lo demás no se sabe sin compilar.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// codificación de caracteres sirven para elegir entre sobrecargas como `getBytes(String)` y
+// `getBytes(Charset)`; una lambda (con lo que tira su cuerpo) o una referencia a método, para saber
+// qué es el `E` de un `throws E` genérico. Lo demás no se sabe sin compilar.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArgumentKind {
     Unknown,
     Text,
     Charset,
+    Lambda(Vec<ThrowPoint>),
+    Reference(CallRoot, String),
 }
 
 // Lo que en un cuerpo puede tirar una excepción chequeada. `Unknown` es lo que no se sabe sin
@@ -265,7 +270,7 @@ pub(super) fn call_origin(invocation: Node<'_>, source: &[u8], variables: &Varia
         steps.push(CallStep {
             name: text(name, source).to_owned(),
             arity: argument_count(current),
-            arguments: argument_kinds(current, source),
+            arguments: argument_kinds(current, source, variables),
         });
         let Some(object) = current.child_by_field_name(OBJECT_FIELD) else {
             steps.reverse();

@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use super::java::{Declaration, JavaSummary};
 use super::java_nullness::{ProjectTypes, Resolved, resolve};
+use super::java_throw_functional::step_thrown;
 use super::java_throw_project::{raw_signature, visit_project};
 use super::java_throw_wanted::Wanted;
 use super::java_typed::{Typed, library_parents, library_returned};
@@ -18,11 +19,14 @@ const QUALIFIER_SEPARATOR: char = '.';
 const DESCRIPTOR_CLOSE: char = ')';
 const MAX_RECEIVERS: usize = 64;
 
-// Lo que una firma candidata dice de una llamada.
+// Lo que una firma candidata dice de una llamada. Cada elemento de `carried` es un `throws E` que
+// depende de lo que tiren las lambdas o referencias a método pasadas en esas posiciones.
 #[derive(Debug, Clone)]
 pub(super) struct Signature {
     pub(super) thrown: Vec<Resolved>,
     pub(super) returned: Option<Typed>,
+    pub(super) carried: Vec<Vec<usize>>,
+    pub(super) unresolved: bool,
 }
 
 #[derive(Default)]
@@ -77,14 +81,14 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
                 Some(vec![self.named(summary, written)])
             }
             ThrowOrigin::Creation(written, arity) => self
-                .constructors(&self.named(summary, written), *arity)
-                .map(|signatures| all_thrown(&signatures)),
+                .constructors(&self.named(summary, written), Some(*arity))
+                .and_then(|signatures| all_thrown(&signatures)),
             ThrowOrigin::Close(written) => {
                 match self.members(
                     &Typed::raw(self.named(summary, written)),
                     Wanted::by_arity(CLOSE, 0),
                 ) {
-                    Search::Found(signatures) => Some(all_thrown(&signatures)),
+                    Search::Found(signatures) => all_thrown(&signatures),
                     Search::Absent | Search::Incomplete => None,
                 }
             }
@@ -104,14 +108,9 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
                 CallRoot::Type(_) | CallRoot::Generic(..) => Some(vec![self.root_type(summary, root)?.class]),
             };
         };
-        let mut signatures = match root {
-            CallRoot::Scope(enclosing) => self.in_scope(summary, enclosing, first)?,
-            CallRoot::Type(_) | CallRoot::Generic(..) => {
-                self.on_receivers(&[self.root_type(summary, root)?], first)?
-            }
-        };
+        let mut signatures = self.on_root(summary, root, Wanted::of_step(first))?;
         for step in rest {
-            signatures = self.on_receivers(&returned_by(&signatures)?, step)?;
+            signatures = self.on_receivers(&returned_by(&signatures)?, Wanted::of_step(step))?;
         }
         Some(
             returned_by(&signatures)?
@@ -145,25 +144,34 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         steps: &[CallStep],
     ) -> Option<Vec<Resolved>> {
         let (first, rest) = steps.split_first()?;
-        let mut signatures = match root {
-            CallRoot::Scope(enclosing) => self.in_scope(summary, enclosing, first)?,
-            CallRoot::Type(_) | CallRoot::Generic(..) => {
-                self.on_receivers(&[self.root_type(summary, root)?], first)?
-            }
-        };
-        let mut thrown = all_thrown(&signatures);
+        let mut signatures = self.on_root(summary, root, Wanted::of_step(first))?;
+        let mut thrown = step_thrown(self, summary, &signatures, first)?;
         for step in rest {
             let receivers = returned_by(&signatures)?;
-            signatures = self.on_receivers(&receivers, step)?;
-            thrown.extend(all_thrown(&signatures));
+            signatures = self.on_receivers(&receivers, Wanted::of_step(step))?;
+            thrown.extend(step_thrown(self, summary, &signatures, step)?);
         }
         Some(thrown)
     }
 
-    fn on_receivers(&self, receivers: &[Typed], step: &CallStep) -> Option<Vec<Signature>> {
+    pub(super) fn on_root(
+        &self,
+        summary: &JavaSummary,
+        root: &CallRoot,
+        wanted: Wanted<'_>,
+    ) -> Option<Vec<Signature>> {
+        match root {
+            CallRoot::Scope(enclosing) => self.in_scope(summary, enclosing, wanted),
+            CallRoot::Type(_) | CallRoot::Generic(..) => {
+                self.on_receivers(&[self.root_type(summary, root)?], wanted)
+            }
+        }
+    }
+
+    fn on_receivers(&self, receivers: &[Typed], wanted: Wanted<'_>) -> Option<Vec<Signature>> {
         let mut found = Vec::new();
         for receiver in receivers {
-            match self.members(receiver, Wanted::of_step(step)) {
+            match self.members(receiver, wanted) {
                 Search::Found(signatures) => found.extend(signatures),
                 Search::Absent | Search::Incomplete => return None,
             }
@@ -177,10 +185,10 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         &self,
         summary: &JavaSummary,
         enclosing: &[String],
-        step: &CallStep,
+        wanted: Wanted<'_>,
     ) -> Option<Vec<Signature>> {
         for owner in enclosing {
-            match self.members(&Typed::raw(self.named(summary, owner)), Wanted::of_step(step)) {
+            match self.members(&Typed::raw(self.named(summary, owner)), wanted) {
                 Search::Found(signatures) => return Some(signatures),
                 Search::Incomplete => return None,
                 Search::Absent => {}
@@ -191,10 +199,10 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
             .static_imports
             .iter()
             .filter_map(|path| path.rsplit_once(QUALIFIER_SEPARATOR))
-            .filter(|(_, member)| *member == step.name || *member == WILDCARD)
+            .filter(|(_, member)| *member == wanted.name || *member == WILDCARD)
             .map(|(class, _)| class)
         {
-            match self.members(&Typed::raw(self.named(summary, class)), Wanted::of_step(step)) {
+            match self.members(&Typed::raw(self.named(summary, class)), wanted) {
                 Search::Found(signatures) => found.extend(signatures),
                 Search::Incomplete => return None,
                 Search::Absent => {}
@@ -242,25 +250,27 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
     }
 
     // Una clase sin constructores escritos tiene el implícito; una interfaz, en `new X() { }`, nada.
-    fn constructors(&self, class: &Resolved, arity: usize) -> Option<Vec<Signature>> {
-        let found = match class {
+    // Sin `arity` es `Tipo::new`, que puede ir a cualquiera.
+    pub(super) fn constructors(&self, class: &Resolved, arity: Option<usize>) -> Option<Vec<Signature>> {
+        let wanted = Wanted {
+            name: CONSTRUCTOR_NAME,
+            arity,
+            kinds: &[],
+        };
+        let found: Vec<Signature> = match class {
             Resolved::Project(owner) => self
                 .types
                 .declarations_of(owner)
-                .filter(|(_, declaration)| declaration.is_constructor && accepts(declaration, arity))
+                .filter(|(_, declaration)| declaration.is_constructor && wanted.admits(declaration))
                 .map(|(summary, declaration)| raw_signature(self, summary, declaration))
                 .collect(),
             Resolved::Library(name) => {
                 let file = self.library.class_or_jdk(name)?;
-                library_members(
-                    &file,
-                    &Typed::raw(class.clone()),
-                    Wanted::by_arity(CONSTRUCTOR_NAME, arity),
-                    &mut HashSet::new(),
-                )
+                library_members(&file, &Typed::raw(class.clone()), wanted, &mut HashSet::new())
             }
         };
-        (!found.is_empty() || arity == 0).then_some(found)
+        let implicit = arity.map_or(matches!(class, Resolved::Project(_)), |count| count == 0);
+        (!found.is_empty() || implicit).then_some(found)
     }
 
     // Si `class` es `ancestor` o hereda de él. Sin leer toda la jerarquía, sólo un sí es seguro.
@@ -287,11 +297,17 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
     }
 }
 
-fn all_thrown(signatures: &[Signature]) -> Vec<Resolved> {
+// Sin los argumentos a mano, un `throws E` que depende de ellos no se sabe qué es.
+pub(super) fn all_thrown(signatures: &[Signature]) -> Option<Vec<Resolved>> {
     signatures
         .iter()
-        .flat_map(|signature| signature.thrown.iter().cloned())
-        .collect()
+        .all(|signature| signature.carried.is_empty() && !signature.unresolved)
+        .then(|| {
+            signatures
+                .iter()
+                .flat_map(|signature| signature.thrown.iter().cloned())
+                .collect()
+        })
 }
 
 // Las clases sobre las que sigue la cadena. Un paso que devuelve un primitivo o `void` no sigue, y
@@ -319,7 +335,7 @@ fn library_members(
         .iter()
         .filter(|method| {
             method.name == wanted.name
-                && method.accepts(wanted.arity)
+                && wanted.admits_method(method)
                 && !method.is_private()
                 && !wanted.rules_out(method)
         })
@@ -327,6 +343,8 @@ fn library_members(
         .map(|method| Signature {
             thrown: method.exceptions.iter().cloned().map(Resolved::Library).collect(),
             returned: library_returned(file, method, current),
+            carried: Vec::new(),
+            unresolved: false,
         })
         .collect()
 }

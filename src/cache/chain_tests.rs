@@ -53,7 +53,15 @@ fn what_a_method_can_throw_survives_the_round_trip() {
     let step = CallStep {
         name: "leer".to_owned(),
         arity: 2,
-        arguments: vec![ArgumentKind::Text, ArgumentKind::Charset],
+        arguments: vec![
+            ArgumentKind::Text,
+            ArgumentKind::Charset,
+            ArgumentKind::Lambda(vec![ThrowPoint {
+                origin: ThrowOrigin::Thrown("SQLException".to_owned()),
+                caught: vec!["Exception".to_owned()],
+            }]),
+            ArgumentKind::Reference(CallRoot::Type("Archivos".to_owned()), "leer".to_owned()),
+        ],
     };
     let origins = [
         ThrowOrigin::Unknown,
