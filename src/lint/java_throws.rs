@@ -64,6 +64,7 @@ pub enum ArgumentKind {
     Unknown,
     Text,
     Charset,
+    Null,
     Lambda(Vec<ThrowPoint>),
     Reference(CallRoot, String),
 }

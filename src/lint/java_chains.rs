@@ -291,6 +291,7 @@ pub(super) fn call_arguments(invocation: Node<'_>) -> Vec<Node<'_>> {
 pub(super) fn argument_kind(argument: Node<'_>, source: &[u8]) -> ArgumentKind {
     match argument.kind() {
         STRING_LITERAL => ArgumentKind::Text,
+        NULL => ArgumentKind::Null,
         FIELD_ACCESS if names_standard_charsets(argument.child_by_field_name(OBJECT_FIELD), source) => {
             ArgumentKind::Charset
         }

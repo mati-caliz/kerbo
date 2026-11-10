@@ -15,6 +15,7 @@ const ARGUMENT_TEXT: u64 = 1;
 const ARGUMENT_CHARSET: u64 = 2;
 const ARGUMENT_LAMBDA: u64 = 3;
 const ARGUMENT_REFERENCE: u64 = 4;
+const ARGUMENT_NULL: u64 = 5;
 const ROOT_SCOPE: u64 = 0;
 const ROOT_TYPE: u64 = 1;
 const ROOT_GENERIC: u64 = 2;
@@ -151,6 +152,7 @@ fn write_argument(writer: &mut Writer, kind: &ArgumentKind) {
         ArgumentKind::Unknown => writer.number(ARGUMENT_UNKNOWN),
         ArgumentKind::Text => writer.number(ARGUMENT_TEXT),
         ArgumentKind::Charset => writer.number(ARGUMENT_CHARSET),
+        ArgumentKind::Null => writer.number(ARGUMENT_NULL),
         ArgumentKind::Lambda(points) => {
             writer.number(ARGUMENT_LAMBDA);
             write_points(writer, points);
@@ -168,6 +170,7 @@ fn read_argument(reader: &mut Reader<'_>) -> Result<ArgumentKind, Corrupt> {
         ARGUMENT_UNKNOWN => Ok(ArgumentKind::Unknown),
         ARGUMENT_TEXT => Ok(ArgumentKind::Text),
         ARGUMENT_CHARSET => Ok(ArgumentKind::Charset),
+        ARGUMENT_NULL => Ok(ArgumentKind::Null),
         ARGUMENT_LAMBDA => Ok(ArgumentKind::Lambda(read_points(reader)?)),
         ARGUMENT_REFERENCE => Ok(ArgumentKind::Reference(read_root(reader)?, reader.text()?)),
         _ => Err(Corrupt),

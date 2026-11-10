@@ -132,15 +132,22 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         }
     }
 
+    // De las sobrecargas posibles del paso anterior, la que se llamó es una cuyo retorno tiene el
+    // método que sigue: `assertThat(flag).isTrue()` sólo puede ser la que devuelve `BooleanSubject`.
     fn on_receivers(&self, receivers: &[Typed], wanted: Wanted<'_>) -> Option<Vec<Signature>> {
         let mut found = Vec::new();
+        let mut any_has_it = false;
         for receiver in receivers {
             match self.members(receiver, wanted) {
-                Search::Found(signatures) => found.extend(signatures),
-                Search::Absent | Search::Incomplete => return None,
+                Search::Found(signatures) => {
+                    any_has_it = true;
+                    found.extend(signatures);
+                }
+                Search::Absent => {}
+                Search::Incomplete => return None,
             }
         }
-        Some(found)
+        any_has_it.then_some(found)
     }
 
     // Una llamada sin receptor va a la clase más cercana que tenga un método con ese nombre, y si
@@ -289,7 +296,7 @@ pub(super) fn all_thrown(signatures: &[Signature]) -> Option<Vec<Resolved>> {
 }
 
 // Las clases sobre las que sigue la cadena. Un paso que devuelve un primitivo o `void` no sigue, y
-// demasiadas sobrecargas distintas (`assertThat`) no se persiguen.
+// demasiadas sobrecargas distintas no se persiguen.
 fn returned_by(signatures: &[Signature]) -> Option<Vec<Typed>> {
     let mut receivers = Vec::new();
     for signature in signatures {

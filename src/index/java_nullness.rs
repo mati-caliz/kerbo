@@ -80,6 +80,21 @@ impl<'summary> ProjectTypes<'summary> {
         self.declared.get(owner).into_iter().flatten().copied()
     }
 
+    // El archivo que declara un tipo visto desde otro: si hay varios tipos con ese nombre simple, el
+    // único del mismo paquete.
+    pub fn declaring_file(&self, owner: &str, from: &JavaSummary) -> Option<&'summary JavaSummary> {
+        let files = self.declared.get(owner)?;
+        if let [(only, _)] = files.as_slice() {
+            return Some(*only);
+        }
+        let mut same_package = files
+            .iter()
+            .map(|(summary, _)| *summary)
+            .filter(|summary| summary.package == from.package);
+        let found = same_package.next();
+        same_package.next().is_none().then_some(found).flatten()
+    }
+
     // Un campo de un tipo del proyecto, con el archivo donde está.
     pub fn field_of(&self, owner: &str, name: &str) -> Option<(&'summary JavaSummary, &'summary Field)> {
         self.declared.get(owner)?.iter().find_map(|(summary, _)| {

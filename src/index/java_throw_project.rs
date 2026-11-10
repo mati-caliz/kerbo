@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ptr;
 
 use super::java::{Declaration, JavaSummary};
 use super::java_nullness::Resolved;
@@ -124,8 +125,7 @@ fn throws_argument(lookup: &ThrowLookup<'_, '_>, summary: &JavaSummary, carrier:
     let Resolved::Project(interface) = lookup.named(summary, &carrier.interface) else {
         return false;
     };
-    let mut files = lookup.types.declared_in(&interface);
-    let (Some((file, _)), None) = (files.next(), files.next()) else {
+    let Some(file) = lookup.types.declaring_file(&interface, summary) else {
         return false;
     };
     let Some(thrown_parameter) =
@@ -136,7 +136,9 @@ fn throws_argument(lookup: &ThrowLookup<'_, '_>, summary: &JavaSummary, carrier:
     let abstract_methods: Vec<(&JavaSummary, &Declaration)> = lookup
         .types
         .declarations_of(&interface)
-        .filter(|(_, declaration)| !declaration.is_constructor && declaration.body == Body::Abstract)
+        .filter(|(owner_file, declaration)| {
+            ptr::eq(*owner_file, file) && !declaration.is_constructor && declaration.body == Body::Abstract
+        })
         .collect();
     matches!(
         abstract_methods.as_slice(),

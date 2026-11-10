@@ -19,6 +19,7 @@ pub mod java_generics;
 mod java_hidden;
 mod java_implicit_constructor;
 pub mod java_inference;
+pub mod java_lambda_targets;
 mod java_null_conditions;
 pub mod java_null_flow;
 pub mod java_null_inference;

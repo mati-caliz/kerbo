@@ -65,6 +65,10 @@ class Users {
     void sample() throws IOException {
         Runner.typed(name -> { }, new IOException());
     }
+
+    void nothing() throws IOException {
+        Runner.run(null, "a");
+    }
 }
 "#;
 
@@ -78,7 +82,8 @@ fn a_generic_throws_is_what_the_lambda_or_method_reference_passed_for_it_throws(
             "40:26 IOException",
             "50:42 Late",
             "54:34 IOException",
-            "58:44 Late"
+            "58:44 Late",
+            "66:27 IOException"
         ]
     );
 }

@@ -12,6 +12,7 @@ use crate::lint::java_constants::{Constant, declared_constants};
 use crate::lint::java_fields::{DeclaredField, declared_fields, used_identifiers, written_only_identifiers};
 use crate::lint::java_generics::{Generics, generics_of};
 use crate::lint::java_inference::{dereferenced_first, unconditionally_dereferenced};
+use crate::lint::java_lambda_targets::{LambdaTargets, lambda_targets_of};
 use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_null_inference::{NullArgument, is_overridable, null_arguments, returns_null};
 use crate::lint::java_owner::{Owner, annotation_names};
@@ -147,12 +148,14 @@ pub struct JavaSummary {
     pub method_throws: Vec<MethodThrows>,
     pub null_arguments: Vec<NullArgument>,
     pub generics: Generics,
+    pub lambda_targets: LambdaTargets,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
     let (declared_types, exposures) = exposures(root, source);
     let mut summary = JavaSummary {
         generics: generics_of(root, source),
+        lambda_targets: lambda_targets_of(root, source),
         declared_types,
         exposures,
         package: named_children(root)

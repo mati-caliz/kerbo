@@ -11,6 +11,7 @@ const INTERFACE: &str = "interface_declaration";
 const ENUM: &str = "enum_declaration";
 const RECORD: &str = "record_declaration";
 const CREATION: &str = "object_creation_expression";
+const ENUM_CONSTANT: &str = "enum_constant";
 const TYPE_FIELD: &str = "type";
 const ANNOTATION_TYPE: &str = "annotation_type_declaration";
 const MEMBER_CONTAINERS: &[&str] = &[
@@ -67,6 +68,12 @@ pub fn owner_of(member: Node<'_>, source: &[u8]) -> Owner {
             ..local
         };
     }
+    if declaration.kind() == ENUM_CONSTANT {
+        return Owner {
+            name: enclosing_enum_name(declaration, source),
+            ..local
+        };
+    }
     let kind = match declaration.kind() {
         CLASS => OwnerKind::Class,
         INTERFACE => OwnerKind::Interface,
@@ -89,6 +96,17 @@ pub fn owner_of(member: Node<'_>, source: &[u8]) -> Owner {
             .unwrap_or_default(),
         annotations: annotation_names(declaration, source),
     }
+}
+
+// El cuerpo de una constante es una clase anónima del enum que la declara.
+fn enclosing_enum_name(constant: Node<'_>, source: &[u8]) -> String {
+    constant
+        .parent()
+        .and_then(|enum_body| enum_body.parent())
+        .filter(|declaration| declaration.kind() == ENUM)
+        .and_then(|declaration| declaration.child_by_field_name(NAME_FIELD))
+        .map(|name| text(name, source).to_owned())
+        .unwrap_or_default()
 }
 
 // Los nombres simples de las anotaciones de una declaración (`@org.junit.Test` es `Test`).

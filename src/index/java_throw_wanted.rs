@@ -66,7 +66,10 @@ impl<'call> Wanted<'call> {
         !method.is_varargs()
             && method.parameter_count() == self.kinds.len()
             && self.kinds.iter().enumerate().any(|(position, kind)| match kind {
-                ArgumentKind::Unknown | ArgumentKind::Lambda(_) | ArgumentKind::Reference(..) => false,
+                ArgumentKind::Unknown
+                | ArgumentKind::Null
+                | ArgumentKind::Lambda(_)
+                | ArgumentKind::Reference(..) => false,
                 ArgumentKind::Text => method.rejects_argument(position, TEXT_PARAMETERS),
                 ArgumentKind::Charset => method.rejects_argument(position, CHARSET_PARAMETERS),
             })

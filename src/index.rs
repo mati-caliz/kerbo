@@ -12,6 +12,7 @@ mod java_resources;
 mod java_rules;
 mod java_taint;
 mod java_throw_functional;
+mod java_throw_lambdas;
 mod java_throw_lookup;
 mod java_throw_project;
 mod java_throw_roots;
@@ -35,6 +36,8 @@ mod go_taint_tests;
 mod java_escapes_tests;
 #[cfg(test)]
 mod java_null_tests;
+#[cfg(test)]
+mod java_throw_abstract_tests;
 #[cfg(test)]
 mod java_throw_functional_tests;
 #[cfg(test)]

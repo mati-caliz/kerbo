@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ptr;
 
 use super::java::{Declaration, JavaSummary, Position, lint_at};
 use super::java_nullness::Resolved;
 use super::java_project::IndexedSummary;
+use super::java_throw_lambdas::lambda_targets;
 use super::java_throw_lookup::ThrowLookup;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::Body;
@@ -26,6 +27,7 @@ const SERIALIZATION_METHODS: [&str; 5] = [
 // método.
 pub struct ThrowsFacts<'summary> {
     declaring: HashMap<&'summary str, Vec<Declaring<'summary>>>,
+    lambda_targets: HashSet<&'summary str>,
 }
 
 struct Declaring<'summary> {
@@ -54,7 +56,10 @@ impl<'summary> ThrowsFacts<'summary> {
                     });
             }
         }
-        Self { declaring }
+        Self {
+            declaring,
+            lambda_targets: lambda_targets(files),
+        }
     }
 }
 
@@ -100,7 +105,7 @@ struct Escaping<'point> {
 impl Checker<'_, '_, '_> {
     fn method_findings(&self, method: &MethodThrows) -> Vec<LintFinding> {
         let Some(declaration) = declaration_at(self.summary, method).filter(|found| {
-            found.body == Body::Written && !SERIALIZATION_METHODS.contains(&found.name.as_str())
+            !SERIALIZATION_METHODS.contains(&found.name.as_str()) && !self.may_be_lambda_target(found)
         }) else {
             return Vec::new();
         };
@@ -122,6 +127,17 @@ impl Checker<'_, '_, '_> {
                 )
             })
             .collect()
+    }
+
+    // Una lambda implementa el único método abstracto de una interfaz sin dejar un `throws` que
+    // mirar: lo que tira su cuerpo sube igual al método.
+    fn may_be_lambda_target(&self, declaration: &Declaration) -> bool {
+        declaration.body == Body::Abstract
+            && declaration.owner.kind == OwnerKind::Interface
+            && self
+                .facts
+                .lambda_targets
+                .contains(declaration.owner.name.as_str())
     }
 
     fn escaping<'point>(&self, points: &'point [ThrowPoint]) -> Option<Vec<Escaping<'point>>> {

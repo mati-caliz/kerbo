@@ -1699,51 +1699,30 @@ Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y 
 contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/java/`
 (`qodana.sh <repo> <inspección>`, `kerbo.sh`, `compare_all.py`), 2026-11-07.
 
-- `RedundantThrows` (`redundant-throws`): junit4 218 de 219, commons-lang 121 de 125, Guava 16 de
-  28, **ninguno de más en los tres** (2026-11-10). Guava se mide sin `android/` ni los
+- `RedundantThrows` (`redundant-throws`): Guava 28 de 28, commons-lang 124 de 125, junit4 218 de
+  219, **ninguno de más en los tres** (2026-11-10). Guava se mide sin `android/` ni los
   `src-super`/`test-super` de GWT (`scripts/parity/java/configs/guava.kerbo.toml`, que `kerbo.sh`
   copia al repo): Qodana sólo analiza los módulos del pom raíz. Falta medir spring-boot.
-  - Ya se calca el análisis global de IntelliJ (`RefMethodImpl.updateThrowsList`): lo que tira el
-    cuerpo de un método que redefine a otro, aunque sea de una clase anónima, sube al de arriba;
-    un `throws` que sólo se declara no sube; una excepción tirada saca de la cláusula a sus padres
-    y a sus hijas; y un `new X() { }` de una interfaz, que IntelliJ no resuelve, calla al método
-    (una clase sin constructor escrito sí se resuelve: junit4 lo confirma con `RunListener`).
-    Que un llamador atrape la excepción no la excusa (IntelliJ no lo mira): sacarlo devolvió
-    `AbstractCache` 51 sin ninguno de más. Un overrider sin `throws`, en código que compila, no tira
-    nada chequeado: sólo importaría por sus llamadas sin resolver, que con el classpath completo
-    casi no hay.
-  - Guava, faltan: los "never thrown in any method implementation" de interfaces y abstractos
-    (`ByteProcessor`, `LineProcessor`, `LineBuffer`, `SloppyTearDown`, `ClosingFuture` 1553, 1743 y
-    1949), `ClassSanityTesterTest` 92, 141 y 452, `ExecutionSequencerTest` 391 y 430.
-  - Próximo avance, los abstractos: reportar en un método abstracto o de interfaz las cláusulas que
-    ningún overrider con `throws` deja escapar (`method_findings` hoy sólo mira `Body::Written`).
-    Empezar por los que una lambda no puede implementar: clases abstractas (`LineBuffer`,
-    `SloppyTearDown`) e interfaces con dos o más métodos abstractos (`ByteProcessor` y
-    `LineProcessor` tienen `processX` y `getResult`). Las funcionales piden elegir las lambdas por
-    su tipo destino: IntelliJ las cuenta como implementaciones, y por eso marca
-    `AsyncClosingFunction3..5` pero no `ClosingFunction2..5` ni `AsyncClosingFunction2`, que tienen
-    lambdas que tiran en los tests. Medir que no aparezcan de más (interfaces sin implementaciones
-    en el proyecto).
-  - Ya se siguen las referencias a método y las lambdas pasadas a un método genérico del proyecto
-    cuyo `throws E` lo decide la interfaz funcional, y un `throws X` con `X` parámetro de tipo sin
-    ligar (`Class<X>`) no se toma como una clase.
-  - Ya se siguen: los genéricos de las clases del proyecto (`Opening<T> extends Source<T,
-    IOException>` hace que el `get() throws E` heredado tire `IOException`; crudo, con otra cantidad
-    de argumentos o tapado por un `<E>` del método, no liga), los casteos, paréntesis y elementos de
-    arreglo como receptor.
-  - Pendientes, por lo que falta: `FailableConsumerTest` 119 y 126 y `FailableTest` 656 siguen
-    faltando aunque ya se sigue la referencia a método como argumento: falta ver qué la corta; el
-    calificador
-    de `GetField` en junit4 (`Result.java` 191); `ClassUtilsOssFuzzTest` tiene bytes NUL que cortan
-    el texto. La sobrecarga se elige por cantidad y por tipo sólo cuando el argumento es un literal
-    de texto o un `Charset` conocido; con cualquier otro sigue juntando todas. `values()` y
-    `valueOf()` de un enum (el índice no sabe qué tipo es un enum). Un método del proyecto que
-    redefine a uno de librería suma lo que tira el de arriba: calla de más. Un parámetro de tipo
-    que se llama igual que una clase en algún lugar del archivo no se resuelve como clase.
-  - Pendientes del análisis global: IntelliJ también sube las llamadas sin resolver de una clase
-    anónima anidada y las de un método que redefine sin `throws` (sólo pesa con classpath
-    incompleto); una interfaz del proyecto sin métodos no se reconoce como interfaz en
-    `new X() { }`.
+  - Ya se calca el análisis global de IntelliJ (`RefMethodImpl.updateThrowsList`): lo que tiran los
+    métodos que redefinen a otro (clases, anónimas, constantes de enum con cuerpo) y las lambdas
+    sube al de arriba; los abstractos y los de interfaz se marcan, salvo una interfaz que puede ser
+    destino de una lambda; una excepción tirada saca de la cláusula a sus padres y a sus hijas; que
+    un llamador la atrape no la excusa.
+  - Ya se siguen las referencias a método, las lambdas y los `null` pasados a un método genérico del
+    proyecto cuyo `throws E` lo decide la interfaz funcional (con un `null` el `E` es
+    `RuntimeException`), y los genéricos de las clases del proyecto.
+  - Lo que falta no es de la regla: `ClassUtilsOssFuzzTest` 46 tiene bytes NUL que cortan el texto,
+    y `Result.java` 191 de junit4 es del JDK: Qodana usó corretto-1.8 y kerbo el 21, donde
+    `ObjectInputStream.GetField.get(String, Object)` declara `ClassNotFoundException`.
+  - Los tipos del proyecto se indexan por nombre simple: con dos del mismo nombre se toma el único
+    del mismo paquete (`ProjectTypes::declaring_file`), y si no hay uno solo no se resuelve. El
+    arreglo de fondo es indexar por nombre calificado.
+  - Pendientes menores: la sobrecarga se elige por tipo sólo con un literal de texto, un `Charset`
+    conocido o un `null`; `values()` y `valueOf()` de un enum; un método del proyecto que redefine a
+    uno de librería suma lo que tira el de arriba (calla de más); un parámetro de tipo que se llama
+    igual que una clase del archivo no se resuelve como clase; IntelliJ también sube las llamadas
+    sin resolver de una anónima anidada y de un overrider sin `throws` (sólo pesa con classpath
+    incompleto); una interfaz del proyecto sin métodos no se reconoce en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
   commons-lang 0 de 2, ninguno de más. Pendientes: los dos de commons-lang son un recurso que se
   crea con una clase del proyecto en un test y un `OutputStream` que vuelve de un método.

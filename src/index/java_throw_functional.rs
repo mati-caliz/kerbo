@@ -8,7 +8,7 @@ use crate::lint::java_throws::{
 
 // Lo que tiran las firmas candidatas de un paso. Un `throws E` que lleva una lambda o una
 // referencia a método es lo que esa lambda o ese método tiran: si no tiran nada chequeado, el
-// compilador infiere `RuntimeException` y la llamada no tira nada.
+// compilador infiere `RuntimeException` y la llamada no tira nada. Con un `null` tampoco.
 pub(super) fn step_thrown(
     lookup: &ThrowLookup<'_, '_>,
     summary: &JavaSummary,
@@ -40,6 +40,7 @@ fn functional_thrown(
     match argument {
         ArgumentKind::Lambda(points) => lambda_thrown(lookup, summary, points),
         ArgumentKind::Reference(root, name) => referenced_thrown(lookup, summary, root, name),
+        ArgumentKind::Null => Some(Vec::new()),
         ArgumentKind::Unknown | ArgumentKind::Text | ArgumentKind::Charset => None,
     }
 }

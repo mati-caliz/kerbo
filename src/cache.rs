@@ -6,6 +6,7 @@ mod declaration_codec;
 mod generics_codec;
 mod go_package_codec;
 mod key;
+mod lambda_codec;
 mod lint_codec;
 pub mod location;
 mod null_codec;
@@ -35,7 +36,7 @@ use crate::rules::RuleId;
 use crate::secrets::{PathProfile, SecretFinding};
 
 const FORMAT_DIRECTORY: &str = "analysis-v2";
-const FORMAT_VERSION: u64 = 56;
+const FORMAT_VERSION: u64 = 57;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisSubject<'subject> {
