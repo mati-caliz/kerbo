@@ -45,8 +45,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
 
 #[test]
 fn what_a_method_can_throw_survives_the_round_trip() {
-    use super::throws_codec::{read_caught_call, read_method_throws, write_caught_call, write_method_throws};
-    use crate::lint::java_caught_calls::CaughtCall;
+    use super::throws_codec::{read_method_throws, write_method_throws};
     use crate::lint::java_throws::{
         ArgumentKind, CallRoot, CallStep, MethodThrows, ThrowOrigin, ThrowPoint, ThrowsClause,
     };
@@ -87,25 +86,11 @@ fn what_a_method_can_throw_survives_the_round_trip() {
             })
             .collect(),
     };
-    let call = CaughtCall {
-        name: "leer".to_owned(),
-        caught: vec!["IOException".to_owned()],
-        origin: ThrowOrigin::Call(
-            CallRoot::Type("Archivo".to_owned()),
-            vec![CallStep {
-                name: "leer".to_owned(),
-                arity: 0,
-                arguments: Vec::new(),
-            }],
-        ),
-    };
     let mut writer = Writer::default();
     write_method_throws(&mut writer, &method);
-    write_caught_call(&mut writer, &call);
     let bytes = writer.into_bytes();
     let mut reader = Reader::new(&bytes);
     assert_eq!(read_method_throws(&mut reader), Ok(method));
-    assert_eq!(read_caught_call(&mut reader), Ok(call));
 }
 
 #[test]

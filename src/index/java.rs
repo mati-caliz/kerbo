@@ -7,7 +7,6 @@ use crate::lint::java::children;
 use crate::lint::java_calls::{
     Arity, Body, Call, Callable, ResultUse, ReturnType, Returns, TYPE_DECLARATIONS, Visibility, extract,
 };
-use crate::lint::java_caught_calls::CaughtCall;
 use crate::lint::java_chains::Chain;
 use crate::lint::java_constants::{Constant, declared_constants};
 use crate::lint::java_fields::{DeclaredField, declared_fields, used_identifiers, written_only_identifiers};
@@ -146,7 +145,6 @@ pub struct JavaSummary {
     pub exposures: Vec<Exposure>,
     pub static_imports: Vec<String>,
     pub method_throws: Vec<MethodThrows>,
-    pub caught_calls: Vec<CaughtCall>,
     pub null_arguments: Vec<NullArgument>,
     pub generics: Generics,
 }
@@ -214,7 +212,6 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.resources.extend(extracted.resources);
         summary.taints.extend(extracted.taints);
         summary.method_throws.extend(extracted.method_throws);
-        summary.caught_calls.extend(extracted.caught_calls);
         summary
             .null_arguments
             .extend(null_arguments_in(top_level, &nodes, source));

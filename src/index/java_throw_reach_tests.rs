@@ -102,34 +102,6 @@ class Spawns {
 }
 ";
 
-const LAMBDAS: &str = r"package app;
-
-import java.io.IOException;
-import java.util.Map;
-
-class Lazy {
-    void open() throws IOException {
-    }
-}
-
-class Eager {
-    void open() throws IOException {
-    }
-}
-
-class Users {
-    void each(Map<String, Lazy> all) {
-        all.forEach((name, lazy) -> {
-            try {
-                lazy.open();
-            } catch (IOException problem) {
-                name.trim();
-            }
-        });
-    }
-}
-";
-
 const GENERICS: &str = r"package app;
 
 import java.io.IOException;
@@ -194,12 +166,6 @@ fn an_anonymous_class_of_an_interface_keeps_the_method_quiet() {
         redundant_in(ANONYMOUS_CREATIONS, &library),
         ["18:25 IOException", "22:24 IOException"]
     );
-}
-
-#[test]
-fn a_call_on_a_for_each_parameter_only_excuses_the_type_of_the_elements() {
-    let library = Library::load(&[]).with_jdk(fixture_jdk());
-    assert_eq!(redundant_in(LAMBDAS, &library), ["12:24 IOException"]);
 }
 
 #[test]

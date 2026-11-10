@@ -8,13 +8,12 @@ use super::java_throw_lookup::ThrowLookup;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::Body;
 use crate::lint::java_owner::OwnerKind;
-use crate::lint::java_throws::{MethodThrows, ThrowOrigin, ThrowPoint, ThrowsClause};
+use crate::lint::java_throws::{MethodThrows, ThrowPoint, ThrowsClause};
 use crate::rules::JavaRule;
 
 const RUNTIME_EXCEPTION: &str = "java.lang.RuntimeException";
 const ERROR: &str = "java.lang.Error";
 const REMOTE_EXCEPTION: &str = "java.rmi.RemoteException";
-const GENERAL_EXCEPTIONS: [&str; 3] = ["java.lang.Throwable", "java.lang.Exception", "java.lang.Error"];
 const SERIALIZATION_METHODS: [&str; 5] = [
     "writeObject",
     "readObject",
@@ -24,10 +23,9 @@ const SERIALIZATION_METHODS: [&str; 5] = [
 ];
 
 // Lo que hace falta saber del resto del proyecto: quién más declara un `throws` con ese nombre de
-// método, y qué llamadas con ese nombre están adentro de un `try`.
+// método.
 pub struct ThrowsFacts<'summary> {
     declaring: HashMap<&'summary str, Vec<Declaring<'summary>>>,
-    caught: HashMap<&'summary str, Vec<Caught<'summary>>>,
 }
 
 struct Declaring<'summary> {
@@ -36,16 +34,9 @@ struct Declaring<'summary> {
     method: &'summary MethodThrows,
 }
 
-struct Caught<'summary> {
-    summary: &'summary JavaSummary,
-    written: &'summary str,
-    origin: &'summary ThrowOrigin,
-}
-
 impl<'summary> ThrowsFacts<'summary> {
     pub fn new(files: &[IndexedSummary<'summary>]) -> Self {
         let mut declaring: HashMap<&str, Vec<Declaring<'_>>> = HashMap::new();
-        let mut caught: HashMap<&str, Vec<Caught<'_>>> = HashMap::new();
         for file in files {
             let summary = file.summary;
             for (method, declaration) in summary
@@ -62,18 +53,8 @@ impl<'summary> ThrowsFacts<'summary> {
                         method,
                     });
             }
-            for call in &summary.caught_calls {
-                caught
-                    .entry(call.name.as_str())
-                    .or_default()
-                    .extend(call.caught.iter().map(|written| Caught {
-                        summary,
-                        written: written.as_str(),
-                        origin: &call.origin,
-                    }));
-            }
         }
-        Self { declaring, caught }
+        Self { declaring }
     }
 }
 
@@ -166,7 +147,6 @@ impl Checker<'_, '_, '_> {
             && declared != Resolved::Library(REMOTE_EXCEPTION.to_owned())
             && !escaping.iter().any(|point| self.escapes_as(point, &declared))
             && !self.thrown_by_overrider(&declared, declaration)
-            && !self.caught_by_caller(&declared, declaration)
     }
 
     fn is_checked(&self, declared: &Resolved) -> bool {
@@ -249,38 +229,4 @@ impl Checker<'_, '_, '_> {
                 .is_subclass(&Resolved::Project(owner.name.clone()), &parent)
                 != Some(false)
     }
-
-    fn caught_by_caller(&self, declared: &Resolved, declaration: &Declaration) -> bool {
-        self.facts
-            .caught
-            .get(declaration.name.as_str())
-            .into_iter()
-            .flatten()
-            .filter(|call| self.may_call(call, declaration))
-            .any(|call| {
-                let handler = self.lookup.named(call.summary, call.written);
-                !is_general(&handler) && self.lookup.is_subclass(declared, &handler) != Some(false)
-            })
-    }
-
-    // Como IntelliJ, el `catch` cuenta para el método al que va la llamada y para los que ese
-    // redefine, no para los que lo redefinen. Un método de una clase anónima o local sólo se llama
-    // desde su archivo; si el receptor no se sabe, cuenta.
-    fn may_call(&self, call: &Caught<'_>, declaration: &Declaration) -> bool {
-        if declaration.owner.kind == OwnerKind::Local {
-            return ptr::eq(call.summary, self.summary);
-        }
-        let owner = Resolved::Project(declaration.owner.name.clone());
-        self.lookup
-            .receivers_of(call.summary, call.origin)
-            .is_none_or(|receivers| {
-                receivers
-                    .iter()
-                    .any(|receiver| self.lookup.is_subclass(receiver, &owner) != Some(false))
-            })
-    }
-}
-
-fn is_general(handler: &Resolved) -> bool {
-    matches!(handler, Resolved::Library(name) if GENERAL_EXCEPTIONS.contains(&name.as_str()))
 }

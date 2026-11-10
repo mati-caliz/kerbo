@@ -1,5 +1,4 @@
 use super::codec::{Corrupt, Reader, Writer};
-use crate::lint::java_caught_calls::CaughtCall;
 use crate::lint::java_throws::{
     ArgumentKind, CallRoot, CallStep, MethodThrows, ThrowOrigin, ThrowPoint, ThrowsClause,
 };
@@ -59,20 +58,6 @@ pub fn read_method_throws(reader: &mut Reader<'_>) -> Result<MethodThrows, Corru
             })
         })?,
         points: read_points(reader)?,
-    })
-}
-
-pub fn write_caught_call(writer: &mut Writer, call: &CaughtCall) {
-    writer.text(&call.name);
-    writer.list(&call.caught, |writer, name| writer.text(name));
-    write_origin(writer, &call.origin);
-}
-
-pub fn read_caught_call(reader: &mut Reader<'_>) -> Result<CaughtCall, Corrupt> {
-    Ok(CaughtCall {
-        name: reader.text()?,
-        caught: reader.list(Reader::text)?,
-        origin: read_origin(reader)?,
     })
 }
 

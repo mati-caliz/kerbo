@@ -101,47 +101,6 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         }
     }
 
-    // Las clases donde se busca el último método de una llamada, o nada si no se sabe.
-    pub fn receivers_of(&self, summary: &JavaSummary, origin: &ThrowOrigin) -> Option<Vec<Resolved>> {
-        let ThrowOrigin::Call(root, steps) = origin else {
-            return None;
-        };
-        let (last, before) = steps.split_last()?;
-        let Some((first, rest)) = before.split_first() else {
-            return match root {
-                CallRoot::Scope(enclosing) => self.scope_owner(summary, enclosing, last),
-                CallRoot::Type(_) | CallRoot::Generic(..) => Some(vec![self.root_type(summary, root)?.class]),
-            };
-        };
-        let mut signatures = self.on_root(summary, root, Wanted::of_step(first))?;
-        for step in rest {
-            signatures = self.on_receivers(&returned_by(&signatures)?, Wanted::of_step(step))?;
-        }
-        Some(
-            returned_by(&signatures)?
-                .into_iter()
-                .map(|receiver| receiver.class)
-                .collect(),
-        )
-    }
-
-    fn scope_owner(
-        &self,
-        summary: &JavaSummary,
-        enclosing: &[String],
-        step: &CallStep,
-    ) -> Option<Vec<Resolved>> {
-        for owner in enclosing {
-            let class = self.named(summary, owner);
-            match self.members(&Typed::raw(class.clone()), Wanted::of_step(step)) {
-                Search::Found(_) => return Some(vec![class]),
-                Search::Incomplete => return None,
-                Search::Absent => {}
-            }
-        }
-        None
-    }
-
     fn call_thrown(
         &self,
         summary: &JavaSummary,

@@ -285,6 +285,7 @@ fn a_throws_nothing_can_reach_is_reported_and_anything_unknown_keeps_quiet() {
             "18:27 Exception",
             "25:27 IOException",
             "36:28 IOException",
+            "59:34 FileNotFoundException",
             "70:22 IOException",
             "95:34 IOException",
         ]

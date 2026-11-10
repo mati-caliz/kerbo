@@ -6,7 +6,6 @@ use super::java_results::result_use;
 use tree_sitter::Node;
 
 use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, PRIVATE, children, modifiers, text};
-use super::java_caught_calls::{CaughtCall, caught_call};
 use super::java_chains::{Chain, NullFacts, chain_of};
 use super::java_constants::{Constants, constant_value, constants_in};
 use super::java_implicit_constructor::implicit_enum_constructor;
@@ -121,7 +120,6 @@ pub struct Extracted<'tree> {
     pub resources: Vec<ResourceCandidate>,
     pub taints: Vec<TaintMethod>,
     pub method_throws: Vec<MethodThrows>,
-    pub caught_calls: Vec<CaughtCall>,
 }
 
 // Lo que declara y lo que llama una clase de nivel superior, con sus clases anidadas.
@@ -190,11 +188,6 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
                     .map(|name| text(*name, source).to_owned()),
             ),
             _ => {}
-        }
-        if node.kind() == INVOCATION || node.kind() == METHOD_REFERENCE || node.kind() == CREATION {
-            extracted
-                .caught_calls
-                .extend(caught_call(node, source, variables));
         }
     }
     extracted
