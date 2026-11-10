@@ -128,9 +128,13 @@ pub fn field<'tree>(
     owner: Owner<'tree>,
 ) -> Option<Field> {
     let call = Call::parse(node, source)?;
-    let class = Some(class_of(call.method))
-        .filter(|known| *known != Class::Other)
-        .or_else(|| owner.settings.field_classes.get(call.method).copied())
+    let classes = &owner.settings.field_classes;
+    let qualified = format!("{}{APP_SEPARATOR}{}", call.receiver, call.method);
+    let class = classes
+        .get(&qualified)
+        .copied()
+        .or_else(|| Some(class_of(call.method)).filter(|known| *known != Class::Other))
+        .or_else(|| classes.get(call.method).copied())
         .unwrap_or(Class::Other);
     let mut field = Field::new(name, class);
     for (keyword, flag) in FLAG_KEYWORDS {

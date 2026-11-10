@@ -20,7 +20,7 @@ const MIGRATIONS_DIRECTORY: &str = "migrations";
 const PYTHON_EXTENSION: &str = "py";
 const PACKAGE_STEM: &str = "__init__";
 const APPS_ROOT_DEPTH: usize = 3;
-const IMPORT_MARKER: &str = "from django.db import";
+const BODY_MARKERS: [&str; 2] = ["from django.db import", "operations"];
 const CLASS_MARKER: &str = "class Migration(";
 
 pub trait Loader {
@@ -59,7 +59,9 @@ pub fn location(path: &Path) -> Option<Location> {
 }
 
 pub fn is_migration_source(source: &[u8]) -> bool {
-    std::str::from_utf8(source).is_ok_and(|text| text.contains(IMPORT_MARKER) && text.contains(CLASS_MARKER))
+    std::str::from_utf8(source).is_ok_and(|text| {
+        text.contains(CLASS_MARKER) && BODY_MARKERS.iter().any(|marker| text.contains(marker))
+    })
 }
 
 pub fn state_before(loader: &impl Loader, location: &Location, current: &Migration) -> State {

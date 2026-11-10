@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use super::dependencies::SWAPPABLE_SETTING_APP;
 use super::model::{Class, Field, Flag, Model, ModelKey, Relation};
 use super::names::truncated_table;
-use super::operations::Operation;
+use super::operations::{Deletion, Operation};
 
 const ID: &str = "id";
 const FROM_PREFIX: &str = "from_";
@@ -24,6 +24,8 @@ pub struct State {
     auto_field: Class,
     column_drops_cascade: bool,
     declared_swappables: Vec<(String, ModelKey)>,
+    pending_models: BTreeMap<ModelKey, Model>,
+    pending_fields: BTreeMap<(ModelKey, String), Model>,
 }
 
 impl State {
@@ -33,6 +35,8 @@ impl State {
             auto_field,
             column_drops_cascade,
             declared_swappables: Vec::new(),
+            pending_models: BTreeMap::new(),
+            pending_fields: BTreeMap::new(),
         }
     }
 
@@ -47,6 +51,14 @@ impl State {
 
     pub fn model(&self, key: &ModelKey) -> Option<&Model> {
         self.models.get(key)
+    }
+
+    pub fn pending_model(&self, key: &ModelKey) -> Option<&Model> {
+        self.pending_models.get(key)
+    }
+
+    pub fn pending_field_owner(&self, key: &ModelKey, field: &str) -> Option<&Model> {
+        self.pending_fields.get(&(key.clone(), field.to_owned()))
     }
 
     pub fn models(&self) -> impl Iterator<Item = &Model> {
@@ -114,9 +126,12 @@ impl State {
             Operation::CreateModel(model) => {
                 self.models.insert(model.key.clone(), model.clone());
             }
-            Operation::DeleteModel(name) => {
-                self.models.remove(&key(name));
-            }
+            Operation::DeleteModel { name, deletion } => self.delete_model(key(name), *deletion),
+            Operation::RemoveField {
+                model,
+                name,
+                deletion: deletion @ (Deletion::MoveToPending | Deletion::Purge),
+            } => self.remove_field_safely(key(model), name, *deletion),
             Operation::RenameModel { old, new } => self.rename_model(&key(old), &key(new)),
             Operation::Separate { state, .. } => {
                 for located in state {
@@ -141,6 +156,31 @@ impl State {
                 }
             }
         }
+    }
+
+    fn delete_model(&mut self, key: ModelKey, deletion: Deletion) {
+        if deletion == Deletion::Purge {
+            self.pending_models.remove(&key);
+            return;
+        }
+        let removed = self.models.remove(&key);
+        if let (Deletion::MoveToPending, Some(model)) = (deletion, removed) {
+            self.pending_models.insert(key, model);
+        }
+    }
+
+    fn remove_field_safely(&mut self, key: ModelKey, name: &str, deletion: Deletion) {
+        let pending_key = (key, name.to_owned());
+        if deletion == Deletion::Purge {
+            self.pending_fields.remove(&pending_key);
+            return;
+        }
+        let Some(owner) = self.models.get_mut(&pending_key.0) else {
+            return;
+        };
+        let snapshot = owner.clone();
+        owner.fields.retain(|field| field.name != name);
+        self.pending_fields.insert(pending_key, snapshot);
     }
 
     fn rename_model(&mut self, old: &ModelKey, new: &ModelKey) {
@@ -194,7 +234,7 @@ fn change(model: &mut Model, operation: &Operation) {
             model.constraints.retain(|constraint| constraint.name != *name);
         }
         Operation::CreateModel(_)
-        | Operation::DeleteModel(_)
+        | Operation::DeleteModel { .. }
         | Operation::RenameModel { .. }
         | Operation::RunSql(_)
         | Operation::CreateExtension(_)

@@ -2,7 +2,8 @@
 
 Las migraciones se nombran por el label de su app (el de apps.py, como en sqlmigrate), no por su carpeta.
 Se compara por migración, regla y cantidad de avisos, sólo en las migraciones que `sqlmigrate`
-pudo convertir (las que fallan quedan en errores.txt y no tienen referencia): squawk marca líneas
+pudo convertir (las que fallan quedan en errores.txt y no tienen referencia) y que son de apps del
+corpus (las de paquetes instalados, como auth en sentry, kerbo no las ve): squawk marca líneas
 del SQL generado y kerbo las de la operación que lo genera, así que la línea no se puede cruzar.
 
 Uso: python compare.py <repo>
@@ -18,7 +19,13 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent.parent.parent
 PARITY = pathlib.Path(os.environ.get("KERBO_PARITY", REPO / ".parity"))
-APPS_ROOTS = {"django": "django/django/contrib", "saleor": "saleor/saleor", "zulip": "zulip", "wagtail": "wagtail"}
+APPS_ROOTS = {
+    "django": "django/django/contrib",
+    "saleor": "saleor/saleor",
+    "zulip": "zulip",
+    "wagtail": "wagtail",
+    "sentry": "sentry/src",
+}
 REFERENCE_PREFIX = "/out/"
 MIGRATIONS_DIRECTORY = "migrations"
 LABEL = re.compile(r"""^\s*label\s*=\s*["']([^"']+)["']""", re.MULTILINE)
@@ -38,9 +45,15 @@ def reference(repo):
     return counts
 
 
+def corpus_apps(repo):
+    root = PARITY / "corpus" / APPS_ROOTS[repo]
+    return {label(repo, path.parent.relative_to(root)) for path in root.rglob(MIGRATIONS_DIRECTORY) if path.is_dir()}
+
+
 def converted_migrations(repo):
     root = PARITY / "django" / repo
-    return {f"{path.parent.name}/{path.stem}" for path in root.glob("*/*.sql")}
+    apps = corpus_apps(repo)
+    return {f"{path.parent.name}/{path.stem}" for path in root.glob("*/*.sql") if path.parent.name in apps}
 
 
 def kerbo(repo, rules):
@@ -58,8 +71,8 @@ def main():
         print(APPS_ROOTS[sys.argv[2]])
         return
     repo = sys.argv[1]
-    expected = reference(repo)
     converted = converted_migrations(repo)
+    expected = collections.Counter({key: count for key, count in reference(repo).items() if key[0] in converted})
     found = kerbo(repo, {rule for _, rule in expected} | migration_rules())
     found = collections.Counter({key: count for key, count in found.items() if key[0] in converted})
     differences = sorted(key for key in expected.keys() | found.keys() if expected[key] != found[key])

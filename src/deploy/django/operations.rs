@@ -9,7 +9,10 @@ pub struct SqlChunk {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operation {
     CreateModel(Model),
-    DeleteModel(String),
+    DeleteModel {
+        name: String,
+        deletion: Deletion,
+    },
     AddField {
         model: String,
         field: Field,
@@ -17,6 +20,7 @@ pub enum Operation {
     RemoveField {
         model: String,
         name: String,
+        deletion: Deletion,
     },
     AlterField {
         model: String,
@@ -72,6 +76,13 @@ pub enum Operation {
         database: Vec<Located>,
         state: Vec<Located>,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Deletion {
+    Immediate,
+    MoveToPending,
+    Purge,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

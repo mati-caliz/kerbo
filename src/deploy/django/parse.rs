@@ -12,7 +12,7 @@ use super::factories::{Factory, imported};
 use super::fields::{Owner, field};
 use super::meta::{constraint, constraints, index, indexes, unique_together};
 use super::model::{Model, ModelKey};
-use super::operations::{Located, Migration, Operation};
+use super::operations::{Deletion, Located, Migration, Operation};
 use super::run_python::functions;
 use super::settings::Settings;
 use super::truth::{reachable_statements, truth};
@@ -31,6 +31,12 @@ const ADD_FIELD: &str = "AddField";
 const CONCATENATION: &str = "binary_operator";
 const RUN_PYTHON: &str = "RunPython";
 const GENERIC_EXTENSION: &str = "CreateExtension";
+const SAFE_DELETE_MODEL: &str = "SafeDeleteModel";
+const SAFE_REMOVE_FIELD: &str = "SafeRemoveField";
+const SAFE_RUN_SQL: &str = "SafeRunSQL";
+const DELETION_ACTION: &str = "deletion_action";
+const MOVE_TO_PENDING: &str = "MOVE_TO_PENDING";
+const PURGE: &str = "DELETE";
 const NAMED_EXTENSIONS: &[(&str, &str)] = &[
     ("BloomExtension", "bloom"),
     ("BtreeGinExtension", "btree_gin"),
@@ -118,6 +124,17 @@ fn argument<'tree>(call: &Call<'tree>, index: usize, name: &str) -> Option<Node<
 
 fn string_argument(call: &Call<'_>, index: usize, name: &str) -> Option<String> {
     argument(call, index, name).and_then(|node| text(node, call.source))
+}
+
+fn deletion_action(call: &Call<'_>, index: usize) -> Option<Deletion> {
+    let action = argument(call, index, DELETION_ACTION)?
+        .utf8_text(call.source)
+        .ok()?;
+    match action.rsplit('.').next()? {
+        MOVE_TO_PENDING => Some(Deletion::MoveToPending),
+        PURGE => Some(Deletion::Purge),
+        _ => None,
+    }
 }
 
 fn model_name(call: &Call<'_>, index: usize, name: &str) -> Option<String> {
@@ -209,11 +226,24 @@ impl<'context> Scope<'context> {
     fn declared_operation(self, call: &Call<'context>) -> Option<Operation> {
         match call.method {
             "CreateModel" => self.create_model(call),
-            "DeleteModel" => model_name(call, 0, "name").map(Operation::DeleteModel),
+            "DeleteModel" => Some(Operation::DeleteModel {
+                name: model_name(call, 0, "name")?,
+                deletion: Deletion::Immediate,
+            }),
+            SAFE_DELETE_MODEL => Some(Operation::DeleteModel {
+                name: model_name(call, 0, "name")?,
+                deletion: deletion_action(call, 1)?,
+            }),
             "AddField" | "AlterField" => self.field_operation(call),
             "RemoveField" => Some(Operation::RemoveField {
                 model: model_name(call, 0, "model_name")?,
                 name: string_argument(call, 1, "name")?,
+                deletion: Deletion::Immediate,
+            }),
+            SAFE_REMOVE_FIELD => Some(Operation::RemoveField {
+                model: model_name(call, 0, "model_name")?,
+                name: string_argument(call, 1, "name")?,
+                deletion: deletion_action(call, 2)?,
             }),
             "RenameField" => Some(Operation::RenameField {
                 model: model_name(call, 0, "model_name")?,
@@ -235,7 +265,7 @@ impl<'context> Scope<'context> {
                     .unwrap_or_default(),
             }),
             "AlterModelOptions" => self.alter_options(call),
-            "RunSQL" => run_sql(self, call),
+            "RunSQL" | SAFE_RUN_SQL => run_sql(self, call),
             GENERIC_EXTENSION => string_argument(call, 0, "name").map(Operation::CreateExtension),
             "SeparateDatabaseAndState" => Some(Operation::Separate {
                 database: argument(call, 0, "database_operations")

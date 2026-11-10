@@ -2,7 +2,7 @@ use super::alter::{FieldChange, alter_field as alter_column};
 use super::deferred::{IndexKind, Kind, Statement, nulls_clause};
 use super::model::{Constraint, ConstraintKind, Model, ModelKey};
 use super::names::quoted;
-use super::operations::{Located, Migration, Operation};
+use super::operations::{Deletion, Located, Migration, Operation};
 use super::rename;
 use super::schema::{Editor, columns_of, named_index, unique_index};
 use super::state::State;
@@ -87,8 +87,16 @@ fn render(editor: &mut Editor, context: Context<'_>, operation: &Operation) {
                 editor.create_model(created, context.after);
             }
         }
-        Operation::DeleteModel(name) => {
-            if let Some(deleted) = context.old_model(name) {
+        Operation::DeleteModel { name, deletion } => {
+            let deleted = match deletion {
+                Deletion::Immediate => context.old_model(name),
+                Deletion::MoveToPending => None,
+                Deletion::Purge => context
+                    .before
+                    .pending_model(&context.key(name))
+                    .filter(|found| found.emits_sql()),
+            };
+            if let Some(deleted) = deleted {
                 editor.delete_model(deleted, context.before);
             }
         }
@@ -130,8 +138,20 @@ fn render_field(editor: &mut Editor, context: Context<'_>, operation: &Operation
                 editor.add_field(owner, field, context.after);
             }
         }
-        Operation::RemoveField { model, name } => {
-            if let Some(owner) = context.old_model(model)
+        Operation::RemoveField {
+            model,
+            name,
+            deletion,
+        } => {
+            let owner = match deletion {
+                Deletion::Immediate => context.old_model(model),
+                Deletion::MoveToPending => None,
+                Deletion::Purge => context
+                    .before
+                    .pending_field_owner(&context.key(model), name)
+                    .filter(|found| found.emits_sql()),
+            };
+            if let Some(owner) = owner
                 && let Some(field) = owner.field(name)
             {
                 editor.remove_field(owner, field, context.before);
@@ -142,7 +162,7 @@ fn render_field(editor: &mut Editor, context: Context<'_>, operation: &Operation
         }
         Operation::RenameField { model, old, new } => alter_field(editor, context, model, (old, new)),
         Operation::CreateModel(_)
-        | Operation::DeleteModel(_)
+        | Operation::DeleteModel { .. }
         | Operation::RenameModel { .. }
         | Operation::AlterModelTable { .. }
         | Operation::AlterUniqueTogether { .. }
@@ -219,7 +239,7 @@ fn render_meta(editor: &mut Editor, context: Context<'_>, operation: &Operation)
         }
         Operation::RemoveConstraint { model, name } => remove_constraint(editor, context, model, name),
         Operation::CreateModel(_)
-        | Operation::DeleteModel(_)
+        | Operation::DeleteModel { .. }
         | Operation::AddField { .. }
         | Operation::RemoveField { .. }
         | Operation::AlterField { .. }

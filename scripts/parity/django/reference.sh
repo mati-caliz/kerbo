@@ -10,8 +10,8 @@
 set -euo pipefail
 
 readonly CPUS=2
-readonly MEMORY_LIMIT="4g"
-readonly PYTHON_IMAGE="python:3.12-slim"
+MEMORY_LIMIT="4g"
+PYTHON_IMAGE="python:3.12-slim"
 readonly POSTGRES_IMAGE="postgres:16-alpine"
 DJANGO_VERSION="$(python "$(dirname "$0")/../versions.py" version django)"
 SQUAWK_VERSION="$(python "$(dirname "$0")/../versions.py" version squawk)"
@@ -27,6 +27,13 @@ case "$repo" in
     database_driver=""
     system_packages="git build-essential pkg-config libpq-dev libldap2-dev libsasl2-dev libxml2-dev libxmlsec1-dev libicu-dev libvips42"
     ;;
+  sentry)
+    dependency_groups="--no-dev"
+    database_driver=""
+    system_packages="git build-essential pkg-config libpq-dev libxmlsec1-dev libxml2-dev libffi-dev"
+    PYTHON_IMAGE="python:3.13-slim"
+    MEMORY_LIMIT="8g"
+    ;;
   wagtail)
     dependency_groups="--no-dev"
     database_driver="psycopg[binary] Jinja2"
@@ -38,6 +45,7 @@ case "$repo" in
     system_packages=""
     ;;
 esac
+readonly PYTHON_IMAGE MEMORY_LIMIT
 database="kerbo-django-db-$repo"
 mkdir -p "$out"
 docker network create "$network" >/dev/null 2>&1 || true

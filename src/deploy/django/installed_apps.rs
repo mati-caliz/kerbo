@@ -6,6 +6,7 @@ const APPS_MODULE: &str = "apps";
 const CONFIG_SUFFIX: &str = "Config";
 const CONCATENATION: char = '+';
 const ASSIGNMENT: char = '=';
+const ANNOTATION: char = ':';
 const COMMENT: char = '#';
 const QUOTES: [char; 2] = ['"', '\''];
 const OPENERS: [char; 2] = ['[', '('];
@@ -61,6 +62,12 @@ fn without_comment(line: &str) -> &str {
     line
 }
 
+fn skip_annotation(annotation: &str) -> &str {
+    annotation
+        .find(ASSIGNMENT)
+        .map_or(annotation, |assignment| &annotation[assignment..])
+}
+
 fn assignments<'text>(text: &'text str, name: &str) -> Vec<&'text str> {
     let mut found = Vec::new();
     let mut offset = 0;
@@ -72,6 +79,7 @@ fn assignments<'text>(text: &'text str, name: &str) -> Vec<&'text str> {
             continue;
         }
         let after = text[offset..].trim_start_matches(INLINE_WHITESPACE);
+        let after = after.strip_prefix(ANNOTATION).map_or(after, skip_annotation);
         let operator = after.strip_prefix(CONCATENATION).unwrap_or(after);
         if let Some(expression) = operator
             .strip_prefix(ASSIGNMENT)
@@ -227,6 +235,16 @@ else:
                 "pages".to_owned()
             ])
         );
+    }
+
+    #[test]
+    fn reads_an_annotated_list() {
+        let source = "INSTALLED_APPS: tuple[str, ...] = (
+    \"django.contrib.auth\",
+    \"sentry.users.apps.Config\",
+)
+";
+        assert_eq!(read(source), Some(vec!["auth".to_owned(), "users".to_owned()]));
     }
 
     #[test]

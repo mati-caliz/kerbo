@@ -8,6 +8,7 @@ convertir (importa algo que falta, o consulta la base) queda anotada en errores.
 
 import io
 import json
+import multiprocessing
 import os
 import pathlib
 import subprocess
@@ -35,6 +36,10 @@ REPOS = {
         "path": "/repo",
         "settings": "zulip_settings",
     },
+    "sentry": {
+        "path": "/repo/src",
+        "sentry_conf": "/harness/sentry_conf.py",
+    },
     "wagtail": {
         "path": "/repo",
         "settings": "wagtail.test.settings",
@@ -47,6 +52,7 @@ REPOS = {
     },
 }
 OUT = pathlib.Path("/out")
+MIGRATIONS_PER_WORKER = 25
 
 
 def temporary_private_key():
@@ -64,6 +70,11 @@ def configure(repo):
     sys.path.insert(0, REPOS[repo]["path"])
     import django
 
+    if "sentry_conf" in REPOS[repo]:
+        from sentry.runner.settings import configure as configure_sentry
+
+        configure_sentry(None, REPOS[repo]["sentry_conf"], None, skip_service_validation=True)
+        return
     if "settings" in REPOS[repo]:
         os.environ["DJANGO_SETTINGS_MODULE"] = REPOS[repo]["settings"]
         os.environ["DATABASE_URL"] = f"postgres://postgres:kerbo@{os.environ['DATABASE_HOST']}/kerbo"
@@ -114,21 +125,30 @@ def sql_of(app, name):
     return buffer.getvalue()
 
 
+def converted(migration):
+    app, name = migration
+    try:
+        return app, name, sql_of(app, name), None
+    except Exception as problem:  # noqa: BLE001 - cada migración que falla se anota y se sigue
+        return app, name, None, f"{app} {name}: {type(problem).__name__}: {problem}"
+
+
 def main():
     repo = os.environ["REPO"]
     configure(repo)
     errors = []
     written = []
-    for app, name in migrations_in_order():
-        try:
-            sql = sql_of(app, name)
-        except Exception as problem:  # noqa: BLE001 - cada migración que falla se anota y se sigue
-            errors.append(f"{app} {name}: {type(problem).__name__}: {problem}")
-            continue
-        target = OUT / app / f"{name}.sql"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(sql, encoding="utf-8")
-        written.append(target)
+    workers = multiprocessing.get_context("fork").Pool(1, maxtasksperchild=MIGRATIONS_PER_WORKER)
+    with workers:
+        results = workers.imap(converted, migrations_in_order())
+        for app, name, sql, error in results:
+            if error:
+                errors.append(error)
+                continue
+            target = OUT / app / f"{name}.sql"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(sql, encoding="utf-8")
+            written.append(target)
     (OUT / "errores.txt").write_text("\n".join(errors) + "\n", encoding="utf-8")
     report = subprocess.run(
         ["squawk", "--reporter", "json", *map(str, written)], capture_output=True, text=True, check=False

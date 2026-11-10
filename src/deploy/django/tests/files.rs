@@ -189,3 +189,62 @@ fn a_project_locked_before_django_six_drops_columns_in_cascade() {
     assert!(settings.column_drops_cascade);
     assert_eq!(settings.auto_field, Class::Auto);
 }
+
+const PENDING_INITIAL: &str = r#"from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    operations = [
+        migrations.CreateModel(name="Note", fields=[("id", models.BigAutoField(primary_key=True)), ("body", models.TextField(null=True))]),
+        migrations.CreateModel(name="Draft", fields=[("id", models.BigAutoField(primary_key=True))]),
+    ]
+"#;
+
+const MOVED_TO_PENDING: &str = r#"from notes.monkey import SafeDeleteModel, SafeRemoveField
+from notes.monkey.state import DeletionAction
+from notes.migrations_base import CheckedMigration
+
+
+class Migration(CheckedMigration):
+    dependencies = [("notes", "0001_initial")]
+
+    operations = [
+        SafeRemoveField(model_name="note", name="body", deletion_action=DeletionAction.MOVE_TO_PENDING),
+        SafeDeleteModel(name="Draft", deletion_action=DeletionAction.MOVE_TO_PENDING),
+    ]
+"#;
+
+const PURGED: &str = r#"from notes.monkey import SafeDeleteModel, SafeRemoveField
+from notes.monkey.state import DeletionAction
+from notes.migrations_base import CheckedMigration
+
+
+class Migration(CheckedMigration):
+    dependencies = [("notes", "0002_pending")]
+
+    operations = [
+        SafeRemoveField(model_name="note", name="body", deletion_action=DeletionAction.DELETE),
+        SafeDeleteModel(name="Draft", deletion_action=DeletionAction.DELETE),
+    ]
+"#;
+
+fn pending_sql(relative: &str, source: &str) -> String {
+    let tree = TempTree::new("django-pending-deletion");
+    tree.write(NOTE_INITIAL, PENDING_INITIAL);
+    tree.write("notes/migrations/0002_pending.py", MOVED_TO_PENDING);
+    tree.write("notes/migrations/0003_purge.py", PURGED);
+    let found = location(&tree.path().join(relative)).expect("es una migración");
+    rendered_sql(parsed(source).root_node(), source.as_bytes(), &found).expect("se convierte")
+}
+
+#[test]
+fn safe_deletions_wait_in_pending_state_until_the_delete_action() {
+    let pending = pending_sql("notes/migrations/0002_pending.py", MOVED_TO_PENDING);
+    assert!(!pending.contains("DROP"), "{pending}");
+    let purged = pending_sql("notes/migrations/0003_purge.py", PURGED);
+    assert!(
+        purged.contains("ALTER TABLE \"notes_note\" DROP COLUMN \"body\""),
+        "{purged}"
+    );
+    assert!(purged.contains("DROP TABLE \"notes_draft\""), "{purged}");
+}

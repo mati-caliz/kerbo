@@ -25,6 +25,7 @@ mod rename;
 mod run_python;
 mod schema;
 mod settings;
+mod settings_module;
 mod state;
 mod truth;
 mod values;
