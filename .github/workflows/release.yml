@@ -97,6 +97,7 @@ jobs:
           name: kerbo-${{ matrix.target }}
           path: ${{ env.DIST_DIR }}/*
           if-no-files-found: error
+          retention-days: 1
 
   publish:
     needs: [version, build]
@@ -130,6 +131,7 @@ jobs:
           name: homebrew-formula
           path: ${{ env.HOMEBREW_FORMULA }}
           if-no-files-found: error
+          retention-days: 1
       - name: Actualizar el tap
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
