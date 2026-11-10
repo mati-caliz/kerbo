@@ -6,8 +6,8 @@ use tree_sitter::Node;
 mod raw_sql;
 
 use super::computed_names::name_text;
-use super::constants::{Constants, assignments, class_attributes};
-use super::dependencies::keys;
+use super::constants::{Constants, assignments, class_attributes, statement_assignments};
+use super::dependencies::{keys, swappable_setting};
 use super::factories::{Factory, imported};
 use super::fields::{Owner, field};
 use super::meta::{constraint, constraints, index, indexes, unique_together};
@@ -15,7 +15,7 @@ use super::model::{Model, ModelKey};
 use super::operations::{Located, Migration, Operation};
 use super::run_python::functions;
 use super::settings::Settings;
-use super::truth::truth;
+use super::truth::{reachable_statements, truth};
 use super::values::{boolean, dictionary, elements, text};
 use crate::deploy::python_calls::Call;
 use crate::syntax::named_children;
@@ -69,7 +69,10 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
                 == Some(MIGRATION_CLASS)
     })?;
     let body = class.child_by_field_name("body")?;
-    let class_bindings = assignments(body, reader.source);
+    let class_bindings = statement_assignments(
+        reachable_statements(body, reader.source, reader.settings),
+        reader.source,
+    );
     let mut bindings = class_attributes(root, reader.source);
     bindings.extend(assignments(root, reader.source));
     bindings.extend(class_bindings.iter().cloned());
@@ -334,6 +337,7 @@ impl<'context> Scope<'context> {
                 "managed" => model.managed = boolean(value) != Some(false),
                 "proxy" => model.proxy = boolean(value) == Some(true),
                 "swappable" => {
+                    model.swappable_setting = swappable_setting(value, self.source);
                     model.swapped_for = text(value, self.source)
                         .and_then(|setting| self.settings.replacement(&setting, &model.key));
                 }

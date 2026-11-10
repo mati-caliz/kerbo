@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
+use super::dependencies::SWAPPABLE_SETTING_APP;
 use super::model::{Class, Field, Flag, Model, ModelKey, Relation};
 use super::names::truncated_table;
 use super::operations::Operation;
@@ -47,7 +48,20 @@ impl State {
     pub fn resolve(&self, key: &ModelKey) -> Cow<'_, Model> {
         self.models
             .get(key)
+            .or_else(|| self.swappable(key))
             .map_or_else(|| Cow::Owned(fallback(key, self.auto_field)), Cow::Borrowed)
+    }
+
+    fn swappable(&self, key: &ModelKey) -> Option<&Model> {
+        if key.app != SWAPPABLE_SETTING_APP {
+            return None;
+        }
+        self.models.values().find(|model| {
+            model
+                .swappable_setting
+                .as_ref()
+                .is_some_and(|setting| key.model.ends_with(setting.as_str()))
+        })
     }
 
     pub fn through(&self, owner: &Model, field: &Field) -> Option<Model> {

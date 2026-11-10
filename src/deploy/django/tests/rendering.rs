@@ -268,3 +268,87 @@ fn a_swapper_reference_points_to_the_default_model() {
         &["text_pattern_ops"],
     );
 }
+
+const AUTOMATIC_NOW: &str = r#"from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [("sites", "0001_initial")]
+
+    operations = [
+        migrations.AddField(model_name="site", name="edited_on", field=models.DateField(auto_now=True)),
+        migrations.AddField(model_name="site", name="edited_at", field=models.TimeField(auto_now_add=True)),
+    ]
+"#;
+
+#[test]
+fn automatic_now_defaults_follow_the_column_type() {
+    let loader = MemoryLoader::default().with("sites", "0001_initial", super::SITES_INITIAL);
+    assert_rendered(
+        &sql(&loader, "sites", "0002_automatic_now", AUTOMATIC_NOW),
+        &[
+            r#""edited_on" date DEFAULT '2000-01-01'::date NOT NULL"#,
+            r#""edited_at" time DEFAULT '00:00:00'::time NOT NULL"#,
+        ],
+        &["timestamptz"],
+    );
+}
+
+const VENDOR_BRANCHES: &str = r#"from django.db import connection, migrations, models
+
+
+class Migration(migrations.Migration):
+    if connection.vendor != "postgresql":
+        operations = [migrations.CreateModel(name="Other", fields=[("id", models.AutoField(primary_key=True))])]
+    elif connection.vendor == "postgresql":
+        operations = [migrations.CreateModel(name="Chosen", fields=[("id", models.AutoField(primary_key=True))])]
+    else:
+        operations = []
+"#;
+
+#[test]
+fn class_body_branches_follow_the_postgres_vendor() {
+    let loader = MemoryLoader::default();
+    assert_rendered(
+        &sql(&loader, APP, "0001_initial", VENDOR_BRANCHES),
+        &[r#"CREATE TABLE "library_chosen""#],
+        &["library_other"],
+    );
+}
+
+const SETTING_PAGE: &str = r#"import swapper
+from django.conf import settings
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [migrations.swappable_dependency(settings.LIBRARY_PAGE_MODEL)]
+
+    operations = [
+        migrations.CreateModel(
+            name="Page",
+            fields=[("id", models.AutoField(primary_key=True))],
+            options={"swappable": swapper.swappable_setting("library", "Page")},
+        ),
+        migrations.CreateModel(
+            name="Site",
+            fields=[
+                ("id", models.AutoField(primary_key=True)),
+                ("root", models.ForeignKey(on_delete=models.CASCADE, to=settings.LIBRARY_PAGE_MODEL)),
+            ],
+        ),
+    ]
+"#;
+
+#[test]
+fn an_unset_swappable_setting_points_to_the_model_that_declares_it() {
+    let loader = MemoryLoader::default();
+    assert_rendered(
+        &sql(&loader, APP, "0001_initial", SETTING_PAGE),
+        &[
+            r#""root_id" integer NOT NULL"#,
+            r#"REFERENCES "library_page" ("id")"#,
+        ],
+        &["settings"],
+    );
+}

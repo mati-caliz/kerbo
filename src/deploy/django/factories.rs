@@ -7,7 +7,7 @@ use tree_sitter::{Node, Parser};
 
 use super::run_python::functions;
 use super::settings::Settings;
-use super::truth::truth;
+use super::truth::{Branch, taken_branch};
 use crate::deploy::python_calls::Call;
 use crate::language::Language;
 use crate::syntax::named_children;
@@ -24,8 +24,6 @@ const EXPRESSION_STATEMENT: &str = "expression_statement";
 const STRING: &str = "string";
 const RETURN: &str = "return_statement";
 const IF: &str = "if_statement";
-const ELIF: &str = "elif_clause";
-const ELSE: &str = "else_clause";
 const NAMED_PARAMETERS: &[&str] = &["typed_parameter", "default_parameter", "typed_default_parameter"];
 const SEARCHED_ROOTS: usize = 2;
 
@@ -178,11 +176,6 @@ fn is_docstring(statement: Node<'_>) -> bool {
             .all(|child| child.kind() == STRING)
 }
 
-enum Branch<'tree> {
-    Taken(Node<'tree>),
-    Skipped,
-}
-
 fn returned_call<'tree>(block: Node<'tree>, source: &[u8], settings: &Settings) -> Option<Node<'tree>> {
     for statement in named_children(block) {
         if statement.kind() == COMMENT || is_docstring(statement) {
@@ -199,24 +192,4 @@ fn returned_call<'tree>(block: Node<'tree>, source: &[u8], settings: &Settings) 
         }
     }
     None
-}
-
-fn taken_branch<'tree>(statement: Node<'tree>, source: &[u8], settings: &Settings) -> Option<Branch<'tree>> {
-    if truth(statement.child_by_field_name("condition")?, source, settings)? {
-        return statement.child_by_field_name("consequence").map(Branch::Taken);
-    }
-    let mut cursor = statement.walk();
-    let alternatives: Vec<Node<'tree>> = statement
-        .children_by_field_name("alternative", &mut cursor)
-        .collect();
-    for alternative in alternatives {
-        match alternative.kind() {
-            ELIF if truth(alternative.child_by_field_name("condition")?, source, settings)? => {
-                return alternative.child_by_field_name("consequence").map(Branch::Taken);
-            }
-            ELSE => return alternative.child_by_field_name("body").map(Branch::Taken),
-            _ => {}
-        }
-    }
-    Some(Branch::Skipped)
 }

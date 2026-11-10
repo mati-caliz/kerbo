@@ -1,4 +1,4 @@
-use super::fields::{NOW_DEFAULT, SANITIZED_NULL_DEFAULT};
+use super::fields::{SANITIZED_NULL_DEFAULT, automatic_now_default};
 use super::model::{Class, Field, FieldDefault, Flag};
 use super::names::quoted;
 use super::state::State;
@@ -199,7 +199,9 @@ pub fn effective_default(field: &Field) -> Option<String> {
         {
             Some(EMPTY_STRING.to_owned())
         }
-        FieldDefault::Unset if field.has(Flag::AutoNow) => Some(NOW_DEFAULT.to_owned()),
+        FieldDefault::Unset if field.has(Flag::AutoNow) => {
+            Some(automatic_now_default(field.class).to_owned())
+        }
         FieldDefault::Null | FieldDefault::Unset if field.class == Class::SanitizedJson => {
             Some(SANITIZED_NULL_DEFAULT.to_owned())
         }

@@ -63,7 +63,11 @@ impl<'tree> Constants<'tree> {
 }
 
 pub fn assignments<'tree>(body: Node<'tree>, source: &[u8]) -> Bindings<'tree> {
-    named_children(body)
+    statement_assignments(named_children(body), source)
+}
+
+pub fn statement_assignments<'tree>(statements: Vec<Node<'tree>>, source: &[u8]) -> Bindings<'tree> {
+    statements
         .into_iter()
         .filter_map(|statement| named_children(statement).into_iter().next())
         .filter(|assignment| assignment.kind() == ASSIGNMENT)

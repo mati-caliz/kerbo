@@ -218,6 +218,7 @@ pub struct Model {
     pub managed: bool,
     pub proxy: bool,
     pub swapped_for: Option<ModelKey>,
+    pub swappable_setting: Option<String>,
 }
 
 impl Model {
@@ -232,6 +233,7 @@ impl Model {
             managed: true,
             proxy: false,
             swapped_for: None,
+            swappable_setting: None,
         }
     }
 

@@ -37,7 +37,10 @@ pub fn is_package(directory: &Path) -> bool {
 pub fn source_root(app_directory: &Path) -> PathBuf {
     let mut current = app_directory;
     if !is_package(current) {
-        return current.parent().map(Path::to_path_buf).unwrap_or_default();
+        match current.parent() {
+            Some(parent) => current = parent,
+            None => return PathBuf::new(),
+        }
     }
     while is_package(current) {
         match current.parent() {
@@ -89,7 +92,8 @@ fn scanned(source_root: &Path) -> Vec<App> {
                 continue;
             }
             let package = is_package(&child);
-            let app = ((package || is_root) && child.join(MIGRATIONS_DIRECTORY).is_dir()).then(|| App {
+            let configured = package || is_root || child.join(CONFIG_MODULE).is_file();
+            let app = (configured && child.join(MIGRATIONS_DIRECTORY).is_dir()).then(|| App {
                 label: label(&child),
                 directory: child.clone(),
             });
@@ -158,6 +162,29 @@ mod tests {
         assert_eq!(root, project);
         assert_eq!(labels, ["cms", "cmsimages", "forms"]);
         assert_eq!(core_label, "cms");
+    }
+
+    #[test]
+    fn an_app_without_package_marker_inside_a_package_belongs_to_the_whole_project() {
+        let project = std::env::temp_dir().join(format!("kerbo-django-namespace-{}", std::process::id()));
+        let core = project.join("cms");
+        let tests = core.join("tests");
+        let streams = tests.join("streams");
+        package(&core);
+        package(&tests);
+        fs::create_dir_all(streams.join(MIGRATIONS_DIRECTORY)).expect("se crean las migraciones");
+        fs::write(
+            streams.join(CONFIG_MODULE),
+            "class Streams(AppConfig):
+    label = \"stream_tests\"
+",
+        )
+        .expect("se escribe la configuración");
+        let root = source_root(&streams);
+        let label = app_label(&root, &streams);
+        fs::remove_dir_all(&project).expect("se borra el proyecto de prueba");
+        assert_eq!(root, project);
+        assert_eq!(label, "stream_tests");
     }
 
     #[test]

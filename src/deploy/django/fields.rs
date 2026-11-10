@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
 use super::constants::Constants;
-use super::dependencies::swappable_default;
+use super::dependencies::swappable_reference;
 use super::model::{Class, Field, FieldDefault, Flag, ModelKey, Relation};
 use super::settings::Settings;
 use super::truth::truth;
@@ -9,7 +9,6 @@ use super::values::{boolean, quoted_literal, raw, sql_literal, text};
 use crate::deploy::python_calls::Call;
 
 const SELF_REFERENCE: &str = "self";
-const USER_MODEL_SETTING: &str = "AUTH_USER_MODEL";
 const APP_SEPARATOR: char = '.';
 const DB_VALUE_WRAPPER: &str = "Value";
 const ARRAY_ELEMENT: &str = "base_field";
@@ -46,6 +45,7 @@ const OBJECT_LITERAL: &str = "dictionary";
 pub const SANITIZED_NULL_DEFAULT: &str = "'null'";
 pub const NOW_DEFAULT: &str = "'2000-01-01 00:00:00+00:00'::timestamptz";
 const TODAY_DEFAULT: &str = "'2000-01-01'::date";
+const CLOCK_DEFAULT: &str = "'00:00:00'::time";
 const UUID_DEFAULT: &str = "'00000000000000000000000000000000'::uuid";
 const FLAG_KEYWORDS: &[(&str, Flag)] = &[
     ("null", Flag::Null),
@@ -323,6 +323,16 @@ fn placeholder_default(class: Class) -> Option<&'static str> {
     .find_map(|(placeholder_class, placeholder)| (placeholder_class == class).then_some(placeholder))
 }
 
+pub const fn automatic_now_default(class: Class) -> &'static str {
+    if matches!(class, Class::Date) {
+        TODAY_DEFAULT
+    } else if matches!(class, Class::Time) {
+        CLOCK_DEFAULT
+    } else {
+        NOW_DEFAULT
+    }
+}
+
 fn empty_json(node: Node<'_>, source: &[u8]) -> Option<&'static str> {
     let reference = raw(node, source);
     let is_empty_literal = node.named_child_count() == 0;
@@ -372,10 +382,7 @@ fn relation(call: &Call<'_>, class: Class, owner: Owner<'_>) -> Option<Relation>
 }
 
 pub fn model_reference(node: Node<'_>, source: &[u8], owner: Owner<'_>) -> Option<ModelKey> {
-    if raw(node, source).ends_with(USER_MODEL_SETTING) {
-        return Some(owner.settings.user_model.clone());
-    }
-    if let Some(swappable) = swappable_default(node, source) {
+    if let Some(swappable) = swappable_reference(node, source, owner.settings) {
         return Some(swappable);
     }
     let reference = text(node, source)?;

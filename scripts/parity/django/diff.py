@@ -12,7 +12,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 PARITY = pathlib.Path(os.environ.get("KERBO_PARITY", HERE.parent.parent.parent / ".parity"))
 COMMENT = "--"
 TRANSACTION = {"BEGIN", "COMMIT"}
-VOLATILE_DEFAULT = re.compile(r"'[^']*'::(timestamptz|date|uuid)")
+VOLATILE_DEFAULT = re.compile(r"'[^']*'::(timestamptz|date|time|uuid)")
 
 
 def statements(path):
