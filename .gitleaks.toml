@@ -1,0 +1,6 @@
+# Lo copia quality/sync.sh como .gitleaks.toml; no se edita en el repo. Las reglas son las de
+# gitleaks; una excepción puntual va en el .gitleaksignore del repo, con el motivo.
+title = "Estándar de calidad"
+
+[extend]
+useDefault = true
