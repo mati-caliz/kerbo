@@ -1,0 +1,3 @@
+[[ignore]]
+paths = ["android/**", "guava-gwt/src-super/**", "guava-gwt/test-super/**"]
+reason = "Qodana analiza los módulos del pom raíz: android/ es una copia de guava que no está entre ellos, y src-super y test-super son el código de reemplazo de GWT, que no son raíces de fuentes. Indexados, sus clases duplicadas cuentan como redefiniciones que no existen."

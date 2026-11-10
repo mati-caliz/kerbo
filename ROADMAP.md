@@ -1699,23 +1699,27 @@ Lo que la etapa 9 dejó porque pide saber más que lo que se ve en el archivo y 
 contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/java/`
 (`qodana.sh <repo> <inspección>`, `kerbo.sh`, `compare_all.py`), 2026-11-07.
 
-- `RedundantThrows` (`redundant-throws`): junit4 218 de 219, commons-lang 121 de 125, **ninguno de
-  más** (2026-11-10). Guava 15 de 28 con 6 de más (sin `android/`, que Qodana no analiza porque
-  sólo mira el proyecto Maven raíz). Falta medir spring-boot.
-  - Guava, de más: `AbstractIdleServiceTest` 158, 166, 185 y 188 (Qodana reporta sólo 2 en todo
-    `guava-tests`: probablemente resolvió mal ese módulo, hay que confirmarlo), `CacheLoader` 126 y
-    el `@BeforeExperiment` de `ExecutionListBenchmark` 223. Faltan: los "never thrown in any method
-    implementation" de interfaces y abstractos (`ByteProcessor`, `LineProcessor`, `LineBuffer`,
-    `SloppyTearDown`, `ClosingFuture` 1553, 1743 y 1949), `AbstractCache` 51, `ClassSanityTesterTest`
-    92, 141 y 452, `ExecutionSequencerTest` 391 y 430.
+- `RedundantThrows` (`redundant-throws`): junit4 218 de 219, commons-lang 121 de 125, Guava 15 de
+  28, **ninguno de más en los tres** (2026-11-10). Guava se mide sin `android/` ni los
+  `src-super`/`test-super` de GWT (`scripts/parity/java/configs/guava.kerbo.toml`, que `kerbo.sh`
+  copia al repo): Qodana sólo analiza los módulos del pom raíz. Falta medir spring-boot.
+  - Ya se calca el análisis global de IntelliJ (`RefMethodImpl.updateThrowsList`): lo que tira el
+    cuerpo de un método que redefine a otro, aunque sea de una clase anónima, sube al de arriba;
+    un `throws` que sólo se declara no sube; una excepción tirada saca de la cláusula a sus padres
+    y a sus hijas; y un `new X() { }` de una interfaz, que IntelliJ no resuelve, calla al método
+    (una clase sin constructor escrito sí se resuelve: junit4 lo confirma con `RunListener`).
+  - Guava, faltan: los "never thrown in any method implementation" de interfaces y abstractos
+    (`ByteProcessor`, `LineProcessor`, `LineBuffer`, `SloppyTearDown`, `ClosingFuture` 1553, 1743 y
+    1949), `AbstractCache` 51 (seguramente lo calla `caught_by_caller`: muchos llamadores atrapan
+    `ExecutionException` alrededor de un `get(key, callable)` de receptor desconocido),
+    `ClassSanityTesterTest` 92, 141 y 452, `ExecutionSequencerTest` 391 y 430.
   - Ya se siguen las referencias a método y las lambdas pasadas a un método genérico del proyecto
     cuyo `throws E` lo decide la interfaz funcional, y un `throws X` con `X` parámetro de tipo sin
     ligar (`Class<X>`) no se toma como una clase.
   - Ya se siguen: los genéricos de las clases del proyecto (`Opening<T> extends Source<T,
     IOException>` hace que el `get() throws E` heredado tire `IOException`; crudo, con otra cantidad
     de argumentos o tapado por un `<E>` del método, no liga), los casteos, paréntesis y elementos de
-    arreglo como receptor, los parámetros de la lambda de un `forEach` de colección o de mapa, y una
-    clase anónima que redefine un método no hereda su `throws`.
+    arreglo como receptor, y los parámetros de la lambda de un `forEach` de colección o de mapa.
   - Pendientes, por lo que falta: `FailableConsumerTest` 119 y 126 y `FailableTest` 656 siguen
     faltando aunque ya se sigue la referencia a método como argumento: falta ver qué la corta; el
     calificador
@@ -1725,6 +1729,10 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     `valueOf()` de un enum (el índice no sabe qué tipo es un enum). Un método del proyecto que
     redefine a uno de librería suma lo que tira el de arriba: calla de más. Un parámetro de tipo
     que se llama igual que una clase en algún lugar del archivo no se resuelve como clase.
+  - Pendientes del análisis global: `caught_by_caller` no existe en IntelliJ y puede estar callando
+    de menos; IntelliJ también sube las llamadas sin resolver de una clase anónima anidada y las de
+    un método que redefine sin `throws`; una clase local con nombre no cuenta como redefinición; una
+    interfaz del proyecto sin métodos no se reconoce como interfaz en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
   commons-lang 0 de 2, ninguno de más. Pendientes: los dos de commons-lang son un recurso que se
   crea con una clase del proyecto en un test y un `OutputStream` que vuelve de un método.

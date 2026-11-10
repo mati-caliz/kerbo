@@ -10,6 +10,7 @@ use crate::jvm::class_file::ClassFile;
 use crate::jvm::library::Library;
 use crate::jvm::method::Method;
 use crate::lint::java_calls::Arity;
+use crate::lint::java_owner::OwnerKind;
 use crate::lint::java_throws::{CallRoot, CallStep, ThrowOrigin};
 
 const CONSTRUCTOR_NAME: &str = "<init>";
@@ -18,6 +19,7 @@ const WILDCARD: &str = "*";
 const QUALIFIER_SEPARATOR: char = '.';
 const DESCRIPTOR_CLOSE: char = ')';
 const MAX_RECEIVERS: usize = 64;
+const NO_ARGUMENTS: usize = 0;
 
 // Lo que una firma candidata dice de una llamada. Cada elemento de `carried` es un `throws E` que
 // depende de lo que tiren las lambdas o referencias a método pasadas en esas posiciones.
@@ -93,6 +95,9 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
                 }
             }
             ThrowOrigin::Call(root, steps) => self.call_thrown(summary, root, steps),
+            ThrowOrigin::Anonymous(written) => {
+                (!self.lacks_constructor(&self.named(summary, written))).then(Vec::new)
+            }
         }
     }
 
@@ -246,6 +251,20 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
                     .extend(library_members(&file, current, wanted, &mut collected.overridden));
                 Some(library_parents(&file, current))
             }
+        }
+    }
+
+    // IntelliJ no le encuentra constructor al `new X() { }` de una interfaz: en el proyecto se nota
+    // por sus métodos, y en una librería porque el `.class` no trae `<init>`.
+    fn lacks_constructor(&self, class: &Resolved) -> bool {
+        match class {
+            Resolved::Project(owner) => self
+                .types
+                .declarations_of(owner)
+                .any(|(_, declaration)| declaration.owner.kind == OwnerKind::Interface),
+            Resolved::Library(_) => self
+                .constructors(class, Some(NO_ARGUMENTS))
+                .is_none_or(|found| found.is_empty()),
         }
     }
 

@@ -4,7 +4,7 @@ use std::ptr;
 use super::java::{Declaration, JavaSummary, Position, lint_at};
 use super::java_nullness::Resolved;
 use super::java_project::IndexedSummary;
-use super::java_throw_lookup::{ThrowLookup, declared_clauses};
+use super::java_throw_lookup::ThrowLookup;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::Body;
 use crate::lint::java_owner::OwnerKind;
@@ -26,8 +26,14 @@ const SERIALIZATION_METHODS: [&str; 5] = [
 // Lo que hace falta saber del resto del proyecto: quién más declara un `throws` con ese nombre de
 // método, y qué llamadas con ese nombre están adentro de un `try`.
 pub struct ThrowsFacts<'summary> {
-    declaring: HashMap<&'summary str, Vec<(&'summary JavaSummary, &'summary Declaration)>>,
+    declaring: HashMap<&'summary str, Vec<Declaring<'summary>>>,
     caught: HashMap<&'summary str, Vec<Caught<'summary>>>,
+}
+
+struct Declaring<'summary> {
+    summary: &'summary JavaSummary,
+    declaration: &'summary Declaration,
+    method: &'summary MethodThrows,
 }
 
 struct Caught<'summary> {
@@ -38,19 +44,23 @@ struct Caught<'summary> {
 
 impl<'summary> ThrowsFacts<'summary> {
     pub fn new(files: &[IndexedSummary<'summary>]) -> Self {
-        let mut declaring: HashMap<&str, Vec<(&JavaSummary, &Declaration)>> = HashMap::new();
+        let mut declaring: HashMap<&str, Vec<Declaring<'_>>> = HashMap::new();
         let mut caught: HashMap<&str, Vec<Caught<'_>>> = HashMap::new();
         for file in files {
             let summary = file.summary;
-            for declaration in summary
+            for (method, declaration) in summary
                 .method_throws
                 .iter()
-                .filter_map(|method| declaration_at(summary, method))
+                .filter_map(|method| Some((method, declaration_at(summary, method)?)))
             {
                 declaring
                     .entry(declaration.name.as_str())
                     .or_default()
-                    .push((summary, declaration));
+                    .push(Declaring {
+                        summary,
+                        declaration,
+                        method,
+                    });
             }
             for call in &summary.caught_calls {
                 caught
@@ -101,12 +111,9 @@ struct Checker<'check, 'query, 'summary> {
     summary: &'check JavaSummary,
 }
 
-// Lo que sale de un punto del cuerpo. `widened` es una variable relanzada: puede llevar cualquier
-// subtipo de su tipo declarado.
 struct Escaping<'point> {
     exception: Resolved,
     caught: &'point [String],
-    widened: bool,
 }
 
 impl Checker<'_, '_, '_> {
@@ -140,11 +147,9 @@ impl Checker<'_, '_, '_> {
         let mut escaping = Vec::new();
         for point in points {
             let thrown = self.lookup.thrown_by(self.summary, &point.origin)?;
-            let widened = matches!(point.origin, ThrowOrigin::Rethrown(_));
             escaping.extend(thrown.into_iter().map(|exception| Escaping {
                 exception,
                 caught: point.caught.as_slice(),
-                widened,
             }));
         }
         Some(escaping)
@@ -160,7 +165,7 @@ impl Checker<'_, '_, '_> {
         self.is_checked(&declared)
             && declared != Resolved::Library(REMOTE_EXCEPTION.to_owned())
             && !escaping.iter().any(|point| self.escapes_as(point, &declared))
-            && !self.declared_by_overrider(&declared, declaration)
+            && !self.thrown_by_overrider(&declared, declaration)
             && !self.caught_by_caller(&declared, declaration)
     }
 
@@ -181,6 +186,8 @@ impl Checker<'_, '_, '_> {
         })
     }
 
+    // Como el análisis global de IntelliJ, una excepción tirada saca de la cláusula tanto a los
+    // tipos de los que hereda como a los que heredan de ella.
     fn escapes_as(&self, point: &Escaping<'_>, declared: &Resolved) -> bool {
         let exception = &point.exception;
         if self.is_known_unchecked(exception) {
@@ -192,13 +199,13 @@ impl Checker<'_, '_, '_> {
         });
         !handled
             && (self.lookup.is_subclass(exception, declared) != Some(false)
-                || point.widened && self.lookup.is_subclass(declared, exception) != Some(false))
+                || self.lookup.is_subclass(declared, exception) != Some(false))
     }
 
-    // Un método que lo redefine y declara ese tipo o uno más chico justifica el `throws`: quien
-    // llama por la clase de arriba tiene que poder atraparlo. IntelliJ los busca en el índice de
-    // nombres de métodos, que no tiene los de clases anónimas ni locales.
-    fn declared_by_overrider(&self, declared: &Resolved, declaration: &Declaration) -> bool {
+    // Lo que tira el cuerpo de un método que lo redefine, aunque sea de una clase anónima, sube a
+    // éste: quien llama por la clase de arriba tiene que poder atraparlo. Un cuerpo que tira algo
+    // chequeado lo declara, así que alcanza con mirar los que tienen `throws`.
+    fn thrown_by_overrider(&self, declared: &Resolved, declaration: &Declaration) -> bool {
         if declaration.owner.kind == OwnerKind::Local || declaration.is_constructor {
             return false;
         }
@@ -207,26 +214,40 @@ impl Checker<'_, '_, '_> {
             .get(declaration.name.as_str())
             .into_iter()
             .flatten()
-            .filter(|(_, other)| {
-                !ptr::eq(*other, declaration)
-                    && other.parameters.len() == declaration.parameters.len()
-                    && self.may_override(other, declaration)
+            .filter(|overrider| {
+                !ptr::eq(overrider.declaration, declaration)
+                    && overrider.declaration.parameters.len() == declaration.parameters.len()
+                    && self.may_override(overrider, declaration)
             })
-            .any(|(summary, other)| {
-                declared_clauses(summary, other).any(|written| {
-                    let thrown = self.lookup.named(summary, written);
-                    self.lookup.is_subclass(&thrown, declared) != Some(false)
-                })
-            })
+            .any(|overrider| self.throws_from_body(overrider, declared))
     }
 
-    fn may_override(&self, other: &Declaration, declaration: &Declaration) -> bool {
-        other.owner.kind != OwnerKind::Local
-            && self.lookup.is_subclass(
-                &Resolved::Project(other.owner.name.clone()),
-                &Resolved::Project(declaration.owner.name.clone()),
-            ) != Some(false)
-            && other.owner.name != declaration.owner.name
+    fn throws_from_body(&self, overrider: &Declaring<'_>, declared: &Resolved) -> bool {
+        let checker = Checker {
+            lookup: self.lookup,
+            facts: self.facts,
+            summary: overrider.summary,
+        };
+        checker
+            .escaping(&overrider.method.points)
+            .is_none_or(|escaping| escaping.iter().any(|point| checker.escapes_as(point, declared)))
+    }
+
+    // Una clase anónima redefine los métodos del tipo que nombra su `new`; una local con nombre,
+    // que no se ve desde afuera, no cuenta.
+    fn may_override(&self, overrider: &Declaring<'_>, declaration: &Declaration) -> bool {
+        let owner = &overrider.declaration.owner;
+        let parent = Resolved::Project(declaration.owner.name.clone());
+        if owner.kind == OwnerKind::Local {
+            let anonymous_base =
+                (!owner.name.is_empty()).then(|| self.lookup.named(overrider.summary, &owner.name));
+            return anonymous_base.is_some_and(|base| self.lookup.is_subclass(&base, &parent) != Some(false));
+        }
+        owner.name != declaration.owner.name
+            && self
+                .lookup
+                .is_subclass(&Resolved::Project(owner.name.clone()), &parent)
+                != Some(false)
     }
 
     fn caught_by_caller(&self, declared: &Resolved, declaration: &Declaration) -> bool {

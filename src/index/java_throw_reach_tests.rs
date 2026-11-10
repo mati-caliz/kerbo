@@ -49,7 +49,58 @@ class Anonymous {
         };
     }
 }
+
+class Declares {
+    void run() throws IOException {
+    }
+}
+
+class OnlyDeclares extends Declares {
+    void run() throws IOException {
+    }
+}
 "#;
+
+const ANONYMOUS_CREATIONS: &str = r"package app;
+
+import java.io.IOException;
+
+class Plain {
+}
+
+class Made {
+    Made() {
+    }
+}
+
+interface Task {
+    void go();
+}
+
+class Spawns {
+    void plain() throws IOException {
+        new Plain() { };
+    }
+
+    void made() throws IOException {
+        new Made() { };
+    }
+
+    void interfaced() throws IOException {
+        new Runnable() {
+            public void run() {
+            }
+        };
+    }
+
+    void tasked() throws IOException {
+        new Task() {
+            public void go() {
+            }
+        };
+    }
+}
+";
 
 const LAMBDAS: &str = r"package app;
 
@@ -128,9 +179,21 @@ fn casts_parentheses_and_array_elements_are_followed_by_their_types() {
 }
 
 #[test]
-fn an_anonymous_overrider_does_not_keep_the_throws_of_its_parent() {
+fn only_what_the_body_of_an_overrider_throws_keeps_the_throws_of_its_parent() {
     let library = Library::load(&[]).with_jdk(fixture_jdk());
-    assert_eq!(redundant_in(OVERRIDERS, &library), ["18:23 IOException"]);
+    assert_eq!(
+        redundant_in(OVERRIDERS, &library),
+        ["31:23 IOException", "36:23 IOException"]
+    );
+}
+
+#[test]
+fn an_anonymous_class_of_an_interface_keeps_the_method_quiet() {
+    let library = Library::load(&[]).with_jdk(fixture_jdk());
+    assert_eq!(
+        redundant_in(ANONYMOUS_CREATIONS, &library),
+        ["18:25 IOException", "22:24 IOException"]
+    );
 }
 
 #[test]

@@ -6,7 +6,7 @@ use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, text};
 use super::java_call_roots::{root_of, with_arguments};
 use super::java_calls::TYPE_DECLARATIONS;
 use super::java_chains::argument_count;
-use super::java_constructor_throws::{constructor_points, explicit_origin};
+use super::java_constructor_throws::{NO_ARGUMENTS, constructor_points, explicit_origin};
 use super::java_functional_arguments::argument_kinds;
 use super::java_receivers::{Variables, enclosing_types, simple_type_name};
 use crate::syntax::{descendants, named_children, one_based};
@@ -71,6 +71,8 @@ pub enum ArgumentKind {
 // Lo que en un cuerpo puede tirar una excepción chequeada. `Unknown` es lo que no se sabe sin
 // compilar: como IntelliJ con una llamada sin resolver, alcanza para no opinar sobre el método.
 // `Rethrown` es un `throw` de una variable, que puede llevar cualquier subtipo del suyo.
+// `Anonymous` es un `new X() { }` sin argumentos: no tira nada, pero IntelliJ no le resuelve el
+// constructor si `X` es una interfaz, y entonces no opina sobre el método.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ThrowOrigin {
     Unknown,
@@ -79,6 +81,7 @@ pub enum ThrowOrigin {
     Creation(String, usize),
     Close(String),
     Call(CallRoot, Vec<CallStep>),
+    Anonymous(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,11 +108,13 @@ pub fn method_throws(method: Node<'_>, source: &[u8], variables: &Variables) -> 
         .child_by_field_name(BODY_FIELD)
         .map(|body| {
             let scoped = with_catch_parameters(body, source, variables);
-            match method.kind() {
+            let mut points = match method.kind() {
                 METHOD => throw_points(body, source, &scoped),
                 CONSTRUCTOR => constructor_points(method, body, source, &scoped),
                 _ => Vec::new(),
-            }
+            };
+            points.extend(anonymous_points(body, source));
+            points
         })
         .unwrap_or_default();
     Some(MethodThrows {
@@ -196,6 +201,39 @@ pub(super) fn throw_points(body: Node<'_>, source: &[u8], variables: &Variables)
         );
     }
     points
+}
+
+// IntelliJ junta lo que tira un método recorriendo también las clases anónimas y locales de
+// adentro, pero no las lambdas.
+fn anonymous_points(body: Node<'_>, source: &[u8]) -> Vec<ThrowPoint> {
+    let mut pending = vec![body];
+    let mut points = Vec::new();
+    while let Some(node) = pending.pop() {
+        if node.kind() == LAMBDA {
+            continue;
+        }
+        if let Some(base) = anonymous_base(node, source) {
+            points.push(ThrowPoint {
+                origin: ThrowOrigin::Anonymous(base),
+                caught: Vec::new(),
+            });
+        }
+        pending.extend(named_children(node));
+    }
+    points
+}
+
+fn anonymous_base(node: Node<'_>, source: &[u8]) -> Option<String> {
+    let is_anonymous = node.kind() == CREATION
+        && argument_count(node) == NO_ARGUMENTS
+        && named_children(node)
+            .iter()
+            .any(|child| child.kind() == CLASS_BODY);
+    if !is_anonymous {
+        return None;
+    }
+    node.child_by_field_name(TYPE_FIELD)
+        .map(|written| written_type(text(written, source)))
 }
 
 // El bloque y los recursos están cubiertos por los `catch` de ese `try`; los `catch` y el `finally`,

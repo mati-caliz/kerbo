@@ -6,7 +6,8 @@
 #   scripts/parity/java/kerbo.sh junit4 hamcrest-core-1.3.jar
 #
 # Los jars de cada repo del corpus están en classpaths.txt. Con "*.jar" entra el propio jar del repo,
-# que tapa a sus clases y ensucia la comparación.
+# que tapa a sus clases y ensucia la comparación. Si existe configs/<repo>.kerbo.toml, se copia como
+# kerbo.toml del repo, para dejar afuera lo que Qodana no analiza.
 set -euo pipefail
 
 readonly CPUS=4
@@ -22,6 +23,10 @@ target="$(basename "$crate")"
 parity="${KERBO_PARITY:-$(cd "$here/../../.." && pwd)/.parity}"
 image="$(docker images --format '{{.Repository}}:{{.Tag}}' quality-rust | head -1)"
 mkdir -p "$parity/qodana/$repo_name"
+repo_config="$here/configs/$repo_name.kerbo.toml"
+if [[ -f "$repo_config" ]]; then
+  cp "$repo_config" "$parity/corpus/$repo_name/kerbo.toml"
+fi
 MSYS_NO_PATHCONV=1 docker run --rm -m "$MEMORY_LIMIT" --cpus="$CPUS" -v "$crate:/src:ro" -w /src \
   -v rust-quality-cache:/cache -v "$JDK_VOLUME:/jdk:ro" -v "qodana-cache-$repo_name:/m2:ro" \
   -v "$(cd "$parity/corpus/$repo_name" && pwd -W):/c:ro" -v "$(cd "$parity/qodana/$repo_name" && pwd -W):/o" \

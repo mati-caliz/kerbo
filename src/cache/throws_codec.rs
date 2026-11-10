@@ -10,6 +10,7 @@ const ORIGIN_CREATION: u64 = 2;
 const ORIGIN_CLOSE: u64 = 3;
 const ORIGIN_CALL: u64 = 4;
 const ORIGIN_RETHROWN: u64 = 5;
+const ORIGIN_ANONYMOUS: u64 = 6;
 const ARGUMENT_UNKNOWN: u64 = 0;
 const ARGUMENT_TEXT: u64 = 1;
 const ARGUMENT_CHARSET: u64 = 2;
@@ -95,6 +96,10 @@ fn write_origin(writer: &mut Writer, origin: &ThrowOrigin) {
             writer.number(ORIGIN_RETHROWN);
             writer.text(name);
         }
+        ThrowOrigin::Anonymous(name) => {
+            writer.number(ORIGIN_ANONYMOUS);
+            writer.text(name);
+        }
         ThrowOrigin::Call(root, steps) => {
             writer.number(ORIGIN_CALL);
             write_root(writer, root);
@@ -114,6 +119,7 @@ fn read_origin(reader: &mut Reader<'_>) -> Result<ThrowOrigin, Corrupt> {
         ORIGIN_CREATION => Ok(ThrowOrigin::Creation(reader.text()?, reader.size()?)),
         ORIGIN_CLOSE => Ok(ThrowOrigin::Close(reader.text()?)),
         ORIGIN_RETHROWN => Ok(ThrowOrigin::Rethrown(reader.text()?)),
+        ORIGIN_ANONYMOUS => Ok(ThrowOrigin::Anonymous(reader.text()?)),
         ORIGIN_CALL => Ok(ThrowOrigin::Call(
             read_root(reader)?,
             reader.list(|reader| {
