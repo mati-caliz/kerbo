@@ -6,6 +6,8 @@ use tree_sitter::Node;
 use super::java::{NAME_FIELD, text};
 use crate::syntax::{descendants, named_children};
 
+pub use super::java_static_imports::StaticImports;
+
 const TYPE_DECLARATIONS: &[&str] = &[
     "class_declaration",
     "enum_declaration",
@@ -41,9 +43,6 @@ const INFERRED: &str = "var";
 const LAMBDA: &str = "lambda_expression";
 const INFERRED_PARAMETERS: &str = "inferred_parameters";
 const PARAMETERS_FIELD: &str = "parameters";
-const IMPORT: &str = "import_declaration";
-const ASTERISK: &str = "asterisk";
-const STATIC: &str = "static ";
 const GENERIC_OPEN: char = '<';
 const QUALIFIER_SEPARATOR: char = '.';
 const ARRAY_OPEN: char = '[';
@@ -259,62 +258,6 @@ pub fn supertype_nodes(declaration: Node<'_>) -> Vec<Node<'_>> {
             })
         })
         .collect()
-}
-
-// Un método importado con `import static` (o con un comodín) se llama sin calificar desde afuera de
-// su clase: esas llamadas no se sabe adónde van.
-pub struct StaticImports {
-    names: Vec<String>,
-    any: bool,
-}
-
-impl StaticImports {
-    pub fn of(top_level: Node<'_>, source: &[u8]) -> Self {
-        let mut imports = Self {
-            names: Vec::new(),
-            any: false,
-        };
-        let declarations = top_level.parent().map(named_children).unwrap_or_default();
-        for import in declarations
-            .into_iter()
-            .filter(|node| node.kind() == IMPORT && text(*node, source).contains(STATIC))
-        {
-            let children = named_children(import);
-            if children.iter().any(|child| child.kind() == ASTERISK) {
-                imports.any = true;
-            }
-            imports.names.extend(
-                children
-                    .iter()
-                    .filter(|child| child.kind() != ASTERISK)
-                    .map(|path| {
-                        let written = text(*path, source);
-                        written
-                            .rsplit(QUALIFIER_SEPARATOR)
-                            .next()
-                            .unwrap_or(written)
-                            .to_owned()
-                    }),
-            );
-        }
-        imports
-    }
-
-    pub fn receiver(&self, invocation: Node<'_>, source: &[u8], variables: &Variables) -> Receiver {
-        let resolved = receiver_of(invocation, source, variables);
-        if self.imports(invocation, source) && matches!(resolved, Receiver::Scope(_)) {
-            Receiver::Unknown
-        } else {
-            resolved
-        }
-    }
-
-    pub fn imports(&self, invocation: Node<'_>, source: &[u8]) -> bool {
-        self.any
-            || invocation
-                .child_by_field_name(NAME_FIELD)
-                .is_some_and(|name| self.names.iter().any(|known| known == text(name, source)))
-    }
 }
 
 // Un receptor escrito con el paquete (`org.junit.Assume.assumeTrue(...)`): una cadena de nombres que

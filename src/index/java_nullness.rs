@@ -66,6 +66,16 @@ impl<'summary> ProjectTypes<'summary> {
         self.declared.contains_key(name)
     }
 
+    // El tipo del proyecto escrito con su paquete (`com.example.Strings`), por su nombre simple.
+    pub fn qualified(&self, path: &str) -> Option<String> {
+        let (package, name) = path.rsplit_once(QUALIFIER_SEPARATOR)?;
+        self.declared
+            .get(name)?
+            .iter()
+            .any(|(summary, _)| summary.package == package)
+            .then(|| name.to_owned())
+    }
+
     // Los métodos que declara un tipo del proyecto, con el archivo donde están.
     pub fn declarations_of<'query>(
         &'query self,
@@ -304,7 +314,9 @@ fn supertypes_of(
 // que esté en la librería, o uno de `java.lang`.
 pub fn resolve(types: &ProjectTypes<'_>, library: &Library, summary: &JavaSummary, simple: &str) -> Resolved {
     if simple.contains(QUALIFIER_SEPARATOR) {
-        return Resolved::Library(simple.to_owned());
+        return types
+            .qualified(simple)
+            .map_or_else(|| Resolved::Library(simple.to_owned()), Resolved::Project);
     }
     let in_project = types.declared.contains_key(simple);
     if let Some(imported) = summary

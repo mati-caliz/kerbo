@@ -54,6 +54,30 @@ class Uses {
 }
 ";
 
+const TEXTS: &str = r"package app;
+
+final class Texts {
+    static String repeat(String text, int count) {
+        return text;
+    }
+}
+";
+
+const IMPORTER: &str = r"package app.uses;
+
+import static app.Texts.repeat;
+
+final class Callers {
+    void calls() {
+        repeat(null, 2);
+        trim(null);
+    }
+
+    void trim(String text) {
+    }
+}
+";
+
 fn null_arguments(sources: &[&str]) -> Vec<String> {
     let summaries: Vec<_> = sources.iter().map(|source| summary_of(source)).collect();
     let files: Vec<IndexedSummary<'_>> = summaries
@@ -86,4 +110,10 @@ fn null_marked_parameters_are_non_null_unless_they_admit_null() {
 #[test]
 fn without_null_marked_unannotated_parameters_say_nothing() {
     assert_eq!(null_arguments(&[MARKED]), Vec::<String>::new());
+}
+
+// La llamada sin calificar a un método traído con `import static` va a la clase del import.
+#[test]
+fn null_passed_to_a_statically_imported_method_reaches_its_class() {
+    assert_eq!(null_arguments(&[PACKAGE_INFO, TEXTS, IMPORTER]), ["7:16 text"]);
 }

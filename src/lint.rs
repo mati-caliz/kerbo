@@ -41,6 +41,7 @@ mod java_returns;
 mod java_same_value;
 mod java_shapes;
 mod java_spacing;
+pub mod java_static_imports;
 mod java_style;
 mod java_switch;
 pub mod java_taint;

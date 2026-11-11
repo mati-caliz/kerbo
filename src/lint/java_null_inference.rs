@@ -281,7 +281,7 @@ pub(super) fn call_target(
         INVOCATION => Some(CallTarget {
             name: text(call.child_by_field_name(NAME_FIELD)?, source).to_owned(),
             is_constructor: false,
-            receiver: imported.receiver(call, source, variables),
+            receiver: imported.receiver_through_class(call, source, variables),
         }),
         CREATION
             if !named_children(call)
