@@ -11,6 +11,7 @@ pub mod java_constants;
 mod java_constructor_throws;
 mod java_curly;
 mod java_design;
+pub mod java_exact_receivers;
 pub mod java_fields;
 mod java_final_fields;
 mod java_flow;

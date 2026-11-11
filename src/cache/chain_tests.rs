@@ -107,6 +107,8 @@ fn null_arguments_survive_the_round_trip() {
         index: 0,
         line: 35,
         column: 88,
+        cast: Some("boolean[][]".to_owned()),
+        exact: false,
     };
     let mut writer = Writer::default();
     write_null_argument(&mut writer, &argument);

@@ -90,8 +90,74 @@ class Uses {
 }
 "#;
 
+const OVERLOADS: &str = r"package app;
+
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+class Counter {
+    private int value;
+
+    Counter(int value) {
+        this.value = value;
+    }
+
+    Counter(Number value) {
+        this.value = value.intValue();
+    }
+
+    Counter(String value) {
+        this.value = Integer.parseInt(value);
+    }
+
+    void setValue(int value) {
+        this.value = value;
+    }
+
+    void setValue(Number value) {
+        this.value = value.intValue();
+    }
+
+    int compareTo(Counter other) {
+        return Integer.compare(this.value, other.value);
+    }
+
+    static int total(int[]... groups) {
+        int total = 0;
+        for (int[] group : groups) {
+            total += group.length;
+        }
+        return total;
+    }
+}
+
+class Uses {
+    void calls(Counter shared, Future<String> pending) throws Exception {
+        final Counter counter = new Counter(0);
+        new Counter((Number) null);
+        new Counter((String) null);
+        counter.setValue(null);
+        counter.compareTo(null);
+        shared.compareTo(null);
+        Counter.total((int[][]) null);
+        pending.get(1, null);
+        pending.get(1, TimeUnit.SECONDS);
+    }
+
+    void other() {
+        Counter counter = new Counter(1);
+        counter = new Counter(2);
+        counter.compareTo(null);
+    }
+}
+";
+
 fn findings(rule: &str) -> Vec<String> {
-    let summary = summary_of(UTILITIES);
+    findings_in(UTILITIES, rule)
+}
+
+fn findings_in(source: &str, rule: &str) -> Vec<String> {
+    let summary = summary_of(source);
     let files = [IndexedSummary {
         summary: &summary,
         in_tests: false,
@@ -120,5 +186,21 @@ fn null_passed_to_a_parameter_the_method_dereferences_is_reported() {
     assert_eq!(
         findings("null-argument"),
         ["74:23 text", "75:32 text", "76:35 texts"]
+    );
+}
+
+// Una sobrecarga con un primitivo no recibe el `null` y un casteo elige la del tipo; con un
+// receptor recién creado, IntelliJ resuelve el método aunque se pueda redefinir.
+#[test]
+fn null_reaches_only_the_overloads_that_can_receive_it() {
+    assert_eq!(
+        findings_in(OVERLOADS, "null-argument"),
+        [
+            "45:30 value",
+            "47:26 value",
+            "48:27 other",
+            "50:33 groups",
+            "51:24 unit"
+        ]
     );
 }

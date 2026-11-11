@@ -14,9 +14,11 @@ use crate::lint::java_generics::{Generics, generics_of};
 use crate::lint::java_inference::{dereferenced_first, unconditionally_dereferenced};
 use crate::lint::java_lambda_targets::{LambdaTargets, lambda_targets_of};
 use crate::lint::java_null_flow::NullFlow;
-use crate::lint::java_null_inference::{NullArgument, is_overridable, null_arguments, returns_null};
+use crate::lint::java_null_inference::{
+    NullArgument, accepts_null, is_overridable, null_arguments_in, parameter_type_name, returns_null,
+};
 use crate::lint::java_owner::{Owner, annotation_names};
-use crate::lint::java_receivers::{Receiver, StaticImports, variable_types};
+use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
 use crate::lint::java_throws::MethodThrows;
 use crate::lint::taint::TaintMethod;
@@ -53,6 +55,8 @@ pub struct Parameter {
     pub declares_nullness: bool,
     pub dereferenced: Dereferenced,
     pub reading: Reading,
+    pub type_name: String,
+    pub accepts_null: bool,
 }
 
 // Si el cuerpo del método nombra al parámetro (un método sin cuerpo o un record, siempre).
@@ -286,15 +290,6 @@ fn read_names(callable: &Callable<'_>, source: &[u8]) -> HashSet<String> {
         .collect()
 }
 
-fn null_arguments_in(top_level: Node<'_>, nodes: &[Node<'_>], source: &[u8]) -> Vec<NullArgument> {
-    let variables = variable_types(nodes, source);
-    let imported = StaticImports::of(top_level, source);
-    nodes
-        .iter()
-        .flat_map(|node| null_arguments(*node, source, &variables, &imported))
-        .collect()
-}
-
 fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declaration {
     let read = read_names(&callable, source);
     let record = callable
@@ -351,6 +346,8 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
                     } else {
                         Reading::Unread
                     },
+                    type_name: parameter_type_name(*parameter, source),
+                    accepts_null: accepts_null(*parameter),
                 }
             })
             .collect(),

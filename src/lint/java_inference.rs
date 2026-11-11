@@ -7,7 +7,11 @@ use crate::syntax::named_children;
 
 const IDENTIFIER: &str = "identifier";
 const OBJECT_FIELD: &str = "object";
-const DEREFERENCES: &[&str] = &["method_invocation", "field_access"];
+const INVOCATION: &str = "method_invocation";
+const FIELD_ACCESS: &str = "field_access";
+const DEREFERENCES: &[&str] = &[INVOCATION, FIELD_ACCESS];
+const FIELD_FIELD: &str = "field";
+const NAME_FIELD: &str = "name";
 const ARRAY_ACCESS: &str = "array_access";
 const ARRAY_FIELD: &str = "array";
 const CONDITION_FIELD: &str = "condition";
@@ -84,7 +88,11 @@ fn visit_statement(statement: Node<'_>, source: &[u8], found: &mut HashSet<Strin
             .filter_map(|field| statement.child_by_field_name(field))
             .collect()
     } else if kind == ENHANCED_FOR {
-        statement.child_by_field_name(VALUE_FIELD).into_iter().collect()
+        let iterated = statement.child_by_field_name(VALUE_FIELD);
+        if let Some(name) = iterated.filter(|iterated| iterated.kind() == IDENTIFIER) {
+            found.insert(text(name, source).to_owned());
+        }
+        iterated.into_iter().collect()
     } else if kind == SYNCHRONIZED {
         statement.child_by_field_name(LOCK_FIELD).into_iter().collect()
     } else if TRY_STATEMENTS.contains(&kind) {
@@ -154,7 +162,7 @@ pub fn dereferenced_first(body: Node<'_>, source: &[u8]) -> HashSet<String> {
     let mut found = HashSet::new();
     let mut pending = vec![body];
     while let Some(node) = pending.pop() {
-        if node.kind() == IDENTIFIER {
+        if node.kind() == IDENTIFIER && !is_member_name(node) {
             let name = text(node, source);
             if seen.insert(name.to_owned()) && is_dereference_target(node) {
                 found.insert(name.to_owned());
@@ -166,6 +174,20 @@ pub fn dereferenced_first(body: Node<'_>, source: &[u8]) -> HashSet<String> {
         pending.extend(children);
     }
     found
+}
+
+// El nombre de un campo o de un método (`this.valor`, `x.valor()`), que no es una variable.
+fn is_member_name(identifier: Node<'_>) -> bool {
+    identifier.parent().is_some_and(|parent| {
+        let field = match parent.kind() {
+            FIELD_ACCESS => FIELD_FIELD,
+            INVOCATION => NAME_FIELD,
+            _ => return false,
+        };
+        parent
+            .child_by_field_name(field)
+            .is_some_and(|member| member.id() == identifier.id())
+    })
 }
 
 fn is_dereference_target(identifier: Node<'_>) -> bool {

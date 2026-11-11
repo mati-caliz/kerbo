@@ -10,6 +10,8 @@ pub fn write_null_argument(writer: &mut Writer, argument: &NullArgument) {
     writer.size(argument.index);
     writer.size(argument.line);
     writer.size(argument.column);
+    writer.list(argument.cast.as_slice(), |writer, cast| writer.text(cast));
+    writer.number(u64::from(argument.exact));
 }
 
 pub fn read_null_argument(reader: &mut Reader<'_>) -> Result<NullArgument, Corrupt> {
@@ -21,5 +23,7 @@ pub fn read_null_argument(reader: &mut Reader<'_>) -> Result<NullArgument, Corru
         index: reader.size()?,
         line: reader.size()?,
         column: reader.size()?,
+        cast: reader.list(Reader::text)?.into_iter().next(),
+        exact: reader.number()? != 0,
     })
 }

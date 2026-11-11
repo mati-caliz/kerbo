@@ -1745,12 +1745,15 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   commons-lang 2 de 2, ninguno de más. Calca los `new` (clases del proyecto y anónimas) y descarta
   el recurso que recibe otro `AutoCloseable` como argumento o receptor. Pendiente: medir con Qodana
   en guava y spring-boot, que no tienen corrida de esta regla.
-- `DataFlowIssue` (`data-flow-issue` y `null-argument`): commons-lang 39 de 141 sin ninguno de más;
+- `DataFlowIssue` (`data-flow-issue` y `null-argument`): commons-lang 72 de 141 sin ninguno de más
+  (los 37 `null` pasados a un parámetro que el método desreferencia salen todos: sobrecargas con
+  primitivos o elegidas por casteo, receptor recién creado en el mismo método y `Future.get`);
   junit4 1 de 19 con uno de más (`f.getParentFile().getParentFile()` en un test, que IntelliJ no
   marca aunque `getParentFile` está en la tabla de nulos del JDK). Lo que falta es en su mayoría de
   otras formas de la inspección que kerbo no calca: "The call to X always fails, according to its
   method contracts" (contratos `null -> fail` inferidos, 47 entre los dos), "Variable is already
-  assigned to this value" (20) y el resto del flujo entre métodos.
+  assigned to this value" (20) y el resto del flujo entre métodos. Las sobrecargas se comparan por
+  nombre simple sin dimensiones (`int` y `int[]` se confunden).
 - `Map.get` y lo que devuelve una lambda en el flujo de nulos: en junit4 y commons-lang Qodana no
   marca ninguno; queda para medir en un repo que los use (Spring, Micrometer).
 - En JS/TS, los tipos del compilador de TypeScript para reconocer conexiones y objetos del pedido

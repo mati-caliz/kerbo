@@ -66,6 +66,8 @@ pub(super) fn write_declaration(writer: &mut Writer, declaration: &Declaration) 
             Dereferenced::AlwaysFirst => DEREFERENCED_FIRST,
         });
         write_flag(writer, parameter.reading == Reading::Read);
+        writer.text(&parameter.type_name);
+        write_flag(writer, parameter.accepts_null);
     });
     writer.list(&declaration.annotations, |writer, name| writer.text(name));
     write_owner(writer, &declaration.owner);
@@ -138,6 +140,8 @@ pub(super) fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, C
                 } else {
                     Reading::Unread
                 },
+                type_name: reader.text()?,
+                accepts_null: read_flag(reader)?,
             })
         })?,
         annotations: reader.list(Reader::text)?,

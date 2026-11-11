@@ -2,7 +2,8 @@ use tree_sitter::Node;
 
 use super::java::{CONSTRUCTOR, FINAL, PRIVATE, STATIC, has_modifier, is_type_declaration, text};
 use super::java_chains::argument_count;
-use super::java_receivers::{Receiver, StaticImports, Variables, simple_type_name};
+use super::java_exact_receivers::ExactReceivers;
+use super::java_receivers::{Receiver, StaticImports, Variables, simple_type_name, variable_types};
 use crate::syntax::{named_children, one_based};
 
 const BODY_FIELD: &str = "body";
@@ -31,6 +32,15 @@ const INTERFACE: &str = "interface_declaration";
 const ENUM: &str = "enum_declaration";
 const RECORD: &str = "record_declaration";
 const COMMENTS: &[&str] = &["line_comment", "block_comment"];
+const OBJECT_FIELD: &str = "object";
+const IDENTIFIER: &str = "identifier";
+const PRIMITIVE_TYPES: &[&str] = &["integral_type", "floating_point_type", "boolean_type"];
+const DECLARATOR_SIBLINGS: &[&str] = &[
+    "modifiers",
+    VARIABLE_DECLARATOR,
+    "annotation",
+    "marker_annotation",
+];
 
 // Un `null` escrito como argumento (también `(Tipo) null`), con la llamada que lo recibe.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +52,8 @@ pub struct NullArgument {
     pub index: usize,
     pub line: usize,
     pub column: usize,
+    pub cast: Option<String>,
+    pub exact: bool,
 }
 
 // Si algún `return` del método devuelve `null`, directo o en una rama de un ternario: IntelliJ
@@ -126,6 +138,48 @@ fn parameter_name(parameter: Node<'_>) -> Option<Node<'_>> {
     })
 }
 
+// El tipo con que se castea el `null` (`(Number) null` da `Number`), por su nombre simple.
+fn cast_type(argument: Node<'_>, source: &[u8]) -> Option<String> {
+    match argument.kind() {
+        CAST => argument
+            .child_by_field_name(TYPE_FIELD)
+            .map(|written| simple_type_name(text(written, source))),
+        PARENTHESIZED => named_children(argument)
+            .first()
+            .and_then(|inner| cast_type(*inner, source)),
+        _ => None,
+    }
+}
+
+// El tipo escrito de un parámetro a partir de su nombre; el de un varargs (`String... textos`) va
+// antes de su declarador.
+fn parameter_type(name: Node<'_>) -> Option<Node<'_>> {
+    let parameter = name.parent()?;
+    if parameter.kind() != VARIABLE_DECLARATOR {
+        return parameter.child_by_field_name(TYPE_FIELD);
+    }
+    named_children(parameter.parent()?)
+        .into_iter()
+        .find(|child| !DECLARATOR_SIBLINGS.contains(&child.kind()))
+}
+
+pub fn parameter_type_name(name: Node<'_>, source: &[u8]) -> String {
+    parameter_type(name)
+        .map(|written| simple_type_name(text(written, source)))
+        .unwrap_or_default()
+}
+
+fn is_variadic(name: Node<'_>) -> bool {
+    name.parent()
+        .is_some_and(|parameter| parameter.kind() == VARIABLE_DECLARATOR)
+}
+
+// Si el parámetro puede recibir un `null`: no, si es de un tipo primitivo (un varargs de
+// primitivos es un arreglo y sí puede).
+pub fn accepts_null(name: Node<'_>) -> bool {
+    is_variadic(name) || parameter_type(name).is_none_or(|written| !PRIMITIVE_TYPES.contains(&written.kind()))
+}
+
 fn null_inside(argument: Node<'_>) -> Option<Node<'_>> {
     match argument.kind() {
         NULL => Some(argument),
@@ -171,22 +225,45 @@ fn enum_has_bodies(declaration: Node<'_>) -> bool {
         .any(|part| part.kind() == CLASS_BODY)
 }
 
+// Los `null` que pasan como argumento las llamadas del archivo.
+pub fn null_arguments_in(top_level: Node<'_>, nodes: &[Node<'_>], source: &[u8]) -> Vec<NullArgument> {
+    let variables = variable_types(nodes, source);
+    let imported = StaticImports::of(top_level, source);
+    let exact = ExactReceivers::of(nodes, source);
+    let context = CallContext {
+        variables: &variables,
+        imported: &imported,
+        exactly_constructed: &exact,
+    };
+    nodes
+        .iter()
+        .flat_map(|node| null_arguments(*node, source, &context))
+        .collect()
+}
+
+// Lo que hace falta del archivo para saber a quién llama una llamada.
+struct CallContext<'context> {
+    variables: &'context Variables,
+    imported: &'context StaticImports,
+    exactly_constructed: &'context ExactReceivers,
+}
+
 // Los `null` que una llamada pasa como argumento.
-pub fn null_arguments(
-    call: Node<'_>,
-    source: &[u8],
-    variables: &Variables,
-    imported: &StaticImports,
-) -> Vec<NullArgument> {
+fn null_arguments(call: Node<'_>, source: &[u8], context: &CallContext<'_>) -> Vec<NullArgument> {
+    let mut exact = false;
     let (name, is_constructor, receiver) = match call.kind() {
         INVOCATION => {
             let Some(name) = call.child_by_field_name(NAME_FIELD) else {
                 return Vec::new();
             };
+            exact = call
+                .child_by_field_name(OBJECT_FIELD)
+                .filter(|object| object.kind() == IDENTIFIER)
+                .is_some_and(|object| context.exactly_constructed.contains(object, source));
             (
                 text(name, source).to_owned(),
                 false,
-                imported.receiver(call, source, variables),
+                context.imported.receiver(call, source, context.variables),
             )
         }
         CREATION
@@ -219,6 +296,8 @@ pub fn null_arguments(
                 index,
                 line: one_based(literal.row),
                 column: one_based(literal.column),
+                cast: cast_type(argument, source),
+                exact,
             })
         })
         .collect()

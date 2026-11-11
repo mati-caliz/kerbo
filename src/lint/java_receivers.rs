@@ -128,7 +128,7 @@ fn arguments_in(scope: Node<'_>, name: &str, source: &[u8]) -> Option<Vec<String
 }
 
 // Las variables que declara un nodo, con el tipo escrito si lo tiene.
-fn declared_by(node: Node<'_>) -> Vec<(Node<'_>, Option<Node<'_>>)> {
+pub fn declared_by(node: Node<'_>) -> Vec<(Node<'_>, Option<Node<'_>>)> {
     if VARIABLE_OWNERS.contains(&node.kind()) {
         let written = node.child_by_field_name(TYPE_FIELD);
         return named_children(node)
