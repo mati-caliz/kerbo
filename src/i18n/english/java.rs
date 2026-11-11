@@ -291,6 +291,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "ArrayUtils.concat((int[][]) null) throws NullPointerException while walking the array; pass an empty array or check first.",
     ),
     RuleText::new(
+        "Variable assigned the value it already holds",
+        "remove the assignment, or check whether another variable or position was meant",
+        "Nothing changed the variable between the previous assignment (or the default of a freshly created array) and this one, so the assignment does nothing; it is often a copy and paste that should have touched another position. Like IntelliJ's DataFlowIssue.",
+        "boolean[] flags = new boolean[2]; flags[1] = false; is redundant: the array already starts as false.",
+    ),
+    RuleText::new(
         "Optional get() without checking it has a value",
         "use orElseThrow() with a message, orElse(...) or ifPresent(...)",
         "Chained to findFirst(), findAny(), max(), min() or ofNullable(), the Optional may be empty and get() throws NoSuchElementException without saying what was missing. Like IntelliJ's OptionalGetWithoutIsPresent.",

@@ -91,6 +91,10 @@ From IntelliJ's inspections, kerbo does:
 - `DataFlowIssue`, the argument case (`null-argument`): a `null` (or `(Type) null`) passed to a
   parameter the method dereferences on every path, if nothing can override it: from that IntelliJ
   infers the parameter is non-null. With overloads, only if all of them dereference it.
+- `DataFlowIssue`, the assignment that changes nothing (`already-assigned`): within one block, a
+  literal assigned to a local variable, or to a fixed position of a freshly created local array,
+  that already held that value (the previous one or the default of `new T[n]`) with nothing using
+  it in between.
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` chained to
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` or `Optional.ofNullable(...)`.
 

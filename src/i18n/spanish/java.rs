@@ -291,6 +291,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "ArrayUtils.concat((int[][]) null) tira NullPointerException al recorrer el arreglo; se pasa un arreglo vacío o se chequea antes.",
     ),
     RuleText::new(
+        "Variable a la que se le asigna el valor que ya tiene",
+        "borrá la asignación, o fijate si querías asignar otra variable u otra posición",
+        "Entre la asignación anterior (o el valor por defecto de un arreglo recién creado) y ésta nada cambió la variable, así que la asignación no hace nada; suele ser un copiar y pegar que debía tocar otra posición. Como DataFlowIssue de IntelliJ.",
+        "boolean[] marcas = new boolean[2]; marcas[1] = false; sobra: el arreglo ya arranca en false.",
+    ),
+    RuleText::new(
         "get() de un Optional sin ver si tiene valor",
         "usá orElseThrow() con un mensaje, orElse(...) o ifPresent(...)",
         "Encadenado a findFirst(), findAny(), max(), min() u ofNullable(), el Optional puede estar vacío y get() tira NoSuchElementException sin decir qué faltaba. Como OptionalGetWithoutIsPresent de IntelliJ.",

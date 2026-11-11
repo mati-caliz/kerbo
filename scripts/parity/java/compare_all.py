@@ -14,6 +14,7 @@ PAIRS = [
     ("AutoCloseableResource", "auto-closeable-resource"),
     ("DataFlowIssue", "data-flow-issue"),
     ("DataFlowIssue", "null-argument"),
+    ("DataFlowIssue", "already-assigned"),
 ]
 COMPARE = pathlib.Path(__file__).with_name("compare.py")
 

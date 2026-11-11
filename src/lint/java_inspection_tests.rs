@@ -40,3 +40,53 @@ fn a_private_field_assigned_only_once_may_be_final() {
         )
     );
 }
+
+// Sólo cuenta lo que ya tenía la variable en el mismo bloque: el valor por defecto de un arreglo de
+// una dimensión, o el mismo literal recién asignado. Usarla en el medio lo olvida, y pasar el
+// arreglo a otro lado deja de seguirlo.
+#[test]
+fn assigning_the_value_a_local_already_holds_is_reported() {
+    let source = "class A {
+    void f(int[] given) {
+        final boolean[] flags = new boolean[2];
+        flags[0] = true;
+        flags[1] = false;
+        final int[][] grid = new int[2][3];
+        grid[1][2] = 0;
+        grid[1][2] = 100;
+        grid[1][2] = 100;
+        int count = 0;
+        count = 0;
+        use(count);
+        count = 0;
+        final int[] shared = new int[2];
+        Object alias = shared;
+        shared[0] = 1;
+        use(alias);
+        shared[0] = 1;
+        given[0] = 1;
+        given[0] = 1;
+        flags[3] = false;
+        String[] names = new String[1];
+        for (int i = 0; i < names.length; i++) {
+            names[i] = \"x\";
+        }
+        names[0] = null;
+    }
+
+    void use(Object value) {
+    }
+}
+";
+    let found = rendered_where(&lints(source, &strict()), |rule| {
+        rule == RuleId::Java(JavaRule::AlreadyAssigned)
+    });
+    assert_eq!(
+        found,
+        expected(
+            "5:9 already-assigned flags[1]
+9:9 already-assigned grid[1][2]
+11:9 already-assigned count"
+        )
+    );
+}

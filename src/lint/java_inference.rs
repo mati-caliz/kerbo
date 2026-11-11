@@ -177,7 +177,7 @@ pub fn dereferenced_first(body: Node<'_>, source: &[u8]) -> HashSet<String> {
 }
 
 // El nombre de un campo o de un método (`this.valor`, `x.valor()`), que no es una variable.
-fn is_member_name(identifier: Node<'_>) -> bool {
+pub fn is_member_name(identifier: Node<'_>) -> bool {
     identifier.parent().is_some_and(|parent| {
         let field = match parent.kind() {
             FIELD_ACCESS => FIELD_FIELD,

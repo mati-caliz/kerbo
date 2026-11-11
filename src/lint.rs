@@ -4,6 +4,7 @@ mod final_parameters;
 pub mod go;
 mod imports;
 pub mod java;
+mod java_already_assigned;
 pub mod java_call_roots;
 pub mod java_calls;
 pub mod java_chains;
@@ -193,6 +194,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     findings.extend(java_wrap::reported(&tokens));
     findings.extend(java_same_value::reported(root, source));
     findings.extend(java_optional::reported(&nodes, source));
+    findings.extend(java_already_assigned::reported(&nodes, source));
     findings.extend(java_final_fields::reported(root, source));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
     findings.sort_by_key(|finding| (finding.line, finding.column));
