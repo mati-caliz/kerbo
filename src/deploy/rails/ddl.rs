@@ -176,21 +176,28 @@ pub fn create_index_on(
     )
 }
 
+pub fn removed_index_columns(arguments: &Arguments<'_>, source: &[u8]) -> Vec<String> {
+    arguments
+        .keyword(COLUMN)
+        .or_else(|| arguments.positional.first().copied())
+        .map(|node| names(node, source))
+        .unwrap_or_default()
+}
+
 pub fn drop_index(table: &str, arguments: &Arguments<'_>, source: &[u8]) -> String {
-    let name = arguments.keyword_name(NAME, source).unwrap_or_else(|| {
-        let columns = arguments
-            .keyword(COLUMN)
-            .or_else(|| arguments.positional.first().copied())
-            .map(|node| names(node, source))
-            .unwrap_or_default();
-        index_name(table, &columns)
-    });
+    let name = arguments
+        .keyword_name(NAME, source)
+        .unwrap_or_else(|| index_name(table, &removed_index_columns(arguments, source)));
+    drop_named_index(&name, arguments, source)
+}
+
+pub fn drop_named_index(name: &str, arguments: &Arguments<'_>, source: &[u8]) -> String {
     let concurrently = if is_concurrent(arguments, source) {
         "CONCURRENTLY "
     } else {
         ""
     };
-    format!("DROP INDEX {concurrently}{}", quote(&name))
+    format!("DROP INDEX {concurrently}{}", quote(name))
 }
 
 fn is_concurrent(arguments: &Arguments<'_>, source: &[u8]) -> bool {

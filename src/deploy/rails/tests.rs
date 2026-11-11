@@ -135,7 +135,7 @@ fn renders_every_schema_statement() {
         "DROP EXTENSION IF EXISTS \"hstore\" CASCADE;",
         "DROP TYPE IF EXISTS \"mood\";",
         "CREATE INDEX IF NOT EXISTS \"index_users_on_email\"",
-        "ADD COLUMN IF NOT EXISTS \"nick\"",
+        "ALTER TABLE \"users\" ADD \"nick\" character varying;",
     ] {
         assert!(sql.contains(expected), "falta {expected} en:\n{sql}");
     }
@@ -238,4 +238,34 @@ fn runs_execute_called_on_the_connection() {
     );
     assert!(sql.contains("DROP VIEW IF EXISTS hypershield.tags;"));
     assert!(sql.contains("ALTER TABLE tags ALTER COLUMN id TYPE bigint"));
+}
+
+#[test]
+fn forced_create_table_drops_without_cascade() {
+    let sql = migration("    create_table :jobs, force: true do |t|\n      t.string :name\n    end");
+    assert!(sql.contains("DROP TABLE IF EXISTS \"jobs\";"));
+    assert!(!sql.contains("CASCADE"));
+}
+
+#[test]
+fn unescapes_and_interpolates_executed_strings() {
+    let sql = migration("    execute \"ALTER ROLE #{role} SET statement_timeout = 0\\nSELECT 1\"");
+    assert!(sql.contains("ALTER ROLE interpolated SET statement_timeout = 0\nSELECT 1"));
+}
+
+#[test]
+fn follows_helpers_defined_in_class_eval_blocks() {
+    let sql = render(concat!(
+        "class Example < ActiveRecord::Migration[7.1]\n",
+        "  def change\n",
+        "    add_things\n",
+        "  end\n",
+        "end\n",
+        "Example.class_eval do\n",
+        "  def add_things\n",
+        "    add_column :users, :age, :integer\n",
+        "  end\n",
+        "end\n",
+    ));
+    assert!(sql.contains("ADD \"age\" integer"), "{sql}");
 }

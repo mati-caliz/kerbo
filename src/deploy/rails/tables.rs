@@ -194,6 +194,8 @@ fn create_table_with(
     let mut statements = Vec::new();
     if arguments.keyword_name(FORCE, source).as_deref() == Some(CASCADE) {
         statements.push(format!("DROP TABLE IF EXISTS {} CASCADE", quote(&table)));
+    } else if arguments.is_true(FORCE) {
+        statements.push(format!("DROP TABLE IF EXISTS {}", quote(&table)));
     }
     let mut constraints = Vec::new();
     let mut indexes = Vec::new();

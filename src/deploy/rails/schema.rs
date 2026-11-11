@@ -84,6 +84,17 @@ impl Schema {
         })
     }
 
+    pub fn index_name_on(&self, table: &str, columns: &[String]) -> Option<String> {
+        let Lookup::Found(found) = self.lookup(table) else {
+            return None;
+        };
+        found
+            .indexes
+            .iter()
+            .find(|index| index.columns == columns)
+            .map(|index| index.name.clone())
+    }
+
     pub fn foreign_key_exists(&self, table: &str, column: &str, name: Option<&str>) -> Option<bool> {
         self.check(table, |found| {
             found

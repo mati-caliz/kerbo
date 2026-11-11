@@ -11,6 +11,12 @@ const ARRAY_KINDS: &[&str] = &[ARRAY, "string_array", "symbol_array"];
 const BARE_WORDS: &[&str] = &["bare_string", "bare_symbol"];
 const STRING: &str = "string";
 const STRING_CONTENT: &str = "string_content";
+const ESCAPE_SEQUENCE: &str = "escape_sequence";
+const INTERPOLATION: &str = "interpolation";
+const INTERPOLATION_PLACEHOLDER: &str = "interpolated";
+const ESCAPE_PREFIX: char = '\\';
+const NEWLINE: &str = "\n";
+const TAB: &str = "\t";
 const SIMPLE_SYMBOL: &str = "simple_symbol";
 const DELIMITED_SYMBOL: &str = "delimited_symbol";
 const HASH_KEY_SYMBOL: &str = "hash_key_symbol";
@@ -125,6 +131,31 @@ pub fn string_content(node: Node<'_>, source: &[u8]) -> Option<String> {
         return None;
     }
     Some(parts.iter().map(|part| raw(*part, source)).collect())
+}
+
+pub fn executed_sql(node: Node<'_>, source: &[u8]) -> Option<String> {
+    let parts = named_children(node);
+    if !parts.iter().any(|part| part.kind() == STRING_CONTENT) {
+        return None;
+    }
+    parts
+        .iter()
+        .map(|part| match part.kind() {
+            STRING_CONTENT => Some(raw(*part, source)),
+            ESCAPE_SEQUENCE => Some(unescape(&raw(*part, source))),
+            INTERPOLATION => Some(INTERPOLATION_PLACEHOLDER.to_owned()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn unescape(sequence: &str) -> String {
+    match sequence.strip_prefix(ESCAPE_PREFIX) {
+        Some("n") => NEWLINE.to_owned(),
+        Some("t") => TAB.to_owned(),
+        Some(escaped) => escaped.to_owned(),
+        None => sequence.to_owned(),
+    }
 }
 
 pub fn names(node: Node<'_>, source: &[u8]) -> Vec<String> {

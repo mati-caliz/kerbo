@@ -1716,15 +1716,13 @@ cerrarse se borra de acá.
   `integer` y clave primaria `serial`. Contra squawk 2.71 (`scripts/parity/rails/`, repos `maybe`,
   `chatwoot`, `mastodon` y `forem`): maybe 849 de 849; chatwoot 951 de 951 con 3 de más en
   `20250108211541`, donde la referencia falla en `create_captain_tables` por el tipo `vector` de
-  pgvector; mastodon 1.763 de 1.763; forem 3.540 de 3.556 con 2 de más. Pendientes:
-  - forem, 12 diferencias: migraciones con sufijo de engine
-    (`*.acts_as_taggable_on_engine.rb`), `drop_table` en el `down` de `create_delayed_jobs` y
-    `acts_as_follower_migration`, timeouts y `prefer-robust-stmts` de 2025-2026
-    (`update_poll_votes_unique_index`, `add_invitation_token_to_organization_memberships`,
-    `add_slug_to_agent_sessions`, `add_index_on_*_and_created_at`) y `ban-drop-column` de más en
-    `setup_vector_columns_for_feed`. Falta cruzarlas con `errores.txt` y los `.sql` de la referencia.
+  pgvector; mastodon 1.763 de 1.763; forem 3.556 de 3.556 con 2 de más. `create_table force: true`
+  borra sin `CASCADE`, los métodos de `Clase.class_eval do` cuentan como helpers, `remove_index` por
+  columnas toma el nombre real del esquema, `add_column if_not_exists:` no escribe `IF NOT EXISTS` y
+  `execute` con interpolación o escapes se evalúa. Pendientes:
+  - forem, `setup_vector_columns_for_feed`: `if column_exists?` no se evalúa (el esquema no sigue
+    columnas) y sale un `remove_column` de más (`ban-drop-column` y `prefer-robust-stmts`).
   - `index_exists?` con `where:` compara sólo las columnas, no el predicado.
-  - `remove_index` por columnas usa el nombre por defecto; podría tomar el nombre real del esquema.
   - Un `execute` con `ALTER TABLE ... RENAME` actualiza el esquema pero no emite los renames de
     índices que Rails no haría (está bien), y el SQL crudo que no se entiende deja el esquema como
     estaba.

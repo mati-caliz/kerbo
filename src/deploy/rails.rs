@@ -18,7 +18,7 @@ use tree_sitter::Node;
 use super::Violation;
 use super::script::{Origin, Script};
 use crate::syntax::{descendants, named_children, one_based};
-use arguments::{Arguments, heredoc_body, heredoc_text, name, string_content};
+use arguments::{Arguments, heredoc_body, heredoc_text, name};
 use schema::Schema;
 
 pub use history::fingerprint;
@@ -31,6 +31,7 @@ const CLASS: &str = "class";
 const METHOD: &str = "method";
 const SINGLETON_METHOD: &str = "singleton_method";
 const CALL: &str = "call";
+const CLASS_EVAL: &str = "class_eval";
 const IDENTIFIER: &str = "identifier";
 const STRING: &str = "string";
 const MIGRATION_MARKER: &str = "Migration";
@@ -59,7 +60,9 @@ const EXECUTE: &str = "execute";
 const CREATE_TABLE: &str = "create_table";
 const CHANGE_TABLE: &str = "change_table";
 const IF_EXISTS: &str = "if_exists";
-const DROPS_IF_EXISTS: &[&str] = &["remove_index", "remove_foreign_key"];
+const REMOVE_INDEX: &str = "remove_index";
+const INDEX_NAME: &str = "name";
+const DROPS_IF_EXISTS: &[&str] = &[REMOVE_INDEX, "remove_foreign_key"];
 const SKIPPED_KINDS: &[&str] = &[
     "string",
     "heredoc_body",
@@ -102,7 +105,7 @@ fn evaluate(root: Node<'_>, source: &[u8], schema: Schema) -> Option<(Script, Sc
         integer_ids: uses_integer_ids(class, source),
         returned: false,
         uncertain: 0,
-        helpers: helpers(class, source),
+        helpers: helpers(root, class, source),
         visiting: HashSet::new(),
         schema,
         script: if transactional {
@@ -160,10 +163,32 @@ fn disables_transaction(class: Node<'_>, source: &[u8]) -> bool {
         .any(|node| node.kind() == IDENTIFIER && arguments::raw(node, source) == DISABLE_TRANSACTION)
 }
 
-fn helpers<'tree>(class: Node<'tree>, source: &[u8]) -> HashMap<String, Node<'tree>> {
-    let Some(body) = class.child_by_field_name("body") else {
-        return HashMap::new();
-    };
+fn helpers<'tree>(root: Node<'tree>, class: Node<'tree>, source: &[u8]) -> HashMap<String, Node<'tree>> {
+    let mut found = HashMap::new();
+    let class_name = class
+        .child_by_field_name("name")
+        .map(|name| arguments::raw(name, source));
+    let reopened = descendants(root)
+        .into_iter()
+        .filter(|node| is_class_eval_of(*node, class_name.as_deref(), source))
+        .filter_map(|call| call.child_by_field_name("block")?.child_by_field_name("body"));
+    for body in class.child_by_field_name("body").into_iter().chain(reopened) {
+        found.extend(methods(body, source));
+    }
+    found
+}
+
+fn is_class_eval_of(node: Node<'_>, class_name: Option<&str>, source: &[u8]) -> bool {
+    node.kind() == CALL
+        && node
+            .child_by_field_name("method")
+            .is_some_and(|method| arguments::raw(method, source) == CLASS_EVAL)
+        && node
+            .child_by_field_name("receiver")
+            .is_some_and(|receiver| Some(arguments::raw(receiver, source).as_str()) == class_name)
+}
+
+fn methods<'tree>(body: Node<'tree>, source: &[u8]) -> Vec<(String, Node<'tree>)> {
     named_children(body)
         .into_iter()
         .filter(|node| [METHOD, SINGLETON_METHOD].contains(&node.kind()))
@@ -302,8 +327,20 @@ impl<'tree> Walker<'tree, '_> {
             CREATE_TABLE => tables::create_table(&table, &shifted, block, self.source),
             CHANGE_TABLE => tables::change_table(&table, block, self.integer_ids, self.source),
             CREATE_JOIN_TABLE => tables::create_join_table(&table, &shifted, block, self.source),
+            REMOVE_INDEX => self.remove_index(&table, &shifted),
             _ => statements::statement(method, &table, &shifted, self.source).unwrap_or_default(),
         }
+    }
+
+    fn remove_index(&self, table: &str, arguments: &Arguments<'tree>) -> Vec<String> {
+        let existing = (!arguments.has(INDEX_NAME))
+            .then(|| ddl::removed_index_columns(arguments, self.source))
+            .filter(|columns| !columns.is_empty())
+            .and_then(|columns| self.schema.index_name_on(table, &columns));
+        vec![existing.map_or_else(
+            || ddl::drop_index(table, arguments, self.source),
+            |name| ddl::drop_named_index(&name, arguments, self.source),
+        )]
     }
 
     fn execute(&mut self, list: Option<Node<'tree>>) {
@@ -315,7 +352,7 @@ impl<'tree> Walker<'tree, '_> {
         } else if let Some((sql, body)) = self.filtered_heredoc(argument) {
             (sql, body)
         } else if argument.kind() == STRING {
-            let Some(sql) = string_content(argument, self.source) else {
+            let Some(sql) = arguments::executed_sql(argument, self.source) else {
                 return;
             };
             (

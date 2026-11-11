@@ -4,7 +4,6 @@ use super::ddl::{ForeignKey, check_name, create_index, drop_index, quote};
 use super::references::reference;
 use super::tables::timestamp_columns;
 
-const IF_NOT_EXISTS: &str = "if_not_exists";
 const IF_EXISTS: &str = "if_exists";
 const FORCE: &str = "force";
 const CASCADE: &str = "cascade";
@@ -101,12 +100,7 @@ fn add_column(table: &str, arguments: &Arguments<'_>, source: &[u8]) -> Option<S
     let name = first_name(arguments, source)?;
     let kind = arguments.name_at(1, source)?;
     let added = column(&kind, name, arguments, source);
-    let if_not_exists = if arguments.is_true(IF_NOT_EXISTS) {
-        "COLUMN IF NOT EXISTS "
-    } else {
-        ""
-    };
-    Some(format!("{} ADD {if_not_exists}{}", alter(table), added.render()))
+    Some(format!("{} ADD {}", alter(table), added.render()))
 }
 
 fn remove_column(table: &str, arguments: &Arguments<'_>, source: &[u8]) -> Option<String> {
