@@ -7,6 +7,7 @@ use super::values::{boolean, elements, is_sequence, quoted_literal, raw, text};
 use crate::deploy::python_calls::Call;
 
 const Q_CLASS: &str = "Q";
+const FIELD_REFERENCE: &str = "F";
 const DECIMAL_CONSTRUCTOR: &str = "Decimal";
 const LOOKUP_SEPARATOR: &str = "__";
 const PRIMARY_KEY_ALIAS: &str = "pk";
@@ -52,6 +53,7 @@ enum Value {
     Boolean(bool),
     Null,
     List(Vec<Self>),
+    Field(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -192,6 +194,9 @@ fn value<'tree>(node: Node<'tree>, constants: Constants<'tree>) -> Option<Value>
     if STRING_LITERALS.contains(&node.kind()) {
         return Some(Value::Literal(quoted_literal(&text(node, source)?)));
     }
+    if let Some(reference) = Call::parse(node, source).filter(|call| call.method == FIELD_REFERENCE) {
+        return text(reference.positional(0)?, source).map(Value::Field);
+    }
     if is_sequence(node) {
         return elements(node)
             .into_iter()
@@ -267,15 +272,27 @@ fn lookup_clause(path: &str, value: &Value, negated: bool, model: &Model) -> Opt
         _ => return None,
     };
     let field = target_field(model, name)?;
-    let (lookup, value) = match value {
+    let referenced = match value {
+        Value::Field(referenced) => Some(target_field(model, referenced)?),
+        Value::Literal(_) | Value::Boolean(_) | Value::Null | Value::List(_) => None,
+    };
+    let column_value = referenced.map(|other| Value::Literal(format!("({})", quoted(&other.column()))));
+    let (lookup, value) = match column_value.as_ref().unwrap_or(value) {
         Value::Null if requested == EXACT => (IS_NULL, &Value::Boolean(true)),
-        Value::Null => return None,
+        Value::Null | Value::Field(_) => return None,
         other @ (Value::Literal(_) | Value::Boolean(_) | Value::List(_)) => (requested, other),
     };
     let column = quoted(&field.column());
     let mut leaves = vec![Where::Leaf(lookup_sql(field, &column, lookup, value)?)];
-    if negated && lookup != IS_NULL && field.null() {
-        leaves.push(Where::Leaf(format!("{column} IS NOT NULL")));
+    if negated && lookup != IS_NULL {
+        let nullable_columns = [Some(field), referenced]
+            .into_iter()
+            .flatten()
+            .filter(|nullable| nullable.null());
+        leaves.extend(
+            nullable_columns
+                .map(|nullable| Where::Leaf(format!("{} IS NOT NULL", quoted(&nullable.column())))),
+        );
     }
     Some(Where::Node {
         connector: Connector::And,
@@ -331,7 +348,7 @@ fn scalar(value: &Value) -> Option<String> {
     match value {
         Value::Literal(sql) => Some(sql.clone()),
         Value::Boolean(flag) => Some(flag.to_string()),
-        Value::Null | Value::List(_) => None,
+        Value::Null | Value::List(_) | Value::Field(_) => None,
     }
 }
 

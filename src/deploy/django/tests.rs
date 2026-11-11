@@ -328,6 +328,10 @@ class Migration(migrations.Migration):
             model_name="site",
             constraint=models.CheckConstraint(check=models.Q(domain__startswith="www"), name="opaque_lookup"),
         ),
+        migrations.AddConstraint(
+            model_name="site",
+            constraint=models.CheckConstraint(condition=models.Q(("parent", models.F("id")), _negated=True), name="no_self_parent"),
+        ),
     ]
 "#;
 
@@ -344,6 +348,7 @@ fn conditions_extensions_and_nulls_distinct_render_like_django() {
         "ADD CONSTRAINT \"not_five\" CHECK (NOT (\"rank\" = 5 AND \"rank\" IS NOT NULL))",
         "ADD CONSTRAINT \"pair\" UNIQUE NULLS NOT DISTINCT (\"domain\", \"name\")",
         "ADD CONSTRAINT \"opaque_lookup\" CHECK (true)",
+        "ADD CONSTRAINT \"no_self_parent\" CHECK (NOT (\"parent_id\" = (\"id\") AND \"parent_id\" IS NOT NULL))",
     ] {
         assert!(rendered.contains(expected), "falta {expected} en {rendered}");
     }

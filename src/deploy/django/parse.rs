@@ -67,6 +67,7 @@ struct Scope<'context> {
     constants: Constants<'context>,
     functions: &'context [(String, Node<'context>)],
     factories: &'context [(String, Arc<Factory>)],
+    apps_root: Option<&'context Path>,
 }
 
 pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
@@ -97,6 +98,7 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
         constants: Constants::new(reader.source, &bindings),
         functions: &module_functions,
         factories: &factories,
+        apps_root: reader.apps_root,
     };
     let base = migration_base(root, class, reader.source, reader.apps_root);
     let zero_downtime = base.zero_downtime(reader.settings.zero_downtime, |attribute| {
@@ -310,6 +312,7 @@ impl<'context> Scope<'context> {
             model: &model,
             settings: self.settings,
             constants: self.constants,
+            apps_root: self.apps_root,
         };
         let parsed = field(&name, argument(call, 2, "field")?, self.source, owner)?;
         Some(if call.method == ADD_FIELD {
@@ -327,6 +330,7 @@ impl<'context> Scope<'context> {
             model: &name,
             settings: self.settings,
             constants: self.constants,
+            apps_root: self.apps_root,
         };
         model.fields = argument(call, 1, "fields")
             .map(elements)

@@ -8,6 +8,7 @@ mod dependencies;
 mod discovery;
 mod dispatch;
 mod django_version;
+mod enum_members;
 mod expression;
 mod factories;
 mod field_defaults;

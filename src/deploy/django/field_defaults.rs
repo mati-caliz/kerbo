@@ -7,6 +7,8 @@ use crate::deploy::python_calls::Call;
 pub const DB_VALUE_WRAPPER: &str = "Value";
 const NOW_FUNCTION: &str = "Now";
 pub const NOW_SQL: &str = "(STATEMENT_TIMESTAMP())";
+const STATEMENT_CLOCK: &str = "STATEMENT_TIMESTAMP()";
+const COMBINED_EXPRESSION: &str = "CombinedExpression";
 const SQL_NULL: &str = "NULL";
 const NONE: &str = "none";
 const DECIMAL_CONSTRUCTOR: &str = "Decimal";
@@ -14,7 +16,7 @@ const DURATION_CONSTRUCTOR: &str = "timedelta";
 const ENVIRONMENT_RECEIVERS: &[&str] = &["os.environ", "environ"];
 const ENVIRONMENT_READER: &str = "get";
 const ENVIRONMENT_FALLBACK: usize = 1;
-const EMPTY_POSTGRES_ARRAY: &str = "'{}'";
+pub const EMPTY_POSTGRES_ARRAY: &str = "'{}'";
 const INTERVAL_CAST: &str = "::interval";
 const SECONDS_PER_MINUTE: i64 = 60;
 const SECONDS_PER_HOUR: i64 = 3_600;
@@ -117,6 +119,14 @@ fn numeric_text(node: Node<'_>, source: &[u8]) -> Option<String> {
 }
 
 fn duration(node: Node<'_>, source: &[u8]) -> Option<String> {
+    let total_seconds = duration_seconds(node, source)?;
+    Some(format!(
+        "{}{INTERVAL_CAST}",
+        quoted_literal(&python_duration(total_seconds))
+    ))
+}
+
+fn duration_seconds(node: Node<'_>, source: &[u8]) -> Option<i64> {
     let call = Call::parse(node, source).filter(|call| call.method == DURATION_CONSTRUCTOR)?;
     let integer = |argument: Node<'_>| raw(argument, source).parse::<i64>().ok();
     let mut total_seconds: i64 = 0;
@@ -130,9 +140,32 @@ fn duration(node: Node<'_>, source: &[u8]) -> Option<String> {
             total_seconds = total_seconds.checked_add(integer(argument)?.checked_mul(*multiplier)?)?;
         }
     }
+    Some(total_seconds)
+}
+
+fn interval_operand(node: Node<'_>, source: &[u8]) -> Option<String> {
+    let call = Call::parse(node, source)?;
+    if call.method == NOW_FUNCTION && call.arguments.is_empty() {
+        return Some(STATEMENT_CLOCK.to_owned());
+    }
+    let total_seconds = duration_seconds(
+        call.positional(0).filter(|_| call.method == DB_VALUE_WRAPPER)?,
+        source,
+    )?;
     Some(format!(
-        "{}{INTERVAL_CAST}",
-        quoted_literal(&python_duration(total_seconds))
+        "'{} days {}.000000 seconds'{INTERVAL_CAST}",
+        total_seconds.div_euclid(SECONDS_PER_DAY),
+        total_seconds.rem_euclid(SECONDS_PER_DAY)
+    ))
+}
+
+fn combined_expression(node: Node<'_>, source: &[u8]) -> Option<String> {
+    let call = Call::parse(node, source).filter(|call| call.method == COMBINED_EXPRESSION)?;
+    let operator = text(call.positional(1)?, source)?;
+    Some(format!(
+        "(({} {operator} {}))",
+        interval_operand(call.positional(0)?, source)?,
+        interval_operand(call.positional(2)?, source)?
     ))
 }
 
@@ -194,6 +227,9 @@ pub fn database_default(node: Node<'_>, source: &[u8], class: Class) -> Option<S
     {
         return Some(NOW_SQL.to_owned());
     }
+    if let Some(combined) = combined_expression(node, source) {
+        return Some(combined);
+    }
     let wrapped = call
         .filter(|call| call.method == DB_VALUE_WRAPPER)
         .and_then(|call| call.positional(0));
@@ -203,6 +239,10 @@ pub fn database_default(node: Node<'_>, source: &[u8], class: Class) -> Option<S
     }
     let typed = if class == Class::Json {
         json_default(value, source)
+    } else if class == Class::Array {
+        empty_json(value, source)
+            .filter(|json| *json == EMPTY_ARRAY)
+            .map(|_| EMPTY_POSTGRES_ARRAY.to_owned())
     } else if class == Class::Decimal {
         decimal_argument(value, source)
     } else {

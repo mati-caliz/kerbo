@@ -1,8 +1,12 @@
+use std::path::Path;
+
 use tree_sitter::Node;
 
+use super::columns::own_type;
 use super::constants::Constants;
 use super::dependencies::swappable_reference;
-use super::field_defaults::{DB_VALUE_WRAPPER, database_default, default};
+use super::enum_members::member_literal;
+use super::field_defaults::{DB_VALUE_WRAPPER, EMPTY_POSTGRES_ARRAY, database_default, default};
 use super::model::{Class, Field, FieldDefault, Flag, ModelKey, Relation};
 use super::settings::Settings;
 use super::truth::truth;
@@ -83,6 +87,7 @@ pub struct Owner<'context> {
     pub model: &'context str,
     pub settings: &'context Settings,
     pub constants: Constants<'context>,
+    pub apps_root: Option<&'context Path>,
 }
 
 pub fn class_of(method: &str) -> Class {
@@ -135,8 +140,12 @@ pub fn field<'tree>(
     field.decimal_places = number("decimal_places");
     field.size = number("size");
     field.db_column = call.keyword("db_column").and_then(|value| text(value, source));
+    let enum_member = |value: Node<'_>| member_literal(constant_value(value, owner), source, owner.apps_root);
     field.default = call.keyword("default").map_or(FieldDefault::Unset, |value| {
-        default(constant_value(value, owner), source, field.class)
+        enum_member(value).map_or_else(
+            || default(constant_value(value, owner), source, field.class),
+            FieldDefault::Literal,
+        )
     });
     if call
         .keyword("db_default")
@@ -145,9 +154,9 @@ pub fn field<'tree>(
     {
         field.flags.insert(Flag::TypedDatabaseDefault);
     }
-    field.db_default = call
-        .keyword("db_default")
-        .and_then(|value| database_default(constant_value(value, owner), source, field.class));
+    field.db_default = call.keyword("db_default").and_then(|value| {
+        enum_member(value).or_else(|| database_default(constant_value(value, owner), source, field.class))
+    });
     field.relation = relation(&call, field.class, owner);
     field.element = call
         .keyword(ARRAY_ELEMENT)
@@ -155,6 +164,9 @@ pub fn field<'tree>(
         .filter(|_| field.class == Class::Array)
         .and_then(|element| self::field(name, element, source, owner))
         .map(Box::new);
+    if field.db_default.as_deref() == Some(EMPTY_POSTGRES_ARRAY) {
+        field.db_default = Some(format!("{EMPTY_POSTGRES_ARRAY}::{}", own_type(&field)));
+    }
     Some(field)
 }
 

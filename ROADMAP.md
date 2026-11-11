@@ -1678,24 +1678,26 @@ cerrarse se borra de acá.
     - Errores de la referencia (no convierte): wagtailcore 0087, taggit 0006, wagtaildocs 0005,
       wagtailembeds 0008, wagtailsearch 0008.
   - Sentry medido (2026-11-11, commit en `corpus.toml`): 295 migraciones; squawk 5.544 avisos,
-    kerbo 5.542, 2 diferencias, ninguna de más (eran 618); sentencia por sentencia, 22 de 295
+    kerbo 5.542, 2 diferencias, ninguna de más (eran 618); sentencia por sentencia, 14 de 295
     migraciones con SQL distinto. Para llegar: `SafeDeleteModel`/`SafeRemoveField` con su estado
     pendiente y `SafeRunSQL`; la base `CheckedMigration` (`atomic = False`); el motor
     `sentry.db.postgres` se reconoce como django_zero_downtime_migrations y se emula (índices
     `CONCURRENTLY`, `CHECK` y claves foráneas con `NOT VALID` + `VALIDATE`, `UNIQUE`/`PRIMARY KEY`
     con `USING INDEX`, también `DEFERRABLE`); los módulos se buscan en todos los ancestros de la
     raíz de las apps (apps anidadas como nodestore); `db_default` con `Now()`
-    (`STATEMENT_TIMESTAMP()`), `None` (`DEFAULT NULL`) y `Value(..., output_field=...)` (que
-    Django ve distinto y le pone `SET DEFAULT`); `UniqueConstraint(deferrable=...)`; las
-    funciones del módulo que devuelven una operación (`RunSQL` con f-string sobre sus
-    parámetros). Lo que queda:
+    (`STATEMENT_TIMESTAMP()`), `None` (`DEFAULT NULL`), `Value(..., output_field=...)` (que
+    Django ve distinto y le pone `SET DEFAULT`), listas vacías en arrays (`'{}'::integer[]`),
+    `CombinedExpression(Now(), "+", Value(timedelta))` y miembros de enums de otro módulo
+    (`Clase.Interna["MIEMBRO"]`, aunque la clase esté decorada); `CHECK` con `F()` del lado
+    derecho; `UniqueConstraint(deferrable=...)`; las funciones del módulo que devuelven una
+    operación (`RunSQL` con f-string sobre sus parámetros). Lo que queda:
     - Las 2 diferencias (0001_squashed_1118): el `ExclusionConstraint` de `groupopenperiod` y su
       `BtreeGistExtension`, que kerbo no emite.
-    - `db_default` con un miembro de un `IntEnum` de otro módulo
-      (`Relocation.Provenance["SELF_HOSTED"]` da `DEFAULT 0`, `RuleSource["ISSUE"]`): kerbo
-      escribe el texto citado. Cambia el SQL, no los avisos.
-    - Índices por expresión con `DateTrunc`, `Case`/`When`, `KeyTextTransform` y casteos, que
-      salen `(true)`; `CheckConstraint` con `F() + ...` que sale `true`.
+    - Sólo SQL, sin cambiar avisos: índices por expresión con `DateTrunc`, `Case`/`When`
+      (hybridcloud 0001), `Coalesce` y `KeyTransform`/`KeyTextTransform` (workflow_engine 0001 y
+      0119) y casteos, que salen `(true)`; `INCLUDE` en índices (monitors 0001); el `config`
+      jsonb de `auth_authenticator` (sentry 0001); los bloques `DO $$` de sentry 1210.
+    - Las apps de terceros (`auth`, `contenttypes`, `sessions`, `sites`) quedan fuera.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
     `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), los
     borrados que Django resuelve por introspección (restricciones sin nombre conocido),

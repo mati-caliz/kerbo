@@ -105,7 +105,7 @@ const fn plain_type(class: Class) -> &'static str {
     }
 }
 
-fn own_type(field: &Field) -> String {
+pub fn own_type(field: &Field) -> String {
     if is_varchar(field.class) {
         let length = field
             .max_length
