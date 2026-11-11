@@ -1678,7 +1678,7 @@ cerrarse se borra de acá.
     - Errores de la referencia (no convierte): wagtailcore 0087, taggit 0006, wagtaildocs 0005,
       wagtailembeds 0008, wagtailsearch 0008.
   - Sentry medido (2026-11-11, commit en `corpus.toml`): 295 migraciones; squawk 5.544 avisos,
-    kerbo 5.544, 0 diferencias (eran 618); sentencia por sentencia, 10 de 295 migraciones con
+    kerbo 5.544, 0 diferencias (eran 618); sentencia por sentencia, 9 de 295 migraciones con
     SQL distinto. Para llegar: `SafeDeleteModel`/`SafeRemoveField` con su estado
     pendiente y `SafeRunSQL`; la base `CheckedMigration` (`atomic = False`); el motor
     `sentry.db.postgres` se reconoce como django_zero_downtime_migrations y se emula (índices
@@ -1695,13 +1695,12 @@ cerrarse se borra de acá.
     `Coalesce`, `KeyTransform`/`KeyTextTransform`, rutas `F("data__k")` sobre JSON y `Cast`;
     `INCLUDE` en índices y `UniqueConstraint`; los campos declarados en módulos que las
     migraciones nombran (`users.models.AuthenticatorConfig` → `jsonb`) y `db_default` de un dict
-    no vacío en un `JSONField` (`'{"period": "14d"}'::jsonb`). Lo que queda, sólo SQL, sin
-    cambiar avisos:
+    no vacío en un `JSONField` (`'{"period": "14d"}'::jsonb`); `operations` como comprensión de
+    lista sobre una constante del módulo, con `RunSQL` de una función local que devuelve un
+    f-string. Lo que queda, sólo SQL, sin cambiar avisos:
     - sentry 0001: un `CREATE EXTENSION IF NOT EXISTS btree_gist` de más en la referencia, que
       emite el schema editor propio (`MakeBtreeGistSchemaEditor` en `sentry/db/postgres/schema.py`)
       antes de cada `ExclusionConstraint`. Es de un solo proyecto; emularlo sería leer ese editor.
-    - sentry 1210: los bloques `DO $$` de `[SafeRunSQL(validate_sql(table), ...) for table in
-      REFERENCING_TABLES]`, una comprensión de lista sobre una constante del módulo.
     - Las apps de terceros (`auth`, `contenttypes`, `sessions`, `sites`) quedan fuera.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
     `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), los

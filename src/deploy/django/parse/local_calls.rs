@@ -1,3 +1,5 @@
+use tree_sitter::Node;
+
 use super::{Scope, argument};
 use crate::deploy::django::constants::Constants;
 use crate::deploy::django::factories::{parameter_names, returned_call};
@@ -8,6 +10,16 @@ pub(super) fn module_function_operation<'context>(
     scope: Scope<'context>,
     call: &Call<'context>,
 ) -> Option<Operation> {
+    with_module_function(scope, call, |inner, returned| {
+        inner.declared_operation(&Call::parse(returned, inner.source)?)
+    })
+}
+
+pub(super) fn with_module_function<'context, T>(
+    scope: Scope<'context>,
+    call: &Call<'context>,
+    read: impl for<'bound> FnOnce(Scope<'bound>, Node<'bound>) -> Option<T>,
+) -> Option<T> {
     if !call.receiver.is_empty() {
         return None;
     }
@@ -23,7 +35,6 @@ pub(super) fn module_function_operation<'context>(
         scope.source,
         scope.settings,
     )?;
-    let inner = Call::parse(returned, scope.source)?;
     let mut bindings = scope.constants.bindings.to_vec();
     bindings.extend(parameters.iter().enumerate().filter_map(|(position, name)| {
         Some((name.clone(), scope.resolved(argument(call, position, name)?)))
@@ -32,7 +43,7 @@ pub(super) fn module_function_operation<'context>(
         constants: Constants::new(scope.source, &bindings),
         ..scope
     };
-    scope.declared_operation(&inner)
+    read(scope, returned)
 }
 
 pub(super) fn factory_operation<'context>(

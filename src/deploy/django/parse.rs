@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use tree_sitter::Node;
 
+mod comprehension;
 mod local_calls;
 mod raw_sql;
 
@@ -22,6 +23,7 @@ use super::truth::{reachable_statements, truth};
 use super::values::{boolean, dictionary, elements, text};
 use crate::deploy::python_calls::Call;
 use crate::syntax::named_children;
+use comprehension::{ReadOperation, expanded_comprehension};
 use local_calls::{factory_operation, module_function_operation};
 use raw_sql::{run_python, run_sql};
 
@@ -184,35 +186,36 @@ impl<'context> Scope<'context> {
     }
 
     fn operations(self, node: Node<'context>) -> Vec<Located> {
-        self.located(node, |call| self.operation(call))
+        self.located(node, &|scope, call| scope.operation(call))
     }
 
     fn database_operations(self, node: Node<'context>) -> Vec<Located> {
-        self.located(node, |call| {
+        self.located(node, &|scope, call| {
             if call.method == RUN_PYTHON {
-                run_python(self, call)
+                run_python(scope, call)
             } else {
-                self.operation(call)
+                scope.operation(call)
             }
         })
     }
 
-    fn located(
-        self,
-        node: Node<'context>,
-        read: impl Fn(&Call<'context>) -> Option<Operation>,
-    ) -> Vec<Located> {
+    fn located(self, node: Node<'context>, read: &ReadOperation) -> Vec<Located> {
+        if let Some(expanded) = expanded_comprehension(self, self.resolved(node), read) {
+            return expanded;
+        }
         self.sequence(node)
             .into_iter()
-            .filter_map(|element| {
-                let call = Call::parse(self.resolved(element), self.source)?;
-                Some(Located {
-                    operation: read(&call)?,
-                    line: call.line,
-                    column: call.column,
-                })
-            })
+            .filter_map(|element| self.located_call(element, read))
             .collect()
+    }
+
+    fn located_call(self, element: Node<'context>, read: &ReadOperation) -> Option<Located> {
+        let call = Call::parse(self.resolved(element), self.source)?;
+        Some(Located {
+            operation: read(self, &call)?,
+            line: call.line,
+            column: call.column,
+        })
     }
 
     fn operation(self, call: &Call<'context>) -> Option<Operation> {

@@ -76,6 +76,37 @@ fn operations_built_by_a_local_function_bind_its_arguments() {
     );
 }
 
+const VALIDATED_TABLES: &str = r#"from django.db import migrations
+
+TABLES = ["library_price", "library_book"]
+
+
+def validate_sql(table):
+    return f"ALTER TABLE {table} VALIDATE CONSTRAINT {table}_fk"
+
+
+class Migration(migrations.Migration):
+    dependencies = [("library", "0001_initial")]
+
+    operations = [
+        migrations.RunSQL(validate_sql(table), reverse_sql=migrations.RunSQL.noop)
+        for table in TABLES
+    ]
+"#;
+
+#[test]
+fn a_comprehension_over_a_module_constant_runs_one_operation_per_element() {
+    let loader = MemoryLoader::default().with(APP, "0001_initial", PRICES);
+    assert_rendered(
+        &sql(&loader, APP, "0002_validate", VALIDATED_TABLES),
+        &[
+            "ALTER TABLE library_price VALIDATE CONSTRAINT library_price_fk",
+            "ALTER TABLE library_book VALIDATE CONSTRAINT library_book_fk",
+        ],
+        &[],
+    );
+}
+
 const STARRED: &str = r#"import django.db.models.constraints
 from django.db import migrations, models
 from django.db.models.functions import Now

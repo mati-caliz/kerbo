@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::local_calls::with_module_function;
 use super::{CONCATENATION, Scope, argument};
 use crate::deploy::django::computed_names::name_text;
 use crate::deploy::django::operations::{Operation, SqlChunk};
@@ -31,7 +32,18 @@ pub(super) fn run_sql<'context>(scope: Scope<'context>, call: &Call<'context>) -
     if is_noop {
         return None;
     }
-    let chunks = sql_literals(scope, sql)
+    let chunks = Call::parse(sql, scope.source)
+        .and_then(|function_call| {
+            with_module_function(scope, &function_call, |inner, returned| {
+                Some(sql_chunks(inner, inner.resolved(returned)))
+            })
+        })
+        .unwrap_or_else(|| sql_chunks(scope, sql));
+    Some(Operation::RunSql(chunks))
+}
+
+fn sql_chunks<'context>(scope: Scope<'context>, sql: Node<'context>) -> Vec<SqlChunk> {
+    sql_literals(scope, sql)
         .into_iter()
         .map(|literal| scope.resolved(literal))
         .filter_map(|literal| {
@@ -40,8 +52,7 @@ pub(super) fn run_sql<'context>(scope: Scope<'context>, call: &Call<'context>) -
                 line: one_based(literal.start_position().row),
             })
         })
-        .collect();
-    Some(Operation::RunSql(chunks))
+        .collect()
 }
 
 fn sql_literals<'context>(scope: Scope<'context>, sql: Node<'context>) -> Vec<Node<'context>> {
