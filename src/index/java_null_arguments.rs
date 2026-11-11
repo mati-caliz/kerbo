@@ -9,10 +9,16 @@ use crate::lint::java_null_inference::NullArgument;
 use crate::lint::java_receivers::{Receiver, simple_type_name};
 use crate::rules::JavaRule;
 
-// Los parámetros del JDK que las anotaciones externas de IntelliJ marcan `@NotNull`: clase, método,
-// cantidad de argumentos, posición y nombre.
-const LIBRARY_NON_NULL: &[(&str, &str, usize, usize, &str)] =
-    &[("java.util.concurrent.Future", "get", 2, 1, "unit")];
+// Los parámetros del JDK que las anotaciones externas de IntelliJ marcan `@NotNull`: clase (vale
+// también para las que la heredan), método, cantidad de argumentos, posición y nombre.
+const LIBRARY_NON_NULL: &[(&str, &str, usize, usize, &str)] = &[
+    ("java.util.concurrent.Future", "get", 2, 1, "unit"),
+    ("java.util.Collection", "addAll", 1, 0, "c"),
+    ("java.util.Collection", "removeAll", 1, 0, "c"),
+    ("java.util.Collection", "retainAll", 1, 0, "c"),
+    ("java.util.Collection", "containsAll", 1, 0, "c"),
+    ("java.util.Map", "putAll", 1, 0, "m"),
+];
 
 // Calca el "Passing 'null' argument to parameter annotated as non-null" de DataFlowIssue con lo que
 // IntelliJ infiere sin anotaciones: un parámetro que el método desreferencia en todos los caminos es
@@ -73,7 +79,7 @@ pub(super) fn non_null_parameter(
         Receiver::Type(written) => match resolve(types, library, summary, written) {
             Resolved::Project(owner) if argument.is_constructor => vec![owner],
             Resolved::Project(owner) => project_lineage(types, library, &owner),
-            Resolved::Library(class) => return library_non_null(&class, argument),
+            Resolved::Library(class) => return library_non_null(library, &class, argument),
         },
         Receiver::Scope(enclosing) => enclosing
             .iter()
@@ -117,11 +123,15 @@ fn receives(parameter: &Parameter, argument: &NullArgument) -> bool {
             .is_none_or(|cast| simple_type_name(cast) == parameter.type_name)
 }
 
-fn library_non_null(class: &str, argument: &NullArgument) -> Option<String> {
+fn library_non_null(library: &Library, class: &str, argument: &NullArgument) -> Option<String> {
+    let supertypes = library.supertypes(class);
     LIBRARY_NON_NULL
         .iter()
         .find(|(owner, name, arity, index, _)| {
-            *owner == class && *name == argument.name && *arity == argument.arity && *index == argument.index
+            supertypes.iter().any(|supertype| supertype == owner)
+                && *name == argument.name
+                && *arity == argument.arity
+                && *index == argument.index
         })
         .map(|(.., parameter)| (*parameter).to_owned())
 }

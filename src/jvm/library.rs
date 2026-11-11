@@ -154,6 +154,23 @@ impl Library {
         Vec::new()
     }
 
+    // La clase y todas las de arriba (padres e interfaces) que se pueden leer.
+    pub fn supertypes(&self, class: &str) -> Vec<String> {
+        let mut pending = vec![class.to_owned()];
+        let mut seen = Vec::new();
+        while let Some(current) = pending.pop() {
+            if seen.contains(&current) {
+                continue;
+            }
+            if let Some(found) = self.class_or_jdk(&current) {
+                pending.extend(found.interfaces.iter().cloned());
+                pending.extend(found.superclass.clone());
+            }
+            seen.push(current);
+        }
+        seen
+    }
+
     // El método que redefine uno de esta clase: el primero con ese nombre y cantidad de
     // parámetros, subiendo por la clase padre y las interfaces.
     pub fn inherited_method(&self, class: &str, name: &str, arity: usize) -> Option<(Rc<ClassFile>, Method)> {

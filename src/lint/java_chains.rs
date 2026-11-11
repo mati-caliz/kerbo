@@ -3,41 +3,29 @@ use std::collections::{HashMap, HashSet};
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
+use super::java_null_checks::{checked_expression, is_stable_call};
 use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
 use super::java_receivers::{StaticImports, Variables, enclosing_types};
 use super::java_throws::ArgumentKind;
+use super::java_unboxing::unboxed_at;
 use crate::syntax::{named_children, one_based};
 
 const INVOCATION: &str = "method_invocation";
 const IDENTIFIER: &str = "identifier";
 const FIELD_ACCESS: &str = "field_access";
 const QUALIFIER_SEPARATOR: char = '.';
-const BINARY: &str = "binary_expression";
+const ASSIGNMENT: &str = "assignment_expression";
 const NULL: &str = "null_literal";
-const NOT_EQUAL: &str = "!=";
 const OBJECT_FIELD: &str = "object";
 const ARGUMENTS_FIELD: &str = "arguments";
-const OPERATOR_FIELD: &str = "operator";
 const LEFT_FIELD: &str = "left";
-const RIGHT_FIELD: &str = "right";
 const COMMENTS: &[&str] = &["line_comment", "block_comment"];
-const ASSERT_THAT: &str = "assertThat";
-const IS_NOT_NULL: &str = "isNotNull";
-const NON_NULL_CHECKS: &[&str] = &["assertNotNull", "requireNonNull", "notNull"];
-const PARENTHESIZED: &str = "parenthesized_expression";
 const CLASS_LITERAL: &str = "class_literal";
 const STRING_LITERAL: &str = "string_literal";
 const STANDARD_CHARSETS: &str = "StandardCharsets";
 const CHARSET_TYPE: &str = "Charset";
 const CHARSET_FACTORIES: &[&str] = &["defaultCharset", "forName"];
 const QUOTE: char = '"';
-const RETURN: &str = "return_statement";
-const LAMBDA: &str = "lambda_expression";
-const METHOD: &str = "method_declaration";
-const VARIABLE_DECLARATOR: &str = "variable_declarator";
-const TYPE_FIELD: &str = "type";
-const VOID: &str = "void";
-const PRIMITIVE_TYPES: &[&str] = &["integral_type", "floating_point_type", "boolean_type"];
 
 // De dónde sale el primer objeto de una cadena: una variable con su tipo declarado, o una clase
 // cuyo método estático se llama.
@@ -93,6 +81,7 @@ impl NullFacts {
     // Se llama en orden de recorrido: un chequeo cuenta para lo que viene después.
     pub fn observe(&mut self, node: Node<'_>, source: &[u8], context: (&Variables, &StaticImports)) {
         let (variables, imported) = context;
+        self.forget_reassigned(node, source);
         if let Some(checked) = checked_expression(node, source) {
             self.checked.insert(compact(text(checked, source)));
         }
@@ -131,6 +120,34 @@ impl NullFacts {
         }
     }
 
+    // Un getter ya desreferenciado no vuelve a dar null en el mismo método: IntelliJ sigue la
+    // llamada sin argumentos como si fuera un campo, mientras el receptor sea el mismo objeto.
+    fn remember_dereferenced(&mut self, invocation: Node<'_>, source: &[u8]) {
+        let mut current = invocation;
+        while let Some(object) = current.child_by_field_name(OBJECT_FIELD)
+            && object.kind() == INVOCATION
+        {
+            if is_stable_call(object) {
+                self.checked.insert(compact(text(object, source)));
+            }
+            current = object;
+        }
+    }
+
+    // Asignar una variable borra lo que se sabía de ella y de las llamadas sobre ella.
+    fn forget_reassigned(&mut self, node: Node<'_>, source: &[u8]) {
+        let Some(variable) = node
+            .child_by_field_name(LEFT_FIELD)
+            .filter(|left| node.kind() == ASSIGNMENT && left.kind() == IDENTIFIER)
+        else {
+            return;
+        };
+        let name = text(variable, source);
+        let member_prefix = format!("{name}{QUALIFIER_SEPARATOR}");
+        self.checked
+            .retain(|known| known != name && !known.starts_with(&member_prefix));
+    }
+
     fn is_checked(&self, expression: Node<'_>, source: &[u8]) -> bool {
         self.checked.contains(&compact(text(expression, source)))
     }
@@ -144,48 +161,6 @@ impl NullFacts {
             .map(|(_, used)| used.clone())
             .collect()
     }
-}
-
-// Lo que un nodo da por no nulo: `x != null`, `assertThat(x).isNotNull()`, `assertNotNull(x)`,
-// `requireNonNull(x)`.
-fn checked_expression<'tree>(node: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
-    if node.kind() == BINARY {
-        let operator = node.child_by_field_name(OPERATOR_FIELD)?;
-        let left = node.child_by_field_name(LEFT_FIELD)?;
-        let right = node.child_by_field_name(RIGHT_FIELD)?;
-        if operator.kind() != NOT_EQUAL {
-            return None;
-        }
-        return match (left.kind(), right.kind()) {
-            (NULL, _) => Some(right),
-            (_, NULL) => Some(left),
-            _ => None,
-        };
-    }
-    if node.kind() != INVOCATION {
-        return None;
-    }
-    let name = text(node.child_by_field_name(NAME_FIELD)?, source);
-    if NON_NULL_CHECKS.contains(&name) {
-        return first_argument(node);
-    }
-    let object = node.child_by_field_name(OBJECT_FIELD)?;
-    let asserted = object.kind() == INVOCATION
-        && object
-            .child_by_field_name(NAME_FIELD)
-            .is_some_and(|inner| text(inner, source) == ASSERT_THAT);
-    (name == IS_NOT_NULL && asserted)
-        .then(|| first_argument(object))
-        .flatten()
-}
-
-fn first_argument(invocation: Node<'_>) -> Option<Node<'_>> {
-    invocation
-        .child_by_field_name(ARGUMENTS_FIELD)
-        .map(named_children)
-        .unwrap_or_default()
-        .into_iter()
-        .find(|argument| !COMMENTS.contains(&argument.kind()))
 }
 
 fn compact(written: &str) -> String {
@@ -205,37 +180,9 @@ pub fn chain_of(
         return None;
     }
     let (root, steps) = walk(invocation, source, variables, facts)?;
+    facts.remember_dereferenced(invocation, source);
     let unboxed = unboxed_at(invocation, source);
     (steps.len() > 1 || unboxed.is_some()).then_some(Chain { root, steps, unboxed })
-}
-
-// Si el valor de la llamada se desempaqueta: lo devuelve un método que devuelve un primitivo, o
-// inicializa una variable primitiva.
-fn unboxed_at(invocation: Node<'_>, source: &[u8]) -> Option<(usize, usize)> {
-    let mut parent = invocation.parent()?;
-    while parent.kind() == PARENTHESIZED {
-        parent = parent.parent()?;
-    }
-    let declared_type = match parent.kind() {
-        RETURN => {
-            let mut current = parent.parent();
-            while let Some(node) = current {
-                if node.kind() == LAMBDA {
-                    return None;
-                }
-                if node.kind() == METHOD {
-                    break;
-                }
-                current = node.parent();
-            }
-            current?.child_by_field_name(TYPE_FIELD)?
-        }
-        VARIABLE_DECLARATOR => parent.parent()?.child_by_field_name(TYPE_FIELD)?,
-        _ => return None,
-    };
-    let primitive = PRIMITIVE_TYPES.contains(&declared_type.kind()) && text(declared_type, source) != VOID;
-    let start = invocation.start_position();
-    primitive.then(|| (one_based(start.row), one_based(start.column)))
 }
 
 // La cadena que da valor a una variable, de un paso o más (`manager.getCache(nombre)`).

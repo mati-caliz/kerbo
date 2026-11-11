@@ -147,8 +147,8 @@ pub fn returned_by(class: &str, method: &str) -> Option<&'static str> {
 const OBJECT: &str = "java.lang.Object";
 
 // Lo que devuelven los métodos del JDK que aparecen en una cadena, y si IntelliJ los da por
-// posiblemente null: el recurso que no está, la propiedad o la variable de entorno que no existe,
-// el padre de la raíz.
+// posiblemente null: el recurso que no está, la propiedad o la variable de entorno que no existe.
+// El padre de un `File` no: Qodana no lo marca nunca.
 const METHODS: &[(&str, &str, usize, &str, bool)] = &[
     (OBJECT, "getClass", 0, "java.lang.Class", false),
     (
@@ -177,8 +177,8 @@ const METHODS: &[(&str, &str, usize, &str, bool)] = &[
     ),
     ("java.lang.System", "getProperty", 1, "java.lang.String", true),
     ("java.lang.System", "getenv", 1, "java.lang.String", true),
-    ("java.io.File", "getParentFile", 0, "java.io.File", true),
-    ("java.io.File", "getParent", 0, "java.lang.String", true),
+    ("java.io.File", "getParentFile", 0, "java.io.File", false),
+    ("java.io.File", "getParent", 0, "java.lang.String", false),
     ("java.io.File", "listFiles", 0, "java.io.File[]", true),
     ("java.io.File", "list", 0, "java.lang.String[]", true),
 ];

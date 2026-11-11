@@ -1767,11 +1767,16 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned` y `failing-call`):
   commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno de más en los dos.
-  Una llamada pasada antes a un parámetro que el método desreferencia queda no nula después (por
-  el texto de la expresión, como el `f.getParentFile()` que IntelliJ recuerda). `failing-call`
-  calca "The call to X always fails, according to its method contracts" con las cláusulas `fail`
-  que IntelliJ infiere del cuerpo y las escritas a mano de Validate, Spring Assert, JUnit y
-  TestNG, con receptores calificados con el paquete y variables que un `if` chequeó no nulas.
+  En guava, 117 de los 972 (101 `data-flow-issue`, 15 `null-argument`, 1 `failing-call`) con uno
+  solo de más. Una llamada pasada antes a un parámetro que el método desreferencia queda no nula
+  después (por el texto de la expresión), y un getter sin argumentos ya desreferenciado también,
+  mientras la cadena no tenga argumentos y no se reasigne la variable. `File.getParent` y
+  `getParentFile` no cuentan como nulos: Qodana no los marca nunca. Del JDK, los parámetros que
+  sus anotaciones externas dan por no nulos (`Future.get`, `Collection.addAll`/`removeAll`/...,
+  `Map.putAll`), también en las clases que los heredan. `failing-call` calca "The call to X
+  always fails, according to its method contracts" con las cláusulas `fail` que IntelliJ infiere
+  del cuerpo y las escritas a mano de Validate, Spring Assert, JUnit y TestNG, con receptores
+  calificados con el paquete y variables que un `if` chequeó no nulas.
   Falta:
   - `assertNull` sobre lo que devuelve un método del proyecto (5 en commons-lang, sobre
     `getIfEmpty`, `getIfBlank` y `applyNonNull`): IntelliJ marca la de 3 argumentos y no la de 4
@@ -1786,6 +1791,11 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     (`List.set` sobre `Collections.unmodifiableList`) en TestWithParametersTest.
   - El flujo de nulos sigue un solo flujo por variable: al juntar ramas queda el más viejo. Dos
     asignaciones distintas en ramas distintas no se siguen a la vez.
+  - guava: los parámetros de un paquete `@NullMarked` del proyecto como no nulos (FilesTest 218
+    sobra por eso), los tipos genéricos `K`/`V` no nulos de `ConcurrentMap.putIfAbsent`/`replace`/
+    `remove` con null, el "Argument might be null" de `e0()`/`e1()`, el `@Nullable` de un método
+    de interfaz del proyecto (`ReferenceEntry.getValueReference()` en LocalCacheTest) y las
+    desreferencias de `getSubscriber()`.
   - Las sobrecargas del proyecto se eligen por el tipo exacto de los argumentos que se conocen
     (variables y casteos); un subtipo no elige la sobrecarga más específica.
   - La asignación repetida sólo se sigue en línea recta dentro de un bloque: falta la que viene

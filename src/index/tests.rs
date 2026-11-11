@@ -269,7 +269,7 @@ fn a_private_field_that_is_only_written_is_reported() {
     assert_eq!(found, ["7 adjustment"]);
 }
 
-const RESOURCES: &str = "package app;\n\nimport java.io.File;\nimport java.io.InputStream;\n\nclass Loader {\n    byte[] read() throws Exception {\n        try (InputStream stream = getClass().getResourceAsStream(\"/data\")) {\n            return stream.readAllBytes();\n        }\n    }\n\n    String version(File file) {\n        file.getParentFile().mkdirs();\n        return System.getProperty(\"app.mode\").trim() + file.getName().trim();\n    }\n}\n";
+const RESOURCES: &str = "package app;\n\nimport java.io.File;\nimport java.io.InputStream;\n\nclass Loader {\n    byte[] read() throws Exception {\n        try (InputStream stream = getClass().getResourceAsStream(\"/data\")) {\n            return stream.readAllBytes();\n        }\n    }\n\n    String version(File file) {\n        file.listFiles().clone();\n        return System.getProperty(\"app.mode\").trim() + file.getName().trim();\n    }\n}\n";
 
 #[test]
 fn what_the_jdk_may_return_as_null_is_known_without_a_classpath() {
@@ -285,7 +285,7 @@ fn what_the_jdk_may_return_as_null_is_known_without_a_classpath() {
         .map(|finding| format!("{} {}", finding.line, finding.subject))
         .collect();
     found.sort();
-    assert_eq!(found, ["14 mkdirs()", "15 trim()", "9 readAllBytes()"]);
+    assert_eq!(found, ["14 clone()", "15 trim()", "9 readAllBytes()"]);
 }
 
 const UNBOXED: &str = "package app;\n\nimport sample.web.Filter;\n\nclass Counter {\n    long count(Filter filter) {\n        return filter.find(\"a\");\n    }\n\n    Object kept(Filter filter) {\n        return filter.find(\"b\");\n    }\n\n    void local(Filter filter) {\n        int size = filter.find(\"c\");\n    }\n}\n";

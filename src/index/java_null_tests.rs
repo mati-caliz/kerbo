@@ -151,6 +151,7 @@ final class Lookup {
 
 const OVERLOADS: &str = r"package app;
 
+import java.util.Collection;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -191,7 +192,7 @@ class Counter {
 }
 
 class Uses {
-    void calls(Counter shared, Future<String> pending) throws Exception {
+    void calls(Counter shared, Future<String> pending, Collection<String> items) throws Exception {
         final Counter counter = new Counter(0);
         new Counter((Number) null);
         new Counter((String) null);
@@ -201,6 +202,8 @@ class Uses {
         Counter.total((int[][]) null);
         pending.get(1, null);
         pending.get(1, TimeUnit.SECONDS);
+        items.removeAll(null);
+        items.add(null);
     }
 
     void other() {
@@ -265,59 +268,98 @@ fn null_passed_to_a_parameter_the_method_dereferences_is_reported() {
 }
 
 // Una sobrecarga con un primitivo no recibe el `null` y un casteo elige la del tipo; con un
-// receptor recién creado, IntelliJ resuelve el método aunque se pueda redefinir.
+// receptor recién creado, IntelliJ resuelve el método aunque se pueda redefinir. Del JDK, lo que
+// sus anotaciones externas dan por no nulo.
 #[test]
 fn null_reaches_only_the_overloads_that_can_receive_it() {
     assert_eq!(
         findings_in(OVERLOADS, "null-argument"),
         [
-            "45:30 value",
-            "47:26 value",
-            "48:27 other",
-            "50:33 groups",
-            "51:24 unit"
+            "46:30 value",
+            "48:26 value",
+            "49:27 other",
+            "51:33 groups",
+            "52:24 unit",
+            "54:25 c"
         ]
     );
 }
 
-const PASSED: &str = r"package app;
+const PASSED: &str = r#"package app;
 
-import java.io.File;
+import java.net.URL;
 
 class Paths {
-    void parents(File file) {
-        expect(file.getParentFile());
-        file.getParentFile().getName();
-        tolerate(file.getParentFile().getParentFile());
-        file.getParentFile().getParentFile().getName();
+    void parents(Class<?> type) {
+        expect(type.getResource("a"));
+        type.getResource("a").getPath();
+        tolerate(type.getResource("b"));
+        type.getResource("b").getPath();
     }
 
-    void together(File file) {
-        pair(file.getParentFile(), file.getParentFile().getName());
+    void together(Class<?> type) {
+        pair(type.getResource("c"), type.getResource("c").getPath());
     }
 
-    private void expect(File file) {
-        file.getName();
+    private void expect(URL url) {
+        url.getPath();
     }
 
-    private void tolerate(File file) {
-        if (file == null) {
+    private void tolerate(URL url) {
+        if (url == null) {
             return;
         }
     }
 
-    private void pair(File file, String name) {
-        file.getName();
+    private void pair(URL url, String path) {
+        url.getPath();
+    }
+
+    void twice(Paths other) {
+        other.maybe().hashCode();
+        other.maybe().hashCode();
+        other.maybe("a").hashCode();
+        other.maybe("a").hashCode();
+        Paths again = other;
+        again.maybe().hashCode();
+        again = this;
+        again.maybe().hashCode();
+        make("a").maybe().hashCode();
+        make("a").maybe().hashCode();
+    }
+
+    private static Paths make(String name) {
+        return new Paths();
+    }
+
+    private Paths maybe() {
+        return null;
+    }
+
+    private Paths maybe(String name) {
+        return null;
     }
 }
-";
+"#;
 
 // Pasar el resultado a un parámetro que el método desreferencia lo da por no nulo después: no
-// adentro de la misma llamada ni si el método lo tolera null.
+// adentro de la misma llamada ni si el método lo tolera null. Un getter sin argumentos ya
+// desreferenciado tampoco vuelve a avisar, salvo que se reasigne la variable o que la cadena
+// tenga argumentos.
 #[test]
 fn a_call_passed_to_a_non_null_parameter_is_not_null_afterwards() {
     assert_eq!(
         findings_in(PASSED, "data-flow-issue"),
-        ["10:46 getName()", "14:57 getName()"]
+        [
+            "10:31 getPath()",
+            "14:59 getPath()",
+            "32:23 hashCode()",
+            "34:26 hashCode()",
+            "35:26 hashCode()",
+            "37:23 hashCode()",
+            "39:23 hashCode()",
+            "40:27 hashCode()",
+            "41:27 hashCode()"
+        ]
     );
 }
