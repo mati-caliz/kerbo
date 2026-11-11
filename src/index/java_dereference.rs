@@ -1,5 +1,6 @@
 use super::java::{JavaSummary, NullInference, Position, lint_at};
 use super::java_jdk::{is_always_defined, jdk_method};
+use super::java_null_arguments::accepts;
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
@@ -154,7 +155,7 @@ fn project_step(
             .filter(|(_, declaration)| {
                 !declaration.is_constructor
                     && declaration.name == step.name
-                    && declaration.parameters.len() == step.arity
+                    && accepts(declaration, step.arity)
             })
             .collect();
         (!found.is_empty()).then_some(found)

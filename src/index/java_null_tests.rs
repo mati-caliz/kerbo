@@ -86,6 +86,14 @@ class Uses {
         Fields.accessible(new Fields()).hashCode();
         System.getProperty("java.version").trim();
         System.getProperty("app.mode").trim();
+        Lookup.none("a", "b").hashCode();
+        Lookup.none().hashCode();
+    }
+}
+
+final class Lookup {
+    static Lookup none(String... names) {
+        return null;
     }
 }
 "#;
@@ -177,7 +185,13 @@ fn findings_in(source: &str, rule: &str) -> Vec<String> {
 fn a_project_method_that_returns_null_and_cannot_be_overridden_is_nullable() {
     assert_eq!(
         findings("data-flow-issue"),
-        ["70:26 hashCode()", "72:33 hashCode()", "83:40 trim()"]
+        [
+            "70:26 hashCode()",
+            "72:33 hashCode()",
+            "83:40 trim()",
+            "84:31 hashCode()",
+            "85:23 hashCode()"
+        ]
     );
 }
 
