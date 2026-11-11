@@ -4,7 +4,7 @@ use super::java_null_arguments::accepts;
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
-use crate::lint::java_calls::{Body, ReturnType};
+use crate::lint::java_calls::{Arity, Body, ReturnType};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::rules::JavaRule;
 
@@ -142,7 +142,8 @@ fn nullable_steps(
 
 // Un paso que va a un método del proyecto (de la clase o de las de arriba en el proyecto): IntelliJ
 // lo infiere `@Nullable` si devuelve `null` en algún `return` y nadie puede redefinirlo. Sigue por
-// el tipo que declara, si todas las sobrecargas dicen el mismo.
+// el tipo que declara, si todas las sobrecargas dicen el mismo. Como Java, una sobrecarga de aridad
+// fija gana a una varargs.
 fn project_step(
     types: &ProjectTypes<'_>,
     library: &Library,
@@ -158,7 +159,13 @@ fn project_step(
                     && accepts(declaration, step.arity)
             })
             .collect();
-        (!found.is_empty()).then_some(found)
+        let fixed: Vec<_> = found
+            .iter()
+            .copied()
+            .filter(|(_, declaration)| declaration.arity == Arity::Fixed)
+            .collect();
+        let preferred = if fixed.is_empty() { found } else { fixed };
+        (!preferred.is_empty()).then_some(preferred)
     })?;
     let is_nullable = candidates.iter().all(|(_, declaration)| {
         declaration.inference == NullInference::ClosedReturnsNull && declaration.body == Body::Written

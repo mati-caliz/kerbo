@@ -88,12 +88,21 @@ class Uses {
         System.getProperty("app.mode").trim();
         Lookup.none("a", "b").hashCode();
         Lookup.none().hashCode();
+        Lookup.pick("a", "b").hashCode();
     }
 }
 
 final class Lookup {
     static Lookup none(String... names) {
         return null;
+    }
+
+    static Lookup pick(String name, Object value) {
+        return null;
+    }
+
+    static Lookup pick(String name, Object... values) {
+        return new Lookup();
     }
 }
 "#;
@@ -190,7 +199,8 @@ fn a_project_method_that_returns_null_and_cannot_be_overridden_is_nullable() {
             "72:33 hashCode()",
             "83:40 trim()",
             "84:31 hashCode()",
-            "85:23 hashCode()"
+            "85:23 hashCode()",
+            "86:31 hashCode()"
         ]
     );
 }
