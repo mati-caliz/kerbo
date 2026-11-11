@@ -9,6 +9,7 @@ mod raw_sql;
 use super::computed_names::name_text;
 use super::constants::{Constants, assignments, class_attributes, statement_assignments};
 use super::dependencies::{keys, swappable_setting};
+use super::expression::Context;
 use super::factories::{Factory, imported};
 use super::fields::{Owner, field};
 use super::meta::{constraint, constraints, index, indexes, unique_together};
@@ -155,6 +156,14 @@ fn model_name(call: &Call<'_>, index: usize, name: &str) -> Option<String> {
 }
 
 impl<'context> Scope<'context> {
+    fn expression_context(self) -> Context<'context> {
+        Context {
+            constants: self.constants,
+            apps_root: self.apps_root,
+            time_zone: self.settings.time_zone.as_deref(),
+        }
+    }
+
     fn resolved(self, node: Node<'context>) -> Node<'context> {
         self.constants.resolve(node)
     }
@@ -278,7 +287,7 @@ impl<'context> Scope<'context> {
         match call.method.trim_end_matches(CONCURRENTLY) {
             "AddIndex" => Some(Operation::AddIndex {
                 model,
-                index: argument(call, 1, "index").and_then(|node| index(node, self.constants))?,
+                index: argument(call, 1, "index").and_then(|node| index(node, self.expression_context()))?,
                 concurrently,
             }),
             "RemoveIndex" => Some(Operation::RemoveIndex {
@@ -294,7 +303,7 @@ impl<'context> Scope<'context> {
             "AddConstraint" => Some(Operation::AddConstraint {
                 model,
                 constraint: argument(call, 1, "constraint")
-                    .and_then(|node| constraint(node, self.constants))?,
+                    .and_then(|node| constraint(node, self.expression_context()))?,
             }),
             "RemoveConstraint" => Some(Operation::RemoveConstraint {
                 model,
@@ -353,8 +362,8 @@ impl<'context> Scope<'context> {
             match key.as_str() {
                 "db_table" => model.db_table = text(value, self.source),
                 "unique_together" => model.unique_together = unique_together(value, self.source),
-                "indexes" => model.indexes = indexes(value, self.constants),
-                "constraints" => model.constraints = constraints(value, self.constants),
+                "indexes" => model.indexes = indexes(value, self.expression_context()),
+                "constraints" => model.constraints = constraints(value, self.expression_context()),
                 "managed" => model.managed = boolean(value) != Some(false),
                 "proxy" => model.proxy = boolean(value) == Some(true),
                 "swappable" => {

@@ -32,6 +32,9 @@ const PYTHON_TRUE: &str = "True";
 const PYTHON_FALSE: &str = "False";
 const CONFIG_MODULE: &str = "apps.py";
 const MAXIMUM_SETTINGS_DEPTH: usize = 3;
+const USE_TZ_SETTING: &str = "USE_TZ";
+const TIME_ZONE_SETTING: &str = "TIME_ZONE";
+const DEFAULT_TIME_ZONE: &str = "America/Chicago";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
@@ -43,6 +46,7 @@ pub struct Settings {
     pub column_drops_cascade: bool,
     pub field_classes: BTreeMap<String, Class>,
     pub zero_downtime: Option<Backend>,
+    pub time_zone: Option<String>,
 }
 
 impl Default for Settings {
@@ -56,6 +60,7 @@ impl Default for Settings {
             column_drops_cascade: false,
             field_classes: BTreeMap::new(),
             zero_downtime: None,
+            time_zone: None,
         }
     }
 }
@@ -86,6 +91,8 @@ impl Settings {
         settings.numbers = numbers(sources);
         settings.flags = flags(sources);
         settings.installed_apps = installed_apps(sources);
+        settings.time_zone = (settings.flag(USE_TZ_SETTING) == Some(true))
+            .then(|| assigned(sources, TIME_ZONE_SETTING).unwrap_or_else(|| DEFAULT_TIME_ZONE.to_owned()));
         settings
     }
 

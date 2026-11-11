@@ -181,6 +181,7 @@ pub struct Index {
     pub name: String,
     pub fields: Vec<String>,
     pub expressions: Vec<Expression>,
+    pub include: Vec<String>,
     pub condition: Option<Condition>,
     pub method: Option<&'static str>,
     pub opclasses: Vec<String>,
@@ -192,6 +193,7 @@ pub enum ConstraintKind {
     Unique {
         fields: Vec<String>,
         expressions: Vec<Expression>,
+        include: Vec<String>,
         by_index: bool,
         condition: Option<Condition>,
         opclasses: Vec<String>,
@@ -200,6 +202,13 @@ pub enum ConstraintKind {
     },
     Check {
         condition: Condition,
+    },
+    Exclusion {
+        expressions: Vec<(Expression, String)>,
+        index_type: String,
+        condition: Option<Condition>,
+        include: Vec<String>,
+        deferrable: Option<&'static str>,
     },
 }
 

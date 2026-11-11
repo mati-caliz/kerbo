@@ -1,4 +1,4 @@
-use super::deferred::{IndexColumn, IndexKind, Kind, Statement, nulls_clause};
+use super::deferred::{IndexColumn, IndexKind, Kind, Statement, include_clause, nulls_clause};
 use super::expression::Expression;
 use super::model::{Constraint, ConstraintKind, Index, Model};
 use super::schema::{columns_of, quoted_columns};
@@ -18,6 +18,30 @@ pub fn constraint_definition(model: &Model, constraint: &Constraint) -> Option<S
             deferrable.unwrap_or_default()
         )),
         ConstraintKind::Check { condition } => Some(format!("CHECK ({})", condition.render(model))),
+        ConstraintKind::Exclusion {
+            expressions,
+            index_type,
+            condition,
+            include,
+            deferrable,
+        } => {
+            let excluded: Vec<String> = expressions
+                .iter()
+                .map(|(expression, operator)| {
+                    format!("{} WITH {operator}", expression.index_column(model).render())
+                })
+                .collect();
+            let condition = condition
+                .as_ref()
+                .map(|condition| format!(" WHERE ({})", condition.render(model)))
+                .unwrap_or_default();
+            Some(format!(
+                "EXCLUDE USING {index_type} ({}){}{condition}{}",
+                excluded.join(", "),
+                include_clause(&columns_of(model, include)),
+                deferrable.unwrap_or_default()
+            ))
+        }
     }
 }
 
@@ -49,15 +73,17 @@ pub fn named_index(model: &Model, index: &Index, kind: IndexKind) -> Statement {
             nulls_distinct: None,
             method: index.method,
             storage: index.storage.clone(),
+            include: columns_of(model, &index.include),
         },
     }
 }
 
 pub fn unique_index(model: &Model, constraint: &Constraint) -> Statement {
-    let (fields, expressions, condition, opclasses, nulls) = match &constraint.kind {
+    let (fields, expressions, include, condition, opclasses, nulls) = match &constraint.kind {
         ConstraintKind::Unique {
             fields,
             expressions,
+            include,
             condition,
             opclasses,
             nulls_distinct,
@@ -65,11 +91,14 @@ pub fn unique_index(model: &Model, constraint: &Constraint) -> Statement {
         } => (
             fields.clone(),
             expressions.clone(),
+            include.clone(),
             condition.clone(),
             opclasses.clone(),
             *nulls_distinct,
         ),
-        ConstraintKind::Check { .. } => (Vec::new(), Vec::new(), None, Vec::new(), None),
+        ConstraintKind::Check { .. } | ConstraintKind::Exclusion { .. } => {
+            (Vec::new(), Vec::new(), Vec::new(), None, Vec::new(), None)
+        }
     };
     let expressions = if fields.is_empty() && expressions.is_empty() {
         vec![Expression::Opaque]
@@ -82,6 +111,7 @@ pub fn unique_index(model: &Model, constraint: &Constraint) -> Statement {
             name: constraint.name.clone(),
             fields,
             expressions,
+            include,
             condition,
             method: None,
             opclasses,

@@ -7,6 +7,8 @@ use super::values::{boolean, elements, is_sequence, quoted_literal, raw, text};
 use crate::deploy::python_calls::Call;
 
 const Q_CLASS: &str = "Q";
+const WHEN_CLASS: &str = "When";
+const THEN_KEYWORD: &str = "then";
 const FIELD_REFERENCE: &str = "F";
 const DECIMAL_CONSTRUCTOR: &str = "Decimal";
 const LOOKUP_SEPARATOR: &str = "__";
@@ -128,7 +130,8 @@ fn operator<'source>(node: Node<'_>, source: &'source [u8]) -> Option<&'source s
 
 fn q_call<'tree>(node: Node<'tree>, constants: Constants<'tree>) -> Option<Tree> {
     let source = constants.source;
-    let call = Call::parse(node, source).filter(|call| call.method == Q_CLASS)?;
+    let call =
+        Call::parse(node, source).filter(|call| call.method == Q_CLASS || call.method == WHEN_CLASS)?;
     let mut tree = Tree {
         connector: Connector::And,
         negated: false,
@@ -148,6 +151,7 @@ fn q_call<'tree>(node: Node<'tree>, constants: Constants<'tree>) -> Option<Tree>
         match name {
             CONNECTOR_KEYWORD => tree.connector = connector_named(&text(rhs, source)?)?,
             NEGATED_KEYWORD => tree.negated = boolean(rhs)?,
+            THEN_KEYWORD if call.method == WHEN_CLASS => {}
             path => keywords.push((path.to_owned(), value(rhs, constants)?)),
         }
     }

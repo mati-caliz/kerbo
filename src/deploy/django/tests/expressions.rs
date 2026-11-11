@@ -151,3 +151,73 @@ fn class_enum_and_conditional_defaults_resolve_to_their_value() {
         "{sql}"
     );
 }
+
+const RICHER_EXPRESSIONS: &str = r#"from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import RangeOperators
+from django.db import migrations, models
+from django.db.models.functions import Cast, Coalesce
+
+
+class Migration(migrations.Migration):
+    operations = [
+        migrations.CreateModel(
+            name="Booking",
+            fields=[
+                ("id", models.BigAutoField(primary_key=True)),
+                ("room", models.IntegerField()),
+                ("starts", models.DateTimeField()),
+                ("ends", models.DateTimeField(null=True)),
+                ("data", models.JSONField()),
+                ("label", models.TextField()),
+            ],
+            options={
+                "indexes": [
+                    models.Index(models.F("data__kind"), name="booking_kind"),
+                    models.Index("room", include=["label"], name="booking_covering"),
+                    models.Index(Cast(models.KeyTextTransform("size", "data"), models.IntegerField()), name="booking_size"),
+                    models.Index(Coalesce("ends", "starts"), name="booking_finish"),
+                    models.Index(models.expressions.RawSQL("lower(label)", []), name="booking_raw"),
+                    models.Index(
+                        models.Case(models.When(room=1, then=models.Value("one")), default="label"),
+                        name="booking_case",
+                    ),
+                ],
+                "constraints": [
+                    ExclusionConstraint(
+                        name="booking_overlap",
+                        expressions=[
+                            ("room", RangeOperators.EQUAL),
+                            (models.Func("starts", "ends", models.Value("[]"), function="TSTZRANGE"), "&&"),
+                        ],
+                    ),
+                ],
+            },
+        ),
+    ]
+"#;
+
+fn richer() -> String {
+    sql(&MemoryLoader::default(), APP, "0001_initial", RICHER_EXPRESSIONS)
+}
+
+#[test]
+fn json_paths_casts_and_functions_render_like_django() {
+    let sql = richer();
+    for expected in [
+        r#"CREATE INDEX "booking_kind" ON "chat_booking" ((("data" -> 'kind')))"#,
+        r#"CREATE INDEX "booking_covering" ON "chat_booking" ("room") INCLUDE ("label")"#,
+        r#"CREATE INDEX "booking_size" ON "chat_booking" (((("data" ->> 'size'))::integer))"#,
+        r#"CREATE INDEX "booking_finish" ON "chat_booking" ((COALESCE("ends", "starts")))"#,
+        r#"CREATE INDEX "booking_raw" ON "chat_booking" (((lower(label))))"#,
+        r#"CREATE INDEX "booking_case" ON "chat_booking" ((CASE WHEN "room" = 1 THEN 'one' ELSE "label" END))"#,
+    ] {
+        assert!(sql.contains(expected), "falta {expected} en\n{sql}");
+    }
+}
+
+#[test]
+fn exclusion_constraints_pair_each_expression_with_its_operator() {
+    let sql = richer();
+    let expected = r#"CONSTRAINT "booking_overlap" EXCLUDE USING GIST ("room" WITH =, (TSTZRANGE("starts", "ends", '[]')) WITH &&)"#;
+    assert!(sql.contains(expected), "falta {expected} en\n{sql}");
+}

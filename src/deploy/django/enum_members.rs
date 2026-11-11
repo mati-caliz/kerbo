@@ -20,15 +20,33 @@ pub fn member_literal(node: Node<'_>, source: &[u8], apps_root: Option<&Path>) -
     }
     let path = node.child_by_field_name("value")?.utf8_text(source).ok()?;
     let member = text(node.child_by_field_name("subscript")?, source)?;
+    class_attribute(path, &member, apps_root, sql_literal)
+}
+
+pub fn class_attribute_text(path: &str, attribute: &str, apps_root: Option<&Path>) -> Option<String> {
+    class_attribute(path, attribute, apps_root, text)
+}
+
+fn class_attribute(
+    path: &str,
+    attribute: &str,
+    apps_root: Option<&Path>,
+    rendered: fn(Node<'_>, &[u8]) -> Option<String>,
+) -> Option<String> {
     let segments: Vec<&str> = path.split(PATH_SEPARATOR).collect();
     (1..segments.len()).rev().find_map(|split| {
         let (module, classes) = segments.split_at(split);
         let file = module_file(apps_root?, &module.join(&PATH_SEPARATOR.to_string()))?;
-        member_in_file(&file, classes, &member)
+        attribute_in_file(&file, classes, attribute, rendered)
     })
 }
 
-fn member_in_file(file: &Path, classes: &[&str], member: &str) -> Option<String> {
+fn attribute_in_file(
+    file: &Path,
+    classes: &[&str],
+    attribute: &str,
+    rendered: fn(Node<'_>, &[u8]) -> Option<String>,
+) -> Option<String> {
     let source = fs::read(file).ok()?;
     let mut parser = Parser::new();
     parser.set_language(&Language::Python.grammar()?).ok()?;
@@ -38,9 +56,9 @@ fn member_in_file(file: &Path, classes: &[&str], member: &str) -> Option<String>
         .try_fold(tree.root_node(), |scope, class| class_body(scope, class, &source))?;
     let value = assignments(body, &source)
         .into_iter()
-        .find(|(name, _)| name == member)?
+        .find(|(name, _)| name == attribute)?
         .1;
-    sql_literal(value, &source)
+    rendered(value, &source)
 }
 
 fn class_body<'tree>(scope: Node<'tree>, name: &str, source: &[u8]) -> Option<Node<'tree>> {

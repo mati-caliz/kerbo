@@ -40,7 +40,7 @@ impl IndexColumn {
         )
     }
 
-    fn render(&self) -> String {
+    pub fn render(&self) -> String {
         let name = if self.name.starts_with(EXPRESSION_START) {
             self.name.clone()
         } else {
@@ -73,6 +73,7 @@ pub enum Kind {
         nulls_distinct: Option<bool>,
         method: Option<&'static str>,
         storage: Vec<String>,
+        include: Vec<String>,
     },
     Constraint {
         name: String,
@@ -146,6 +147,7 @@ impl Statement {
                 nulls_distinct,
                 method,
                 storage,
+                include,
             } => {
                 let create = match kind {
                     IndexKind::Plain => "CREATE INDEX",
@@ -153,6 +155,7 @@ impl Statement {
                     IndexKind::Concurrent => "CREATE INDEX CONCURRENTLY",
                 };
                 let nulls = nulls_clause(*nulls_distinct);
+                let include = include_clause(include);
                 let condition = condition
                     .as_ref()
                     .map(|sql| format!(" WHERE {sql}"))
@@ -166,7 +169,7 @@ impl Statement {
                     format!(" WITH ({})", storage.join(", "))
                 };
                 format!(
-                    "{create} {} ON {table}{using} ({columns}){nulls}{storage}{condition}",
+                    "{create} {} ON {table}{using} ({columns}){include}{nulls}{storage}{condition}",
                     quoted(name)
                 )
             }
@@ -226,4 +229,12 @@ pub const fn nulls_clause(nulls_distinct: Option<bool>) -> &'static str {
         Some(false) => " NULLS NOT DISTINCT",
         None => "",
     }
+}
+
+pub fn include_clause(columns: &[String]) -> String {
+    if columns.is_empty() {
+        return String::new();
+    }
+    let quoted_columns: Vec<String> = columns.iter().map(|column| quoted(column)).collect();
+    format!(" INCLUDE ({})", quoted_columns.join(", "))
 }
