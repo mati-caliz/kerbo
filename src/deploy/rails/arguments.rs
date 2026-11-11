@@ -7,6 +7,8 @@ use crate::syntax::named_children;
 const PAIR: &str = "pair";
 const HASH: &str = "hash";
 const ARRAY: &str = "array";
+const ARRAY_KINDS: &[&str] = &[ARRAY, "string_array", "symbol_array"];
+const BARE_WORDS: &[&str] = &["bare_string", "bare_symbol"];
 const STRING: &str = "string";
 const STRING_CONTENT: &str = "string_content";
 const SIMPLE_SYMBOL: &str = "simple_symbol";
@@ -112,6 +114,7 @@ pub fn name(node: Node<'_>, source: &[u8]) -> Option<String> {
             Some(raw(node, source).trim_start_matches(SYMBOL_PREFIX).to_owned())
         }
         STRING | DELIMITED_SYMBOL => string_content(node, source),
+        kind if BARE_WORDS.contains(&kind) => string_content(node, source),
         _ => None,
     }
 }
@@ -125,7 +128,7 @@ pub fn string_content(node: Node<'_>, source: &[u8]) -> Option<String> {
 }
 
 pub fn names(node: Node<'_>, source: &[u8]) -> Vec<String> {
-    if node.kind() == ARRAY {
+    if ARRAY_KINDS.contains(&node.kind()) {
         return named_children(node)
             .into_iter()
             .filter_map(|element| name(element, source))

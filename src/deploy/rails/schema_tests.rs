@@ -175,3 +175,22 @@ fn replays_previous_migrations_of_the_directory() {
     assert_eq!(before.table_exists("items"), Some(true));
     assert_eq!(before.table_exists("products"), Some(false));
 }
+
+#[test]
+fn reads_word_arrays_in_index_guards() {
+    let sql = complete(concat!(
+        "    create_table :posts, id: :bigserial
+",
+        "    add_index :posts, [:a, :b, :c]
+",
+        "    remove_index :posts, column: [:a, :b] if index_exists?(:posts, %w(a b))
+",
+        "    remove_index :posts, column: [:a, :b, :c] if index_exists?(:posts, %i(a b c))",
+    ));
+    assert!(sql.contains("\"id\" bigserial NOT NULL PRIMARY KEY"), "{sql}");
+    assert!(!sql.contains("index_posts_on_a_and_b\""), "{sql}");
+    assert!(
+        sql.contains("DROP INDEX \"index_posts_on_a_and_b_and_c\""),
+        "{sql}"
+    );
+}

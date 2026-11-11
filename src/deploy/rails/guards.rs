@@ -91,6 +91,9 @@ impl Guard<'_> {
                 .get(1)
                 .map(|columns| names(*columns, self.source))
                 .unwrap_or_default();
+            if columns.is_empty() && parsed.positional.len() > 1 {
+                return None;
+            }
             return self.schema.index_exists(&table, &columns, named.as_deref());
         }
         if method != FOREIGN_KEY_EXISTS {

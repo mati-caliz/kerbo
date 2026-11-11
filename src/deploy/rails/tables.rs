@@ -18,9 +18,11 @@ const PRECISION: &str = "precision";
 const NAME: &str = "name";
 const UUID: &str = "uuid";
 const SERIAL_TYPES: &[&str] = &["serial", "integer"];
+const BIGSERIAL_TYPES: &[&str] = &["bigserial", "bigint"];
 const DEFAULT_PRIMARY_KEY: &str = "bigserial primary key";
 const UUID_PRIMARY_KEY: &str = "uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY";
 const SERIAL_PRIMARY_KEY: &str = "serial NOT NULL PRIMARY KEY";
+const BIGSERIAL_PRIMARY_KEY: &str = "bigserial NOT NULL PRIMARY KEY";
 const DEFAULT_PRECISION: &str = "6";
 const CREATED_AT: &str = "created_at";
 const UPDATED_AT: &str = "updated_at";
@@ -110,6 +112,7 @@ fn primary_key(arguments: &Arguments<'_>, source: &[u8]) -> Option<String> {
     let definition = match kind.as_deref() {
         Some(UUID) => UUID_PRIMARY_KEY,
         Some(declared) if SERIAL_TYPES.contains(&declared) => SERIAL_PRIMARY_KEY,
+        Some(declared) if BIGSERIAL_TYPES.contains(&declared) => BIGSERIAL_PRIMARY_KEY,
         _ if arguments.integer_ids => SERIAL_PRIMARY_KEY,
         _ => DEFAULT_PRIMARY_KEY,
     };
