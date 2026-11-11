@@ -1773,11 +1773,13 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned` y `failing-call`):
   commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno de más en los dos.
-  En guava, 208 de los 972 (101 `data-flow-issue`, 106 `null-argument`, 1 `failing-call`), ninguno
+  En guava, 216 de los 972 (101 `data-flow-issue`, 114 `null-argument`, 1 `failing-call`), ninguno
   de más. Bajo `@NullMarked`/`@NonNullApi` (del paquete, la clase o las que la encierran, cortado
   por `@NullUnmarked`) un parámetro sin anotar es no nulo aunque el método se pueda redefinir; no
   si su tipo es una variable con límite `@Nullable` o el tipo calificado lleva `@Nullable` en su
-  último tramo (`Spliterator.@Nullable OfInt`). Una llamada pasada antes a un parámetro que el método desreferencia queda no nula
+  último tramo (`Spliterator.@Nullable OfInt`). Un método traído con `import static` explícito se
+  busca en la clase del import, y un tipo calificado, entre los del proyecto antes que en las
+  librerías. Una llamada pasada antes a un parámetro que el método desreferencia queda no nula
   después (por el texto de la expresión), y un getter sin argumentos ya desreferenciado también,
   mientras la cadena no tenga argumentos y no se reasigne la variable. `File.getParent` y
   `getParentFile` no cuentan como nulos: Qodana no los marca nunca. Del JDK, los parámetros que
