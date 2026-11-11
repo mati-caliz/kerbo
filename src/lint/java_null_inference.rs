@@ -16,6 +16,8 @@ const ALTERNATIVE_FIELD: &str = "alternative";
 const RETURN: &str = "return_statement";
 const IF: &str = "if_statement";
 const VARIABLE_DECLARATOR: &str = "variable_declarator";
+const ARRAY_TYPE: &str = "array_type";
+pub const ARRAY_SUFFIX: &str = "[]";
 const CONDITION_FIELD: &str = "condition";
 const PARAMETERS_FIELD: &str = "parameters";
 const PARAMETER_FIRST_CHECKS: [&str; 3] = ["==null", "!=null", "instanceof"];
@@ -156,9 +158,14 @@ pub fn parameter_name(parameter: Node<'_>) -> Option<Node<'_>> {
 // El tipo con que se castea el `null` (`(Number) null` da `Number`), por su nombre simple.
 pub(super) fn cast_type(argument: Node<'_>, source: &[u8]) -> Option<String> {
     match argument.kind() {
-        CAST => argument
-            .child_by_field_name(TYPE_FIELD)
-            .map(|written| simple_type_name(text(written, source))),
+        CAST => argument.child_by_field_name(TYPE_FIELD).map(|written| {
+            let simple = simple_type_name(text(written, source));
+            if written.kind() == ARRAY_TYPE {
+                format!("{simple}{ARRAY_SUFFIX}")
+            } else {
+                simple
+            }
+        }),
         PARENTHESIZED => named_children(argument)
             .first()
             .and_then(|inner| cast_type(*inner, source)),

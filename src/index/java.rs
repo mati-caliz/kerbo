@@ -4,6 +4,7 @@ use tree_sitter::Node;
 
 use super::java_exposure::{DeclaredType, Exposure, exposures};
 use super::java_header::{imported_paths, package_annotations, package_of};
+use crate::lint::java::VARIABLE_DECLARATOR;
 use crate::lint::java_calls::{
     Arity, Body, Call, Callable, ResultUse, ReturnType, Returns, TYPE_DECLARATIONS, Visibility, extract,
 };
@@ -23,7 +24,9 @@ use crate::lint::java_owner::{Owner, annotation_names};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
 use crate::lint::java_throws::MethodThrows;
-use crate::lint::java_type_variables::{has_nullable_qualified_type, has_nullable_type_variable};
+use crate::lint::java_type_variables::{
+    has_nullable_qualified_type, has_nullable_type_variable, is_type_variable,
+};
 use crate::lint::taint::TaintMethod;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::JavaRule;
@@ -50,6 +53,7 @@ pub struct Parameter {
     pub dereferenced: Dereferenced,
     pub reading: Reading,
     pub type_name: String,
+    pub type_variable: bool,
     pub accepts_null: bool,
 }
 
@@ -223,6 +227,13 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
 // Si el parámetro dice algo de su nulabilidad (`@Nullable`, `@NonNull`, `@NotNull`...).
 fn declares_nullness(name: Node<'_>, source: &[u8]) -> bool {
     name.parent()
+        .and_then(|parent| {
+            if parent.kind() == VARIABLE_DECLARATOR {
+                parent.parent()
+            } else {
+                Some(parent)
+            }
+        })
         .map(|parameter| annotation_names(parameter, source))
         .unwrap_or_default()
         .iter()
@@ -326,6 +337,7 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
                         Reading::Unread
                     },
                     type_name: parameter_type_name(*parameter, source),
+                    type_variable: is_type_variable(*parameter, source),
                     accepts_null: accepts_null(*parameter),
                 }
             })

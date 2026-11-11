@@ -7,7 +7,7 @@ use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body};
 use crate::lint::java_null_flow::NullFlow;
-use crate::lint::java_null_inference::NullArgument;
+use crate::lint::java_null_inference::{ARRAY_SUFFIX, NullArgument};
 use crate::lint::java_receivers::{Receiver, simple_type_name};
 use crate::rules::JavaRule;
 
@@ -90,7 +90,7 @@ pub(super) fn non_null_parameter(
         Receiver::Unknown => return None,
     };
     let candidates = owners.iter().find_map(|owner| {
-        let found: Vec<(&JavaSummary, &Declaration, &Parameter)> = types
+        let mut found: Vec<(&JavaSummary, &Declaration, &Parameter, Slot)> = types
             .declarations_of(owner)
             .filter(|(_, declaration)| {
                 declaration.is_constructor == argument.is_constructor
@@ -98,17 +98,22 @@ pub(super) fn non_null_parameter(
                     && accepts(declaration, argument.arity)
             })
             .filter_map(|(declaring, declaration)| {
-                let parameter = parameter_at(declaration, argument)?;
-                receives(parameter, argument).then_some((declaring, declaration, parameter))
+                let (parameter, slot) = parameter_at(declaration, argument)?;
+                receives(parameter, argument).then_some((declaring, declaration, parameter, slot))
             })
             .collect();
+        if found.iter().any(|(.., slot)| *slot == Slot::Whole) {
+            found.retain(|(.., slot)| *slot == Slot::Whole);
+        }
         (!found.is_empty()).then_some(found)
     })?;
-    let mut names = candidates.iter().map(|(declaring, declaration, parameter)| {
-        (inferred_non_null(declaration, parameter, argument)
-            || marked_non_null(types, declaring, declaration, parameter))
-        .then(|| parameter.name.clone())
-    });
+    let mut names = candidates
+        .iter()
+        .map(|(declaring, declaration, parameter, slot)| {
+            (*slot == Slot::Whole && inferred_non_null(declaration, parameter, argument)
+                || marked_non_null(types, declaring, declaration, parameter))
+            .then(|| parameter.name.clone())
+        });
     let first = names.next()??;
     names.all(|other| other.is_some()).then_some(first)
 }
@@ -134,13 +139,13 @@ fn marked_non_null(
 }
 
 // Si la sobrecarga puede recibir este `null`: un primitivo no, y con un casteo sólo la del tipo
-// casteado.
+// casteado o una cuyo tipo es una variable de tipo.
 fn receives(parameter: &Parameter, argument: &NullArgument) -> bool {
     parameter.accepts_null
         && argument
             .cast
             .as_deref()
-            .is_none_or(|cast| simple_type_name(cast) == parameter.type_name)
+            .is_none_or(|cast| parameter.type_variable || simple_type_name(cast) == parameter.type_name)
 }
 
 fn library_non_null(library: &Library, class: &str, argument: &NullArgument) -> Option<String> {
@@ -156,18 +161,39 @@ fn library_non_null(library: &Library, class: &str, argument: &NullArgument) -> 
         .map(|(.., parameter)| (*parameter).to_owned())
 }
 
-// Un `null` en el lugar del varargs es el arreglo entero sólo si es el único argumento de ahí.
+// Qué recibe el parámetro con el `null`: el valor entero, o uno de los elementos del varargs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Slot {
+    Whole,
+    Element,
+}
+
+// Un `null` en el lugar del varargs es el arreglo entero sólo si es el único argumento de ahí;
+// si no, es uno de sus elementos.
 fn parameter_at<'declaration>(
     declaration: &'declaration Declaration,
     argument: &NullArgument,
-) -> Option<&'declaration Parameter> {
+) -> Option<(&'declaration Parameter, Slot)> {
     let last = declaration.parameters.len().checked_sub(1)?;
     if declaration.arity == Arity::Variadic && argument.index >= last {
-        return (argument.arity == declaration.parameters.len())
-            .then(|| declaration.parameters.get(last))
-            .flatten();
+        let cast_to_element = argument
+            .cast
+            .as_deref()
+            .is_some_and(|cast| !cast.ends_with(ARRAY_SUFFIX));
+        let slot = if argument.arity == declaration.parameters.len() && !cast_to_element {
+            Slot::Whole
+        } else {
+            Slot::Element
+        };
+        return declaration
+            .parameters
+            .get(last)
+            .map(|parameter| (parameter, slot));
     }
-    declaration.parameters.get(argument.index)
+    declaration
+        .parameters
+        .get(argument.index)
+        .map(|parameter| (parameter, Slot::Whole))
 }
 
 pub(super) const fn accepts(declaration: &Declaration, arity: usize) -> bool {

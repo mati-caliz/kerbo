@@ -36,15 +36,25 @@ pub fn has_nullable_qualified_type(name: Node<'_>, source: &[u8]) -> bool {
 // Object>`): la declarada más cerca, en el método o en las clases que lo encierran. Bajo
 // `@NullMarked` esa variable admite null.
 pub fn has_nullable_type_variable(name: Node<'_>, source: &[u8]) -> bool {
+    closest_bound_is_nullable(name, source).unwrap_or(false)
+}
+
+// Si el tipo del parámetro (o el de sus elementos, en un arreglo o varargs) es una variable de tipo
+// del método o de las clases que lo encierran.
+pub fn is_type_variable(name: Node<'_>, source: &[u8]) -> bool {
+    closest_bound_is_nullable(name, source).is_some()
+}
+
+fn closest_bound_is_nullable(name: Node<'_>, source: &[u8]) -> Option<bool> {
     let written = parameter_type_name(name, source);
     let mut current = name.parent();
     while let Some(node) = current {
         if let Some(nullable) = declared_bound_is_nullable(node, &written, source) {
-            return nullable;
+            return Some(nullable);
         }
         current = node.parent();
     }
-    false
+    None
 }
 
 fn declared_bound_is_nullable(declaration: Node<'_>, written: &str, source: &[u8]) -> Option<bool> {

@@ -78,6 +78,33 @@ final class Callers {
 }
 ";
 
+const BUILDER: &str = r#"package app;
+
+import org.jspecify.annotations.Nullable;
+
+final class Builder<E> {
+    Builder<E> add(E element) { return this; }
+    Builder<E> add(E... elements) { return this; }
+    static <E> Builder<E> of(E first, E... rest) { return new Builder<>(); }
+    static <F extends @Nullable Object> Builder<F> loose(F... elements) { return new Builder<>(); }
+    static void all(@Nullable Object... expected) {}
+    static int count(String... texts) { return texts.length; }
+}
+
+final class Building {
+    void calls(Builder<String> builder) {
+        builder.add((String) null);
+        builder.add((String[]) null);
+        builder.add("a", null);
+        Builder.of("a", "b", null);
+        Builder.of((String) null);
+        Builder.loose((String) null);
+        Builder.all("a", null);
+        Builder.count((String) null);
+    }
+}
+"#;
+
 fn null_arguments(sources: &[&str]) -> Vec<String> {
     let summaries: Vec<_> = sources.iter().map(|source| summary_of(source)).collect();
     let files: Vec<IndexedSummary<'_>> = summaries
@@ -116,4 +143,22 @@ fn without_null_marked_unannotated_parameters_say_nothing() {
 #[test]
 fn null_passed_to_a_statically_imported_method_reaches_its_class() {
     assert_eq!(null_arguments(&[PACKAGE_INFO, TEXTS, IMPORTER]), ["7:16 text"]);
+}
+
+// Un casteo llega igual a un parámetro cuyo tipo es una variable (`add(E)` con `(String) null`), y
+// bajo `@NullMarked` un `null` entre los elementos de un varargs también es un argumento no nulo.
+#[test]
+fn null_reaches_type_variables_through_casts_and_varargs_elements() {
+    assert_eq!(
+        null_arguments(&[PACKAGE_INFO, BUILDER]),
+        [
+            "16:30 element",
+            "17:32 element",
+            "18:26 elements",
+            "19:30 rest",
+            "20:29 first",
+            "23:32 texts"
+        ]
+    );
+    assert_eq!(null_arguments(&[BUILDER]), Vec::<String>::new());
 }

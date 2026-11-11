@@ -78,6 +78,7 @@ pub(super) fn write_declaration(writer: &mut Writer, declaration: &Declaration) 
         });
         write_flag(writer, parameter.reading == Reading::Read);
         writer.text(&parameter.type_name);
+        write_flag(writer, parameter.type_variable);
         write_flag(writer, parameter.accepts_null);
     });
     writer.list(&declaration.annotations, |writer, name| writer.text(name));
@@ -167,6 +168,7 @@ pub(super) fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, C
                     Reading::Unread
                 },
                 type_name: reader.text()?,
+                type_variable: read_flag(reader)?,
                 accepts_null: read_flag(reader)?,
             })
         })?,
