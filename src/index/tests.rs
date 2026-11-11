@@ -112,6 +112,74 @@ fn with_the_jdk_a_resource_is_whatever_inherits_from_auto_closeable() {
     );
 }
 
+const STREAMS: &str = "package app;
+
+import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
+import java.io.OutputStream;
+
+class Streams {
+    static class Tracked implements Closeable {
+        public void close() {
+        }
+    }
+
+    void leaked() {
+        final Tracked tracked = new Tracked();
+        run(() -> consume(tracked));
+        final OutputStream failing = new OutputStream() {
+            public void write(int value) {
+            }
+        };
+        new Tracked().hashCode();
+    }
+
+    void handed() {
+        final Tracked tracked = new Tracked();
+        consume(tracked);
+        final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        new Tracked().close();
+        try (Tracked closed = new Tracked()) {
+        }
+        new Wrapping(buffer).hashCode();
+        new Wrapping(new ByteArrayOutputStream()).hashCode();
+    }
+
+    void consume(Closeable closeable) {
+    }
+
+    void run(Runnable runnable) {
+    }
+
+    static class Wrapping implements Closeable {
+        Wrapping(OutputStream wrapped) {
+        }
+
+        public void close() {
+        }
+    }
+}
+";
+
+// Un `new` de una clase del proyecto que se cierra o de una anónima de la librería, que no va a un
+// try con recursos ni se pasa a otro fuera de una lambda; no el de un tipo ignorado ni el que
+// recibe otro recurso.
+#[test]
+fn a_constructed_resource_is_reported_unless_it_escapes() {
+    let summary = summary_of(STREAMS);
+    let files = [IndexedSummary {
+        summary: &summary,
+        in_tests: false,
+    }];
+    let found: Vec<String> = project_lints(&files, &Library::load(&[]))
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "auto-closeable-resource")
+        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
+        .collect();
+    assert_eq!(found, ["14:37 Tracked", "16:42 OutputStream", "20:13 Tracked"]);
+}
+
 fn unclosed(library: &Library) -> Vec<String> {
     let summary = summary_of(JOBS);
     let files = [IndexedSummary {

@@ -1724,8 +1724,9 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     sin resolver de una anónima anidada y de un overrider sin `throws` (sólo pesa con classpath
     incompleto); una interfaz del proyecto sin métodos no se reconoce en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
-  commons-lang 0 de 2, ninguno de más. Pendientes: los dos de commons-lang son un recurso que se
-  crea con una clase del proyecto en un test y un `OutputStream` que vuelve de un método.
+  commons-lang 2 de 2, ninguno de más. Calca los `new` (clases del proyecto y anónimas) y descarta
+  el recurso que recibe otro `AutoCloseable` como argumento o receptor. Pendiente: medir con Qodana
+  en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue` y `null-argument`): commons-lang 39 de 141 sin ninguno de más;
   junit4 1 de 19 con uno de más (`f.getParentFile().getParentFile()` en un test, que IntelliJ no
   marca aunque `getParentFile` está en la tabla de nulos del JDK). Lo que falta es en su mayoría de

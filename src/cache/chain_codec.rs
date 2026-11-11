@@ -2,11 +2,14 @@ use super::codec::{Corrupt, Reader, Writer};
 use super::summary_codec::{read_flag, write_flag};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::lint::java_null_flow::{Dereference, NullFlow};
+use crate::lint::java_resources::ResourceOrigin;
 
 const ABSENT: u64 = 0;
 const PRESENT: u64 = 1;
 const ROOT_INSTANCE: u64 = 0;
 const ROOT_CLASS: u64 = 1;
+const ORIGIN_CALL: u64 = 0;
+const ORIGIN_CONSTRUCTION: u64 = 1;
 
 pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
     match &chain.root {
@@ -84,4 +87,25 @@ pub(super) fn read_flow(reader: &mut Reader<'_>) -> Result<NullFlow, Corrupt> {
             })
         })?,
     })
+}
+
+pub(super) fn write_resource_origin(writer: &mut Writer, origin: &ResourceOrigin) {
+    match origin {
+        ResourceOrigin::Call(chain) => {
+            writer.number(ORIGIN_CALL);
+            write_chain(writer, chain);
+        }
+        ResourceOrigin::Construction(class) => {
+            writer.number(ORIGIN_CONSTRUCTION);
+            writer.text(class);
+        }
+    }
+}
+
+pub(super) fn read_resource_origin(reader: &mut Reader<'_>) -> Result<ResourceOrigin, Corrupt> {
+    match reader.number()? {
+        ORIGIN_CALL => Ok(ResourceOrigin::Call(read_chain(reader)?)),
+        ORIGIN_CONSTRUCTION => Ok(ResourceOrigin::Construction(reader.text()?)),
+        _ => Err(Corrupt),
+    }
 }

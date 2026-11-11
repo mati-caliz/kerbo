@@ -1,4 +1,6 @@
-use super::chain_codec::{read_chain, read_flow, write_chain, write_flow};
+use super::chain_codec::{
+    read_chain, read_flow, read_resource_origin, write_chain, write_flow, write_resource_origin,
+};
 use super::codec::{Corrupt, Reader, Writer};
 use super::declaration_codec::{read_declaration, read_owner, write_declaration, write_owner};
 use super::generics_codec::{read_generics, write_generics};
@@ -62,7 +64,8 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     writer.list(&summary.chains, write_chain);
     writer.list(&summary.null_flows, write_flow);
     writer.list(&summary.resources, |writer, candidate| {
-        write_chain(writer, &candidate.origin);
+        write_resource_origin(writer, &candidate.origin);
+        writer.list(&candidate.owners, write_resource_origin);
         writer.size(candidate.line);
         writer.size(candidate.column);
     });
@@ -132,7 +135,8 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         null_flows: reader.list(read_flow)?,
         resources: reader.list(|reader| {
             Ok(ResourceCandidate {
-                origin: read_chain(reader)?,
+                origin: read_resource_origin(reader)?,
+                owners: reader.list(read_resource_origin)?,
                 line: reader.size()?,
                 column: reader.size()?,
             })

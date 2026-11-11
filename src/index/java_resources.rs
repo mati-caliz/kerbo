@@ -6,6 +6,7 @@ use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
+use crate::lint::java_resources::ResourceOrigin;
 use crate::rules::JavaRule;
 
 const QUALIFIER_SEPARATOR: char = '.';
@@ -19,8 +20,9 @@ enum Place {
     Library(String),
 }
 
-// Calca AutoCloseableResource: una llamada que crea algo que se cierra (por los jars, por el tipo
-// que declara un método del proyecto o por la tabla del JDK) y que no va a un try con recursos.
+// Calca AutoCloseableResource: una llamada o un `new` que crea algo que se cierra (por los jars, por
+// el tipo que declara un método del proyecto o por la tabla del JDK) y que no va a un try con
+// recursos.
 pub fn unclosed_resources(
     types: &ProjectTypes<'_>,
     library: &Library,
@@ -35,23 +37,85 @@ pub fn unclosed_resources(
     summary
         .resources
         .iter()
+        .filter(|candidate| {
+            !candidate
+                .owners
+                .iter()
+                .any(|owner| is_closeable(types, library, summary, owner))
+        })
         .filter_map(|candidate| {
-            let created = created_class(types, library, summary, &candidate.origin)?;
-            (is_resource(library, &created) || holds_a_file(types, library, summary, &candidate.origin)).then(
-                || {
-                    let simple = created.rsplit(QUALIFIER_SEPARATOR).next().unwrap_or(&created);
-                    lint_at(
-                        JavaRule::AutoCloseableResource,
-                        &Position {
-                            line: candidate.line,
-                            column: candidate.column,
-                        },
-                        simple.to_owned(),
-                    )
+            let created = unclosed_class(types, library, summary, &candidate.origin)?;
+            let simple = created.rsplit(QUALIFIER_SEPARATOR).next().unwrap_or(&created);
+            Some(lint_at(
+                JavaRule::AutoCloseableResource,
+                &Position {
+                    line: candidate.line,
+                    column: candidate.column,
                 },
-            )
+                simple.to_owned(),
+            ))
         })
         .collect()
+}
+
+// La clase de lo creado, si es algo que hay que cerrar.
+fn unclosed_class(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    origin: &ResourceOrigin,
+) -> Option<String> {
+    match origin {
+        ResourceOrigin::Call(chain) => {
+            let created = created_class(types, library, summary, chain)?;
+            (is_resource(library, &created) || holds_a_file(types, library, summary, chain))
+                .then_some(created)
+        }
+        ResourceOrigin::Construction(class) => match resolve(types, library, summary, class) {
+            Resolved::Library(created) => is_resource(library, &created).then_some(created),
+            Resolved::Project(created) => {
+                is_project_resource(library, &library_ancestors(types, library, &created)).then_some(created)
+            }
+        },
+    }
+}
+
+// Si lo que da el argumento o el receptor es `AutoCloseable`, aunque sea de los ignorados: el
+// recurso nuevo puede quedarse con él y IntelliJ no sigue a ninguno de los dos.
+fn is_closeable(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    owner: &ResourceOrigin,
+) -> bool {
+    let inherited = match owner {
+        ResourceOrigin::Call(chain) => created_class(types, library, summary, chain)
+            .map(|created| ancestors(library, &created))
+            .unwrap_or_default(),
+        ResourceOrigin::Construction(class) => match resolve(types, library, summary, class) {
+            Resolved::Library(created) => ancestors(library, &created),
+            Resolved::Project(created) => library_ancestors(types, library, &created)
+                .iter()
+                .flat_map(|ancestor| ancestors(library, ancestor))
+                .collect(),
+        },
+    };
+    inherited.iter().any(|class| {
+        class == AUTO_CLOSEABLE
+            || CLOSEABLE.contains(&class.as_str())
+            || NOT_RESOURCES.contains(&class.as_str())
+    })
+}
+
+// Una clase del proyecto se cierra si hereda de un recurso de una librería y de ninguno de los
+// ignorados.
+fn is_project_resource(library: &Library, inherited: &[String]) -> bool {
+    inherited.iter().any(|class| is_resource(library, class))
+        && !inherited.iter().any(|class| {
+            ancestors(library, class)
+                .iter()
+                .any(|ancestor| NOT_RESOURCES.contains(&ancestor.as_str()))
+        })
 }
 
 // La clase que devuelve el último paso de la cadena, siguiendo cada paso por el proyecto, los jars
