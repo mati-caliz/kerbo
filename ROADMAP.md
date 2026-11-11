@@ -1764,7 +1764,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   el recurso que recibe otro `AutoCloseable` como argumento o receptor. Pendiente: medir con Qodana
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned` y `failing-call`):
-  commons-lang 128 de 141 sin ninguno de más; junit4 14 de 19 con uno de más
+  commons-lang 130 de 141 sin ninguno de más; junit4 14 de 19 con uno de más
   (`f.getParentFile().getParentFile()` en un test, que IntelliJ no marca aunque `getParentFile`
   está en la tabla de nulos del JDK). `failing-call` calca "The call to X always fails, according
   to its method contracts" con las cláusulas `fail` que IntelliJ infiere del cuerpo y las escritas
@@ -1774,9 +1774,12 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     (5 en commons-lang); el `assertNull(message, x)` de `junit.framework` con mensaje concatenado.
   - Delegación (`DelegationContract`/`MethodCallContract`), `isAssignableFrom`, y el "always fails
     as an argument is out of bounds" (`read(arr, -1, 0)`, `new GregorianCalendar(...)`).
-  - "may produce NPE" entre métodos (5): el `Map` que devuelve `getTypeArguments` en TypeUtils
-    (848, 1163, 1173), que pide elegir la sobrecarga por el tipo de los argumentos y no sólo por
-    la aridad, `Method.invoke` y `throw Throwables.rethrowAsException(...)` en junit4.
+  - "may produce NPE" entre métodos (2): `Method.invoke` y
+    `throw Throwables.rethrowAsException(...)` en junit4.
+  - "Argument might be null": una variable que puede ser null pasada a un parámetro que el método
+    desreferencia (`unrollVariableAssignments(typeParams[0], toTypeVarAssigns)` en TypeUtils 1163).
+  - Las sobrecargas del proyecto se eligen por el tipo exacto de los argumentos que se conocen
+    (variables y casteos); un subtipo no elige la sobrecarga más específica.
   - La asignación repetida sólo se sigue en línea recta dentro de un bloque: falta la que viene
     después de un `assertNull(x)`. Las sobrecargas se comparan por nombre simple sin dimensiones
     (`int` y `int[]` se confunden).

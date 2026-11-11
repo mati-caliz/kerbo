@@ -30,6 +30,13 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
         write_flag(writer, step.checked);
         writer.list(&step.class_arguments, |writer, position| writer.size(*position));
         writer.list(&step.text_arguments, |writer, argument| writer.text(argument));
+        writer.list(&step.argument_types, |writer, argument| match argument {
+            Some(declared) => {
+                writer.number(PRESENT);
+                writer.text(declared);
+            }
+            None => writer.number(ABSENT),
+        });
     });
     match chain.unboxed {
         Some((line, column)) => {
@@ -57,6 +64,7 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
                 checked: read_flag(reader)?,
                 class_arguments: reader.list(Reader::size)?,
                 text_arguments: reader.list(Reader::text)?,
+                argument_types: reader.list(read_optional_text)?,
             })
         })?,
         unboxed: match reader.number()? {
@@ -65,6 +73,14 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
             _ => return Err(Corrupt),
         },
     })
+}
+
+fn read_optional_text(reader: &mut Reader<'_>) -> Result<Option<String>, Corrupt> {
+    match reader.number()? {
+        ABSENT => Ok(None),
+        PRESENT => Ok(Some(reader.text()?)),
+        _ => Err(Corrupt),
+    }
 }
 
 pub(super) fn write_flow(writer: &mut Writer, flow: &NullFlow) {

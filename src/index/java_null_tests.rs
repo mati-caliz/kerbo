@@ -89,6 +89,10 @@ class Uses {
         Lookup.none("a", "b").hashCode();
         Lookup.none().hashCode();
         Lookup.pick("a", "b").hashCode();
+        final Fields field = new Fields();
+        Lookup.typed(field).hashCode();
+        Lookup.typed((Object) field).hashCode();
+        Lookup.copied("a").hashCode();
     }
 }
 
@@ -102,6 +106,22 @@ final class Lookup {
     }
 
     static Lookup pick(String name, Object... values) {
+        return new Lookup();
+    }
+
+    static Lookup typed(Fields field) {
+        return null;
+    }
+
+    static Lookup typed(Object value) {
+        return new Lookup();
+    }
+
+    static Lookup copied(String name) {
+        final String copy = name == null ? "" : name;
+        if (copy.isEmpty()) {
+            return null;
+        }
         return new Lookup();
     }
 }
@@ -200,7 +220,9 @@ fn a_project_method_that_returns_null_and_cannot_be_overridden_is_nullable() {
             "83:40 trim()",
             "84:31 hashCode()",
             "85:23 hashCode()",
-            "86:31 hashCode()"
+            "86:31 hashCode()",
+            "88:29 hashCode()",
+            "90:28 hashCode()"
         ]
     );
 }

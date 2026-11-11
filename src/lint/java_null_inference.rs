@@ -59,7 +59,9 @@ pub struct NullArgument {
 // Si algún `return` del método devuelve `null`, directo o en una rama de un ternario: IntelliJ
 // infiere de eso que el método es `@Nullable`. Si alguna condición pregunta por un parámetro
 // (`texto == null`, `texto != null`, `objeto instanceof Cloneable`), lo que infiere es un contrato
-// (`null -> null`), y con un contrato ya no da el método por `@Nullable`.
+// (`null -> null`), y con un contrato ya no da el método por `@Nullable`. Un ternario sólo arma
+// contrato si es lo que se devuelve: el que arma una variable (`mapa == null ? new HashMap<>() : mapa`)
+// no.
 pub fn returns_null(method: Node<'_>, source: &[u8]) -> bool {
     let Some(body) = method.child_by_field_name(BODY_FIELD) else {
         return false;
@@ -68,7 +70,8 @@ pub fn returns_null(method: Node<'_>, source: &[u8]) -> bool {
     let mut returns_null = false;
     let mut pending = vec![body];
     while let Some(node) = pending.pop() {
-        if (node.kind() == IF || node.kind() == TERNARY) && checks_a_parameter(node, source, &checks) {
+        let may_be_a_contract = node.kind() == IF || (node.kind() == TERNARY && is_returned(node));
+        if may_be_a_contract && checks_a_parameter(node, source, &checks) {
             return false;
         }
         if node.kind() == RETURN {
@@ -81,6 +84,18 @@ pub fn returns_null(method: Node<'_>, source: &[u8]) -> bool {
         }
     }
     returns_null
+}
+
+fn is_returned(expression: Node<'_>) -> bool {
+    let mut current = expression;
+    while let Some(parent) = current.parent() {
+        match parent.kind() {
+            RETURN => return true,
+            TERNARY | PARENTHESIZED => current = parent,
+            _ => return false,
+        }
+    }
+    false
 }
 
 // `p == null`, `p != null`, sus vueltas y `p instanceof` de cada parámetro, sin espacios.
@@ -139,7 +154,7 @@ pub fn parameter_name(parameter: Node<'_>) -> Option<Node<'_>> {
 }
 
 // El tipo con que se castea el `null` (`(Number) null` da `Number`), por su nombre simple.
-fn cast_type(argument: Node<'_>, source: &[u8]) -> Option<String> {
+pub(super) fn cast_type(argument: Node<'_>, source: &[u8]) -> Option<String> {
     match argument.kind() {
         CAST => argument
             .child_by_field_name(TYPE_FIELD)

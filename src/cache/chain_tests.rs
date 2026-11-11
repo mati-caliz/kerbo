@@ -16,6 +16,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
                 checked: false,
                 class_arguments: vec![1],
                 text_arguments: vec!["java.version".to_owned()],
+                argument_types: vec![Some("String".to_owned()), None],
             }],
             unboxed: Some((12, 16)),
         },

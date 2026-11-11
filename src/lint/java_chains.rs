@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
+use super::java_null_inference::cast_type;
 use super::java_receivers::{Variables, enclosing_types};
 use super::java_throws::ArgumentKind;
 use crate::syntax::{named_children, one_based};
@@ -57,6 +58,7 @@ pub struct ChainStep {
     pub checked: bool,
     pub class_arguments: Vec<usize>,
     pub text_arguments: Vec<String>,
+    pub argument_types: Vec<Option<String>>,
 }
 
 // `respuesta.getBody().error()`: la raíz y los pasos en orden. Interesan las de al menos dos pasos,
@@ -217,6 +219,7 @@ fn walk(
             checked: facts.is_checked(current, source),
             class_arguments: class_arguments(current),
             text_arguments: text_arguments(current, source),
+            argument_types: argument_types(current, source, variables),
         });
         let Some(object) = current.child_by_field_name(OBJECT_FIELD) else {
             steps.reverse();
@@ -275,6 +278,19 @@ fn text_arguments(invocation: Node<'_>, source: &[u8]) -> Vec<String> {
         .into_iter()
         .filter(|argument| argument.kind() == STRING_LITERAL)
         .map(|literal| text(literal, source).trim_matches(QUOTE).to_owned())
+        .collect()
+}
+
+// El tipo de cada argumento cuando se sabe: una variable con su tipo declarado o un casteo.
+fn argument_types(invocation: Node<'_>, source: &[u8], variables: &Variables) -> Vec<Option<String>> {
+    call_arguments(invocation)
+        .into_iter()
+        .map(|argument| {
+            if argument.kind() == IDENTIFIER {
+                return variables.get(text(argument, source)).cloned().flatten();
+            }
+            cast_type(argument, source)
+        })
         .collect()
 }
 

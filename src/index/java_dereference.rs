@@ -1,4 +1,4 @@
-use super::java::{JavaSummary, NullInference, Position, lint_at};
+use super::java::{Declaration, JavaSummary, NullInference, Position, lint_at};
 use super::java_jdk::{is_always_defined, jdk_method};
 use super::java_null_arguments::accepts;
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
@@ -143,7 +143,7 @@ fn nullable_steps(
 // Un paso que va a un método del proyecto (de la clase o de las de arriba en el proyecto): IntelliJ
 // lo infiere `@Nullable` si devuelve `null` en algún `return` y nadie puede redefinirlo. Sigue por
 // el tipo que declara, si todas las sobrecargas dicen el mismo. Como Java, una sobrecarga de aridad
-// fija gana a una varargs.
+// fija gana a una varargs, y la que declara justo el tipo conocido de cada argumento gana al resto.
 fn project_step(
     types: &ProjectTypes<'_>,
     library: &Library,
@@ -165,7 +165,13 @@ fn project_step(
             .filter(|(_, declaration)| declaration.arity == Arity::Fixed)
             .collect();
         let preferred = if fixed.is_empty() { found } else { fixed };
-        (!preferred.is_empty()).then_some(preferred)
+        let exact: Vec<_> = preferred
+            .iter()
+            .copied()
+            .filter(|(_, declaration)| declares_argument_types(declaration, &step.argument_types))
+            .collect();
+        let chosen = if exact.is_empty() { preferred } else { exact };
+        (!chosen.is_empty()).then_some(chosen)
     })?;
     let is_nullable = candidates.iter().all(|(_, declaration)| {
         declaration.inference == NullInference::ClosedReturnsNull && declaration.body == Body::Written
@@ -177,4 +183,17 @@ fn project_step(
     let first = returned.next().flatten();
     let same = returned.all(|other| other == first);
     Some((is_nullable, first.filter(|_| same)))
+}
+
+fn declares_argument_types(declaration: &Declaration, argument_types: &[Option<String>]) -> bool {
+    argument_types.iter().enumerate().all(|(index, known)| {
+        let parameter = declaration
+            .parameters
+            .get(index)
+            .or_else(|| declaration.parameters.last());
+        known
+            .as_ref()
+            .zip(parameter)
+            .is_none_or(|(argument, parameter)| parameter.type_name == *argument)
+    })
 }
