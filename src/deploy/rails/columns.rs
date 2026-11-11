@@ -10,8 +10,8 @@ const BIGINT: &str = "bigint";
 const SMALLINT: &str = "smallint";
 const INTEGER: &str = "integer";
 const DECIMAL: &str = "decimal";
-const BIG_LIMIT: &str = "8";
-const SMALL_LIMIT: &str = "2";
+const SMALLINT_LIMIT: u8 = 2;
+const INTEGER_LIMIT: u8 = 4;
 const ARRAY_SUFFIX: &str = "[]";
 const EMPTY_ARRAY: &str = "'{}'";
 const EMPTY_JSON_ARRAY: &str = "'[]'";
@@ -93,9 +93,9 @@ pub fn column(kind: &str, name: String, arguments: &Arguments<'_>, source: &[u8]
 pub fn sql_type(declared: &str, arguments: &Arguments<'_>, source: &[u8]) -> String {
     let limit = arguments.number(LIMIT, source);
     if declared == INTEGER {
-        return match limit.as_deref() {
-            Some(BIG_LIMIT) => BIGINT,
-            Some(SMALL_LIMIT) => SMALLINT,
+        return match limit.as_deref().and_then(|limit| limit.parse::<u8>().ok()) {
+            Some(bytes) if bytes <= SMALLINT_LIMIT => SMALLINT,
+            Some(bytes) if bytes > INTEGER_LIMIT => BIGINT,
             _ => INTEGER,
         }
         .to_owned();

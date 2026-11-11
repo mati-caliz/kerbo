@@ -191,3 +191,8 @@ uso = "migraciones de Rails contra squawk"
 url = "https://github.com/chatwoot/chatwoot.git"
 commit = "309c63f359a1206caf9a36a271407f3bb4cc9419"
 uso = "migraciones de Rails contra squawk"
+
+[repos.mastodon]
+url = "https://github.com/mastodon/mastodon.git"
+commit = "46fe6b9849684818cb7ef07aed6ebf0d58e4d551"
+uso = "migraciones de Rails contra squawk"

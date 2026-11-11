@@ -15,6 +15,7 @@ const CALL: &str = "call";
 const CONNECTION: &str = "connection";
 const TABLE_EXISTS: &[&str] = &["table_exists?", "data_source_exists?"];
 const INDEX_EXISTS: &str = "index_exists?";
+const INDEX_NAME_EXISTS: &str = "index_name_exists?";
 const FOREIGN_KEY_EXISTS: &str = "foreign_key_exists?";
 const NAME: &str = "name";
 const COLUMN: &str = "column";
@@ -25,7 +26,7 @@ struct Guard<'context> {
     source: &'context [u8],
 }
 
-pub fn branches<'tree>(node: Node<'tree>, schema: &Schema, source: &[u8]) -> Vec<Node<'tree>> {
+pub fn branches<'tree>(node: Node<'tree>, schema: &Schema, source: &[u8]) -> Option<Vec<Node<'tree>>> {
     let kind = node.kind();
     let negated = NEGATED.contains(&kind);
     let guard = Guard { schema, source };
@@ -41,11 +42,7 @@ pub fn branches<'tree>(node: Node<'tree>, schema: &Schema, source: &[u8]) -> Vec
             node.child_by_field_name("alternative"),
         )
     };
-    match verdict {
-        Some(true) => taken.into_iter().collect(),
-        Some(false) => other.into_iter().collect(),
-        None => named_children(node),
-    }
+    verdict.map(|holds| if holds { taken } else { other }.into_iter().collect())
 }
 
 impl Guard<'_> {
@@ -82,6 +79,10 @@ impl Guard<'_> {
         let table = name(*parsed.positional.first()?, self.source)?;
         if TABLE_EXISTS.contains(&method.as_str()) {
             return self.schema.table_exists(&table);
+        }
+        if method == INDEX_NAME_EXISTS {
+            let index = parsed.name_at(1, self.source)?;
+            return self.schema.index_exists(&table, &[], Some(&index));
         }
         let named = parsed.keyword_name(NAME, self.source);
         if method == INDEX_EXISTS {

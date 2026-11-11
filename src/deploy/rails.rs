@@ -45,6 +45,15 @@ const WRAPPERS: &[&str] = &[
     "revert",
 ];
 const UP_DIRECTION: &str = "up";
+const RECEIVER_BLOCKS: &[&str] = &[UP_DIRECTION, "transaction"];
+const RETURN: &str = "return";
+const SQUISH: &str = "squish";
+const HEREDOC_FILTERS: &[&str] = &[SQUISH, "strip_heredoc"];
+const CREATE_JOIN_TABLE: &str = "create_join_table";
+const VERSION_OPEN: char = '[';
+const VERSION_CLOSE: char = ']';
+const VERSION_SEPARATOR: char = '.';
+const FIRST_BIGINT_VERSION: (u32, u32) = (5, 1);
 const DOWN_DIRECTION: &str = "down";
 const EXECUTE: &str = "execute";
 const CREATE_TABLE: &str = "create_table";
@@ -56,6 +65,7 @@ const SKIPPED_KINDS: &[&str] = &[
     "heredoc_body",
     "lambda",
     "comment",
+    "rescue",
     "method",
     "singleton_method",
     "class",
@@ -89,6 +99,9 @@ fn evaluate(root: Node<'_>, source: &[u8], schema: Schema) -> Option<(Script, Sc
     let transactional = !disables_transaction(class, source);
     let mut walker = Walker {
         source,
+        integer_ids: uses_integer_ids(class, source),
+        returned: false,
+        uncertain: 0,
         helpers: helpers(class, source),
         visiting: HashSet::new(),
         schema,
@@ -121,6 +134,26 @@ fn migration_class<'tree>(root: Node<'tree>, source: &[u8]) -> Option<Node<'tree
     })
 }
 
+fn uses_integer_ids(class: Node<'_>, source: &[u8]) -> bool {
+    let superclass = class
+        .child_by_field_name("superclass")
+        .map(|superclass| arguments::raw(superclass, source))
+        .unwrap_or_default();
+    let Some(version) = superclass
+        .split_once(VERSION_OPEN)
+        .and_then(|(_, rest)| rest.split_once(VERSION_CLOSE))
+        .map(|(version, _)| version)
+    else {
+        return true;
+    };
+    let mut parts = version
+        .split(VERSION_SEPARATOR)
+        .map(|part| part.trim().parse::<u32>().unwrap_or_default());
+    let major = parts.next().unwrap_or_default();
+    let minor = parts.next().unwrap_or_default();
+    (major, minor) < FIRST_BIGINT_VERSION
+}
+
 fn disables_transaction(class: Node<'_>, source: &[u8]) -> bool {
     descendants(class)
         .into_iter()
@@ -143,6 +176,9 @@ fn helpers<'tree>(class: Node<'tree>, source: &[u8]) -> HashMap<String, Node<'tr
 
 struct Walker<'tree, 'source> {
     source: &'source [u8],
+    integer_ids: bool,
+    returned: bool,
+    uncertain: usize,
     helpers: HashMap<String, Node<'tree>>,
     visiting: HashSet<String>,
     schema: Schema,
@@ -151,19 +187,33 @@ struct Walker<'tree, 'source> {
 
 impl<'tree> Walker<'tree, '_> {
     fn walk(&mut self, node: Node<'tree>) {
+        if self.returned {
+            return;
+        }
         match node.kind() {
             CALL => self.call(node),
             IDENTIFIER => self.helper(&arguments::raw(node, self.source)),
-            kind if guards::CONDITIONALS.contains(&kind) => {
-                for branch in guards::branches(node, &self.schema, self.source) {
-                    self.walk(branch);
-                }
-            }
+            RETURN => self.returned = self.uncertain == 0,
+            kind if guards::CONDITIONALS.contains(&kind) => self.conditional(node),
             kind if SKIPPED_KINDS.contains(&kind) => {}
             _ => named_children(node)
                 .into_iter()
                 .for_each(|child| self.walk(child)),
         }
+    }
+
+    fn conditional(&mut self, node: Node<'tree>) {
+        if let Some(branches) = guards::branches(node, &self.schema, self.source) {
+            for branch in branches {
+                self.walk(branch);
+            }
+            return;
+        }
+        self.uncertain += 1;
+        for child in named_children(node) {
+            self.walk(child);
+        }
+        self.uncertain -= 1;
     }
 
     fn helper(&mut self, method: &str) {
@@ -174,6 +224,7 @@ impl<'tree> Walker<'tree, '_> {
             return;
         }
         self.walk(body);
+        self.returned = false;
         self.visiting.remove(method);
     }
 
@@ -191,7 +242,7 @@ impl<'tree> Walker<'tree, '_> {
             return;
         };
         if call.child_by_field_name("receiver").is_some() {
-            if method == UP_DIRECTION {
+            if RECEIVER_BLOCKS.contains(&method.as_str()) {
                 self.walk_block(call);
             }
             return;
@@ -212,7 +263,7 @@ impl<'tree> Walker<'tree, '_> {
             self.execute(list);
             return;
         }
-        let parsed = Arguments::parse(list, self.source);
+        let parsed = Arguments::parse(list, self.source).with_integer_ids(self.integer_ids);
         let origin = Origin::Call {
             line: one_based(call.start_position().row),
             column: one_based(call.start_position().column),
@@ -247,7 +298,8 @@ impl<'tree> Walker<'tree, '_> {
         let block = call.child_by_field_name("block");
         match method {
             CREATE_TABLE => tables::create_table(&table, &shifted, block, self.source),
-            CHANGE_TABLE => tables::change_table(&table, block, self.source),
+            CHANGE_TABLE => tables::change_table(&table, block, self.integer_ids, self.source),
+            CREATE_JOIN_TABLE => tables::create_join_table(&table, &shifted, block, self.source),
             _ => statements::statement(method, &table, &shifted, self.source).unwrap_or_default(),
         }
     }
@@ -258,6 +310,8 @@ impl<'tree> Walker<'tree, '_> {
         };
         let (sql, start) = if let Some(body) = heredoc_body(argument) {
             (heredoc_text(body, self.source), body)
+        } else if let Some((sql, body)) = self.filtered_heredoc(argument) {
+            (sql, body)
         } else if argument.kind() == STRING {
             let Some(sql) = string_content(argument, self.source) else {
                 return;
@@ -278,6 +332,22 @@ impl<'tree> Walker<'tree, '_> {
                 script_line: 0,
             },
         );
+    }
+
+    fn filtered_heredoc(&self, argument: Node<'tree>) -> Option<(String, Node<'tree>)> {
+        if argument.kind() != CALL {
+            return None;
+        }
+        let method = arguments::raw(argument.child_by_field_name("method")?, self.source);
+        if !HEREDOC_FILTERS.contains(&method.as_str()) {
+            return None;
+        }
+        let body = heredoc_body(argument.child_by_field_name("receiver")?)?;
+        let sql = heredoc_text(body, self.source);
+        if method == SQUISH {
+            return Some((sql.split_whitespace().collect::<Vec<_>>().join(" "), body));
+        }
+        Some((sql, body))
     }
 }
 

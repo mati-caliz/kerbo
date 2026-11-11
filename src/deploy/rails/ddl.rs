@@ -79,6 +79,13 @@ pub fn pluralize(word: &str) -> String {
 }
 
 pub fn singularize(word: &str) -> String {
+    if let Some(stem) = ["statuses", "aliases"]
+        .iter()
+        .find(|plural| word.ends_with(*plural))
+        .and_then(|_| word.strip_suffix("es"))
+    {
+        return stem.to_owned();
+    }
     if let Some(stem) = word.strip_suffix("ies") {
         return format!("{stem}y");
     }

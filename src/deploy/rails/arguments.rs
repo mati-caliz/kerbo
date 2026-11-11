@@ -30,6 +30,7 @@ const UNKNOWN_VALUE: &str = "''";
 pub struct Arguments<'tree> {
     pub positional: Vec<Node<'tree>>,
     pub keywords: HashMap<String, Node<'tree>>,
+    pub integer_ids: bool,
 }
 
 impl<'tree> Arguments<'tree> {
@@ -60,7 +61,14 @@ impl<'tree> Arguments<'tree> {
         Self {
             positional: self.positional.iter().skip(1).copied().collect(),
             keywords: self.keywords.clone(),
+            integer_ids: self.integer_ids,
         }
+    }
+
+    #[must_use]
+    pub const fn with_integer_ids(mut self, integer_ids: bool) -> Self {
+        self.integer_ids = integer_ids;
+        self
     }
 
     pub fn keyword(&self, key: &str) -> Option<Node<'tree>> {

@@ -1,9 +1,9 @@
 use tree_sitter::Node;
 
 use super::arguments::{Arguments, names, text};
-use super::columns::{Column, column};
-use super::ddl::{ForeignKey, check_name, create_index, quote};
-use super::references::reference;
+use super::columns::{Column, column, default};
+use super::ddl::{ForeignKey, check_name, create_index, quote, singularize};
+use super::references::{column_index, reference};
 use super::statements::{
     add_reference, add_timestamps, change_column, remove_columns, remove_index, rename_column,
 };
@@ -40,13 +40,30 @@ const RECEIVER: &str = "receiver";
 const METHOD: &str = "method";
 const ARGUMENTS: &str = "arguments";
 const CALL: &str = "call";
+const GENERIC_COLUMN: &str = "column";
+const DEFAULT: &str = "default";
+const DATETIME: &str = "datetime";
+const TABLE_NAME: &str = "table_name";
+const COLUMN_OPTIONS: &str = "column_options";
+const NOT_NULL: &str = "NOT NULL";
+const INTEGER_ID_TYPE: &str = "integer";
+const BIGINT_ID_TYPE: &str = "bigint";
+
+struct NewTable {
+    name: String,
+    elements: Vec<String>,
+}
 
 pub struct TableCall<'tree> {
     pub method: String,
     pub arguments: Arguments<'tree>,
 }
 
-pub fn block_calls<'tree>(block: Option<Node<'tree>>, source: &[u8]) -> Vec<TableCall<'tree>> {
+pub fn block_calls<'tree>(
+    block: Option<Node<'tree>>,
+    integer_ids: bool,
+    source: &[u8],
+) -> Vec<TableCall<'tree>> {
     let Some(block) = block else {
         return Vec::new();
     };
@@ -58,7 +75,8 @@ pub fn block_calls<'tree>(block: Option<Node<'tree>>, source: &[u8]) -> Vec<Tabl
         .filter_map(|statement| {
             Some(TableCall {
                 method: super::arguments::raw(statement.child_by_field_name(METHOD)?, source),
-                arguments: Arguments::parse(statement.child_by_field_name(ARGUMENTS), source),
+                arguments: Arguments::parse(statement.child_by_field_name(ARGUMENTS), source)
+                    .with_integer_ids(integer_ids),
             })
         })
         .collect()
@@ -73,7 +91,9 @@ pub fn timestamp_columns(arguments: &Arguments<'_>, source: &[u8]) -> Vec<Column
         .map(|name| Column {
             name: name.to_owned(),
             sql_type: format!("{TIMESTAMP}({precision})"),
-            default: None,
+            default: arguments
+                .keyword(DEFAULT)
+                .and_then(|value| default(value, DATETIME, false, source)),
             not_null: !arguments.is_true(NULL),
         })
         .collect()
@@ -90,6 +110,7 @@ fn primary_key(arguments: &Arguments<'_>, source: &[u8]) -> Option<String> {
     let definition = match kind.as_deref() {
         Some(UUID) => UUID_PRIMARY_KEY,
         Some(declared) if SERIAL_TYPES.contains(&declared) => SERIAL_PRIMARY_KEY,
+        _ if arguments.integer_ids => SERIAL_PRIMARY_KEY,
         _ => DEFAULT_PRIMARY_KEY,
     };
     Some(format!("{} {definition}", quote(&name)))
@@ -101,15 +122,79 @@ pub fn create_table(
     block: Option<Node<'_>>,
     source: &[u8],
 ) -> Vec<String> {
-    let table = table.to_owned();
+    let elements = primary_key(arguments, source).into_iter().collect();
+    let new_table = NewTable {
+        name: table.to_owned(),
+        elements,
+    };
+    create_table_with(new_table, arguments, block, source)
+}
+
+pub fn create_join_table(
+    first: &str,
+    arguments: &Arguments<'_>,
+    block: Option<Node<'_>>,
+    source: &[u8],
+) -> Vec<String> {
+    let Some(second) = arguments.name_at(0, source) else {
+        return Vec::new();
+    };
+    let mut joined = [first.to_owned(), second];
+    joined.sort();
+    let table = arguments
+        .keyword_name(TABLE_NAME, source)
+        .unwrap_or_else(|| joined.join("_"));
+    let column_options = arguments
+        .keyword(COLUMN_OPTIONS)
+        .map(|options| Arguments::parse(Some(options), source))
+        .unwrap_or_default();
+    let not_null = if column_options.is_true(NULL) {
+        String::new()
+    } else {
+        format!(" {NOT_NULL}")
+    };
+    let id_type = if arguments.integer_ids {
+        INTEGER_ID_TYPE
+    } else {
+        BIGINT_ID_TYPE
+    };
+    let elements = joined
+        .iter()
+        .map(|name| {
+            format!(
+                "{} {id_type}{not_null}",
+                quote(&format!("{}_{ID}", singularize(name)))
+            )
+        })
+        .collect();
+    create_table_with(
+        NewTable {
+            name: table,
+            elements,
+        },
+        arguments,
+        block,
+        source,
+    )
+}
+
+fn create_table_with(
+    new_table: NewTable,
+    arguments: &Arguments<'_>,
+    block: Option<Node<'_>>,
+    source: &[u8],
+) -> Vec<String> {
+    let NewTable {
+        name: table,
+        mut elements,
+    } = new_table;
     let mut statements = Vec::new();
     if arguments.keyword_name(FORCE, source).as_deref() == Some(CASCADE) {
         statements.push(format!("DROP TABLE IF EXISTS {} CASCADE", quote(&table)));
     }
-    let mut elements: Vec<String> = primary_key(arguments, source).into_iter().collect();
     let mut constraints = Vec::new();
     let mut indexes = Vec::new();
-    for call in block_calls(block, source) {
+    for call in block_calls(block, arguments.integer_ids, source) {
         let method = call.method.as_str();
         let options = &call.arguments;
         if method == TIMESTAMPS {
@@ -137,7 +222,9 @@ pub fn create_table(
         } else if method == CHECK_CONSTRAINT {
             constraints.extend(check_constraint(&table, options, source));
         } else {
-            elements.extend(columns(method, options, source).iter().map(Column::render));
+            let added = columns(method, options, source);
+            elements.extend(added.iter().map(Column::render));
+            indexes.extend(indexes_for(&table, &added, options, source));
         }
     }
     elements.extend(constraints);
@@ -155,6 +242,13 @@ pub fn create_table(
     statements
 }
 
+fn indexes_for(table: &str, added: &[Column], options: &Arguments<'_>, source: &[u8]) -> Vec<String> {
+    added
+        .iter()
+        .filter_map(|column| column_index(table, std::slice::from_ref(&column.name), options, source))
+        .collect()
+}
+
 fn reference_names(arguments: &Arguments<'_>, source: &[u8]) -> Vec<String> {
     arguments
         .positional
@@ -164,7 +258,12 @@ fn reference_names(arguments: &Arguments<'_>, source: &[u8]) -> Vec<String> {
 }
 
 pub fn columns(method: &str, arguments: &Arguments<'_>, source: &[u8]) -> Vec<Column> {
-    reference_names(arguments, source)
+    let names = if method == GENERIC_COLUMN {
+        arguments.name_at(0, source).into_iter().collect()
+    } else {
+        reference_names(arguments, source)
+    };
+    names
         .into_iter()
         .map(|name| column(method, name, arguments, source))
         .collect()
@@ -178,11 +277,11 @@ pub fn check_constraint(table: &str, arguments: &Arguments<'_>, source: &[u8]) -
     Some(format!("CONSTRAINT {name} CHECK ({expression})"))
 }
 
-pub fn change_table(table: &str, block: Option<Node<'_>>, source: &[u8]) -> Vec<String> {
+pub fn change_table(table: &str, block: Option<Node<'_>>, integer_ids: bool, source: &[u8]) -> Vec<String> {
     let table = table.to_owned();
     let alter = format!("ALTER TABLE {}", quote(&table));
     let mut statements = Vec::new();
-    for call in block_calls(block, source) {
+    for call in block_calls(block, integer_ids, source) {
         let method = call.method.as_str();
         let options = &call.arguments;
         match method {
@@ -210,11 +309,15 @@ pub fn change_table(table: &str, block: Option<Node<'_>>, source: &[u8]) -> Vec<
                     statements.extend(add_reference(&table, &name, options, source));
                 }
             }
-            _ => statements.extend(
-                columns(method, options, source)
-                    .iter()
-                    .map(|column| format!("{alter} ADD {}", column.render())),
-            ),
+            _ => {
+                let added = columns(method, options, source);
+                statements.extend(
+                    added
+                        .iter()
+                        .map(|column| format!("{alter} ADD {}", column.render())),
+                );
+                statements.extend(indexes_for(&table, &added, options, source));
+            }
         }
     }
     statements

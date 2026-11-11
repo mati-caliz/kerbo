@@ -1712,9 +1712,14 @@ cerrarse se borra de acá.
   `db/migrate/*.rb` (`src/deploy/rails/`). Cada migración se evalúa con el esquema que dejan las
   anteriores del mismo directorio (`history.rs` y `schema.rs`: tablas, índices, clave primaria y
   claves foráneas), así salen los renames de índices y secuencias, `if_exists:` y las guardias
-  `*_exists?`. Contra squawk 2.71 (`scripts/parity/rails/`, repos `maybe` y `chatwoot`): maybe
-  849 de 849; chatwoot 951 de 951 con 3 de más en `20250108211541`, donde la referencia falla en
-  `create_captain_tables` por el tipo `vector` de pgvector. Pendientes:
+  `*_exists?`. Migraciones de antes de Rails 5.1 (`Migration[4.2]` o sin versión) usan ids
+  `integer` y clave primaria `serial`. Contra squawk 2.71 (`scripts/parity/rails/`, repos `maybe`,
+  `chatwoot` y `mastodon`): maybe 849 de 849; chatwoot 951 de 951 con 3 de más en
+  `20250108211541`, donde la referencia falla en `create_captain_tables` por el tipo `vector` de
+  pgvector; mastodon 1.763 de 1.767. Pendientes:
+  - mastodon `20180514140000_revert_index_change_on_statuses_for_api_v1_accounts_account_id_statuses`:
+    `index_exists?` con `where:` compara sólo columnas y no el predicado (3 de más).
+  - mastodon `20170506235850_create_conversations`: un `prefer-bigint-over-int` de más.
   - `remove_index` por columnas usa el nombre por defecto; podría tomar el nombre real del esquema.
   - Un `execute` con `ALTER TABLE ... RENAME` actualiza el esquema pero no emite los renames de
     índices que Rails no haría (está bien), y el SQL crudo que no se entiende deja el esquema como

@@ -12,6 +12,7 @@ const FOREIGN_KEY: &str = "foreign_key";
 const HASH: &str = "hash";
 const TRUE: &str = "true";
 const DEFAULT_TYPE: &str = "bigint";
+const INTEGER_TYPE: &str = "integer";
 const POLYMORPHIC_TYPE: &str = "character varying";
 const REFERENCE_TYPES: &[(&str, &str)] = &[
     ("uuid", "uuid"),
@@ -37,7 +38,11 @@ pub fn reference(table: &str, name: &str, arguments: &Arguments<'_>, source: &[u
                 .iter()
                 .find_map(|(rails, sql)| (*rails == declared).then_some(*sql))
         })
-        .unwrap_or(DEFAULT_TYPE);
+        .unwrap_or(if arguments.integer_ids {
+            INTEGER_TYPE
+        } else {
+            DEFAULT_TYPE
+        });
     let mut columns = vec![Column {
         name: id.clone(),
         sql_type: id_type.to_owned(),
@@ -61,6 +66,17 @@ pub fn reference(table: &str, name: &str, arguments: &Arguments<'_>, source: &[u
             .flatten(),
         columns,
     }
+}
+
+pub fn column_index(
+    table: &str,
+    columns: &[String],
+    arguments: &Arguments<'_>,
+    source: &[u8],
+) -> Option<String> {
+    arguments
+        .keyword(INDEX)
+        .and_then(|option| index(table, columns, Some(option), source))
 }
 
 fn index(table: &str, columns: &[String], option: Option<Node<'_>>, source: &[u8]) -> Option<String> {

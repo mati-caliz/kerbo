@@ -171,3 +171,62 @@ fn renders_change_table_operations() {
         assert!(sql.contains(expected), "falta {expected} en:\n{sql}");
     }
 }
+
+fn versioned(version: &str, body: &str) -> String {
+    render(&format!(
+        "class Example < ActiveRecord::Migration[{version}]\n  def change\n{body}\n  end\nend\n"
+    ))
+}
+
+#[test]
+fn uses_integer_ids_before_rails_five_one() {
+    let sql = versioned(
+        "5.0",
+        "    create_table :posts do |t|\n      t.references :user\n    end",
+    );
+    assert!(sql.contains("CREATE TABLE \"posts\" (\"id\" serial NOT NULL PRIMARY KEY, \"user_id\" integer)"));
+    let join = versioned("5.0", "    create_join_table :tags, :statuses");
+    assert!(join.contains(
+        "CREATE TABLE \"statuses_tags\" (\"status_id\" integer NOT NULL, \"tag_id\" integer NOT NULL)"
+    ));
+}
+
+#[test]
+fn renders_generic_columns_with_indexes_and_small_limits() {
+    let sql = migration(
+        "    create_table :checks do |t|\n      t.column :kind, :integer, limit: 1\n      t.string :name, index: { unique: true }\n    end",
+    );
+    assert!(sql.contains("\"kind\" smallint, \"name\" character varying)"));
+    assert!(sql.contains("CREATE UNIQUE INDEX \"index_checks_on_name\" ON \"checks\" (\"name\")"));
+}
+
+#[test]
+fn honours_timestamp_defaults_squished_heredocs_and_receiver_transactions() {
+    let sql = migration(
+        "    add_timestamps :users, default: -> { 'now()' }\n    execute <<~SQL.squish\n      DROP TABLE a;\n    SQL\n    ActiveRecord::Base.transaction do\n      drop_table :b\n    end",
+    );
+    assert!(sql.contains("\"created_at\" timestamp(6) DEFAULT now() NOT NULL"));
+    assert!(sql.contains("DROP TABLE a;"));
+    assert!(sql.contains("DROP TABLE \"b\";"));
+}
+
+#[test]
+fn stops_at_return_and_skips_rescue_clauses() {
+    let sql = render(concat!(
+        "class Example < ActiveRecord::Migration[7.1]\n",
+        "  def up\n",
+        "    drop_table :a\n",
+        "    return if foo?\n",
+        "    drop_table :b\n",
+        "    return\n",
+        "    drop_table :c\n",
+        "  rescue StandardError\n",
+        "    drop_table :d\n",
+        "  end\n",
+        "end\n",
+    ));
+    assert!(sql.contains("DROP TABLE \"a\""));
+    assert!(sql.contains("DROP TABLE \"b\""));
+    assert!(!sql.contains("DROP TABLE \"c\""));
+    assert!(!sql.contains("DROP TABLE \"d\""));
+}
