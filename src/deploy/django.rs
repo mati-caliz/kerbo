@@ -10,12 +10,14 @@ mod dispatch;
 mod django_version;
 mod expression;
 mod factories;
+mod field_defaults;
 mod fields;
 mod graph;
 mod history;
 mod installed_apps;
 mod md5;
 mod meta;
+mod migration_base;
 mod model;
 mod names;
 mod operations;
@@ -27,8 +29,10 @@ mod schema;
 mod settings;
 mod settings_module;
 mod state;
+mod table_constraints;
 mod truth;
 mod values;
+mod zero_downtime;
 
 use std::path::Path;
 

@@ -13,6 +13,7 @@ use super::settings::Settings;
 use crate::language::Language;
 use crate::rules::{MigrationRule, RuleId};
 
+mod database_defaults;
 mod dump;
 mod expressions;
 mod files;
@@ -278,57 +279,6 @@ fn sql(loader: &MemoryLoader, app: &str, stem: &str, source: &str) -> String {
     };
     let mut state = state_before(loader, &current, &parsed_migration);
     dispatch::sql(&parsed_migration, app, &mut state)
-}
-
-const TYPED_DEFAULTS: &str = r#"from datetime import timedelta
-from decimal import Decimal
-import os
-import uuid
-
-from django.contrib.postgres.fields import ArrayField
-from django.db import migrations, models
-from django.utils import timezone
-
-
-class Migration(migrations.Migration):
-    dependencies = [("sites", "0001_initial")]
-
-    operations = [
-        migrations.AddField(model_name="site", name="metadata", field=models.JSONField(default=dict)),
-        migrations.AddField(model_name="site", name="tags", field=models.JSONField(default=[])),
-        migrations.AddField(model_name="site", name="token", field=models.UUIDField(default=uuid.uuid4)),
-        migrations.AddField(model_name="site", name="created", field=models.DateTimeField(default=timezone.now)),
-        migrations.AddField(
-            model_name="site",
-            name="balance",
-            field=models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("0.0")),
-        ),
-        migrations.AddField(model_name="site", name="grace", field=models.DurationField(default=timedelta(days=1, minutes=30))),
-        migrations.AddField(model_name="site", name="limit", field=models.IntegerField(default=Decimal(5))),
-        migrations.AddField(model_name="site", name="region", field=models.TextField(default=os.environ.get("REGION", "ar"))),
-        migrations.AddField(model_name="site", name="codes", field=ArrayField(models.TextField(), size=3, default=list)),
-        migrations.AddField(model_name="site", name="extra", field=models.JSONField(db_default={})),
-    ]
-"#;
-
-#[test]
-fn defaults_are_rendered_with_the_type_postgres_receives() {
-    let loader = MemoryLoader::default().with("sites", "0001_initial", SITES_INITIAL);
-    let rendered = sql(&loader, "sites", "0002_typed_defaults", TYPED_DEFAULTS);
-    for expected in [
-        "\"metadata\" jsonb DEFAULT '{}'::jsonb NOT NULL",
-        "\"tags\" jsonb DEFAULT '[]'::jsonb NOT NULL",
-        "\"token\" uuid DEFAULT '00000000000000000000000000000000'::uuid NOT NULL",
-        "\"created\" timestamp with time zone DEFAULT '2000-01-01 00:00:00+00:00'::timestamptz NOT NULL",
-        "\"balance\" numeric(12, 3) DEFAULT 0.0 NOT NULL",
-        "\"grace\" interval DEFAULT '1 day 0:30:00'::interval NOT NULL",
-        "\"limit\" integer DEFAULT 5 NOT NULL",
-        "\"region\" text DEFAULT 'ar' NOT NULL",
-        "\"codes\" text[3] DEFAULT '{}' NOT NULL",
-        "\"extra\" jsonb DEFAULT '{}'::jsonb NOT NULL",
-    ] {
-        assert!(rendered.contains(expected), "falta {expected} en {rendered}");
-    }
 }
 
 const CONDITIONS: &str = r#"from decimal import Decimal

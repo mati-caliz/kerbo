@@ -1,11 +1,12 @@
 use super::alter::{FieldChange, alter_field as alter_column};
-use super::deferred::{IndexKind, Kind, Statement, nulls_clause};
+use super::deferred::{IndexKind, Kind, Statement};
 use super::model::{Constraint, ConstraintKind, Model, ModelKey};
 use super::names::quoted;
 use super::operations::{Deletion, Located, Migration, Operation};
 use super::rename;
-use super::schema::{Editor, columns_of, named_index, unique_index};
+use super::schema::{Editor, columns_of};
 use super::state::State;
+use super::table_constraints::{constraint_definition, named_index, unique_index};
 use crate::deploy::Violation;
 use crate::deploy::script::Origin;
 
@@ -47,7 +48,7 @@ pub fn sql(migration: &Migration, app: &str, state: &mut State) -> String {
 }
 
 fn editor_after(migration: &Migration, app: &str, state: &mut State) -> Editor {
-    let mut editor = Editor::new(migration.atomic);
+    let mut editor = Editor::new(migration.atomic, migration.zero_downtime);
     run_all(&mut editor, &migration.operations, app, state);
     editor
 }
@@ -268,31 +269,13 @@ fn alter_unique_together(editor: &mut Editor, context: Context<'_>, model: &str,
 }
 
 fn add_constraint(editor: &mut Editor, owner: &Model, constraint: &Constraint) {
-    let table = quoted(&owner.table());
-    let name = quoted(&constraint.name);
-    match &constraint.kind {
-        ConstraintKind::Unique { by_index: true, .. } => editor.run(&unique_index(owner, constraint)),
-        ConstraintKind::Unique {
-            fields,
-            nulls_distinct,
-            ..
-        } => {
-            let columns = columns_of(owner, fields)
-                .iter()
-                .map(|column| quoted(column))
-                .collect::<Vec<_>>()
-                .join(", ");
-            editor.execute(&format!(
-                "ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE{} ({columns})",
-                nulls_clause(*nulls_distinct)
-            ));
-        }
-        ConstraintKind::Check { condition } => {
-            editor.execute(&format!(
-                "ALTER TABLE {table} ADD CONSTRAINT {name} CHECK ({})",
-                condition.render(owner)
-            ));
-        }
+    match constraint_definition(owner, constraint) {
+        Some(definition) => editor.execute(&format!(
+            "ALTER TABLE {} ADD CONSTRAINT {} {definition}",
+            quoted(&owner.table()),
+            quoted(&constraint.name)
+        )),
+        None => editor.run(&unique_index(owner, constraint)),
     }
 }
 

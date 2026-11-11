@@ -39,6 +39,8 @@ const COLUMN_TYPES: &[(&str, Class)] = &[
     ("timestamp with time zone", Class::DateTime),
 ];
 
+const REFINEMENTS: [(Class, Class); 1] = [(Class::Json, Class::SanitizedJson)];
+
 struct Declaration {
     qualified: String,
     name: String,
@@ -231,6 +233,15 @@ fn base_class(base: &str, by_name: &BTreeMap<String, Class>) -> Option<Class> {
         .or_else(|| by_name.get(base).copied())
 }
 
+fn refined(name: &str, inherited: Class) -> Class {
+    let named = class_of(name);
+    if REFINEMENTS.contains(&(inherited, named)) {
+        named
+    } else {
+        inherited
+    }
+}
+
 pub fn field_classes(source_root: &Path) -> BTreeMap<String, Class> {
     let mut modules = Vec::new();
     fields_modules(source_root, false, &mut modules);
@@ -253,6 +264,7 @@ pub fn field_classes(source_root: &Path) -> BTreeMap<String, Class> {
                     .bases
                     .iter()
                     .find_map(|base| base_class(base, &by_name))
+                    .map(|inherited| refined(&declaration.name, inherited))
             }) else {
                 continue;
             };
@@ -300,6 +312,28 @@ mod tests {
         );
         assert!(!classes.contains_key("Shifted"));
         assert!(!classes.contains_key("Ignored"));
+    }
+
+    #[test]
+    fn a_known_name_refines_the_class_it_inherits_when_the_column_is_the_same() {
+        let source = "class SanitizedJSONField(JSONField):
+    pass
+
+
+class JSONField(TextField):
+    pass
+";
+        let project =
+            std::env::temp_dir().join(format!("kerbo-django-refined-fields-{}", std::process::id()));
+        fs::create_dir_all(project.join("core")).expect("se crea la app de prueba");
+        fs::write(project.join("core").join(FIELDS_MODULE), source).expect("se escriben los campos");
+        let classes = field_classes(&project);
+        fs::remove_dir_all(&project).expect("se borra el proyecto de prueba");
+        assert_eq!(
+            classes.get("core.fields.SanitizedJSONField"),
+            Some(&Class::SanitizedJson)
+        );
+        assert_eq!(classes.get("core.fields.JSONField"), Some(&Class::Text));
     }
 
     #[test]

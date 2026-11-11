@@ -1,16 +1,23 @@
 use std::mem;
 
-use super::columns::{check, definition, effective_default, has_like_index, identity, like_operator_class};
-use super::deferred::{IndexColumn, IndexKind, Kind, Statement, foreign_key_name, nulls_clause};
-use super::expression::Expression;
-use super::model::{Constraint, ConstraintKind, Field, Index, Model};
-use super::names::quoted;
+use super::columns::{
+    bare_definition, check, definition, effective_default, has_like_index, identity, like_operator_class,
+};
+use super::deferred::{IndexKind, Kind, Statement, foreign_key_name};
+use super::field_defaults::NOW_SQL;
+use super::model::{Constraint, Field, Model};
+use super::names::{index_name, quoted};
 use super::state::State;
+use super::table_constraints::named_index;
+use super::table_constraints::{constraint_definition, unique_index};
+use super::zero_downtime::{Backend, translate};
 use crate::deploy::Violation;
 use crate::deploy::script::{Origin, Script};
 
 const STATEMENT_TERMINATOR: char = ';';
 const CASCADE_SUFFIX: &str = " CASCADE";
+const SQL_NULL: &str = "NULL";
+const PRIMARY_KEY_SUFFIX: &str = "_pk";
 
 #[derive(Debug)]
 pub struct Editor {
@@ -18,10 +25,11 @@ pub struct Editor {
     deferred: Vec<(Statement, Origin)>,
     origin: Origin,
     atomic: bool,
+    zero_downtime: Option<Backend>,
 }
 
 impl Editor {
-    pub fn new(atomic: bool) -> Self {
+    pub fn new(atomic: bool, zero_downtime: Option<Backend>) -> Self {
         Self {
             script: if atomic {
                 Script::new()
@@ -31,7 +39,12 @@ impl Editor {
             deferred: Vec::new(),
             origin: Origin::Synthetic,
             atomic,
+            zero_downtime,
         }
+    }
+
+    pub const fn zero_downtime(&self) -> Option<Backend> {
+        self.zero_downtime
     }
 
     pub const fn at(&mut self, origin: Origin) {
@@ -39,7 +52,18 @@ impl Editor {
     }
 
     pub fn execute(&mut self, sql: &str) {
-        self.script.push(sql, self.origin);
+        let origin = self.origin;
+        self.push_translated(sql, origin);
+    }
+
+    fn push_translated(&mut self, sql: &str, origin: Origin) {
+        if self.zero_downtime.is_none() {
+            self.script.push(sql, origin);
+            return;
+        }
+        for statement in translate(sql) {
+            self.script.push(&statement, origin);
+        }
     }
 
     pub fn execute_raw(&mut self, sql: &str, first_line: usize) {
@@ -82,7 +106,7 @@ impl Editor {
 
     pub fn into_script(mut self) -> Script {
         for (statement, origin) in mem::take(&mut self.deferred) {
-            self.script.push(&statement.render(), origin);
+            self.push_translated(&statement.render(), origin);
         }
         if self.atomic {
             self.script.leave_transaction();
@@ -106,12 +130,10 @@ impl Editor {
             .local_fields()
             .map(|field| self.column_definition(model, field, state))
             .collect();
-        definitions.extend(
-            model
-                .constraints
-                .iter()
-                .filter_map(|constraint| self.inline_constraint(model, constraint)),
-        );
+        let deferred_constraints = model.local_fields().any(has_parametrized_default);
+        for constraint in &model.constraints {
+            definitions.extend(self.table_constraint(model, constraint, deferred_constraints));
+        }
         self.execute(&format!(
             "CREATE TABLE {} ({})",
             quoted(&table),
@@ -148,26 +170,23 @@ impl Editor {
         parts.join(" ")
     }
 
-    fn inline_constraint(&mut self, model: &Model, constraint: &Constraint) -> Option<String> {
-        let name = quoted(&constraint.name);
-        match &constraint.kind {
-            ConstraintKind::Unique { by_index: true, .. } => {
-                self.defer(unique_index(model, constraint));
-                None
-            }
-            ConstraintKind::Unique {
-                fields,
-                nulls_distinct,
-                ..
-            } => Some(format!(
-                "CONSTRAINT {name} UNIQUE{} ({})",
-                nulls_clause(*nulls_distinct),
-                quoted_columns(&columns_of(model, fields))
-            )),
-            ConstraintKind::Check { condition } => {
-                Some(format!("CONSTRAINT {name} CHECK ({})", condition.render(model)))
-            }
+    fn table_constraint(&mut self, model: &Model, constraint: &Constraint, deferred: bool) -> Option<String> {
+        let Some(definition) = constraint_definition(model, constraint) else {
+            self.defer(unique_index(model, constraint));
+            return None;
+        };
+        if deferred {
+            self.defer(Statement::on_columns(
+                &model.table(),
+                &[],
+                Kind::Constraint {
+                    name: constraint.name.clone(),
+                    definition,
+                },
+            ));
+            return None;
         }
+        Some(format!("CONSTRAINT {} {definition}", quoted(&constraint.name)))
     }
 
     pub fn defer_field_indexes(&mut self, table: &str, field: &Field, state: &State) {
@@ -211,10 +230,17 @@ impl Editor {
         }
         let table = model.table();
         let column = quoted(&field.column());
-        let mut parts = vec![definition(field, state, true)];
+        let zero_downtime = self.zero_downtime.is_some();
+        let mut parts = vec![if zero_downtime {
+            bare_definition(field, state, true)
+        } else {
+            definition(field, state, true)
+        }];
         parts.extend(identity(field).map(str::to_owned));
         parts.extend(check(field).map(|check| format!("CHECK ({check})")));
-        if let Some((to_table, to_column)) = constrained_target(field, state) {
+        if zero_downtime {
+            self.defer_added_constraints(&table, field, state);
+        } else if let Some((to_table, to_column)) = constrained_target(field, state) {
             let name = quoted(&foreign_key_name(
                 &table,
                 &[&field.column()],
@@ -238,6 +264,29 @@ impl Editor {
             ));
         }
         self.defer_field_indexes(&table, field, state);
+    }
+
+    fn defer_added_constraints(&mut self, table: &str, field: &Field, state: &State) {
+        let columns = [field.column()];
+        if field.primary_key() {
+            self.defer(Statement::on_columns(
+                table,
+                &[],
+                Kind::Constraint {
+                    name: index_name(table, &[&field.column()], PRIMARY_KEY_SUFFIX),
+                    definition: format!("PRIMARY KEY ({})", quoted(&field.column())),
+                },
+            ));
+        } else if field.unique() {
+            self.defer(Statement::on_columns(table, &columns, Kind::Unique));
+        }
+        if let Some((to_table, to_column)) = constrained_target(field, state) {
+            self.defer(Statement::on_columns(
+                table,
+                &columns,
+                Kind::ForeignKey { to_table, to_column },
+            ));
+        }
     }
 
     pub fn remove_field(&mut self, model: &Model, field: &Field, state: &State) {
@@ -277,6 +326,13 @@ impl Editor {
     }
 }
 
+fn has_parametrized_default(field: &Field) -> bool {
+    field
+        .db_default
+        .as_deref()
+        .is_some_and(|database_default| database_default != SQL_NULL && database_default != NOW_SQL)
+}
+
 pub fn constrained_target(field: &Field, state: &State) -> Option<(String, String)> {
     let relation = field.relation.as_ref()?;
     if !field.is_foreign_key() || !field.db_constraint() {
@@ -301,78 +357,4 @@ pub fn quoted_columns(columns: &[String]) -> String {
         .map(|column| quoted(column))
         .collect::<Vec<_>>()
         .join(", ")
-}
-
-pub fn named_index(model: &Model, index: &Index, kind: IndexKind) -> Statement {
-    let columns = if index.fields.is_empty() {
-        index
-            .expressions
-            .iter()
-            .map(|expression| expression.index_column(model))
-            .collect()
-    } else {
-        index
-            .fields
-            .iter()
-            .enumerate()
-            .map(|(position, entry)| IndexColumn {
-                operator_class: index.opclasses.get(position).cloned(),
-                ..IndexColumn::parse(entry, |name| model.column_of(name))
-            })
-            .collect()
-    };
-    Statement {
-        table: model.table(),
-        columns,
-        kind: Kind::Named {
-            name: index.name.clone(),
-            kind,
-            condition: index.condition.as_ref().map(|condition| condition.render(model)),
-            nulls_distinct: None,
-            method: index.method,
-            storage: index.storage.clone(),
-        },
-    }
-}
-
-pub fn unique_index(model: &Model, constraint: &Constraint) -> Statement {
-    let (fields, expressions, condition, opclasses, nulls) = match &constraint.kind {
-        ConstraintKind::Unique {
-            fields,
-            expressions,
-            condition,
-            opclasses,
-            nulls_distinct,
-            ..
-        } => (
-            fields.clone(),
-            expressions.clone(),
-            condition.clone(),
-            opclasses.clone(),
-            *nulls_distinct,
-        ),
-        ConstraintKind::Check { .. } => (Vec::new(), Vec::new(), None, Vec::new(), None),
-    };
-    let expressions = if fields.is_empty() && expressions.is_empty() {
-        vec![Expression::Opaque]
-    } else {
-        expressions
-    };
-    let mut statement = named_index(
-        model,
-        &Index {
-            name: constraint.name.clone(),
-            fields,
-            expressions,
-            condition,
-            method: None,
-            opclasses,
-            storage: Vec::new(),
-        },
-        IndexKind::Unique,
-    );
-    if let Kind::Named { nulls_distinct, .. } = &mut statement.kind {
-        *nulls_distinct = nulls;
-    }
-    statement
 }

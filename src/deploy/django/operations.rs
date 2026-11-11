@@ -1,4 +1,5 @@
 use super::model::{Constraint, Field, Index, Model};
+use super::zero_downtime::Backend;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SqlChunk {
@@ -98,6 +99,7 @@ pub struct Migration {
     pub atomic: bool,
     pub dependencies: Vec<MigrationKey>,
     pub run_before: Vec<MigrationKey>,
+    pub zero_downtime: Option<Backend>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

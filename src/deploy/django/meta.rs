@@ -11,6 +11,11 @@ const UNIQUE_CONSTRAINT: &str = "UniqueConstraint";
 const CHECK_CONSTRAINT: &str = "CheckConstraint";
 const INDEX_ONLY_UNIQUE_KEYWORDS: &[&str] = &["condition", "include", "opclasses"];
 const NULLS_DISTINCT: &str = "nulls_distinct";
+const DEFERRABLE: &str = "deferrable";
+const DEFERRABLE_MODES: &[(&str, &str)] = &[
+    ("DEFERRED", " DEFERRABLE INITIALLY DEFERRED"),
+    ("IMMEDIATE", " DEFERRABLE INITIALLY IMMEDIATE"),
+];
 const CHECK_KEYWORDS: &[&str] = &["condition", "check"];
 const CONDITION: &str = "condition";
 const STORAGE_PARAMETERS: &[&str] = &[
@@ -94,6 +99,7 @@ pub fn constraint<'tree>(node: Node<'tree>, constants: Constants<'tree>) -> Opti
                 condition: parsed_condition(&call, constants),
                 opclasses: operator_classes(&call, source),
                 nulls_distinct: call.keyword(NULLS_DISTINCT).and_then(boolean),
+                deferrable: deferrable(&call, source),
             }
         }
         CHECK_CONSTRAINT => ConstraintKind::Check {
@@ -105,6 +111,25 @@ pub fn constraint<'tree>(node: Node<'tree>, constants: Constants<'tree>) -> Opti
         _ => return None,
     };
     Some(Constraint { name, kind })
+}
+
+fn deferrable(call: &Call<'_>, source: &[u8]) -> Option<&'static str> {
+    let value = call.keyword(DEFERRABLE)?;
+    let member = match value.kind() {
+        "attribute" => value
+            .child_by_field_name("attribute")?
+            .utf8_text(source)
+            .ok()
+            .map(str::to_owned),
+        "subscript" => value
+            .child_by_field_name("subscript")
+            .and_then(|key| text(key, source)),
+        _ => None,
+    }?;
+    DEFERRABLE_MODES
+        .iter()
+        .find(|(mode, _)| *mode == member)
+        .map(|(_, clause)| *clause)
 }
 
 fn expressions(call: &Call<'_>, source: &[u8]) -> Vec<Expression> {

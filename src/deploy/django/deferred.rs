@@ -74,6 +74,11 @@ pub enum Kind {
         method: Option<&'static str>,
         storage: Vec<String>,
     },
+    Constraint {
+        name: String,
+        definition: String,
+    },
+    Alter(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -165,6 +170,10 @@ impl Statement {
                     quoted(name)
                 )
             }
+            Kind::Constraint { name, definition } => {
+                format!("ALTER TABLE {table} ADD CONSTRAINT {} {definition}", quoted(name))
+            }
+            Kind::Alter(changes) => format!("ALTER TABLE {table} {changes}"),
         }
     }
 

@@ -1,4 +1,4 @@
-use super::fields::{SANITIZED_NULL_DEFAULT, automatic_now_default};
+use super::field_defaults::{SANITIZED_NULL_DEFAULT, automatic_now_default};
 use super::model::{Class, Field, FieldDefault, Flag};
 use super::names::quoted;
 use super::state::State;
@@ -226,6 +226,16 @@ pub fn identity(field: &Field) -> Option<&'static str> {
 }
 
 pub fn definition(field: &Field, state: &State, include_default: bool) -> String {
+    let mut parts = vec![bare_definition(field, state, include_default)];
+    if field.primary_key() {
+        parts.push("PRIMARY KEY".to_owned());
+    } else if field.unique() {
+        parts.push("UNIQUE".to_owned());
+    }
+    parts.join(" ")
+}
+
+pub fn bare_definition(field: &Field, state: &State, include_default: bool) -> String {
     let mut parts = vec![db_type(field, state)];
     if let Some(database_default) = &field.db_default {
         parts.push(format!("DEFAULT {database_default}"));
@@ -233,10 +243,5 @@ pub fn definition(field: &Field, state: &State, include_default: bool) -> String
         parts.push(format!("DEFAULT {default}"));
     }
     parts.push(if field.null() { "NULL" } else { "NOT NULL" }.to_owned());
-    if field.primary_key() {
-        parts.push("PRIMARY KEY".to_owned());
-    } else if field.unique() {
-        parts.push("UNIQUE".to_owned());
-    }
     parts.join(" ")
 }

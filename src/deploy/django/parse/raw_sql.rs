@@ -1,9 +1,10 @@
 use tree_sitter::Node;
 
 use super::{CONCATENATION, Scope, argument};
+use crate::deploy::django::computed_names::name_text;
 use crate::deploy::django::operations::{Operation, SqlChunk};
 use crate::deploy::django::run_python::schema_editor_sql;
-use crate::deploy::django::values::{elements, is_sequence, text};
+use crate::deploy::django::values::{elements, is_sequence};
 use crate::deploy::python_calls::Call;
 use crate::syntax::one_based;
 
@@ -35,7 +36,7 @@ pub(super) fn run_sql<'context>(scope: Scope<'context>, call: &Call<'context>) -
         .map(|literal| scope.resolved(literal))
         .filter_map(|literal| {
             Some(SqlChunk {
-                sql: text(literal, scope.source)?,
+                sql: name_text(literal, scope.constants)?,
                 line: one_based(literal.start_position().row),
             })
         })

@@ -25,7 +25,6 @@ const STRING: &str = "string";
 const RETURN: &str = "return_statement";
 const IF: &str = "if_statement";
 const NAMED_PARAMETERS: &[&str] = &["typed_parameter", "default_parameter", "typed_default_parameter"];
-const SEARCHED_ROOTS: usize = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Factory {
@@ -55,7 +54,7 @@ pub fn imported(
         .collect()
 }
 
-fn imported_names(statement: Node<'_>, source: &[u8]) -> Vec<(String, String, String)> {
+pub(super) fn imported_names(statement: Node<'_>, source: &[u8]) -> Vec<(String, String, String)> {
     let Some(module) = statement
         .child_by_field_name("module_name")
         .filter(|module| module.kind() == DOTTED_NAME)
@@ -84,8 +83,8 @@ fn imported_names(statement: Node<'_>, source: &[u8]) -> Vec<(String, String, St
         .collect()
 }
 
-fn module_file(apps_root: &Path, module: &str) -> Option<PathBuf> {
-    apps_root.ancestors().take(SEARCHED_ROOTS).find_map(|root| {
+pub(super) fn module_file(apps_root: &Path, module: &str) -> Option<PathBuf> {
+    apps_root.ancestors().find_map(|root| {
         let base = module
             .split(MODULE_SEPARATOR)
             .fold(root.to_path_buf(), |path, segment| path.join(segment));
@@ -151,7 +150,7 @@ fn built_factory(function: Node<'_>, source: &[u8], settings: &Settings) -> Opti
     })
 }
 
-fn parameter_names(parameters: Node<'_>, source: &[u8]) -> Vec<String> {
+pub(super) fn parameter_names(parameters: Node<'_>, source: &[u8]) -> Vec<String> {
     named_children(parameters)
         .into_iter()
         .filter_map(|parameter| {
@@ -176,7 +175,11 @@ fn is_docstring(statement: Node<'_>) -> bool {
             .all(|child| child.kind() == STRING)
 }
 
-fn returned_call<'tree>(block: Node<'tree>, source: &[u8], settings: &Settings) -> Option<Node<'tree>> {
+pub(super) fn returned_call<'tree>(
+    block: Node<'tree>,
+    source: &[u8],
+    settings: &Settings,
+) -> Option<Node<'tree>> {
     for statement in named_children(block) {
         if statement.kind() == COMMENT || is_docstring(statement) {
             continue;

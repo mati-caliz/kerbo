@@ -21,7 +21,7 @@ pub fn declared_modules(source_root: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-fn python_files(directory: &Path) -> Vec<PathBuf> {
+pub(super) fn python_files(directory: &Path) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = fs::read_dir(directory)
         .map(|entries| {
             entries

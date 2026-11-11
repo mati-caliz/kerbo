@@ -16,6 +16,7 @@ pub enum Flag {
     IndexOff,
     NoConstraint,
     AutoNow,
+    TypedDatabaseDefault,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -195,6 +196,7 @@ pub enum ConstraintKind {
         condition: Option<Condition>,
         opclasses: Vec<String>,
         nulls_distinct: Option<bool>,
+        deferrable: Option<&'static str>,
     },
     Check {
         condition: Condition,

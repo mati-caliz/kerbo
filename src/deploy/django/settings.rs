@@ -10,6 +10,7 @@ use super::installed_apps::installed_apps;
 use super::model::{Class, ModelKey};
 use super::project_fields::field_classes;
 use super::settings_module::declared_modules;
+use super::zero_downtime::{Backend, backend};
 
 const SETTINGS_MODULE: &str = "settings";
 const PYTHON_EXTENSION: &str = "py";
@@ -41,6 +42,7 @@ pub struct Settings {
     pub installed_apps: Option<BTreeSet<String>>,
     pub column_drops_cascade: bool,
     pub field_classes: BTreeMap<String, Class>,
+    pub zero_downtime: Option<Backend>,
 }
 
 impl Default for Settings {
@@ -53,6 +55,7 @@ impl Default for Settings {
             installed_apps: None,
             column_drops_cascade: false,
             field_classes: BTreeMap::new(),
+            zero_downtime: None,
         }
     }
 }
@@ -306,6 +309,7 @@ fn discovered(apps_root: &Path) -> Settings {
         settings.auto_field = Class::BigAuto;
     }
     settings.field_classes = field_classes(apps_root);
+    settings.zero_downtime = backend(&sources, apps_root);
     settings.column_drops_cascade = version.is_some_and(|known| known < CASCADE_DROPPED_IN);
     settings
 }

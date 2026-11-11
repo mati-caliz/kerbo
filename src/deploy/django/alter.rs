@@ -3,16 +3,18 @@ use super::columns::{
     like_operator_class, type_template,
 };
 use super::deferred::{Kind, Statement, like_index_name};
-use super::model::{Class, Field, FieldDefault};
+use super::model::{Class, Field, FieldDefault, Flag};
 use super::names::{index_name, quoted};
 use super::schema::{Editor, constrained_target};
 use super::state::State;
+use super::zero_downtime::Backend;
 
 const VARCHAR: &str = "varchar";
 const TEXT: &str = "text";
 const PRIMARY_KEY_SUFFIX: &str = "_pk";
 const CHECK_SUFFIX: &str = "_check";
 const NULL: &str = "NULL";
+const NOT_NULL_SUFFIX: &str = "_notnull";
 
 #[derive(Debug, Clone, Copy)]
 pub struct FieldChange<'change> {
@@ -139,6 +141,10 @@ fn type_actions(editor: &mut Editor, change: FieldChange<'_>) -> Actions {
 }
 
 fn apply_actions(editor: &mut Editor, change: FieldChange<'_>, mut actions: Actions) {
+    if let Some(backend) = editor.zero_downtime() {
+        apply_actions_apart(editor, change, &actions, backend);
+        return;
+    }
     let four_way = change.four_way();
     if !four_way {
         actions.combined.append(&mut actions.null);
@@ -165,6 +171,45 @@ fn apply_actions(editor: &mut Editor, change: FieldChange<'_>, mut actions: Acti
     for post_action in &actions.post {
         editor.execute(post_action);
     }
+}
+
+fn apply_actions_apart(editor: &mut Editor, change: FieldChange<'_>, actions: &Actions, backend: Backend) {
+    for action in &actions.combined {
+        editor.execute(&change.alter_table(action));
+    }
+    change_nullability_apart(editor, change, backend);
+    for post_action in &actions.post {
+        editor.execute(post_action);
+    }
+}
+
+fn change_nullability_apart(editor: &mut Editor, change: FieldChange<'_>, backend: Backend) {
+    if change.old.null() == change.new.null() {
+        return;
+    }
+    let column = change.column();
+    let check_name = index_name(change.table, &[&change.new.column()], NOT_NULL_SUFFIX);
+    let deferred = |changes: String| Statement::on_columns(change.table, &[], Kind::Alter(changes));
+    if change.new.null() {
+        editor.execute(&change.alter_table(&format!("ALTER COLUMN {column} DROP NOT NULL")));
+        if backend.drops_not_null_check {
+            editor.defer(deferred(format!(
+                "DROP CONSTRAINT IF EXISTS {}",
+                quoted(&check_name)
+            )));
+        }
+        return;
+    }
+    editor.defer(Statement::on_columns(
+        change.table,
+        &[],
+        Kind::Constraint {
+            name: check_name.clone(),
+            definition: format!("CHECK ({column} IS NOT NULL)"),
+        },
+    ));
+    editor.defer(deferred(format!("ALTER COLUMN {column} SET NOT NULL")));
+    editor.defer(deferred(format!("DROP CONSTRAINT {}", quoted(&check_name))));
 }
 
 fn add_field_constraints(editor: &mut Editor, change: FieldChange<'_>) {
@@ -220,7 +265,8 @@ fn default_actions(change: FieldChange<'_>, actions: &mut Actions) {
     let (old, new) = (change.old, change.new);
     let column = change.column();
     if let Some(database_default) = &new.db_default {
-        if old.db_default.as_ref() != Some(database_default) {
+        let same_expression = old.has(Flag::TypedDatabaseDefault) == new.has(Flag::TypedDatabaseDefault);
+        if old.db_default.as_ref() != Some(database_default) || !same_expression {
             actions
                 .combined
                 .push(format!("ALTER COLUMN {column} SET DEFAULT {database_default}"));

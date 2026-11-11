@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use tree_sitter::Node;
 
+mod local_calls;
 mod raw_sql;
 
 use super::computed_names::name_text;
@@ -11,6 +12,7 @@ use super::dependencies::{keys, swappable_setting};
 use super::factories::{Factory, imported};
 use super::fields::{Owner, field};
 use super::meta::{constraint, constraints, index, indexes, unique_together};
+use super::migration_base::migration_base;
 use super::model::{Model, ModelKey};
 use super::operations::{Deletion, Located, Migration, Operation};
 use super::run_python::functions;
@@ -19,6 +21,7 @@ use super::truth::{reachable_statements, truth};
 use super::values::{boolean, dictionary, elements, text};
 use crate::deploy::python_calls::Call;
 use crate::syntax::named_children;
+use local_calls::{factory_operation, module_function_operation};
 use raw_sql::{run_python, run_sql};
 
 const MIGRATION_CLASS: &str = "Migration";
@@ -95,11 +98,19 @@ pub fn migration(root: Node<'_>, reader: Reader<'_>) -> Option<Migration> {
         functions: &module_functions,
         factories: &factories,
     };
+    let base = migration_base(root, class, reader.source, reader.apps_root);
+    let zero_downtime = base.zero_downtime(reader.settings.zero_downtime, |attribute| {
+        class_bindings
+            .iter()
+            .find(|(name, _)| name == attribute)
+            .and_then(|(_, value)| truth(scope.resolved(*value), reader.source, reader.settings))
+    });
     let mut migration = Migration {
         operations: Vec::new(),
-        atomic: true,
+        atomic: base.atomic.unwrap_or(true),
         dependencies: Vec::new(),
         run_before: Vec::new(),
+        zero_downtime,
     };
     for (name, value) in class_bindings {
         match name.as_str() {
@@ -195,32 +206,8 @@ impl<'context> Scope<'context> {
 
     fn operation(self, call: &Call<'context>) -> Option<Operation> {
         self.declared_operation(call)
-            .or_else(|| self.factory_operation(call))
-    }
-
-    fn factory_operation(self, call: &Call<'context>) -> Option<Operation> {
-        if !call.receiver.is_empty() {
-            return None;
-        }
-        let factory = self
-            .factories
-            .iter()
-            .rev()
-            .find(|(name, _)| name == call.method)
-            .map(|(_, factory)| factory)?;
-        let arguments = factory
-            .forwarded
-            .iter()
-            .map(|parameter| argument(call, parameter.position, &parameter.name))
-            .collect::<Option<Vec<_>>>()?;
-        self.declared_operation(&Call {
-            receiver: "",
-            method: &factory.method,
-            line: call.line,
-            column: call.column,
-            arguments,
-            source: call.source,
-        })
+            .or_else(|| factory_operation(self, call))
+            .or_else(|| module_function_operation(self, call))
     }
 
     fn declared_operation(self, call: &Call<'context>) -> Option<Operation> {

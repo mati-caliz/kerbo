@@ -7,6 +7,7 @@ use crate::deploy::python_calls::Call;
 use crate::syntax::named_children;
 
 const STRING: &str = "string";
+const CONCATENATED_STRING: &str = "concatenated_string";
 const STRING_CONTENT: &str = "string_content";
 const INTERPOLATION: &str = "interpolation";
 const CALL: &str = "call";
@@ -21,6 +22,9 @@ const MODEL_PART: &str = "1";
 pub fn name_text(node: Node<'_>, constants: Constants<'_>) -> Option<String> {
     let resolved = constants.resolve(node);
     let parts = named_children(resolved);
+    if resolved.kind() == CONCATENATED_STRING {
+        return parts.into_iter().map(|part| name_text(part, constants)).collect();
+    }
     if resolved.kind() != STRING || !parts.iter().any(|part| part.kind() == INTERPOLATION) {
         return text(resolved, constants.source);
     }
