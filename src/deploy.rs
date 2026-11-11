@@ -3,6 +3,7 @@ mod compose;
 mod django;
 mod dockerfile;
 mod python_calls;
+mod rails;
 mod script;
 mod sql;
 
@@ -48,6 +49,9 @@ pub fn detect(path: &Path) -> Option<Language> {
     let name = path.file_name()?.to_str()?;
     let lowercase = name.to_lowercase();
     let extension = path.extension().and_then(|extension| extension.to_str());
+    if extension == Some(rails::EXTENSION) {
+        return rails::is_migration(path).then_some(Language::Rails);
+    }
     if extension == Some(SQL_EXTENSION) {
         return is_migration(path, name).then_some(Language::Sql);
     }
@@ -108,6 +112,12 @@ pub fn analyze(
                 .parse(source, None)
                 .ok_or(ParseFailed)
                 .map(|tree| compose::violations(tree.root_node(), source)),
+        ),
+        Language::Rails => Some(
+            parser
+                .parse(source, None)
+                .ok_or(ParseFailed)
+                .map(|tree| rails::violations(tree.root_node(), source)),
         ),
         Language::Go
         | Language::Python

@@ -30,6 +30,7 @@ tree-sitter-go = { package = "kerbo-tree-sitter-go", version = "0.25.0", path = 
 tree-sitter-java = "0.23.5"
 tree-sitter-javascript = "0.25.0"
 tree-sitter-python = { package = "kerbo-tree-sitter-python", version = "0.25.0", path = "grammars/tree-sitter-python" }
+tree-sitter-ruby = "0.23.1"
 tree-sitter-rust = "0.24.2"
 tree-sitter-typescript = "0.23.2"
 tree-sitter-yaml = "0.7.2"

@@ -60,6 +60,8 @@ def latest_version(source):
         return fetch_json(f"https://pypi.org/pypi/{name}/json")["info"]["version"]
     if kind == "npm":
         return fetch_json(f"https://registry.npmjs.org/{name}/latest")["version"]
+    if kind == "rubygems":
+        return fetch_json(f"https://rubygems.org/api/v1/versions/{name}/latest.json")["version"]
     if kind == "crates":
         return fetch_json(f"https://crates.io/api/v1/crates/{name}")["crate"]["max_stable_version"]
     if kind == "github":

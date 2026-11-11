@@ -181,3 +181,13 @@ uso = "Dockerfile contra hadolint"
 url = "https://github.com/grafana/grafana.git"
 commit = "58cc33fcc665da3d869076bb943aea07b927d137"
 uso = "Dockerfile contra hadolint"
+
+[repos.maybe]
+url = "https://github.com/maybe-finance/maybe.git"
+commit = "77b5469832758d1cbee1a940f3012a1ae1c74cd3"
+uso = "migraciones de Rails contra squawk"
+
+[repos.chatwoot]
+url = "https://github.com/chatwoot/chatwoot.git"
+commit = "309c63f359a1206caf9a36a271407f3bb4cc9419"
+uso = "migraciones de Rails contra squawk"

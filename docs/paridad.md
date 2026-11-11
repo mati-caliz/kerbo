@@ -206,6 +206,17 @@ su propio SQL y `SeparateDatabaseAndState` sólo lo de `database_operations`. Co
 sobre el `sqlmigrate` real de las 23 migraciones de `django.contrib`: los 89 avisos, por archivo,
 regla y cantidad, ninguno de más (`scripts/parity/django/`).
 
+En Rails se recorre el `change` (o el `up`) de la clase que hereda de `Migration`, con tree-sitter-ruby,
+y se arma el SQL que manda ActiveRecord 8 a Postgres: `create_table` y `change_table` con sus
+columnas, referencias, índices y restricciones, los `add_*`, `remove_*`, `rename_*` y `change_*`,
+`execute` con su SQL (heredoc o string), `reversible` y `up_only` por la rama `up`, y los métodos
+propios de la migración. `disable_ddl_transaction!` saca el `BEGIN`. La referencia es squawk 2.71
+sobre el SQL que ActiveRecord manda de verdad al aplicar las migraciones en orden sobre un Postgres
+vacío (`scripts/parity/rails/`): en maybe y chatwoot coinciden 1.781 de 1.800 avisos. Lo que falta
+depende del estado de la base, que kerbo no ve migración por migración: los `ALTER INDEX ... RENAME`
+que Rails agrega al renombrar una tabla o una columna, y lo que se salta en Ruby (`if_exists:`,
+`if index_exists?`) porque el objeto ya no estaba; kerbo avisa igual, del lado seguro.
+
 **Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` y `*.Dockerfile`, contra
 [hadolint](https://github.com/hadolint/hadolint): todas las reglas DL que hadolint trae prendidas
 (59), con su código como nombre (`kerbo explain DL3008`). El shell de cada `RUN` se lee con un

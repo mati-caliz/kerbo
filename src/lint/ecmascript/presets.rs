@@ -54,7 +54,8 @@ pub fn relaxed_by(preset: Preset, language: Language) -> Vec<RuleId> {
         | Language::Sql
         | Language::Dockerfile
         | Language::Compose
-        | Language::Shell => &[],
+        | Language::Shell
+        | Language::Rails => &[],
     };
     let by_preset: &[&[EslintRule]] = match preset {
         Preset::Strict => &[],

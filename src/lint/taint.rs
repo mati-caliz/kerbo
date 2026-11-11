@@ -27,7 +27,8 @@ impl TaintFamily {
             | Language::Sql
             | Language::Dockerfile
             | Language::Compose
-            | Language::Shell => None,
+            | Language::Shell
+            | Language::Rails => None,
         }
     }
 }

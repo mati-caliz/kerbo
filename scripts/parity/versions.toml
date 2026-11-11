@@ -3,7 +3,7 @@
 # que cambió: ver la etapa 17 del ROADMAP.
 #
 # Cada herramienta dice su versión y de dónde se averigua la última publicada (`latest`):
-# pypi:<paquete>, npm:<paquete>, github:<dueño>/<repo>, crates:<crate>, go o dockerhub:<imagen>.
+# pypi:<paquete>, npm:<paquete>, rubygems:<gema>, github:<dueño>/<repo>, crates:<crate>, go o dockerhub:<imagen>.
 # `image` es la imagen de Docker con que la corren los scripts y `cited_as`, cómo la cita docs/;
 # `{version}`, `{minor}` (las dos primeras partes) y `{major}` se reemplazan. `floating` es una imagen
 # que ya sigue sola el último parche (`golang:1.27`).
@@ -87,6 +87,11 @@ family = "migrations"
 version = "6.1.3"
 latest = "pypi:django"
 
+[tools.activerecord]
+family = "migrations"
+version = "8.1.4.1"
+latest = "rubygems:activerecord"
+
 [tools.hadolint]
 family = "dockerfile"
 version = "2.15.1"
@@ -129,6 +134,10 @@ latest = "crates:tree-sitter-rust"
 [grammars.tree-sitter-yaml]
 version = "0.7.2"
 latest = "crates:tree-sitter-yaml"
+
+[grammars.tree-sitter-ruby]
+version = "0.23.1"
+latest = "crates:tree-sitter-ruby"
 
 [grammars.tree-sitter-bash]
 version = "0.25.1"

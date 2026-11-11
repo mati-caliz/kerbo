@@ -21,6 +21,7 @@ pub enum Language {
     Dockerfile,
     Compose,
     Shell,
+    Rails,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -44,7 +45,7 @@ impl Language {
             Self::Java => Stack::Java,
             Self::TypeScript | Self::Tsx | Self::JavaScript => Stack::Typescript,
             Self::Rust => Stack::Rust,
-            Self::Sql => Stack::Sql,
+            Self::Sql | Self::Rails => Stack::Sql,
             Self::Dockerfile | Self::Compose => Stack::Docker,
             Self::Shell => Stack::Shell,
         }
@@ -82,6 +83,7 @@ impl Language {
             Self::Rust => tree_sitter_rust::LANGUAGE,
             Self::Compose => tree_sitter_yaml::LANGUAGE,
             Self::Shell => tree_sitter_bash::LANGUAGE,
+            Self::Rails => tree_sitter_ruby::LANGUAGE,
             Self::Sql | Self::Dockerfile => return None,
         };
         Some(grammar.into())
@@ -116,7 +118,7 @@ impl Language {
             Self::Java => Some(&profile::JAVA),
             Self::TypeScript | Self::Tsx | Self::JavaScript => Some(&profile::ECMASCRIPT),
             Self::Rust => Some(&profile::RUST),
-            Self::Sql | Self::Dockerfile | Self::Compose | Self::Shell => None,
+            Self::Sql | Self::Dockerfile | Self::Compose | Self::Shell | Self::Rails => None,
         }
     }
 }
@@ -223,6 +225,7 @@ mod tests {
             Language::JavaScript,
             Language::Rust,
             Language::Compose,
+            Language::Rails,
         ] {
             let mut parser = tree_sitter::Parser::new();
             let grammar = language.grammar().expect("tiene gramática de tree-sitter");

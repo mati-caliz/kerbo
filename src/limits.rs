@@ -123,7 +123,8 @@ impl DuplicateLimits {
             | Language::Sql
             | Language::Dockerfile
             | Language::Compose
-            | Language::Shell => self.tokens,
+            | Language::Shell
+            | Language::Rails => self.tokens,
             Language::TypeScript | Language::Tsx | Language::JavaScript => self.lines,
         }
     }
@@ -244,7 +245,8 @@ impl Preset {
             | Language::Sql
             | Language::Dockerfile
             | Language::Compose
-            | Language::Shell => base,
+            | Language::Shell
+            | Language::Rails => base,
         }
     }
 }
@@ -256,14 +258,16 @@ const fn strict(language: Language) -> [Option<usize>; 5] {
         Language::Java => JAVA_STRICT,
         Language::TypeScript | Language::Tsx | Language::JavaScript => ECMASCRIPT_STRICT,
         Language::Rust => RUST_STRICT,
-        Language::Sql | Language::Dockerfile | Language::Compose | Language::Shell => UNMEASURED_STRICT,
+        Language::Sql | Language::Dockerfile | Language::Compose | Language::Shell | Language::Rails => {
+            UNMEASURED_STRICT
+        }
     }
 }
 
 const fn unmeasured(language: Language) -> &'static [RuleId] {
     match language {
         Language::Rust => RUST_UNMEASURED,
-        Language::Sql | Language::Dockerfile | Language::Compose => &RuleId::CODE_RULES,
+        Language::Sql | Language::Dockerfile | Language::Compose | Language::Rails => &RuleId::CODE_RULES,
         Language::Shell => SHELL_UNMEASURED,
         Language::Go
         | Language::Python

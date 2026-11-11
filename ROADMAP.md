@@ -1708,8 +1708,20 @@ cerrarse se borra de acá.
     `RenameIndex` sin `old_name`, los `AlterField` de un `ManyToManyField` a otro, las
     operaciones de `django.contrib.postgres` fuera de las restricciones, y `db_collation` y
     `db_comment`.
-- Rails (`add_index` sin `algorithm: :concurrently`, `remove_column`, `change_column`), con
-  strong_migrations como referencia. Pide sumar una gramática de Ruby. Viene de la etapa 12.
+- Rails (empezada, 2026-11-11): tree-sitter-ruby y el SQL de ActiveRecord 8 para Postgres armado
+  desde `db/migrate/*.rb` (`src/deploy/rails/`). Contra squawk 2.71 sobre el SQL real de cada
+  migración (`scripts/parity/rails/reference.sh`, `corpus.sh` y `compare.py`, repos `maybe` y
+  `chatwoot` en `corpus.toml`): maybe 830 de 849, chatwoot 951 de 951 con 11 de más. Pendientes:
+  - Los renames que dependen de los índices existentes: `rename_table` y `rename_column` renombran
+    los índices con nombre por defecto (`index_<tabla>_on_...`) y la secuencia `<tabla>_id_seq`.
+    Pide seguir los índices creados por las migraciones anteriores del mismo directorio (19 avisos
+    de `renaming-object` de menos en maybe).
+  - Lo que Rails decide en Ruby contra la base (`if_exists: true`, `if index_exists?`,
+    `if table_exists?`): kerbo avisa siempre. Con el estado de las migraciones anteriores se podría
+    saber si el objeto existe (3 migraciones; en chatwoot la referencia además falla en
+    `create_captain_tables` por el tipo `vector` de pgvector).
+  - `bulk: true` en `change_table` (un solo `ALTER TABLE`), y los modelos o helpers de la
+    aplicación llamados desde las migraciones (quedan en `errores.txt` de la referencia).
 
 ### 16. Tipos y firmas completas
 
