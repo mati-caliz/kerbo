@@ -1763,24 +1763,31 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   el recurso que recibe otro `AutoCloseable` como argumento o receptor. Pendiente: medir con Qodana
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned` y `failing-call`):
-  commons-lang 131 de 141 sin ninguno de más; junit4 14 de 19 con uno de más
-  (`f.getParentFile().getParentFile()` en un test, que IntelliJ no marca aunque `getParentFile`
-  está en la tabla de nulos del JDK). `failing-call` calca "The call to X always fails, according
-  to its method contracts" con las cláusulas `fail` que IntelliJ infiere del cuerpo y las escritas
-  a mano de Validate, Spring Assert, JUnit y TestNG. Falta:
-  - Receptores calificados enteros (`org.junit.Assume.assumeTrue(false)`).
-  - `assertNull` sobre lo que devuelve un método del proyecto: pide inferir el valor de retorno
-    (5 en commons-lang); el `assertNull(message, x)` de `junit.framework` con mensaje concatenado.
-  - Delegación (`DelegationContract`/`MethodCallContract`), `isAssignableFrom`, y el "always fails
-    as an argument is out of bounds" (`read(arr, -1, 0)`, `new GregorianCalendar(...)`).
+  commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno de más en los dos.
+  Una llamada pasada antes a un parámetro que el método desreferencia queda no nula después (por
+  el texto de la expresión, como el `f.getParentFile()` que IntelliJ recuerda). `failing-call`
+  calca "The call to X always fails, according to its method contracts" con las cláusulas `fail`
+  que IntelliJ infiere del cuerpo y las escritas a mano de Validate, Spring Assert, JUnit y
+  TestNG, con receptores calificados con el paquete y variables que un `if` chequeó no nulas.
+  Falta:
+  - `assertNull` sobre lo que devuelve un método del proyecto (5 en commons-lang, sobre
+    `getIfEmpty`, `getIfBlank` y `applyNonNull`): IntelliJ marca la de 3 argumentos y no la de 4
+    con el mismo cuerpo, así que parece salir del orden en que infiere; no se persigue.
+  - El "always fails as an argument is out of bounds" (`read(arr, -1, 0)`,
+    `new GregorianCalendar(...)`, 3 en commons-lang): sale de las anotaciones de rango de los
+    parámetros del JDK (`DfaUtil.addRangeContracts`) y pide un modelo de enteros.
+  - El `@NotNull` de las anotaciones externas del JDK (`Iterable.iterator()` devolviendo null en
+    TypeUtilsTest): una sola vez en commons-lang.
   - "may produce NPE" entre métodos (2): `Method.invoke` y
-    `throw Throwables.rethrowAsException(...)` en junit4.
+    `throw Throwables.rethrowAsException(...)` en junit4; y "Immutable object is modified"
+    (`List.set` sobre `Collections.unmodifiableList`) en TestWithParametersTest.
   - El flujo de nulos sigue un solo flujo por variable: al juntar ramas queda el más viejo. Dos
     asignaciones distintas en ramas distintas no se siguen a la vez.
   - Las sobrecargas del proyecto se eligen por el tipo exacto de los argumentos que se conocen
     (variables y casteos); un subtipo no elige la sobrecarga más específica.
   - La asignación repetida sólo se sigue en línea recta dentro de un bloque: falta la que viene
-    después de un `assertNull(x)`. Las sobrecargas se comparan por nombre simple sin dimensiones
+    después de un `assertNull(x)`, que además pide contratos entre archivos
+    (StringUtilsSubstringTest 487). Las sobrecargas se comparan por nombre simple sin dimensiones
     (`int` y `int[]` se confunden).
 - `Map.get` y lo que devuelve una lambda en el flujo de nulos: en junit4 y commons-lang Qodana no
   marca ninguno; queda para medir en un repo que los use (Spring, Micrometer).

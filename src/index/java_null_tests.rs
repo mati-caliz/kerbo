@@ -279,3 +279,45 @@ fn null_reaches_only_the_overloads_that_can_receive_it() {
         ]
     );
 }
+
+const PASSED: &str = r"package app;
+
+import java.io.File;
+
+class Paths {
+    void parents(File file) {
+        expect(file.getParentFile());
+        file.getParentFile().getName();
+        tolerate(file.getParentFile().getParentFile());
+        file.getParentFile().getParentFile().getName();
+    }
+
+    void together(File file) {
+        pair(file.getParentFile(), file.getParentFile().getName());
+    }
+
+    private void expect(File file) {
+        file.getName();
+    }
+
+    private void tolerate(File file) {
+        if (file == null) {
+            return;
+        }
+    }
+
+    private void pair(File file, String name) {
+        file.getName();
+    }
+}
+";
+
+// Pasar el resultado a un parámetro que el método desreferencia lo da por no nulo después: no
+// adentro de la misma llamada ni si el método lo tolera null.
+#[test]
+fn a_call_passed_to_a_non_null_parameter_is_not_null_afterwards() {
+    assert_eq!(
+        findings_in(PASSED, "data-flow-issue"),
+        ["10:46 getName()", "14:57 getName()"]
+    );
+}

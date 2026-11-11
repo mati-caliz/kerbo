@@ -38,6 +38,7 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
             }
             None => writer.number(ABSENT),
         });
+        writer.list(&step.passed_before, write_null_argument);
     });
     match chain.unboxed {
         Some((line, column)) => {
@@ -66,6 +67,7 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
                 class_arguments: reader.list(Reader::size)?,
                 text_arguments: reader.list(Reader::text)?,
                 argument_types: reader.list(read_optional_text)?,
+                passed_before: reader.list(read_null_argument)?,
             })
         })?,
         unboxed: match reader.number()? {

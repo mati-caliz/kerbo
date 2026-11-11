@@ -141,7 +141,7 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
             scopes.push((node.end_byte(), method_variables(node, source, &file_variables)));
         }
         let variables = scopes.last().map_or(&file_variables, |(_, scoped)| scoped);
-        facts.observe(node, source);
+        facts.observe(node, source, (variables, &imported));
         if TYPE_DECLARATIONS.contains(&node.kind())
             && let Some(name) = node.child_by_field_name(NAME_FIELD)
         {

@@ -19,6 +19,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
                 class_arguments: vec![1],
                 text_arguments: vec!["java.version".to_owned()],
                 argument_types: vec![Some("String".to_owned()), None],
+                passed_before: Vec::new(),
             }],
             unboxed: Some((12, 16)),
         },
@@ -43,8 +44,16 @@ fn chains_and_null_flows_survive_the_round_trip() {
     let classes = NullFlow {
         origin: Chain {
             root: ChainRoot::Class("System".to_owned()),
+            steps: flow
+                .origin
+                .steps
+                .iter()
+                .map(|step| ChainStep {
+                    passed_before: flow.arguments.clone(),
+                    ..step.clone()
+                })
+                .collect(),
             unboxed: None,
-            ..flow.origin.clone()
         },
         dereferences: Vec::new(),
         arguments: Vec::new(),

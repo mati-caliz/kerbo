@@ -63,7 +63,7 @@ pub(super) fn reaches(
             .all(|argument| non_null_parameter(types, library, summary, argument).is_none())
 }
 
-fn non_null_parameter(
+pub(super) fn non_null_parameter(
     types: &ProjectTypes<'_>,
     library: &Library,
     summary: &JavaSummary,

@@ -1,6 +1,6 @@
 use super::java::{Declaration, JavaSummary, NullInference, Position, lint_at};
 use super::java_jdk::{is_always_defined, jdk_method};
-use super::java_null_arguments::{accepts, reaches};
+use super::java_null_arguments::{accepts, non_null_parameter, reaches};
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
@@ -29,7 +29,9 @@ pub fn nullable_dereferences(
                 .unboxed
                 .zip(chain.steps.last())
                 .filter(|(_, last)| {
-                    !last.checked && nullable.len() == chain.steps.len() && nullable.last() == Some(&true)
+                    nullable.len() == chain.steps.len()
+                        && nullable.last() == Some(&true)
+                        && !known_not_null(types, library, summary, last)
                 })
                 .map(|((line, column), last)| report(line, column, &last.name));
             chain
@@ -37,7 +39,7 @@ pub fn nullable_dereferences(
                 .windows(2)
                 .zip(nullable.iter().copied())
                 .filter_map(|(pair, is_nullable)| match pair {
-                    [step, next] if is_nullable && !step.checked => {
+                    [step, next] if is_nullable && !known_not_null(types, library, summary, step) => {
                         Some(report(next.line, next.column, &next.name))
                     }
                     _ => None,
@@ -67,6 +69,20 @@ pub(super) fn may_return_null(
 ) -> bool {
     let nullable = nullable_steps(types, library, summary, chain);
     nullable.len() == chain.steps.len() && nullable.last() == Some(&true)
+}
+
+// Si antes se chequeó contra null o se pasó a un parámetro que no puede ser null.
+fn known_not_null(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    step: &ChainStep,
+) -> bool {
+    step.checked
+        || step
+            .passed_before
+            .iter()
+            .any(|argument| non_null_parameter(types, library, summary, argument).is_some())
 }
 
 fn report(line: usize, column: usize, name: &str) -> LintFinding {

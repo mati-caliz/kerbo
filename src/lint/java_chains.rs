@@ -1,10 +1,10 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
-use super::java_null_inference::cast_type;
-use super::java_receivers::{Variables, enclosing_types};
+use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
+use super::java_receivers::{StaticImports, Variables, enclosing_types};
 use super::java_throws::ArgumentKind;
 use crate::syntax::{named_children, one_based};
 
@@ -47,8 +47,9 @@ pub enum ChainRoot {
     Class(String),
 }
 
-// Un paso de una cadena de llamadas: el método, la cantidad de argumentos, dónde está su nombre y
-// si su resultado ya se chequeó contra null antes en el archivo.
+// Un paso de una cadena de llamadas: el método, la cantidad de argumentos, dónde está su nombre,
+// si su resultado ya se chequeó contra null antes en el archivo y a qué llamadas se pasó antes la
+// misma expresión (si alguna exige un parámetro no nulo, IntelliJ la da por no nula después).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChainStep {
     pub name: String,
@@ -59,6 +60,7 @@ pub struct ChainStep {
     pub class_arguments: Vec<usize>,
     pub text_arguments: Vec<String>,
     pub argument_types: Vec<Option<String>>,
+    pub passed_before: Vec<NullArgument>,
 }
 
 // `respuesta.getBody().error()`: la raíz y los pasos en orden. Interesan las de al menos dos pasos,
@@ -72,10 +74,12 @@ pub struct Chain {
 }
 
 // Lo que se sabe del archivo hasta el punto que se recorre: lo que ya se chequeó contra null (por
-// texto) y las llamadas que ya son parte de una cadena.
+// texto), las llamadas pasadas como argumento (por texto, con dónde termina la llamada que las
+// recibe) y las llamadas que ya son parte de una cadena.
 #[derive(Default)]
 pub struct NullFacts {
     checked: HashSet<String>,
+    passed: HashMap<String, Vec<(usize, NullArgument)>>,
     seen: HashSet<usize>,
 }
 
@@ -83,17 +87,62 @@ impl NullFacts {
     // Un chequeo vale dentro del método donde está: al entrar en otro se olvida.
     pub fn enter_method(&mut self) {
         self.checked.clear();
+        self.passed.clear();
     }
 
     // Se llama en orden de recorrido: un chequeo cuenta para lo que viene después.
-    pub fn observe(&mut self, node: Node<'_>, source: &[u8]) {
+    pub fn observe(&mut self, node: Node<'_>, source: &[u8], context: (&Variables, &StaticImports)) {
+        let (variables, imported) = context;
         if let Some(checked) = checked_expression(node, source) {
             self.checked.insert(compact(text(checked, source)));
+        }
+        let arguments = call_arguments(node);
+        if !arguments.iter().any(|argument| argument.kind() == INVOCATION) {
+            return;
+        }
+        let Some(CallTarget {
+            name,
+            is_constructor,
+            receiver,
+        }) = call_target(node, source, imported, variables)
+        else {
+            return;
+        };
+        for (index, argument) in arguments.iter().enumerate() {
+            if argument.kind() != INVOCATION {
+                continue;
+            }
+            let start = argument.start_position();
+            let used = NullArgument {
+                name: name.clone(),
+                is_constructor,
+                arity: arguments.len(),
+                receiver: receiver.clone(),
+                index,
+                line: one_based(start.row),
+                column: one_based(start.column),
+                cast: None,
+                exact: false,
+            };
+            self.passed
+                .entry(compact(text(*argument, source)))
+                .or_default()
+                .push((node.end_byte(), used));
         }
     }
 
     fn is_checked(&self, expression: Node<'_>, source: &[u8]) -> bool {
         self.checked.contains(&compact(text(expression, source)))
+    }
+
+    fn passed_before(&self, expression: Node<'_>, source: &[u8]) -> Vec<NullArgument> {
+        self.passed
+            .get(&compact(text(expression, source)))
+            .into_iter()
+            .flatten()
+            .filter(|(call_end, _)| *call_end <= expression.start_byte())
+            .map(|(_, used)| used.clone())
+            .collect()
     }
 }
 
@@ -220,6 +269,7 @@ fn walk(
             class_arguments: class_arguments(current),
             text_arguments: text_arguments(current, source),
             argument_types: argument_types(current, source, variables),
+            passed_before: facts.passed_before(current, source),
         });
         let Some(object) = current.child_by_field_name(OBJECT_FIELD) else {
             steps.reverse();
