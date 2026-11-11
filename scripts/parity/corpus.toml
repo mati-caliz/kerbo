@@ -196,3 +196,8 @@ uso = "migraciones de Rails contra squawk"
 url = "https://github.com/mastodon/mastodon.git"
 commit = "46fe6b9849684818cb7ef07aed6ebf0d58e4d551"
 uso = "migraciones de Rails contra squawk"
+
+[repos.forem]
+url = "https://github.com/forem/forem.git"
+commit = "d9d366e2573bce951f6974fa84477fcbde3aebba"
+uso = "migraciones de Rails contra squawk"

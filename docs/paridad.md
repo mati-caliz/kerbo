@@ -212,7 +212,7 @@ columnas, referencias, índices y restricciones, los `add_*`, `remove_*`, `renam
 `execute` con su SQL (heredoc o string), `reversible` y `up_only` por la rama `up`, y los métodos
 propios de la migración. `disable_ddl_transaction!` saca el `BEGIN`. La referencia es squawk 2.71
 sobre el SQL que ActiveRecord manda de verdad al aplicar las migraciones en orden sobre un Postgres
-vacío (`scripts/parity/rails/`): en maybe, chatwoot y mastodon coinciden los 3.563 avisos.
+vacío (`scripts/parity/rails/`): en maybe, chatwoot y mastodon coinciden los 3.563 avisos; en forem, 3.540 de 3.556.
 Las migraciones anteriores a Rails 5.1 arman ids `integer`, como hacía Rails. Cada migración
 se evalúa con el esquema que dejan las anteriores del mismo directorio, así salen los
 `ALTER INDEX ... RENAME` que Rails agrega al renombrar una tabla o una columna y se saltea lo que

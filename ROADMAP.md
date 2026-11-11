@@ -1714,9 +1714,15 @@ cerrarse se borra de acá.
   claves foráneas), así salen los renames de índices y secuencias, `if_exists:` y las guardias
   `*_exists?`. Migraciones de antes de Rails 5.1 (`Migration[4.2]` o sin versión) usan ids
   `integer` y clave primaria `serial`. Contra squawk 2.71 (`scripts/parity/rails/`, repos `maybe`,
-  `chatwoot` y `mastodon`): maybe 849 de 849; chatwoot 951 de 951 con 3 de más en
+  `chatwoot`, `mastodon` y `forem`): maybe 849 de 849; chatwoot 951 de 951 con 3 de más en
   `20250108211541`, donde la referencia falla en `create_captain_tables` por el tipo `vector` de
-  pgvector; mastodon 1.763 de 1.763. Pendientes:
+  pgvector; mastodon 1.763 de 1.763; forem 3.540 de 3.556 con 2 de más. Pendientes:
+  - forem, 12 diferencias: migraciones con sufijo de engine
+    (`*.acts_as_taggable_on_engine.rb`), `drop_table` en el `down` de `create_delayed_jobs` y
+    `acts_as_follower_migration`, timeouts y `prefer-robust-stmts` de 2025-2026
+    (`update_poll_votes_unique_index`, `add_invitation_token_to_organization_memberships`,
+    `add_slug_to_agent_sessions`, `add_index_on_*_and_created_at`) y `ban-drop-column` de más en
+    `setup_vector_columns_for_feed`. Falta cruzarlas con `errores.txt` y los `.sql` de la referencia.
   - `index_exists?` con `where:` compara sólo las columnas, no el predicado.
   - `remove_index` por columnas usa el nombre por defecto; podría tomar el nombre real del esquema.
   - Un `execute` con `ALTER TABLE ... RENAME` actualiza el esquema pero no emite los renames de

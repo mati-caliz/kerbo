@@ -244,6 +244,8 @@ impl<'tree> Walker<'tree, '_> {
         if call.child_by_field_name("receiver").is_some() {
             if RECEIVER_BLOCKS.contains(&method.as_str()) {
                 self.walk_block(call);
+            } else if method == EXECUTE {
+                self.execute(call.child_by_field_name("arguments"));
             }
             return;
         }

@@ -230,3 +230,12 @@ fn stops_at_return_and_skips_rescue_clauses() {
     assert!(!sql.contains("DROP TABLE \"c\""));
     assert!(!sql.contains("DROP TABLE \"d\""));
 }
+
+#[test]
+fn runs_execute_called_on_the_connection() {
+    let sql = migration(
+        "    ActiveRecord::Base.connection.execute(\"DROP VIEW IF EXISTS hypershield.tags\")\n    connection.execute(<<-SQL\n      ALTER TABLE tags ALTER COLUMN id TYPE bigint\n    SQL\n    )",
+    );
+    assert!(sql.contains("DROP VIEW IF EXISTS hypershield.tags;"));
+    assert!(sql.contains("ALTER TABLE tags ALTER COLUMN id TYPE bigint"));
+}
