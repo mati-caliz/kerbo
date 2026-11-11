@@ -148,6 +148,7 @@ class Migration(migrations.Migration):
         migrations.AddField(model_name="site", name="region", field=models.TextField(default=os.environ.get("REGION", "ar"))),
         migrations.AddField(model_name="site", name="codes", field=ArrayField(models.TextField(), size=3, default=list)),
         migrations.AddField(model_name="site", name="extra", field=models.JSONField(db_default={})),
+        migrations.AddField(model_name="site", name="filters", field=models.JSONField(db_default={"period": "14d"})),
         migrations.AddField(
             model_name="site",
             name="chunks",
@@ -180,6 +181,7 @@ fn defaults_are_rendered_with_the_type_postgres_receives() {
         "\"region\" text DEFAULT 'ar' NOT NULL",
         "\"codes\" text[3] DEFAULT '{}' NOT NULL",
         "\"extra\" jsonb DEFAULT '{}'::jsonb NOT NULL",
+        "\"filters\" jsonb DEFAULT '{\"period\": \"14d\"}'::jsonb NOT NULL",
         "\"chunks\" integer[] DEFAULT '{}'::integer[] NOT NULL",
         "\"expires\" timestamp with time zone DEFAULT ((STATEMENT_TIMESTAMP() + '30 days 3600.000000 seconds'::interval)) NOT NULL",
     ] {

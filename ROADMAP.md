@@ -1693,11 +1693,15 @@ cerrarse se borra de acá.
     operación (`RunSQL` con f-string sobre sus parámetros); `ExclusionConstraint` (inline en el
     `CREATE TABLE`, con `RangeOperators`); índices por expresión con `DateTrunc`, `Case`/`When`,
     `Coalesce`, `KeyTransform`/`KeyTextTransform`, rutas `F("data__k")` sobre JSON y `Cast`;
-    `INCLUDE` en índices y `UniqueConstraint`. Lo que queda, sólo SQL, sin cambiar avisos:
-    - sentry 0001: el `config` jsonb de `auth_authenticator` (kerbo da `text`) y el `db_default`
-      de un dict no vacío en un `JSONField` (`'{"period": "14d"}'::jsonb`; hoy sólo se castean
-      `{}` y `[]`, en `field_defaults::empty_json`).
-    - sentry 1210: los bloques `DO $$` de `SafeRunSQL`.
+    `INCLUDE` en índices y `UniqueConstraint`; los campos declarados en módulos que las
+    migraciones nombran (`users.models.AuthenticatorConfig` → `jsonb`) y `db_default` de un dict
+    no vacío en un `JSONField` (`'{"period": "14d"}'::jsonb`). Lo que queda, sólo SQL, sin
+    cambiar avisos:
+    - sentry 0001: un `CREATE EXTENSION IF NOT EXISTS btree_gist` de más en la referencia, que
+      emite el schema editor propio (`MakeBtreeGistSchemaEditor` en `sentry/db/postgres/schema.py`)
+      antes de cada `ExclusionConstraint`. Es de un solo proyecto; emularlo sería leer ese editor.
+    - sentry 1210: los bloques `DO $$` de `[SafeRunSQL(validate_sql(table), ...) for table in
+      REFERENCING_TABLES]`, una comprensión de lista sobre una constante del módulo.
     - Las apps de terceros (`auth`, `contenttypes`, `sessions`, `sites`) quedan fuera.
   - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
     `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), los

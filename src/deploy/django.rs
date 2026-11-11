@@ -19,6 +19,7 @@ mod installed_apps;
 mod md5;
 mod meta;
 mod migration_base;
+mod migration_references;
 mod model;
 mod names;
 mod operations;

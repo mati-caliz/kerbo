@@ -87,7 +87,12 @@ fn typed_default(node: Node<'_>, source: &[u8], class: Class) -> Option<String> 
 }
 
 fn json_default(node: Node<'_>, source: &[u8]) -> Option<String> {
-    empty_json(node, source).map(|json| format!("{}{JSON_CAST}", quoted_literal(json)))
+    let literal = empty_json(node, source).map(quoted_literal).or_else(|| {
+        (node.kind() == OBJECT_LITERAL)
+            .then(|| sql_literal(node, source))
+            .flatten()
+    })?;
+    Some(format!("{literal}{JSON_CAST}"))
 }
 
 const fn is_integer(class: Class) -> bool {

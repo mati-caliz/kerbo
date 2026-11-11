@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use super::discovery::subdirectories;
 use super::fields::class_of;
+use super::migration_references::modules_named_by_migrations;
 use super::model::Class;
 
 const FIELDS_MODULE: &str = "fields.py";
@@ -243,14 +244,18 @@ fn refined(name: &str, inherited: Class) -> Class {
 }
 
 pub fn field_classes(source_root: &Path) -> BTreeMap<String, Class> {
-    let mut modules = Vec::new();
-    fields_modules(source_root, false, &mut modules);
-    modules.sort();
+    let mut found = Vec::new();
+    fields_modules(source_root, false, &mut found);
+    let mut modules: BTreeMap<PathBuf, String> = modules_named_by_migrations(source_root);
+    for module in found {
+        let name = module_path(source_root, &module);
+        modules.insert(module, name);
+    }
     let declared: Vec<Declaration> = modules
         .iter()
-        .filter_map(|module| {
+        .filter_map(|(module, name)| {
             let source = fs::read_to_string(module).ok()?;
-            Some(declarations(&source, &module_path(source_root, module)))
+            Some(declarations(&source, name))
         })
         .flatten()
         .collect();
