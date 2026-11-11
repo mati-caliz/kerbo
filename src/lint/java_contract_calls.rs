@@ -7,7 +7,8 @@ use super::java::{
 use super::java_chains::argument_count;
 use super::java_contracts::Constraint;
 use super::java_receivers::{
-    Receiver, StaticImports, Variables, receiver_of, simple_type_name, variable_types,
+    Receiver, StaticImports, Variables, qualified_type_receiver, receiver_of, simple_type_name,
+    variable_types,
 };
 use crate::syntax::{descendants, named_children, one_based};
 
@@ -51,9 +52,17 @@ const NOT_NULL_KINDS: &[&str] = &[
 const TEST_ANNOTATION: &str = "Test";
 const EXPECTED_ELEMENTS: &[&str] = &["expected", "expectedExceptions"];
 const ASSERT_THROWS: &str = "assertThrows";
+const IF: &str = "if_statement";
+const CONDITION_FIELD: &str = "condition";
+const CONSEQUENCE_FIELD: &str = "consequence";
+const LEFT_FIELD: &str = "left";
+const RIGHT_FIELD: &str = "right";
+const NOT_EQUAL: &str = "!=";
+const CONJUNCTION: &str = "&&";
+const ASSIGNMENT: &str = "assignment_expression";
 
-// Una llamada que pasa algún `null`, `true` o `false` conocido, con lo que se sabe de cada
-// argumento, para cruzarla con los contratos `fail` del método llamado.
+// Una llamada que pasa algún `null`, `true` o `false` conocido, o una variable que se sabe no nula,
+// con lo que se sabe de cada argumento, para cruzarla con los contratos `fail` del método llamado.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContractCall {
     pub name: String,
@@ -98,7 +107,12 @@ fn contract_call(
             } else {
                 CallTarget::Method
             },
-            receiver_of(call, source, variables),
+            match receiver_of(call, source, variables) {
+                Receiver::Unknown => {
+                    qualified_type_receiver(call, source, variables).map_or(Receiver::Unknown, Receiver::Type)
+                }
+                known @ (Receiver::Type(_) | Receiver::Scope(_)) => known,
+            },
         ),
         OBJECT_CREATION
             if !named_children(call)
@@ -114,20 +128,26 @@ fn contract_call(
         }
         _ => return None,
     };
-    let arguments: Vec<Option<Constraint>> = call
+    let written: Vec<Node<'_>> = call
         .child_by_field_name(ARGUMENTS_FIELD)
         .map(named_children)
         .unwrap_or_default()
         .into_iter()
         .filter(|argument| !COMMENTS.contains(&argument.kind()))
-        .map(|argument| fact(argument, call, source))
         .collect();
-    if !arguments.iter().any(|argument| {
-        matches!(
-            argument,
-            Some(Constraint::Null | Constraint::True | Constraint::False)
-        )
-    }) {
+    let arguments: Vec<Option<Constraint>> = written
+        .iter()
+        .map(|argument| fact(*argument, call, source))
+        .collect();
+    let decisive = written
+        .iter()
+        .zip(&arguments)
+        .any(|(argument, known)| match known {
+            Some(Constraint::Null | Constraint::True | Constraint::False) => true,
+            Some(Constraint::NotNull) => argument.kind() == IDENTIFIER,
+            None => false,
+        });
+    if !decisive {
         return None;
     }
     let position = name_node.start_position();
@@ -148,8 +168,8 @@ fn contract_call(
     })
 }
 
-// Lo que se sabe de un argumento sin seguir el flujo: un literal, algo que nunca es nulo o una
-// variable local `final` inicializada con un literal.
+// Lo que se sabe de un argumento sin seguir el flujo: un literal, algo que nunca es nulo, una
+// variable local `final` inicializada con un literal o una variable que un `if` chequeó.
 fn fact(argument: Node<'_>, call: Node<'_>, source: &[u8]) -> Option<Constraint> {
     match argument.kind() {
         PARENTHESIZED => named_children(argument)
@@ -168,7 +188,9 @@ fn fact(argument: Node<'_>, call: Node<'_>, source: &[u8]) -> Option<Constraint>
         {
             Some(Constraint::NotNull)
         }
-        IDENTIFIER => final_local_literal(argument, call, source),
+        IDENTIFIER => final_local_literal(argument, call, source).or_else(|| {
+            guarded_not_null(text(argument, source), call, source).then_some(Constraint::NotNull)
+        }),
         kind if NOT_NULL_KINDS.contains(&kind) => Some(Constraint::NotNull),
         _ => None,
     }
@@ -204,6 +226,69 @@ fn final_local_literal(identifier: Node<'_>, call: Node<'_>, source: &[u8]) -> O
         FALSE => Some(Constraint::False),
         _ => None,
     }
+}
+
+// Dentro del `then` de un `if (x != null)` (o de un `&&` que lo incluye), sin que nada reasigne `x`
+// antes de la llamada, `x` no es nulo.
+fn guarded_not_null(name: &str, call: Node<'_>, source: &[u8]) -> bool {
+    let mut inner = call;
+    for ancestor in ancestors(call) {
+        if ancestor.kind() == METHOD || ancestor.kind() == CONSTRUCTOR {
+            return false;
+        }
+        let guards = ancestor.kind() == IF
+            && ancestor
+                .child_by_field_name(CONSEQUENCE_FIELD)
+                .is_some_and(|consequence| consequence.id() == inner.id())
+            && ancestor
+                .child_by_field_name(CONDITION_FIELD)
+                .is_some_and(|condition| checks_not_null(condition, name, source));
+        if guards {
+            return !reassigned_before(inner, name, call, source);
+        }
+        inner = ancestor;
+    }
+    false
+}
+
+fn checks_not_null(condition: Node<'_>, name: &str, source: &[u8]) -> bool {
+    match condition.kind() {
+        PARENTHESIZED => named_children(condition)
+            .first()
+            .is_some_and(|inner| checks_not_null(*inner, name, source)),
+        BINARY => {
+            let operator = condition
+                .child_by_field_name(OPERATOR_FIELD)
+                .map(|operator| text(operator, source));
+            let (Some(left), Some(right)) = (
+                condition.child_by_field_name(LEFT_FIELD),
+                condition.child_by_field_name(RIGHT_FIELD),
+            ) else {
+                return false;
+            };
+            match operator {
+                Some(NOT_EQUAL) => {
+                    let names = |side: Node<'_>| side.kind() == IDENTIFIER && text(side, source) == name;
+                    (names(left) && right.kind() == NULL) || (left.kind() == NULL && names(right))
+                }
+                Some(CONJUNCTION) => {
+                    checks_not_null(left, name, source) || checks_not_null(right, name, source)
+                }
+                _ => false,
+            }
+        }
+        _ => false,
+    }
+}
+
+fn reassigned_before(scope: Node<'_>, name: &str, call: Node<'_>, source: &[u8]) -> bool {
+    descendants(scope).into_iter().any(|node| {
+        node.kind() == ASSIGNMENT
+            && node.start_byte() < call.start_byte()
+            && node
+                .child_by_field_name(LEFT_FIELD)
+                .is_some_and(|left| left.kind() == IDENTIFIER && text(left, source) == name)
+    })
 }
 
 fn ancestors(node: Node<'_>) -> impl Iterator<Item = Node<'_>> {

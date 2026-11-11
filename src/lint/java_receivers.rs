@@ -317,6 +317,26 @@ impl StaticImports {
     }
 }
 
+// Un receptor escrito con el paquete (`org.junit.Assume.assumeTrue(...)`): una cadena de nombres que
+// arranca en minúscula sin ser una variable y termina en un tipo.
+pub fn qualified_type_receiver(invocation: Node<'_>, source: &[u8], variables: &Variables) -> Option<String> {
+    let object = invocation.child_by_field_name(OBJECT_FIELD)?;
+    let mut segments = Vec::new();
+    let mut current = object;
+    while current.kind() == FIELD_ACCESS {
+        segments.push(text(current.child_by_field_name(FIELD_FIELD)?, source));
+        current = current.child_by_field_name(OBJECT_FIELD)?;
+    }
+    let root = text(current, source);
+    let is_package = current.kind() == IDENTIFIER
+        && !variables.contains_key(root)
+        && root.starts_with(|first: char| first.is_ascii_lowercase());
+    let names_type = segments
+        .first()
+        .is_some_and(|last| last.starts_with(|first: char| first.is_ascii_uppercase()));
+    (is_package && names_type).then(|| text(object, source).to_owned())
+}
+
 pub fn simple_type_name(written: &str) -> String {
     let without_arguments = written.split(GENERIC_OPEN).next().unwrap_or(written);
     let without_arrays = without_arguments

@@ -41,10 +41,28 @@ final class Checks {
         lenient(null);
         Validate.isTrue(false, "never");
         Validate.notNull("value");
+        org.junit.Assume.assumeTrue(false);
         try {
             length(null);
         } catch (IllegalArgumentException expected) {
         }
+    }
+
+    static void absent(Object value) {
+        if (value != null) {
+            throw new IllegalStateException();
+        }
+    }
+
+    void guarded(String text, String other) {
+        if (other != null && text != null) {
+            absent(text);
+        }
+        if (text != null) {
+            text = other;
+            absent(text);
+        }
+        absent(text);
     }
 }
 "#;
@@ -74,7 +92,9 @@ fn a_call_whose_arguments_meet_a_fail_contract_is_reported() {
             "34:9 distance",
             "35:9 distance",
             "37:18 isTrue",
-            "40:13 length",
+            "39:26 assumeTrue",
+            "41:13 length",
+            "54:13 absent",
         ]
     );
 }
@@ -89,6 +109,8 @@ fn a_test_that_expects_the_exception_is_not_reported() {
             "34:9 distance",
             "35:9 distance",
             "37:18 isTrue",
+            "39:26 assumeTrue",
+            "54:13 absent",
         ]
     );
 }
