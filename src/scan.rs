@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
+use std::collections::{HashMap, hash_map::Entry};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -17,8 +16,8 @@ use crate::lint::go::platform::GoPlatform;
 use crate::lint::{go_analysis_context, python_analysis_context};
 use crate::macro_rules::MacroIndex;
 use crate::rules::{Diagnostic, FileIdentity, evaluate};
-use crate::shell;
 use crate::suppressions::{Suppressed, split_with_shell_rc};
+use crate::{deploy, shell};
 
 mod go_packages;
 mod go_typed;
@@ -333,7 +332,8 @@ fn check_file(
         .map(|crate_macros| crate_macros.analysis_context(&file.identity.absolute))
         .or_else(|| shell::analysis_context(language, &file.identity.absolute))
         .or_else(|| python_analysis_context(language, &file.identity.absolute))
-        .or_else(|| go_analysis_context(language, &file.identity.absolute, &go_platform));
+        .or_else(|| go_analysis_context(language, &file.identity.absolute, &go_platform))
+        .or_else(|| deploy::analysis_context(language, &file.identity.absolute));
     let subject = AnalysisSubject {
         language,
         source: &source,

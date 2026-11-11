@@ -212,10 +212,11 @@ columnas, referencias, índices y restricciones, los `add_*`, `remove_*`, `renam
 `execute` con su SQL (heredoc o string), `reversible` y `up_only` por la rama `up`, y los métodos
 propios de la migración. `disable_ddl_transaction!` saca el `BEGIN`. La referencia es squawk 2.71
 sobre el SQL que ActiveRecord manda de verdad al aplicar las migraciones en orden sobre un Postgres
-vacío (`scripts/parity/rails/`): en maybe y chatwoot coinciden 1.781 de 1.800 avisos. Lo que falta
-depende del estado de la base, que kerbo no ve migración por migración: los `ALTER INDEX ... RENAME`
-que Rails agrega al renombrar una tabla o una columna, y lo que se salta en Ruby (`if_exists:`,
-`if index_exists?`) porque el objeto ya no estaba; kerbo avisa igual, del lado seguro.
+vacío (`scripts/parity/rails/`): en maybe y chatwoot coinciden los 1.800 avisos. Cada migración
+se evalúa con el esquema que dejan las anteriores del mismo directorio, así salen los
+`ALTER INDEX ... RENAME` que Rails agrega al renombrar una tabla o una columna y se saltea lo que
+Ruby decide contra la base (`if_exists:`, `if index_exists?`, `if table_exists?`). Si una
+migración toca una tabla que el historial no conoce, kerbo vuelve a avisar del lado seguro.
 
 **Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` y `*.Dockerfile`, contra
 [hadolint](https://github.com/hadolint/hadolint): todas las reglas DL que hadolint trae prendidas

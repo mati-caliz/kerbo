@@ -16,7 +16,6 @@ const TO: &str = "to";
 const TO_TABLE: &str = "to_table";
 const VALIDATE: &str = "validate";
 const FOREIGN_KEY: &str = "foreign_key";
-const PRIMARY_KEY_SUFFIX: &str = "_pkey";
 const CREATED_AT: &str = "created_at";
 const UPDATED_AT: &str = "updated_at";
 
@@ -144,14 +143,7 @@ fn rename_table(table: &str, arguments: &Arguments<'_>, source: &[u8]) -> Vec<St
     let Some(to) = first_name(arguments, source) else {
         return Vec::new();
     };
-    vec![
-        format!("{} RENAME TO {}", alter(table), quote(&to)),
-        format!(
-            "ALTER INDEX {} RENAME TO {}",
-            quote(&format!("{table}{PRIMARY_KEY_SUFFIX}")),
-            quote(&format!("{to}{PRIMARY_KEY_SUFFIX}"))
-        ),
-    ]
+    vec![format!("{} RENAME TO {}", alter(table), quote(&to))]
 }
 
 fn add_index(table: &str, arguments: &Arguments<'_>, source: &[u8]) -> Option<String> {

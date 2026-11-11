@@ -8,6 +8,7 @@ mod script;
 mod sql;
 
 use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Component, Path};
 
 use tree_sitter::{Node, Parser};
@@ -102,6 +103,7 @@ pub fn analyze(
     parser: &mut Parser,
     language: Language,
     source: &[u8],
+    path: Option<&Path>,
 ) -> Option<Result<Vec<Violation>, ParseFailed>> {
     let text = || String::from_utf8_lossy(source);
     match language {
@@ -117,7 +119,7 @@ pub fn analyze(
             parser
                 .parse(source, None)
                 .ok_or(ParseFailed)
-                .map(|tree| rails::violations(tree.root_node(), source)),
+                .map(|tree| rails::violations(tree.root_node(), source, path)),
         ),
         Language::Go
         | Language::Python
@@ -186,6 +188,15 @@ pub fn migration_violations(root: Node<'_>, source: &[u8], path: Option<&Path>) 
 
 pub fn migration_history_fingerprint(path: &Path) -> Option<u64> {
     django::fingerprint(path)
+}
+
+pub fn analysis_context(language: Language, path: &Path) -> Option<u64> {
+    (language == Language::Rails).then(|| {
+        let mut hasher = DefaultHasher::new();
+        path.hash(&mut hasher);
+        rails::fingerprint(path).hash(&mut hasher);
+        hasher.finish()
+    })
 }
 
 pub fn violation_diagnostics<'analysis>(

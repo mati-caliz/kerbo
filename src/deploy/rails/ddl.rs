@@ -1,15 +1,14 @@
 use tree_sitter::Node;
 
 use super::arguments::{Arguments, names, raw, string_content};
+use super::sha256::hex_digest;
 
-const MAXIMUM_IDENTIFIER: usize = 63;
+const MAXIMUM_INDEX_NAME: usize = 62;
 const INDEX_PREFIX: &str = "index_";
-const SHORT_INDEX_PREFIX: &str = "idx_";
+const SHORT_INDEX_PREFIX: &str = "idx_on_";
 const FOREIGN_KEY_PREFIX: &str = "fk_rails_";
 const CHECK_PREFIX: &str = "chk_rails_";
 const HASH_DIGITS: usize = 10;
-const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
-const FNV_PRIME: u64 = 0x0100_0000_01b3;
 const ID_SUFFIX: &str = "_id";
 const TYPE_SUFFIX: &str = "_type";
 const PRIMARY_KEY: &str = "id";
@@ -20,7 +19,6 @@ const USING: &str = "using";
 const WHERE: &str = "where";
 const NAME: &str = "name";
 const IF_NOT_EXISTS: &str = "if_not_exists";
-const IF_EXISTS: &str = "if_exists";
 const COLUMN: &str = "column";
 const TO_TABLE: &str = "to_table";
 const PRIMARY_KEY_OPTION: &str = "primary_key";
@@ -37,27 +35,34 @@ pub fn quote(identifier: &str) -> String {
     format!("\"{identifier}\"")
 }
 
-fn fnv(text: &str) -> String {
-    let hash = text.bytes().fold(FNV_OFFSET, |hash, byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(FNV_PRIME)
-    });
-    format!("{hash:016x}")[..HASH_DIGITS].to_owned()
+fn short_hash(text: &str) -> String {
+    hex_digest(text.as_bytes()).chars().take(HASH_DIGITS).collect()
 }
 
 pub fn index_name(table: &str, columns: &[String]) -> String {
     let name = format!("{INDEX_PREFIX}{table}_on_{}", columns.join("_and_"));
-    if name.len() <= MAXIMUM_IDENTIFIER {
+    if name.len() <= MAXIMUM_INDEX_NAME {
         return name;
     }
-    format!("{SHORT_INDEX_PREFIX}{}", fnv(&name))
+    let suffix = format!("_{}", short_hash(&name));
+    let short_name = format!("{SHORT_INDEX_PREFIX}{}", columns.join("_"));
+    let limit = MAXIMUM_INDEX_NAME - suffix.len();
+    let truncated: String = short_name.chars().take(limit).collect();
+    format!("{truncated}{suffix}")
 }
 
 pub fn foreign_key_name(table: &str, column: &str) -> String {
-    format!("{FOREIGN_KEY_PREFIX}{}", fnv(&format!("{table}_{column}_fk")))
+    format!(
+        "{FOREIGN_KEY_PREFIX}{}",
+        short_hash(&format!("{table}_{column}_fk"))
+    )
 }
 
 pub fn check_name(table: &str, expression: &str) -> String {
-    format!("{CHECK_PREFIX}{}", fnv(&format!("{table}_{expression}_chk")))
+    format!(
+        "{CHECK_PREFIX}{}",
+        short_hash(&format!("{table}_{expression}_chk"))
+    )
 }
 
 pub fn pluralize(word: &str) -> String {
@@ -178,12 +183,7 @@ pub fn drop_index(table: &str, arguments: &Arguments<'_>, source: &[u8]) -> Stri
     } else {
         ""
     };
-    let if_exists = if arguments.is_true(IF_EXISTS) {
-        "IF EXISTS "
-    } else {
-        ""
-    };
-    format!("DROP INDEX {concurrently}{if_exists}{}", quote(&name))
+    format!("DROP INDEX {concurrently}{}", quote(&name))
 }
 
 fn is_concurrent(arguments: &Arguments<'_>, source: &[u8]) -> bool {

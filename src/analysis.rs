@@ -117,7 +117,7 @@ pub fn analyze_unit(
 ) -> Result<FileAnalysis, ParseFailed> {
     let SourceUnit { language, source, .. } = unit;
     if let Some(violations) =
-        deploy::analyze(parser, language, source).or_else(|| shell::analyze(parser, unit))
+        deploy::analyze(parser, language, source, unit.path).or_else(|| shell::analyze(parser, unit))
     {
         return violations.map(FileAnalysis::of_violations);
     }

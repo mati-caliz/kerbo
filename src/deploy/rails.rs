@@ -1,7 +1,12 @@
 mod arguments;
 mod columns;
 mod ddl;
+mod guards;
+mod history;
 mod references;
+mod schema;
+mod sha256;
+mod sql_tokens;
 mod statements;
 mod tables;
 
@@ -14,6 +19,9 @@ use super::Violation;
 use super::script::{Origin, Script};
 use crate::syntax::{descendants, named_children, one_based};
 use arguments::{Arguments, heredoc_body, heredoc_text, name, string_content};
+use schema::Schema;
+
+pub use history::fingerprint;
 
 pub const EXTENSION: &str = "rb";
 
@@ -41,6 +49,8 @@ const DOWN_DIRECTION: &str = "down";
 const EXECUTE: &str = "execute";
 const CREATE_TABLE: &str = "create_table";
 const CHANGE_TABLE: &str = "change_table";
+const IF_EXISTS: &str = "if_exists";
+const DROPS_IF_EXISTS: &[&str] = &["remove_index", "remove_foreign_key"];
 const SKIPPED_KINDS: &[&str] = &[
     "string",
     "heredoc_body",
@@ -67,17 +77,21 @@ pub fn is_migration(path: &Path) -> bool {
         .any(|pair| matches!(pair, [database, migrate] if *database == DATABASE_DIRECTORY && *migrate == MIGRATE_DIRECTORY))
 }
 
-pub fn violations(root: Node<'_>, source: &[u8]) -> Vec<Violation> {
-    script(root, source).map(Script::finish).unwrap_or_default()
+pub fn violations(root: Node<'_>, source: &[u8], path: Option<&Path>) -> Vec<Violation> {
+    let schema = path.map(history::schema_before).unwrap_or_default();
+    evaluate(root, source, schema)
+        .map(|(script, _)| script.finish())
+        .unwrap_or_default()
 }
 
-fn script(root: Node<'_>, source: &[u8]) -> Option<Script> {
+fn evaluate(root: Node<'_>, source: &[u8], schema: Schema) -> Option<(Script, Schema)> {
     let class = migration_class(root, source)?;
     let transactional = !disables_transaction(class, source);
     let mut walker = Walker {
         source,
         helpers: helpers(class, source),
         visiting: HashSet::new(),
+        schema,
         script: if transactional {
             Script::new()
         } else {
@@ -95,7 +109,7 @@ fn script(root: Node<'_>, source: &[u8]) -> Option<Script> {
     if transactional {
         script.leave_transaction();
     }
-    Some(script)
+    Some((script, walker.schema))
 }
 
 fn migration_class<'tree>(root: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
@@ -131,6 +145,7 @@ struct Walker<'tree, 'source> {
     source: &'source [u8],
     helpers: HashMap<String, Node<'tree>>,
     visiting: HashSet<String>,
+    schema: Schema,
     script: Script,
 }
 
@@ -139,6 +154,11 @@ impl<'tree> Walker<'tree, '_> {
         match node.kind() {
             CALL => self.call(node),
             IDENTIFIER => self.helper(&arguments::raw(node, self.source)),
+            kind if guards::CONDITIONALS.contains(&kind) => {
+                for branch in guards::branches(node, &self.schema, self.source) {
+                    self.walk(branch);
+                }
+            }
             kind if SKIPPED_KINDS.contains(&kind) => {}
             _ => named_children(node)
                 .into_iter()
@@ -197,8 +217,21 @@ impl<'tree> Walker<'tree, '_> {
             line: one_based(call.start_position().row),
             column: one_based(call.start_position().column),
         };
+        let table = parsed
+            .positional
+            .first()
+            .and_then(|node| name(*node, self.source))
+            .unwrap_or_default();
+        let drops_if_exists = DROPS_IF_EXISTS.contains(&method.as_str()) && parsed.is_true(IF_EXISTS);
         for statement in self.statements(&method, &parsed, call) {
+            if drops_if_exists && self.schema.drops_missing_object(&table, &statement) {
+                continue;
+            }
+            let follow_ups = self.schema.apply(&statement);
             self.script.push(&statement, origin);
+            for follow_up in follow_ups {
+                self.script.push(&follow_up, origin);
+            }
         }
     }
 
@@ -236,8 +269,10 @@ impl<'tree> Walker<'tree, '_> {
         } else {
             return;
         };
+        let sql = sql.trim_end().trim_end_matches(';');
+        self.schema.apply(sql);
         self.script.push(
-            sql.trim_end().trim_end_matches(';'),
+            sql,
             Origin::Execute {
                 first_line: one_based(start.start_position().row),
                 script_line: 0,
@@ -246,5 +281,7 @@ impl<'tree> Walker<'tree, '_> {
     }
 }
 
+#[cfg(test)]
+mod schema_tests;
 #[cfg(test)]
 mod tests;

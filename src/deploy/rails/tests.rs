@@ -2,7 +2,8 @@ use std::path::Path;
 
 use tree_sitter::Parser;
 
-use super::{is_migration, script};
+use super::schema::Schema;
+use super::{evaluate, is_migration};
 
 fn render(source: &str) -> String {
     let mut parser = Parser::new();
@@ -10,8 +11,8 @@ fn render(source: &str) -> String {
         .set_language(&tree_sitter_ruby::LANGUAGE.into())
         .expect("la gramática de Ruby carga");
     let tree = parser.parse(source, None).expect("el parser devuelve un árbol");
-    script(tree.root_node(), source.as_bytes())
-        .map(|script| script.text().to_owned())
+    evaluate(tree.root_node(), source.as_bytes(), Schema::default())
+        .map(|(script, _)| script.text().to_owned())
         .unwrap_or_default()
 }
 
@@ -122,7 +123,7 @@ fn renders_every_schema_statement() {
         "ALTER TABLE \"users\" DROP COLUMN \"a\", DROP COLUMN \"b\";",
         "ALTER TABLE \"users\" RENAME COLUMN \"a\" TO \"b\";",
         "ALTER TABLE \"users\" RENAME TO \"people\";",
-        "DROP INDEX CONCURRENTLY IF EXISTS \"index_users_on_email\";",
+        "DROP INDEX CONCURRENTLY \"index_users_on_email\";",
         "\"author_id\" bigint",
         "VALIDATE CONSTRAINT",
         "NOT VALID",
