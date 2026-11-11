@@ -205,7 +205,9 @@ fn extract_method<'tree>(
         .method_throws
         .extend(method_throws(method, source, variables));
     if let Some(body) = method.child_by_field_name(BODY_FIELD) {
-        extracted.null_flows.extend(null_flows(body, source, variables));
+        extracted
+            .null_flows
+            .extend(null_flows(body, source, variables, imported));
         extracted
             .resources
             .extend(resource_candidates(body, source, variables));

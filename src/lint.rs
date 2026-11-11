@@ -28,6 +28,7 @@ pub mod java_lambda_targets;
 mod java_null_conditions;
 pub mod java_null_flow;
 pub mod java_null_inference;
+mod java_null_uses;
 mod java_optional;
 mod java_order;
 pub mod java_owner;

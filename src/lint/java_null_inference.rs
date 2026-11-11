@@ -263,37 +263,57 @@ struct CallContext<'context> {
     exactly_constructed: &'context ExactReceivers,
 }
 
-// Los `null` que una llamada pasa como argumento.
-fn null_arguments(call: Node<'_>, source: &[u8], context: &CallContext<'_>) -> Vec<NullArgument> {
-    let mut exact = false;
-    let (name, is_constructor, receiver) = match call.kind() {
-        INVOCATION => {
-            let Some(name) = call.child_by_field_name(NAME_FIELD) else {
-                return Vec::new();
-            };
-            exact = call
-                .child_by_field_name(OBJECT_FIELD)
-                .filter(|object| object.kind() == IDENTIFIER)
-                .is_some_and(|object| context.exactly_constructed.contains(object, source));
-            (
-                text(name, source).to_owned(),
-                false,
-                context.imported.receiver(call, source, context.variables),
-            )
-        }
+// A quién llama una llamada: el nombre del método (o de la clase, si construye), si es un
+// constructor y el receptor.
+pub(super) struct CallTarget {
+    pub(super) name: String,
+    pub(super) is_constructor: bool,
+    pub(super) receiver: Receiver,
+}
+
+pub(super) fn call_target(
+    call: Node<'_>,
+    source: &[u8],
+    imported: &StaticImports,
+    variables: &Variables,
+) -> Option<CallTarget> {
+    match call.kind() {
+        INVOCATION => Some(CallTarget {
+            name: text(call.child_by_field_name(NAME_FIELD)?, source).to_owned(),
+            is_constructor: false,
+            receiver: imported.receiver(call, source, variables),
+        }),
         CREATION
             if !named_children(call)
                 .iter()
                 .any(|child| child.kind() == CLASS_BODY) =>
         {
-            let Some(created) = call.child_by_field_name(TYPE_FIELD) else {
-                return Vec::new();
-            };
-            let name = simple_type_name(text(created, source));
-            (name.clone(), true, Receiver::Type(name))
+            let name = simple_type_name(text(call.child_by_field_name(TYPE_FIELD)?, source));
+            Some(CallTarget {
+                name: name.clone(),
+                is_constructor: true,
+                receiver: Receiver::Type(name),
+            })
         }
-        _ => return Vec::new(),
+        _ => None,
+    }
+}
+
+// Los `null` que una llamada pasa como argumento.
+fn null_arguments(call: Node<'_>, source: &[u8], context: &CallContext<'_>) -> Vec<NullArgument> {
+    let Some(CallTarget {
+        name,
+        is_constructor,
+        receiver,
+    }) = call_target(call, source, context.imported, context.variables)
+    else {
+        return Vec::new();
     };
+    let exact = call.kind() == INVOCATION
+        && call
+            .child_by_field_name(OBJECT_FIELD)
+            .filter(|object| object.kind() == IDENTIFIER)
+            .is_some_and(|object| context.exactly_constructed.contains(object, source));
     let arity = argument_count(call);
     call.child_by_field_name(ARGUMENTS_FIELD)
         .map(named_children)

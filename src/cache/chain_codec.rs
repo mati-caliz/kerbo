@@ -1,4 +1,5 @@
 use super::codec::{Corrupt, Reader, Writer};
+use super::null_codec::{read_null_argument, write_null_argument};
 use super::summary_codec::{read_flag, write_flag};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::lint::java_null_flow::{Dereference, NullFlow};
@@ -90,6 +91,8 @@ pub(super) fn write_flow(writer: &mut Writer, flow: &NullFlow) {
         writer.size(used.line);
         writer.size(used.column);
     });
+    writer.list(&flow.arguments, write_null_argument);
+    writer.list(&flow.passed_before, write_null_argument);
 }
 
 pub(super) fn read_flow(reader: &mut Reader<'_>) -> Result<NullFlow, Corrupt> {
@@ -102,6 +105,8 @@ pub(super) fn read_flow(reader: &mut Reader<'_>) -> Result<NullFlow, Corrupt> {
                 column: reader.size()?,
             })
         })?,
+        arguments: reader.list(read_null_argument)?,
+        passed_before: reader.list(read_null_argument)?,
     })
 }
 

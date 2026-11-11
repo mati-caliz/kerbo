@@ -5,13 +5,14 @@ use tree_sitter::Node;
 use super::java::{NAME_FIELD, text};
 use super::java_chains::{Chain, origin_chain};
 use super::java_null_conditions::{asserted_present, branch_states, is_logical, without_cast};
-use super::java_receivers::Variables;
-use crate::syntax::{named_children, one_based};
+use super::java_null_inference::NullArgument;
+use super::java_null_uses::{dereference, passed};
+use super::java_receivers::{StaticImports, Variables};
+use crate::syntax::named_children;
 
 pub(super) const IDENTIFIER: &str = "identifier";
 pub(super) const INVOCATION: &str = "method_invocation";
-const FIELD_ACCESS: &str = "field_access";
-const ARRAY_ACCESS: &str = "array_access";
+const CREATION: &str = "object_creation_expression";
 pub(super) const PARENTHESIZED: &str = "parenthesized_expression";
 pub(super) const UNARY: &str = "unary_expression";
 pub(super) const BINARY: &str = "binary_expression";
@@ -46,7 +47,6 @@ const EXITS: &[&str] = &[
     "yield_statement",
 ];
 pub(super) const OBJECT_FIELD: &str = "object";
-const ARRAY_FIELD: &str = "array";
 pub(super) const ARGUMENTS_FIELD: &str = "arguments";
 const CONDITION_FIELD: &str = "condition";
 const CONSEQUENCE_FIELD: &str = "consequence";
@@ -75,21 +75,26 @@ pub struct Dereference {
     pub column: usize,
 }
 
-// Una variable asignada desde una llamada (`Cache cache = manager.getCache(nombre)`) y los usos
-// que no tienen un chequeo de null por delante en ningún camino.
+// Una variable asignada desde una llamada (`Cache cache = manager.getCache(nombre)`), los usos
+// que no tienen un chequeo de null por delante en ningún camino y las llamadas a las que se pasa
+// sin chequear. Después de pasarla a una llamada, los usos van a otro flujo que recuerda esa
+// llamada: si el parámetro resulta no nulo, IntelliJ ya la da por presente.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NullFlow {
     pub origin: Chain,
     pub dereferences: Vec<Dereference>,
+    pub arguments: Vec<NullArgument>,
+    pub passed_before: Vec<NullArgument>,
 }
 
 // Las variables que podrían ser null en un punto del método, con la asignación que lo causó.
 pub(super) type State = HashMap<String, usize>;
 
-pub(super) struct Analysis<'source, 'variables> {
-    source: &'source [u8],
-    variables: &'variables Variables,
-    flows: Vec<NullFlow>,
+pub(super) struct Analysis<'source, 'context> {
+    pub(super) source: &'source [u8],
+    pub(super) variables: &'context Variables,
+    pub(super) imported: &'context StaticImports,
+    pub(super) flows: Vec<NullFlow>,
 }
 
 // Recorre el cuerpo de un método como lo haría IntelliJ, sin compilar: cada variable asignada
@@ -97,25 +102,36 @@ pub(super) struct Analysis<'source, 'variables> {
 // salida, `instanceof`, `requireNonNull`, `assertThat(x).isNotNull()`, `hasText`) la dan por
 // presente en el camino que corresponde, y el primer uso sin chequeo en cada camino se anota.
 // Las lambdas y las clases anónimas no se recorren.
-pub fn null_flows(body: Node<'_>, source: &[u8], variables: &Variables) -> Vec<NullFlow> {
+pub fn null_flows(
+    body: Node<'_>,
+    source: &[u8],
+    variables: &Variables,
+    imported: &StaticImports,
+) -> Vec<NullFlow> {
     let mut analysis = Analysis {
         source,
         variables,
+        imported,
         flows: Vec::new(),
     };
     analysis.statement(body, State::new());
     analysis
         .flows
         .into_iter()
-        .filter(|flow| !flow.dereferences.is_empty())
+        .filter(|flow| !flow.dereferences.is_empty() || !flow.arguments.is_empty())
         .collect()
 }
 
+// Si las dos ramas siguen la variable, queda el flujo más viejo: uno nacido en una rama al pasarla a
+// un método sólo suma chequeos, así que el viejo es el que llega por algún camino.
 pub(super) fn join(first: Option<State>, second: Option<State>) -> Option<State> {
     match (first, second) {
         (Some(mut merged), Some(other)) => {
             for (name, origin) in other {
-                merged.entry(name).or_insert(origin);
+                merged
+                    .entry(name)
+                    .and_modify(|kept| *kept = (*kept).min(origin))
+                    .or_insert(origin);
             }
             Some(merged)
         }
@@ -285,6 +301,8 @@ impl Analysis<'_, '_> {
             self.flows.push(NullFlow {
                 origin,
                 dereferences: Vec::new(),
+                arguments: Vec::new(),
+                passed_before: Vec::new(),
             });
         }
         state
@@ -347,7 +365,7 @@ impl Analysis<'_, '_> {
         let mut current = state;
         if let Some(object) = receiver {
             current = self.expression(object, current);
-            current = self.dereference(node, current);
+            current = dereference(self, node, current);
         }
         for child in named_children(node)
             .into_iter()
@@ -355,44 +373,13 @@ impl Analysis<'_, '_> {
         {
             current = self.expression(child, current);
         }
+        if kind == INVOCATION || kind == CREATION {
+            current = passed(self, node, current);
+        }
         if receiver.is_some() {
             current
         } else {
-            self.dereference(node, current)
+            dereference(self, node, current)
         }
-    }
-
-    fn dereference(&mut self, node: Node<'_>, mut state: State) -> State {
-        let (receiver, used) = match node.kind() {
-            INVOCATION | FIELD_ACCESS => (
-                node.child_by_field_name(OBJECT_FIELD),
-                node.child_by_field_name(if node.kind() == INVOCATION {
-                    NAME_FIELD
-                } else {
-                    "field"
-                }),
-            ),
-            ARRAY_ACCESS => (
-                node.child_by_field_name(ARRAY_FIELD),
-                node.child_by_field_name(ARRAY_FIELD),
-            ),
-            _ => (None, None),
-        };
-        let (Some(receiver), Some(used)) = (receiver.filter(|receiver| receiver.kind() == IDENTIFIER), used)
-        else {
-            return state;
-        };
-        if let Some(origin) = state.remove(self.text(receiver)) {
-            let start = used.start_position();
-            let name = self.text(used).to_owned();
-            if let Some(flow) = self.flows.get_mut(origin) {
-                flow.dereferences.push(Dereference {
-                    name,
-                    line: one_based(start.row),
-                    column: one_based(start.column),
-                });
-            }
-        }
-        state
     }
 }

@@ -1,8 +1,10 @@
 use super::java::{Declaration, Dereferenced, JavaSummary, NullInference, Parameter, Position, lint_at};
+use super::java_dereference::may_return_null;
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body};
+use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_null_inference::NullArgument;
 use crate::lint::java_receivers::{Receiver, simple_type_name};
 use crate::rules::JavaRule;
@@ -14,15 +16,24 @@ const LIBRARY_NON_NULL: &[(&str, &str, usize, usize, &str)] =
 
 // Calca el "Passing 'null' argument to parameter annotated as non-null" de DataFlowIssue con lo que
 // IntelliJ infiere sin anotaciones: un parámetro que el método desreferencia en todos los caminos es
-// no nulo, si nadie puede redefinir el método. Con sobrecargas, todas tienen que coincidir.
+// no nulo, si nadie puede redefinir el método. Con sobrecargas, todas tienen que coincidir. También
+// el "Argument might be null": una variable asignada desde una llamada que puede devolver null y
+// pasada así a ese parámetro.
 pub fn null_arguments(
     types: &ProjectTypes<'_>,
     library: &Library,
     summary: &JavaSummary,
 ) -> Vec<LintFinding> {
+    let possibly_null = summary
+        .null_flows
+        .iter()
+        .filter(|flow| !flow.arguments.is_empty())
+        .filter(|flow| reaches(types, library, summary, flow))
+        .flat_map(|flow| &flow.arguments);
     summary
         .null_arguments
         .iter()
+        .chain(possibly_null)
         .filter_map(|argument| {
             let parameter = non_null_parameter(types, library, summary, argument)?;
             Some(lint_at(
@@ -35,6 +46,21 @@ pub fn null_arguments(
             ))
         })
         .collect()
+}
+
+// Si la variable del flujo puede llegar null a sus usos: la llamada que le dio el valor puede
+// devolver null y ninguna llamada anterior a la que se pasó exige un parámetro no nulo.
+pub(super) fn reaches(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    flow: &NullFlow,
+) -> bool {
+    may_return_null(types, library, summary, &flow.origin)
+        && flow
+            .passed_before
+            .iter()
+            .all(|argument| non_null_parameter(types, library, summary, argument).is_none())
 }
 
 fn non_null_parameter(

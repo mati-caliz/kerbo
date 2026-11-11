@@ -90,7 +90,10 @@ From IntelliJ's inspections, kerbo does:
   type.
 - `DataFlowIssue`, the argument case (`null-argument`): a `null` (or `(Type) null`) passed to a
   parameter the method dereferences on every path, if nothing can override it: from that IntelliJ
-  infers the parameter is non-null. With overloads, only if all of them dereference it.
+  infers the parameter is non-null. With overloads, only if all of them dereference it. Also a
+  variable assigned from a call that may return `null` and passed unchecked to such a parameter;
+  from there on IntelliJ treats it as non-null, and its later uses are not reported. A `do` body
+  counts as running at least once.
 - `DataFlowIssue`, the assignment that changes nothing (`already-assigned`): within one block, a
   literal assigned to a local variable, or to a fixed position of a freshly created local array,
   that already held that value (the previous one or the default of `new T[n]`) with nothing using

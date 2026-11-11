@@ -2,6 +2,8 @@ use super::chain_codec::{read_flow, write_flow};
 use super::codec::{Reader, Writer};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::lint::java_null_flow::{Dereference, NullFlow};
+use crate::lint::java_null_inference::NullArgument;
+use crate::lint::java_receivers::Receiver;
 
 #[test]
 fn chains_and_null_flows_survive_the_round_trip() {
@@ -25,6 +27,18 @@ fn chains_and_null_flows_survive_the_round_trip() {
             line: 13,
             column: 9,
         }],
+        arguments: vec![NullArgument {
+            name: "unroll".to_owned(),
+            is_constructor: false,
+            arity: 2,
+            receiver: Receiver::Scope(vec!["TypeUtils".to_owned()]),
+            index: 1,
+            line: 14,
+            column: 30,
+            cast: None,
+            exact: false,
+        }],
+        passed_before: Vec::new(),
     };
     let classes = NullFlow {
         origin: Chain {
@@ -33,6 +47,8 @@ fn chains_and_null_flows_survive_the_round_trip() {
             ..flow.origin.clone()
         },
         dereferences: Vec::new(),
+        arguments: Vec::new(),
+        passed_before: flow.arguments.clone(),
     };
     let mut writer = Writer::default();
     write_flow(&mut writer, &flow);
@@ -97,8 +113,6 @@ fn what_a_method_can_throw_survives_the_round_trip() {
 #[test]
 fn null_arguments_survive_the_round_trip() {
     use super::null_codec::{read_null_argument, write_null_argument};
-    use crate::lint::java_null_inference::NullArgument;
-    use crate::lint::java_receivers::Receiver;
 
     let argument = NullArgument {
         name: "concat".to_owned(),
@@ -122,7 +136,6 @@ fn contract_calls_survive_the_round_trip() {
     use super::null_codec::{read_contract_call, write_contract_call};
     use crate::lint::java_contract_calls::{CallTarget, ContractCall};
     use crate::lint::java_contracts::Constraint;
-    use crate::lint::java_receivers::Receiver;
 
     let call = ContractCall {
         name: "isTrue".to_owned(),

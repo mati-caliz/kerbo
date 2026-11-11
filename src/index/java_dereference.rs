@@ -1,6 +1,6 @@
 use super::java::{Declaration, JavaSummary, NullInference, Position, lint_at};
 use super::java_jdk::{is_always_defined, jdk_method};
-use super::java_null_arguments::accepts;
+use super::java_null_arguments::{accepts, reaches};
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
@@ -47,8 +47,7 @@ pub fn nullable_dereferences(
         })
         .collect();
     for flow in &summary.null_flows {
-        let nullable = nullable_steps(types, library, summary, &flow.origin);
-        if nullable.len() == flow.origin.steps.len() && nullable.last() == Some(&true) {
+        if reaches(types, library, summary, flow) {
             findings.extend(
                 flow.dereferences
                     .iter()
@@ -57,6 +56,17 @@ pub fn nullable_dereferences(
         }
     }
     findings
+}
+
+// Si el último paso de la cadena, resuelto entero, puede devolver null.
+pub(super) fn may_return_null(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    chain: &Chain,
+) -> bool {
+    let nullable = nullable_steps(types, library, summary, chain);
+    nullable.len() == chain.steps.len() && nullable.last() == Some(&true)
 }
 
 fn report(line: usize, column: usize, name: &str) -> LintFinding {

@@ -285,9 +285,9 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "response.getBody().error() becomes Objects.requireNonNull(response.getBody()).error(), or the null is checked first.",
     ),
     RuleText::new(
-        "null passed to a parameter the method uses without checking",
-        "pass a value, or make the method accept null and check it",
-        "The method dereferences that parameter on every path and nothing can override it (it is static, private, final or in a final class): IntelliJ infers it does not accept null, and passing null throws NullPointerException inside. Like IntelliJ's DataFlowIssue.",
+        "null (or something that may be null) passed to a parameter the method uses without checking",
+        "pass a value or check for null first, or make the method accept null and check it",
+        "The method dereferences that parameter on every path and nothing can override it (it is static, private, final or in a final class): IntelliJ infers it does not accept null, and passing null, or a variable assigned from a method that may return it, throws NullPointerException inside. Like IntelliJ's DataFlowIssue.",
         "ArrayUtils.concat((int[][]) null) throws NullPointerException while walking the array; pass an empty array or check first.",
     ),
     RuleText::new(

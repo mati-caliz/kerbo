@@ -93,6 +93,9 @@ De las inspecciones de IntelliJ, kerbo hace:
 - `DataFlowIssue`, el caso de los argumentos (`null-argument`): un `null` (o `(Tipo) null`) pasado a
   un parámetro que el método desreferencia en todos los caminos, si nadie puede redefinirlo: de eso
   IntelliJ infiere que el parámetro es no nulo. Con sobrecargas, sólo si todas lo desreferencian.
+  También una variable asignada desde una llamada que puede devolver `null` y pasada sin chequeo a
+  un parámetro así; desde ahí IntelliJ la da por no nula, y no se marcan sus usos siguientes. Un
+  `do` cuenta como cuerpo que corre al menos una vez.
 - `DataFlowIssue`, el caso de la asignación que no cambia nada (`already-assigned`): en un mismo
   bloque, un literal asignado a una variable local, o a una posición fija de un arreglo local recién
   creado, que ya tenía ese valor (el anterior o el por defecto de `new T[n]`) sin que nada la usara

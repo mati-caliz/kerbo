@@ -23,6 +23,8 @@ const BLOCK: &str = "block";
 const IF: &str = "if_statement";
 const LOOPS_WITH_CONDITION: &[&str] = &["while_statement", "for_statement"];
 const ENHANCED_FOR: &str = "enhanced_for_statement";
+const DO: &str = "do_statement";
+const BODY_FIELD: &str = "body";
 const TRY_STATEMENTS: &[&str] = &["try_statement", "try_with_resources_statement"];
 const SYNCHRONIZED: &str = "synchronized_statement";
 const SWITCH: &str = "switch_expression";
@@ -51,8 +53,9 @@ const COMMENTS: &[&str] = &["line_comment", "block_comment"];
 // Los nombres que el cuerpo de un método desreferencia (`p.algo()`, `p.campo`, `p[0]`) en todos
 // los caminos: IntelliJ infiere de eso que el parámetro es no nulo. Se recorren las sentencias en
 // orden hasta la primera que puede salir antes o un `try` (de él sólo cuentan los recursos); de un
-// `if` o un bucle cuenta la condición, no el cuerpo, y de una expresión no cuentan las lambdas,
-// las ramas de un ternario ni lo que está a la derecha de un `&&` o un `||`.
+// `if` o un bucle cuenta la condición, no el cuerpo, salvo en un `do`, que corre al menos una vez.
+// De una expresión no cuentan las lambdas, las ramas de un ternario ni lo que está a la derecha de
+// un `&&` o un `||`.
 pub fn unconditionally_dereferenced(body: Node<'_>, source: &[u8]) -> HashSet<String> {
     let mut found = HashSet::new();
     for statement in statements(body) {
@@ -81,6 +84,15 @@ fn visit_statement(statement: Node<'_>, source: &[u8], found: &mut HashSet<Strin
         return statements(statement)
             .into_iter()
             .all(|inner| visit_statement(inner, source, found));
+    }
+    if kind == DO {
+        let completes = statement
+            .child_by_field_name(BODY_FIELD)
+            .is_none_or(|body| visit_statement(body, source, found));
+        if completes && let Some(condition) = statement.child_by_field_name(CONDITION_FIELD) {
+            collect(condition, source, found);
+        }
+        return completes && !exits_early(statement);
     }
     let evaluated: Vec<Node<'_>> = if kind == IF || LOOPS_WITH_CONDITION.contains(&kind) || kind == SWITCH {
         [CONDITION_FIELD, INIT_FIELD]

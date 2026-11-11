@@ -93,6 +93,13 @@ class Uses {
         Lookup.typed(field).hashCode();
         Lookup.typed((Object) field).hashCode();
         Lookup.copied("a").hashCode();
+        final Fields found = Fields.find("b");
+        Lookup.code(found);
+        found.hashCode();
+        final Fields other = Fields.find("c");
+        Lookup.typed(other);
+        other.hashCode();
+        Lookup.unrolled(null);
     }
 }
 
@@ -123,6 +130,21 @@ final class Lookup {
             return null;
         }
         return new Lookup();
+    }
+
+    static int code(Fields field) {
+        return field.hashCode();
+    }
+
+    static int unrolled(String text) {
+        int size;
+        do {
+            size = text.length();
+            if (size > 0) {
+                break;
+            }
+        } while (true);
+        return size;
     }
 }
 "#;
@@ -222,7 +244,8 @@ fn a_project_method_that_returns_null_and_cannot_be_overridden_is_nullable() {
             "85:23 hashCode()",
             "86:31 hashCode()",
             "88:29 hashCode()",
-            "90:28 hashCode()"
+            "90:28 hashCode()",
+            "96:15 hashCode()"
         ]
     );
 }
@@ -231,7 +254,13 @@ fn a_project_method_that_returns_null_and_cannot_be_overridden_is_nullable() {
 fn null_passed_to_a_parameter_the_method_dereferences_is_reported() {
     assert_eq!(
         findings("null-argument"),
-        ["74:23 text", "75:32 text", "76:35 texts"]
+        [
+            "74:23 text",
+            "75:32 text",
+            "76:35 texts",
+            "97:25 text",
+            "92:21 field"
+        ]
     );
 }
 
