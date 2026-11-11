@@ -26,6 +26,8 @@ const STRING_FRAGMENT: &str = "string_fragment";
 const VARIABLE_DECLARATOR: &str = "variable_declarator";
 const QUALIFIER_SEPARATOR: char = '.';
 const IDENTIFIER_SEPARATOR: char = '_';
+const NULL_MARKED: &[&str] = &["NullMarked", "NonNullApi"];
+const NULL_UNMARKED: &str = "NullUnmarked";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OwnerKind {
@@ -44,9 +46,21 @@ pub struct Owner {
     pub kind: OwnerKind,
     pub name: String,
     pub annotations: Vec<String>,
+    pub null_marking: NullMarking,
+}
+
+// Lo que dice de nulos la declaración más cercana que lo diga (el miembro o un tipo que lo
+// encierra): `@NullMarked` o `@NonNullApi` dan por no nulo lo que no se anota, `@NullUnmarked` lo
+// deshace. Si nadie dice nada, decide el paquete.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NullMarking {
+    Unspecified,
+    Marked,
+    Unmarked,
 }
 
 pub fn owner_of(member: Node<'_>, source: &[u8]) -> Owner {
+    let null_marking = null_marking_of(member, source);
     let mut container = member.parent().and_then(|body| body.parent());
     if container.is_some_and(|node| node.kind() == ENUM_BODY) {
         container = container.and_then(|enum_body| enum_body.parent());
@@ -55,6 +69,7 @@ pub fn owner_of(member: Node<'_>, source: &[u8]) -> Owner {
         kind: OwnerKind::Local,
         name: String::new(),
         annotations: Vec::new(),
+        null_marking,
     };
     let Some(declaration) = container else {
         return local;
@@ -95,7 +110,26 @@ pub fn owner_of(member: Node<'_>, source: &[u8]) -> Owner {
             .map(|name| text(name, source).to_owned())
             .unwrap_or_default(),
         annotations: annotation_names(declaration, source),
+        null_marking,
     }
+}
+
+fn null_marking_of(member: Node<'_>, source: &[u8]) -> NullMarking {
+    let mut current = Some(member);
+    while let Some(node) = current {
+        let annotations = annotation_names(node, source);
+        if annotations
+            .iter()
+            .any(|annotation| NULL_MARKED.contains(&annotation.as_str()))
+        {
+            return NullMarking::Marked;
+        }
+        if annotations.iter().any(|annotation| annotation == NULL_UNMARKED) {
+            return NullMarking::Unmarked;
+        }
+        current = node.parent();
+    }
+    NullMarking::Unspecified
 }
 
 // El cuerpo de una constante es una clase anónima del enum que la declara.

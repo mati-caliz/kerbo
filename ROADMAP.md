@@ -1773,8 +1773,11 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned` y `failing-call`):
   commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno de más en los dos.
-  En guava, 117 de los 972 (101 `data-flow-issue`, 15 `null-argument`, 1 `failing-call`) con uno
-  solo de más. Una llamada pasada antes a un parámetro que el método desreferencia queda no nula
+  En guava, 208 de los 972 (101 `data-flow-issue`, 106 `null-argument`, 1 `failing-call`), ninguno
+  de más. Bajo `@NullMarked`/`@NonNullApi` (del paquete, la clase o las que la encierran, cortado
+  por `@NullUnmarked`) un parámetro sin anotar es no nulo aunque el método se pueda redefinir; no
+  si su tipo es una variable con límite `@Nullable` o el tipo calificado lleva `@Nullable` en su
+  último tramo (`Spliterator.@Nullable OfInt`). Una llamada pasada antes a un parámetro que el método desreferencia queda no nula
   después (por el texto de la expresión), y un getter sin argumentos ya desreferenciado también,
   mientras la cadena no tenga argumentos y no se reasigne la variable. `File.getParent` y
   `getParentFile` no cuentan como nulos: Qodana no los marca nunca. Del JDK, los parámetros que
@@ -1797,9 +1800,10 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     (`List.set` sobre `Collections.unmodifiableList`) en TestWithParametersTest.
   - El flujo de nulos sigue un solo flujo por variable: al juntar ramas queda el más viejo. Dos
     asignaciones distintas en ramas distintas no se siguen a la vez.
-  - guava: los parámetros de un paquete `@NullMarked` del proyecto como no nulos (FilesTest 218
-    sobra por eso), los tipos genéricos `K`/`V` no nulos de `ConcurrentMap.putIfAbsent`/`replace`/
-    `remove` con null, el "Argument might be null" de `e0()`/`e1()`, el `@Nullable` de un método
+  - guava: los receptores que son campos heredados o getters (`collection`, `getMap()` en los
+    testers de testlib) para los parámetros no nulos del JDK, la inferencia por contexto
+    (`Suppliers.ofInstance(null)`), los tipos genéricos `K`/`V` no nulos de
+    `ConcurrentMap.putIfAbsent`/`replace`/`remove` con null, el "Argument might be null" de `e0()`/`e1()`, el `@Nullable` de un método
     de interfaz del proyecto (`ReferenceEntry.getValueReference()` en LocalCacheTest) y las
     desreferencias de `getSubscriber()`.
   - Las sobrecargas del proyecto se eligen por el tipo exacto de los argumentos que se conocen

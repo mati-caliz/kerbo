@@ -23,6 +23,7 @@ use crate::lint::java_owner::{Owner, annotation_names};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
 use crate::lint::java_throws::MethodThrows;
+use crate::lint::java_type_variables::{has_nullable_qualified_type, has_nullable_type_variable};
 use crate::lint::taint::TaintMethod;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::JavaRule;
@@ -45,11 +46,20 @@ pub struct Position {
 pub struct Parameter {
     pub name: String,
     pub position: Position,
-    pub declares_nullness: bool,
+    pub nullness: ParameterNullness,
     pub dereferenced: Dereferenced,
     pub reading: Reading,
     pub type_name: String,
     pub accepts_null: bool,
+}
+
+// Lo que el parámetro dice de su nulabilidad: una anotación (`@Nullable`, `@NonNull`...), nada, o
+// nada pero con un tipo que es una variable que admite null (`<T extends @Nullable Object>`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParameterNullness {
+    Unannotated,
+    Annotated,
+    NullableVariable,
 }
 
 // Si el cuerpo del método nombra al parámetro (un método sin cuerpo o un record, siempre).
@@ -219,6 +229,16 @@ fn declares_nullness(name: Node<'_>, source: &[u8]) -> bool {
         .any(|annotation| NULLNESS_ANNOTATIONS.contains(&annotation.as_str()))
 }
 
+fn parameter_nullness(name: Node<'_>, source: &[u8]) -> ParameterNullness {
+    if declares_nullness(name, source) || has_nullable_qualified_type(name, source) {
+        ParameterNullness::Annotated
+    } else if has_nullable_type_variable(name, source) {
+        ParameterNullness::NullableVariable
+    } else {
+        ParameterNullness::Unannotated
+    }
+}
+
 // Los nombres que se leen en el cuerpo: un parámetro que no aparece no se usa.
 fn read_names(callable: &Callable<'_>, source: &[u8]) -> HashSet<String> {
     callable
@@ -294,7 +314,7 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
                 Parameter {
                     name: name.to_owned(),
                     position: position_of(*parameter),
-                    declares_nullness: declares_nullness(*parameter, source),
+                    nullness: parameter_nullness(*parameter, source),
                     dereferenced: match (dereferenced.contains(name), used_first.contains(name)) {
                         (false, _) => Dereferenced::No,
                         (true, false) => Dereferenced::Always,

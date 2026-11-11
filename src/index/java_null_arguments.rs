@@ -1,4 +1,6 @@
-use super::java::{Declaration, Dereferenced, JavaSummary, NullInference, Parameter, Position, lint_at};
+use super::java::{
+    Declaration, Dereferenced, JavaSummary, NullInference, Parameter, ParameterNullness, Position, lint_at,
+};
 use super::java_dereference::may_return_null;
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::library::Library;
@@ -88,29 +90,47 @@ pub(super) fn non_null_parameter(
         Receiver::Unknown => return None,
     };
     let candidates = owners.iter().find_map(|owner| {
-        let found: Vec<(&Declaration, &Parameter)> = types
+        let found: Vec<(&JavaSummary, &Declaration, &Parameter)> = types
             .declarations_of(owner)
-            .map(|(_, declaration)| declaration)
-            .filter(|declaration| {
+            .filter(|(_, declaration)| {
                 declaration.is_constructor == argument.is_constructor
                     && declaration.name == argument.name
                     && accepts(declaration, argument.arity)
             })
-            .filter_map(|declaration| {
+            .filter_map(|(declaring, declaration)| {
                 let parameter = parameter_at(declaration, argument)?;
-                receives(parameter, argument).then_some((declaration, parameter))
+                receives(parameter, argument).then_some((declaring, declaration, parameter))
             })
             .collect();
         (!found.is_empty()).then_some(found)
     })?;
-    let mut names = candidates.iter().map(|(declaration, parameter)| {
-        ((declaration.inference != NullInference::Overridable || argument.exact)
-            && declaration.body == Body::Written
-            && parameter.dereferenced == Dereferenced::AlwaysFirst)
-            .then(|| parameter.name.clone())
+    let mut names = candidates.iter().map(|(declaring, declaration, parameter)| {
+        (inferred_non_null(declaration, parameter, argument)
+            || marked_non_null(types, declaring, declaration, parameter))
+        .then(|| parameter.name.clone())
     });
     let first = names.next()??;
     names.all(|other| other.is_some()).then_some(first)
+}
+
+// Lo que IntelliJ infiere sin anotaciones: el método lo desreferencia antes que nada y nadie lo
+// puede redefinir (o se sabe cuál se llama).
+fn inferred_non_null(declaration: &Declaration, parameter: &Parameter, argument: &NullArgument) -> bool {
+    (declaration.inference != NullInference::Overridable || argument.exact)
+        && declaration.body == Body::Written
+        && parameter.dereferenced == Dereferenced::AlwaysFirst
+}
+
+// Bajo `@NullMarked`, un parámetro sin anotar es no nulo salvo que su tipo sea una variable que
+// admite null, aunque el método se pueda redefinir o no tenga cuerpo.
+fn marked_non_null(
+    types: &ProjectTypes<'_>,
+    declaring: &JavaSummary,
+    declaration: &Declaration,
+    parameter: &Parameter,
+) -> bool {
+    types.is_null_marked(declaring, &declaration.owner)
+        && parameter.nullness == ParameterNullness::Unannotated
 }
 
 // Si la sobrecarga puede recibir este `null`: un primitivo no, y con un casteo sólo la del tipo

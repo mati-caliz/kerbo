@@ -3,9 +3,9 @@ use super::null_codec::{read_constraint, write_constraint};
 use super::summary_codec::{
     read_flag, read_position, read_visibility, write_flag, write_position, write_visibility,
 };
-use crate::index::java::{Declaration, Dereferenced, NullInference, Parameter, Reading};
+use crate::index::java::{Declaration, Dereferenced, NullInference, Parameter, ParameterNullness, Reading};
 use crate::lint::java_calls::{Arity, Body, ReturnType, Returns};
-use crate::lint::java_owner::{Owner, OwnerKind};
+use crate::lint::java_owner::{NullMarking, Owner, OwnerKind};
 
 const INFERENCE_OVERRIDABLE: u64 = 0;
 const INFERENCE_CLOSED: u64 = 1;
@@ -22,6 +22,12 @@ const OWNER_ENUM: u64 = 2;
 const OWNER_RECORD: u64 = 3;
 const OWNER_ANNOTATION: u64 = 4;
 const OWNER_LOCAL: u64 = 5;
+const NULLNESS_UNANNOTATED: u64 = 0;
+const NULLNESS_ANNOTATED: u64 = 1;
+const NULLNESS_NULLABLE_VARIABLE: u64 = 2;
+const MARKING_UNSPECIFIED: u64 = 0;
+const MARKING_MARKED: u64 = 1;
+const MARKING_UNMARKED: u64 = 2;
 const RETURN_TYPE_VOID: u64 = 0;
 const RETURN_TYPE_PRIMITIVE: u64 = 1;
 const RETURN_TYPE_REFERENCE: u64 = 2;
@@ -60,7 +66,11 @@ pub(super) fn write_declaration(writer: &mut Writer, declaration: &Declaration) 
     writer.list(&declaration.parameters, |writer, parameter| {
         writer.text(&parameter.name);
         write_position(writer, &parameter.position);
-        write_flag(writer, parameter.declares_nullness);
+        writer.number(match parameter.nullness {
+            ParameterNullness::Unannotated => NULLNESS_UNANNOTATED,
+            ParameterNullness::Annotated => NULLNESS_ANNOTATED,
+            ParameterNullness::NullableVariable => NULLNESS_NULLABLE_VARIABLE,
+        });
         writer.number(match parameter.dereferenced {
             Dereferenced::No => DEREFERENCED_NO,
             Dereferenced::Always => DEREFERENCED_ALWAYS,
@@ -90,6 +100,11 @@ pub(super) fn write_owner(writer: &mut Writer, owner: &Owner) {
     });
     writer.text(&owner.name);
     writer.list(&owner.annotations, |writer, name| writer.text(name));
+    writer.number(match owner.null_marking {
+        NullMarking::Unspecified => MARKING_UNSPECIFIED,
+        NullMarking::Marked => MARKING_MARKED,
+        NullMarking::Unmarked => MARKING_UNMARKED,
+    });
 }
 
 pub(super) fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
@@ -134,7 +149,12 @@ pub(super) fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, C
             Ok(Parameter {
                 name: reader.text()?,
                 position: read_position(reader)?,
-                declares_nullness: read_flag(reader)?,
+                nullness: match reader.number()? {
+                    NULLNESS_UNANNOTATED => ParameterNullness::Unannotated,
+                    NULLNESS_ANNOTATED => ParameterNullness::Annotated,
+                    NULLNESS_NULLABLE_VARIABLE => ParameterNullness::NullableVariable,
+                    _ => return Err(Corrupt),
+                },
                 dereferenced: match reader.number()? {
                     DEREFERENCED_NO => Dereferenced::No,
                     DEREFERENCED_ALWAYS => Dereferenced::Always,
@@ -169,5 +189,11 @@ pub(super) fn read_owner(reader: &mut Reader<'_>) -> Result<Owner, Corrupt> {
         },
         name: reader.text()?,
         annotations: reader.list(Reader::text)?,
+        null_marking: match reader.number()? {
+            MARKING_UNSPECIFIED => NullMarking::Unspecified,
+            MARKING_MARKED => NullMarking::Marked,
+            MARKING_UNMARKED => NullMarking::Unmarked,
+            _ => return Err(Corrupt),
+        },
     })
 }

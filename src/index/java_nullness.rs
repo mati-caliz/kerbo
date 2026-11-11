@@ -1,14 +1,14 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use super::java::{Declaration, Dereferenced, Field, JavaSummary, lint_at};
+use super::java::{Declaration, Dereferenced, Field, JavaSummary, ParameterNullness, lint_at};
 use super::java_project::IndexedSummary;
 use crate::jvm::class_file::ClassFile;
 use crate::jvm::library::Library;
 use crate::jvm::method::Method;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::ReturnType;
-use crate::lint::java_owner::OwnerKind;
+use crate::lint::java_owner::{NullMarking, Owner, OwnerKind};
 use crate::rules::JavaRule;
 
 const WILDCARD_SUFFIX: &str = ".*";
@@ -22,6 +22,7 @@ const PROJECT_DEFAULTS: &[&str] = &["NullMarked", "NonNullApi"];
 // padres con los imports de ese archivo).
 pub struct ProjectTypes<'summary> {
     declared: HashMap<&'summary str, Vec<(&'summary JavaSummary, &'summary [String])>>,
+    null_marked_packages: HashSet<&'summary str>,
 }
 
 impl<'summary> ProjectTypes<'summary> {
@@ -35,7 +36,30 @@ impl<'summary> ProjectTypes<'summary> {
                     .push((file.summary, supertypes.as_slice()));
             }
         }
-        Self { declared }
+        let null_marked_packages = files
+            .iter()
+            .filter(|file| {
+                file.summary
+                    .package_annotations
+                    .iter()
+                    .any(|annotation| PROJECT_DEFAULTS.contains(&annotation.as_str()))
+            })
+            .map(|file| file.summary.package.as_str())
+            .collect();
+        Self {
+            declared,
+            null_marked_packages,
+        }
+    }
+
+    // Si lo que declara un tipo del proyecto sin anotar es no nulo: por `@NullMarked` en él, en uno
+    // que lo encierra o en su paquete.
+    pub fn is_null_marked(&self, summary: &JavaSummary, owner: &Owner) -> bool {
+        match owner.null_marking {
+            NullMarking::Marked => true,
+            NullMarking::Unmarked => false,
+            NullMarking::Unspecified => self.null_marked_packages.contains(summary.package.as_str()),
+        }
     }
 
     pub fn is_declared(&self, name: &str) -> bool {
@@ -175,7 +199,7 @@ fn unannotated_parameters(declaration: &Declaration, method: &Method, label: &st
         .iter()
         .zip(&method.parameter_annotations)
         .filter(|(parameter, inherited)| {
-            !parameter.declares_nullness
+            parameter.nullness != ParameterNullness::Annotated
                 && parameter.dereferenced == Dereferenced::No
                 && !inherited.iter().any(|annotation| is_nullable(annotation))
         })

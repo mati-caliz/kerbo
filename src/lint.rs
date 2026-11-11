@@ -47,6 +47,7 @@ pub mod java_taint;
 mod java_text;
 pub mod java_throws;
 mod java_tokens;
+pub mod java_type_variables;
 mod java_unboxing;
 mod java_wrap;
 mod modifiers;
