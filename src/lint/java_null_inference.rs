@@ -129,7 +129,7 @@ fn may_be_null(value: Node<'_>) -> bool {
 }
 
 // El nombre de un parámetro; el de un varargs (`String... textos`) está en su declarador.
-fn parameter_name(parameter: Node<'_>) -> Option<Node<'_>> {
+pub fn parameter_name(parameter: Node<'_>) -> Option<Node<'_>> {
     parameter.child_by_field_name(NAME_FIELD).or_else(|| {
         named_children(parameter)
             .into_iter()

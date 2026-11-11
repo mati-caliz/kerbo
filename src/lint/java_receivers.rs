@@ -169,7 +169,7 @@ pub fn inferred_parameters(lambda: Node<'_>) -> Vec<Node<'_>> {
     }
 }
 
-fn receiver_of(invocation: Node<'_>, source: &[u8], variables: &Variables) -> Receiver {
+pub fn receiver_of(invocation: Node<'_>, source: &[u8], variables: &Variables) -> Receiver {
     let Some(object) = invocation.child_by_field_name(OBJECT_FIELD) else {
         return Receiver::Scope(enclosing_types(invocation, source));
     };
@@ -302,15 +302,18 @@ impl StaticImports {
 
     pub fn receiver(&self, invocation: Node<'_>, source: &[u8], variables: &Variables) -> Receiver {
         let resolved = receiver_of(invocation, source, variables);
-        let imported = self.any
-            || invocation
-                .child_by_field_name(NAME_FIELD)
-                .is_some_and(|name| self.names.iter().any(|known| known == text(name, source)));
-        if imported && matches!(resolved, Receiver::Scope(_)) {
+        if self.imports(invocation, source) && matches!(resolved, Receiver::Scope(_)) {
             Receiver::Unknown
         } else {
             resolved
         }
+    }
+
+    pub fn imports(&self, invocation: Node<'_>, source: &[u8]) -> bool {
+        self.any
+            || invocation
+                .child_by_field_name(NAME_FIELD)
+                .is_some_and(|name| self.names.iter().any(|known| known == text(name, source)))
     }
 }
 

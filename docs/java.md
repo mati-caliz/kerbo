@@ -97,6 +97,11 @@ De las inspecciones de IntelliJ, kerbo hace:
   bloque, un literal asignado a una variable local, o a una posición fija de un arreglo local recién
   creado, que ya tenía ese valor (el anterior o el por defecto de `new T[n]`) sin que nada la usara
   en el medio.
+- `DataFlowIssue`, el caso de la llamada que falla siempre (`failing-call`): una llamada cuyos
+  argumentos `null`, `true` o `false` cumplen siempre las condiciones con que el método tira, según
+  el contrato que IntelliJ infiere del cuerpo (un `if` que tira) o conoce de memoria (`Validate`,
+  el `Assert` de Spring, las aserciones de JUnit y TestNG). En los tests, no dentro de un `try` con
+  `catch`, de `assertThrows` ni de `@Test(expected = ...)`.
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` encadenado a
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` u `Optional.ofNullable(...)`.
 

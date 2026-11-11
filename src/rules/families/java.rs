@@ -49,6 +49,7 @@ rule_family!(JavaRule {
     DataFlowIssue => "data-flow-issue",
     NullArgument => "null-argument",
     AlreadyAssigned => "already-assigned",
+    FailingCall => "failing-call",
     OptionalGetWithoutIsPresent => "optional-get-without-is-present",
     AutoCloseableResource => "auto-closeable-resource",
     UnusedField => "unused-field",

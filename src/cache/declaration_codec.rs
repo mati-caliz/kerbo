@@ -1,4 +1,5 @@
 use super::codec::{Corrupt, Reader, Writer};
+use super::null_codec::{read_constraint, write_constraint};
 use super::summary_codec::{
     read_flag, read_position, read_visibility, write_flag, write_position, write_visibility,
 };
@@ -71,6 +72,11 @@ pub(super) fn write_declaration(writer: &mut Writer, declaration: &Declaration) 
     });
     writer.list(&declaration.annotations, |writer, name| writer.text(name));
     write_owner(writer, &declaration.owner);
+    writer.list(&declaration.fail_clauses, |writer, clause| {
+        writer.list(clause, |writer, constraint| {
+            write_constraint(writer, constraint.as_ref());
+        });
+    });
 }
 
 pub(super) fn write_owner(writer: &mut Writer, owner: &Owner) {
@@ -146,6 +152,7 @@ pub(super) fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, C
         })?,
         annotations: reader.list(Reader::text)?,
         owner: read_owner(reader)?,
+        fail_clauses: reader.list(|reader| reader.list(read_constraint))?,
     })
 }
 

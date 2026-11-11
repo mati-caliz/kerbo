@@ -3,12 +3,14 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 use super::java_exposure::{DeclaredType, Exposure, exposures};
-use crate::lint::java::children;
+use super::java_header::{imported_paths, package_annotations, package_of};
 use crate::lint::java_calls::{
     Arity, Body, Call, Callable, ResultUse, ReturnType, Returns, TYPE_DECLARATIONS, Visibility, extract,
 };
 use crate::lint::java_chains::Chain;
 use crate::lint::java_constants::{Constant, declared_constants};
+use crate::lint::java_contract_calls::{ContractCall, contract_calls_in};
+use crate::lint::java_contracts::{Clause, fail_clauses};
 use crate::lint::java_fields::{DeclaredField, declared_fields, used_identifiers, written_only_identifiers};
 use crate::lint::java_generics::{Generics, generics_of};
 use crate::lint::java_inference::{dereferenced_first, unconditionally_dereferenced};
@@ -27,19 +29,10 @@ use crate::rules::JavaRule;
 use crate::syntax::descendants;
 use crate::syntax::{named_children, one_based};
 
-const PACKAGE: &str = "package_declaration";
-const ANNOTATION: &str = "marker_annotation";
-const ANNOTATIONS: &[&str] = &["marker_annotation", "annotation"];
-const IMPORT: &str = "import_declaration";
-const STATIC: &str = "static";
-const ASTERISK: &str = "asterisk";
-const WILDCARD_SUFFIX: &str = ".*";
-const NAME_FIELD: &str = "name";
 const BODY_FIELD: &str = "body";
 const IDENTIFIER: &str = "identifier";
 // Los componentes de un record son sus campos: siempre se usan.
 const RECORD: &str = "record_declaration";
-const QUALIFIER_SEPARATOR: char = '.';
 const NULLNESS_ANNOTATIONS: &[&str] = &["Nullable", "NonNull", "NotNull", "Nonnull", "CheckForNull"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,6 +96,7 @@ pub struct Declaration {
     pub parameters: Vec<Parameter>,
     pub annotations: Vec<String>,
     pub owner: Owner,
+    pub fail_clauses: Vec<Clause>,
 }
 
 // Un campo tal como lo necesita el índice para saber si alguien lo usa.
@@ -151,6 +145,7 @@ pub struct JavaSummary {
     pub static_imports: Vec<String>,
     pub method_throws: Vec<MethodThrows>,
     pub null_arguments: Vec<NullArgument>,
+    pub contract_calls: Vec<ContractCall>,
     pub generics: Generics,
     pub lambda_targets: LambdaTargets,
 }
@@ -162,34 +157,10 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         lambda_targets: lambda_targets_of(root, source),
         declared_types,
         exposures,
-        package: named_children(root)
-            .into_iter()
-            .find(|node| node.kind() == PACKAGE)
-            .and_then(|package| {
-                named_children(package)
-                    .into_iter()
-                    .find(|child| child.kind() != ANNOTATION)
-            })
-            .and_then(|name| name.utf8_text(source).ok())
-            .unwrap_or_default()
-            .to_owned(),
-        imports: named_children(root)
-            .into_iter()
-            .filter(|node| node.kind() == IMPORT)
-            .filter(|import| !children(*import).iter().any(|child| child.kind() == STATIC))
-            .filter_map(|import| imported_path(import, source))
-            .collect(),
-        static_imports: named_children(root)
-            .into_iter()
-            .filter(|node| node.kind() == IMPORT)
-            .filter(|import| children(*import).iter().any(|child| child.kind() == STATIC))
-            .filter_map(|import| imported_path(import, source))
-            .collect(),
-        package_annotations: named_children(root)
-            .into_iter()
-            .find(|node| node.kind() == PACKAGE)
-            .map(|package| package_annotation_names(package, source))
-            .unwrap_or_default(),
+        package: package_of(root, source),
+        imports: imported_paths(root, source, false),
+        static_imports: imported_paths(root, source, true),
+        package_annotations: package_annotations(root, source),
         ..JavaSummary::default()
     };
     for top_level in named_children(root)
@@ -222,6 +193,9 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary
             .null_arguments
             .extend(null_arguments_in(top_level, &nodes, source));
+        summary
+            .contract_calls
+            .extend(contract_calls_in(top_level, &nodes, source));
         summary.constants.extend(declared_constants(&nodes, source));
         summary
             .fields
@@ -236,28 +210,6 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
     summary
 }
 
-// `import a.b.C;` da `a.b.C` y `import a.b.*;` da `a.b.*`.
-fn imported_path(import: Node<'_>, source: &[u8]) -> Option<String> {
-    let parts = named_children(import);
-    let path = parts.first()?.utf8_text(source).ok()?;
-    let wildcard = parts.iter().any(|part| part.kind() == ASTERISK);
-    Some(if wildcard {
-        format!("{path}{WILDCARD_SUFFIX}")
-    } else {
-        path.to_owned()
-    })
-}
-
-fn package_annotation_names(package: Node<'_>, source: &[u8]) -> Vec<String> {
-    named_children(package)
-        .into_iter()
-        .filter(|child| ANNOTATIONS.contains(&child.kind()))
-        .filter_map(|annotation| annotation.child_by_field_name(NAME_FIELD))
-        .filter_map(|name| name.utf8_text(source).ok())
-        .map(simple_name)
-        .collect()
-}
-
 // Si el parámetro dice algo de su nulabilidad (`@Nullable`, `@NonNull`, `@NotNull`...).
 fn declares_nullness(name: Node<'_>, source: &[u8]) -> bool {
     name.parent()
@@ -265,14 +217,6 @@ fn declares_nullness(name: Node<'_>, source: &[u8]) -> bool {
         .unwrap_or_default()
         .iter()
         .any(|annotation| NULLNESS_ANNOTATIONS.contains(&annotation.as_str()))
-}
-
-fn simple_name(written: &str) -> String {
-    written
-        .rsplit(QUALIFIER_SEPARATOR)
-        .next()
-        .unwrap_or(written)
-        .to_owned()
 }
 
 // Los nombres que se leen en el cuerpo: un parámetro que no aparece no se usa.
@@ -311,7 +255,22 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
     } else {
         NullInference::Closed
     };
+    let fail_clauses = match method {
+        Some(declaration) if inference != NullInference::Overridable && callable.body == Body::Written => {
+            let not_null: Vec<bool> = callable
+                .parameters
+                .iter()
+                .map(|parameter| {
+                    let name = parameter.utf8_text(source).unwrap_or_default();
+                    dereferenced.contains(name) && used_first.contains(name)
+                })
+                .collect();
+            fail_clauses(declaration, source, &not_null)
+        }
+        _ => Vec::new(),
+    };
     Declaration {
+        fail_clauses,
         name: callable.name,
         scope: scope.to_owned(),
         position: position_of(callable.name_node),

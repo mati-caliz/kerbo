@@ -95,6 +95,11 @@ From IntelliJ's inspections, kerbo does:
   literal assigned to a local variable, or to a fixed position of a freshly created local array,
   that already held that value (the previous one or the default of `new T[n]`) with nothing using
   it in between.
+- `DataFlowIssue`, the call that always fails (`failing-call`): a call whose `null`, `true` or
+  `false` arguments always meet the conditions under which the method throws, by the contract
+  IntelliJ infers from its body (an `if` that throws) or knows by heart (`Validate`, Spring's
+  `Assert`, the JUnit and TestNG assertions). In tests, not inside a `try` with `catch`,
+  `assertThrows` or `@Test(expected = ...)`.
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` chained to
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` or `Optional.ofNullable(...)`.
 

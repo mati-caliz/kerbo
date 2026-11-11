@@ -114,7 +114,7 @@ fn parameter_at<'declaration>(
     declaration.parameters.get(argument.index)
 }
 
-const fn accepts(declaration: &Declaration, arity: usize) -> bool {
+pub(super) const fn accepts(declaration: &Declaration, arity: usize) -> bool {
     let parameters = declaration.parameters.len();
     match declaration.arity {
         Arity::Fixed => arity == parameters,

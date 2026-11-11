@@ -1748,16 +1748,21 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   commons-lang 2 de 2, ninguno de más. Calca los `new` (clases del proyecto y anónimas) y descarta
   el recurso que recibe otro `AutoCloseable` como argumento o receptor. Pendiente: medir con Qodana
   en guava y spring-boot, que no tienen corrida de esta regla.
-- `DataFlowIssue` (`data-flow-issue`, `null-argument` y `already-assigned`): commons-lang 91 de 141
-  sin ninguno de más (los 37 `null` pasados a un parámetro que el método desreferencia y 19 de las
-  20 asignaciones que no cambian nada); junit4 1 de 19 con uno de más
+- `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned` y `failing-call`):
+  commons-lang 118 de 141 sin ninguno de más; junit4 14 de 19 con uno de más
   (`f.getParentFile().getParentFile()` en un test, que IntelliJ no marca aunque `getParentFile`
-  está en la tabla de nulos del JDK). Lo que falta es en su mayoría de otras formas de la
-  inspección: "The call to X always fails, according to its method contracts" (contratos
-  `null -> fail` inferidos, 47 entre los dos) y el resto del flujo entre métodos. La asignación
-  repetida sólo se sigue en línea recta dentro de un bloque: falta la que viene después de un
-  `assertNull(x)` (IntelliJ sabe que `x` quedó en null). Las sobrecargas se comparan por nombre
-  simple sin dimensiones (`int` y `int[]` se confunden).
+  está en la tabla de nulos del JDK). `failing-call` calca "The call to X always fails, according
+  to its method contracts" con las cláusulas `fail` que IntelliJ infiere del cuerpo y las escritas
+  a mano de Validate, Spring Assert, JUnit y TestNG. Falta:
+  - Receptores calificados enteros (`org.junit.Assume.assumeTrue(false)`).
+  - `assertNull` sobre lo que devuelve un método del proyecto: pide inferir el valor de retorno
+    (5 en commons-lang); el `assertNull(message, x)` de `junit.framework` con mensaje concatenado.
+  - Delegación (`DelegationContract`/`MethodCallContract`), `isAssignableFrom`, y el "always fails
+    as an argument is out of bounds" (`read(arr, -1, 0)`, `new GregorianCalendar(...)`).
+  - "may produce NPE" entre métodos (12, la mayoría `getDeclaringClass` y `setAccessible`).
+  - La asignación repetida sólo se sigue en línea recta dentro de un bloque: falta la que viene
+    después de un `assertNull(x)`. Las sobrecargas se comparan por nombre simple sin dimensiones
+    (`int` y `int[]` se confunden).
 - `Map.get` y lo que devuelve una lambda en el flujo de nulos: en junit4 y commons-lang Qodana no
   marca ninguno; queda para medir en un repo que los use (Spring, Micrometer).
 - En JS/TS, los tipos del compilador de TypeScript para reconocer conexiones y objetos del pedido

@@ -297,6 +297,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "boolean[] marcas = new boolean[2]; marcas[1] = false; sobra: el arreglo ya arranca en false.",
     ),
     RuleText::new(
+        "Llamada que falla siempre según el contrato del método",
+        "corregí el argumento, o sacá la llamada si la idea es que tire",
+        "Con el null, true o false que se pasa, siempre se cumplen las condiciones con que el método llamado tira una excepción: IntelliJ las infiere del cuerpo (un if que tira, un chequeo delegado) o las conoce para Validate, Assert y las aserciones de JUnit y TestNG. Como DataFlowIssue de IntelliJ.",
+        "Validate.isTrue(false, \"nunca\") tira IllegalArgumentException siempre.",
+    ),
+    RuleText::new(
         "get() de un Optional sin ver si tiene valor",
         "usá orElseThrow() con un mensaje, orElse(...) o ifPresent(...)",
         "Encadenado a findFirst(), findAny(), max(), min() u ofNullable(), el Optional puede estar vacío y get() tira NoSuchElementException sin decir qué faltaba. Como OptionalGetWithoutIsPresent de IntelliJ.",

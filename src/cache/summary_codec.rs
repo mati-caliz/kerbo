@@ -5,7 +5,7 @@ use super::codec::{Corrupt, Reader, Writer};
 use super::declaration_codec::{read_declaration, read_owner, write_declaration, write_owner};
 use super::generics_codec::{read_generics, write_generics};
 use super::lambda_codec::{read_lambda_targets, write_lambda_targets};
-use super::null_codec::{read_null_argument, write_null_argument};
+use super::null_codec::{read_contract_call, read_null_argument, write_contract_call, write_null_argument};
 use super::taint_codec::{read_taints, write_taints};
 use super::throws_codec::{read_method_throws, write_method_throws};
 use crate::index::java::{CallSite, Field, JavaSummary, Position};
@@ -100,6 +100,7 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     writer.list(&summary.static_imports, |writer, path| writer.text(path));
     writer.list(&summary.method_throws, write_method_throws);
     writer.list(&summary.null_arguments, write_null_argument);
+    writer.list(&summary.contract_calls, write_contract_call);
     write_generics(writer, &summary.generics);
     write_lambda_targets(writer, &summary.lambda_targets);
 }
@@ -180,6 +181,7 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         static_imports: reader.list(Reader::text)?,
         method_throws: reader.list(read_method_throws)?,
         null_arguments: reader.list(read_null_argument)?,
+        contract_calls: reader.list(read_contract_call)?,
         generics: read_generics(reader)?,
         lambda_targets: read_lambda_targets(reader)?,
     }))

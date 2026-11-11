@@ -115,3 +115,26 @@ fn null_arguments_survive_the_round_trip() {
     let bytes = writer.into_bytes();
     assert_eq!(read_null_argument(&mut Reader::new(&bytes)), Ok(argument));
 }
+
+#[test]
+fn contract_calls_survive_the_round_trip() {
+    use super::null_codec::{read_contract_call, write_contract_call};
+    use crate::lint::java_contract_calls::{CallTarget, ContractCall};
+    use crate::lint::java_contracts::Constraint;
+    use crate::lint::java_receivers::Receiver;
+
+    let call = ContractCall {
+        name: "isTrue".to_owned(),
+        target: CallTarget::ImportedMethod,
+        arity: 2,
+        receiver: Receiver::Scope(vec!["ValidateTest".to_owned()]),
+        arguments: vec![Some(Constraint::False), None, Some(Constraint::NotNull)],
+        line: 12,
+        column: 18,
+        exception_expected: true,
+    };
+    let mut writer = Writer::default();
+    write_contract_call(&mut writer, &call);
+    let bytes = writer.into_bytes();
+    assert_eq!(read_contract_call(&mut Reader::new(&bytes)), Ok(call));
+}

@@ -297,6 +297,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "boolean[] flags = new boolean[2]; flags[1] = false; is redundant: the array already starts as false.",
     ),
     RuleText::new(
+        "Call that always fails by the method's contract",
+        "fix the argument, or remove the call if it is meant to throw",
+        "With the null, true or false passed, the conditions under which the called method throws always hold: IntelliJ infers them from the method body (an if that throws, a delegated check) or knows them for Validate, Assert and the JUnit and TestNG assertions. Like IntelliJ's DataFlowIssue.",
+        "Validate.isTrue(false, \"never\") always throws IllegalArgumentException.",
+    ),
+    RuleText::new(
         "Optional get() without checking it has a value",
         "use orElseThrow() with a message, orElse(...) or ifPresent(...)",
         "Chained to findFirst(), findAny(), max(), min() or ofNullable(), the Optional may be empty and get() throws NoSuchElementException without saying what was missing. Like IntelliJ's OptionalGetWithoutIsPresent.",
