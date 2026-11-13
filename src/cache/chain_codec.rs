@@ -2,7 +2,7 @@ use super::codec::{Corrupt, Reader, Writer};
 use super::null_codec::{read_null_argument, write_null_argument};
 use super::summary_codec::{read_flag, write_flag};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
-use crate::lint::java_null_flow::{Dereference, NullFlow};
+use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin};
 use crate::lint::java_resources::ResourceOrigin;
 
 const ABSENT: u64 = 0;
@@ -11,6 +11,8 @@ const ROOT_INSTANCE: u64 = 0;
 const ROOT_CLASS: u64 = 1;
 const ORIGIN_CALL: u64 = 0;
 const ORIGIN_CONSTRUCTION: u64 = 1;
+const NULL_FROM_CALL: u64 = 0;
+const NULL_FROM_FIELD: u64 = 1;
 
 pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
     match &chain.root {
@@ -87,7 +89,13 @@ fn read_optional_text(reader: &mut Reader<'_>) -> Result<Option<String>, Corrupt
 }
 
 pub(super) fn write_flow(writer: &mut Writer, flow: &NullFlow) {
-    write_chain(writer, &flow.origin);
+    match &flow.origin {
+        NullOrigin::Call(chain) => {
+            writer.number(NULL_FROM_CALL);
+            write_chain(writer, chain);
+        }
+        NullOrigin::NullableField => writer.number(NULL_FROM_FIELD),
+    }
     writer.list(&flow.dereferences, |writer, used| {
         writer.text(&used.name);
         writer.size(used.line);
@@ -99,7 +107,11 @@ pub(super) fn write_flow(writer: &mut Writer, flow: &NullFlow) {
 
 pub(super) fn read_flow(reader: &mut Reader<'_>) -> Result<NullFlow, Corrupt> {
     Ok(NullFlow {
-        origin: read_chain(reader)?,
+        origin: match reader.number()? {
+            NULL_FROM_CALL => NullOrigin::Call(read_chain(reader)?),
+            NULL_FROM_FIELD => NullOrigin::NullableField,
+            _ => return Err(Corrupt),
+        },
         dereferences: reader.list(|reader| {
             Ok(Dereference {
                 name: reader.text()?,

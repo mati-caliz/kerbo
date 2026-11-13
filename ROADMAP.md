@@ -1775,13 +1775,18 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned` y `failing-call`):
   commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno de más en los dos.
-  En guava, 238 de los 972 (101 `data-flow-issue`, 136 `null-argument`, 1 `failing-call`), ninguno
-  de más. Un `null` casteado llega a un parámetro cuyo tipo es variable (`builder.add((String) null)`),
+  En guava, 324 de los 972 (185 `data-flow-issue`, 138 `null-argument`, 1 `failing-call`), ninguno
+  de más. Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
+  clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
+  `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
+  calificador. `checkState`/`checkArgument`/`checkRemove`/`verify`/`assertTrue` como sentencia
+  siguen con la condición verdadera, `&` y `|` cuentan como `&&` y `||`, y un `requireNonNull`
+  deja presente su argumento también anidado. Un `null` casteado llega a un parámetro cuyo tipo es variable (`builder.add((String) null)`),
   y en un varargs cuenta como elemento salvo que se pase el arreglo entero (sin casteo o casteado a
   arreglo): el elemento sólo es no nulo por `@NullMarked`, no por desreferencias del cuerpo. Lo
-  que falta de guava, lo más grande: desreferencias de campos `@Nullable` (unas 150 a 240, como
-  `table.length()` en `LocalCache`, también calificadas `segment.table`), receptores heredados o
-  getters para el JDK, `ConcurrentMap.putIfAbsent`/`replace`/`remove`, `Multiset.setCount`. Bajo `@NullMarked`/`@NonNullApi` (del paquete, la clase o las que la encierran, cortado
+  que falta de guava, lo más grande: campos `@Nullable` calificados con otro objeto
+  (`segment.table`, pide `ProjectTypes`), getters `@Nullable` de interfaces del proyecto, campos
+  `volatile` que IntelliJ olvida en cada llamada, receptores heredados o getters para el JDK, `ConcurrentMap.putIfAbsent`/`replace`/`remove`, `Multiset.setCount`. Bajo `@NullMarked`/`@NonNullApi` (del paquete, la clase o las que la encierran, cortado
   por `@NullUnmarked`) un parámetro sin anotar es no nulo aunque el método se pueda redefinir; no
   si su tipo es una variable con límite `@Nullable` o el tipo calificado lleva `@Nullable` en su
   último tramo (`Spliterator.@Nullable OfInt`). Un método traído con `import static` explícito se

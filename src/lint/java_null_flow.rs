@@ -4,8 +4,11 @@ use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_chains::{Chain, origin_chain};
-use super::java_null_conditions::{asserted_present, branch_states, is_logical, without_cast};
+use super::java_null_conditions::{
+    asserted_condition, asserted_present, branch_states, condition_asserted, is_logical, without_cast,
+};
 use super::java_null_inference::NullArgument;
+use super::java_null_keys::{forget, join, seed_nullable_fields, spellings, tracked_key};
 use super::java_null_uses::{dereference, passed};
 use super::java_receivers::{StaticImports, Variables};
 use crate::syntax::named_children;
@@ -81,10 +84,17 @@ pub struct Dereference {
 // llamada: si el parámetro resulta no nulo, IntelliJ ya la da por presente.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NullFlow {
-    pub origin: Chain,
+    pub origin: NullOrigin,
     pub dereferences: Vec<Dereference>,
     pub arguments: Vec<NullArgument>,
     pub passed_before: Vec<NullArgument>,
+}
+
+// De dónde puede venir el null: una llamada que puede devolverlo o un campo anotado `@Nullable`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NullOrigin {
+    Call(Chain),
+    NullableField,
 }
 
 // Las variables que podrían ser null en un punto del método, con la asignación que lo causó.
@@ -95,48 +105,36 @@ pub(super) struct Analysis<'source, 'context> {
     pub(super) variables: &'context Variables,
     pub(super) imported: &'context StaticImports,
     pub(super) flows: Vec<NullFlow>,
+    pub(super) partners: HashMap<String, String>,
 }
 
 // Recorre el cuerpo de un método como lo haría IntelliJ, sin compilar: cada variable asignada
-// desde una llamada se supone posiblemente null, los chequeos (`x != null`, `x == null` con
+// desde una llamada y cada campo `@Nullable` de las clases que lo encierran se suponen
+// posiblemente null, los chequeos (`x != null`, `x == null` con
 // salida, `instanceof`, `requireNonNull`, `assertThat(x).isNotNull()`, `hasText`) la dan por
 // presente en el camino que corresponde, y el primer uso sin chequeo en cada camino se anota.
 // Las lambdas y las clases anónimas no se recorren.
 pub fn null_flows(
+    method: Node<'_>,
     body: Node<'_>,
     source: &[u8],
-    variables: &Variables,
-    imported: &StaticImports,
+    context: (&Variables, &StaticImports),
 ) -> Vec<NullFlow> {
+    let (variables, imported) = context;
     let mut analysis = Analysis {
         source,
         variables,
         imported,
         flows: Vec::new(),
+        partners: HashMap::new(),
     };
-    analysis.statement(body, State::new());
+    let entry = seed_nullable_fields(&mut analysis, method);
+    analysis.statement(body, entry);
     analysis
         .flows
         .into_iter()
         .filter(|flow| !flow.dereferences.is_empty() || !flow.arguments.is_empty())
         .collect()
-}
-
-// Si las dos ramas siguen la variable, queda el flujo más viejo: uno nacido en una rama al pasarla a
-// un método sólo suma chequeos, así que el viejo es el que llega por algún camino.
-pub(super) fn join(first: Option<State>, second: Option<State>) -> Option<State> {
-    match (first, second) {
-        (Some(mut merged), Some(other)) => {
-            for (name, origin) in other {
-                merged
-                    .entry(name)
-                    .and_modify(|kept| *kept = (*kept).min(origin))
-                    .or_insert(origin);
-            }
-            Some(merged)
-        }
-        (one, None) | (None, one) => one,
-    }
 }
 
 impl Analysis<'_, '_> {
@@ -291,19 +289,28 @@ impl Analysis<'_, '_> {
     }
 
     fn assign(&mut self, variable: String, written: Node<'_>, mut state: State) -> State {
-        state.remove(&variable);
+        let keys = spellings(self, variable);
         let value = without_cast(written);
-        let origin = (value.kind() == INVOCATION)
-            .then(|| origin_chain(value, self.source, self.variables))
-            .flatten();
-        if let Some(origin) = origin {
-            state.insert(variable, self.flows.len());
+        let copied = tracked_key(self, value).and_then(|source_key| state.get(&source_key).copied());
+        for key in &keys {
+            state.remove(key);
+        }
+        let origin = copied.or_else(|| {
+            let chain = (value.kind() == INVOCATION)
+                .then(|| origin_chain(value, self.source, self.variables))
+                .flatten()?;
             self.flows.push(NullFlow {
-                origin,
+                origin: NullOrigin::Call(chain),
                 dereferences: Vec::new(),
                 arguments: Vec::new(),
                 passed_before: Vec::new(),
             });
+            Some(self.flows.len() - 1)
+        });
+        if let Some(origin) = origin {
+            for key in keys {
+                state.insert(key, origin);
+            }
         }
         state
     }
@@ -312,11 +319,10 @@ impl Analysis<'_, '_> {
         let Some(expression) = named_children(node).into_iter().next() else {
             return state;
         };
-        let mut after = self.expression(expression, state);
-        if let Some(asserted) = asserted_present(expression, self.source) {
-            after.remove(self.text(asserted));
+        match condition_asserted(expression, self.source) {
+            Some(condition) => asserted_condition(self, expression, condition, state),
+            None => self.expression(expression, state),
         }
-        after
     }
 
     // El estado después de evaluar la expresión, anotando los usos sin chequeo.
@@ -352,10 +358,9 @@ impl Analysis<'_, '_> {
                 return state;
             };
             let after = self.expression(right, state);
-            return if left.kind() == IDENTIFIER {
-                self.assign(self.text(left).to_owned(), right, after)
-            } else {
-                self.expression(left, after)
+            return match tracked_key(self, left) {
+                Some(variable) => self.assign(variable, right, after),
+                None => self.expression(left, after),
             };
         }
         // El receptor se usa antes que los argumentos: en `x.put(k, x.get(k))` el primer uso es `put`.
@@ -375,6 +380,11 @@ impl Analysis<'_, '_> {
         }
         if kind == INVOCATION || kind == CREATION {
             current = passed(self, node, current);
+        }
+        if let Some(asserted) =
+            asserted_present(node, self.source).and_then(|argument| tracked_key(self, argument))
+        {
+            forget(&mut current, &asserted);
         }
         if receiver.is_some() {
             current

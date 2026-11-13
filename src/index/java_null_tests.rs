@@ -218,7 +218,7 @@ fn findings(rule: &str) -> Vec<String> {
     findings_in(UTILITIES, rule)
 }
 
-fn findings_in(source: &str, rule: &str) -> Vec<String> {
+pub(super) fn findings_in(source: &str, rule: &str) -> Vec<String> {
     let summary = summary_of(source);
     let files = [IndexedSummary {
         summary: &summary,

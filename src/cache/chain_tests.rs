@@ -1,14 +1,14 @@
 use super::chain_codec::{read_flow, write_flow};
 use super::codec::{Reader, Writer};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
-use crate::lint::java_null_flow::{Dereference, NullFlow};
+use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin};
 use crate::lint::java_null_inference::NullArgument;
 use crate::lint::java_receivers::Receiver;
 
 #[test]
 fn chains_and_null_flows_survive_the_round_trip() {
     let flow = NullFlow {
-        origin: Chain {
+        origin: NullOrigin::Call(Chain {
             root: ChainRoot::Instance("JdbcTemplate".to_owned()),
             steps: vec![ChainStep {
                 name: "queryForObject".to_owned(),
@@ -22,7 +22,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
                 passed_before: Vec::new(),
             }],
             unboxed: Some((12, 16)),
-        },
+        }),
         dereferences: vec![Dereference {
             name: "intValue".to_owned(),
             line: 13,
@@ -41,11 +41,13 @@ fn chains_and_null_flows_survive_the_round_trip() {
         }],
         passed_before: Vec::new(),
     };
+    let NullOrigin::Call(called) = &flow.origin else {
+        unreachable!("el flujo de arriba sale de una llamada");
+    };
     let classes = NullFlow {
-        origin: Chain {
+        origin: NullOrigin::Call(Chain {
             root: ChainRoot::Class("System".to_owned()),
-            steps: flow
-                .origin
+            steps: called
                 .steps
                 .iter()
                 .map(|step| ChainStep {
@@ -54,18 +56,26 @@ fn chains_and_null_flows_survive_the_round_trip() {
                 })
                 .collect(),
             unboxed: None,
-        },
+        }),
         dereferences: Vec::new(),
         arguments: Vec::new(),
         passed_before: flow.arguments.clone(),
     };
+    let field = NullFlow {
+        origin: NullOrigin::NullableField,
+        dereferences: Vec::new(),
+        arguments: Vec::new(),
+        passed_before: Vec::new(),
+    };
     let mut writer = Writer::default();
     write_flow(&mut writer, &flow);
     write_flow(&mut writer, &classes);
+    write_flow(&mut writer, &field);
     let bytes = writer.into_bytes();
     let mut reader = Reader::new(&bytes);
     assert_eq!(read_flow(&mut reader), Ok(flow));
     assert_eq!(read_flow(&mut reader), Ok(classes));
+    assert_eq!(read_flow(&mut reader), Ok(field));
     assert!(read_flow(&mut Reader::new(&[9])).is_err());
 }
 

@@ -6,7 +6,7 @@ use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body};
-use crate::lint::java_null_flow::NullFlow;
+use crate::lint::java_null_flow::{NullFlow, NullOrigin};
 use crate::lint::java_null_inference::{ARRAY_SUFFIX, NullArgument};
 use crate::lint::java_receivers::{Receiver, simple_type_name};
 use crate::rules::JavaRule;
@@ -64,7 +64,11 @@ pub(super) fn reaches(
     summary: &JavaSummary,
     flow: &NullFlow,
 ) -> bool {
-    may_return_null(types, library, summary, &flow.origin)
+    let origin_may_be_null = match &flow.origin {
+        NullOrigin::Call(chain) => may_return_null(types, library, summary, chain),
+        NullOrigin::NullableField => true,
+    };
+    origin_may_be_null
         && flow
             .passed_before
             .iter()

@@ -2,10 +2,11 @@ use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_null_flow::{
-    AND, ARGUMENTS_FIELD, Analysis, BINARY, COMMENTS, EQUAL, IDENTIFIER, INSTANCEOF, INVOCATION, LEFT_FIELD,
-    NOT, NOT_EQUAL, NULL, OBJECT_FIELD, OPERAND_FIELD, OPERATOR_FIELD, OR, PARENTHESIZED, RIGHT_FIELD, State,
-    UNARY, join,
+    AND, ARGUMENTS_FIELD, Analysis, BINARY, COMMENTS, EQUAL, INSTANCEOF, INVOCATION, LEFT_FIELD, NOT,
+    NOT_EQUAL, NULL, OBJECT_FIELD, OPERAND_FIELD, OPERATOR_FIELD, OR, PARENTHESIZED, RIGHT_FIELD, State,
+    UNARY,
 };
+use super::java_null_keys::{forget, join, tracked_key};
 use crate::syntax::named_children;
 
 // Llamadas que, si dan verdadero, prueban que su primer argumento no es null, y las que lo prueban
@@ -18,6 +19,15 @@ const IS_NOT_NULL: &str = "isNotNull";
 const VALUE_FIELD: &str = "value";
 const TRUE_MEANS_PRESENT: &[&str] = &["nonNull", "hasText", "hasLength", "isNotEmpty", "isNotBlank"];
 const FALSE_MEANS_PRESENT: &[&str] = &["isNull", "isEmpty", "isBlank"];
+const FAILS_WHEN_FALSE: &[&str] = &[
+    "checkState",
+    "checkArgument",
+    "checkRemove",
+    "verify",
+    "assertTrue",
+];
+const EAGER_AND: &str = "&";
+const EAGER_OR: &str = "|";
 
 // Los estados si la condición da verdadero y si da falso.
 pub(super) fn branch_states(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) -> (State, State) {
@@ -48,9 +58,9 @@ pub(super) fn branch_states(analysis: &mut Analysis<'_, '_>, node: Node<'_>, sta
             let mut when_true = after.clone();
             if let Some(tested) = node
                 .child_by_field_name(LEFT_FIELD)
-                .filter(|left| left.kind() == IDENTIFIER)
+                .and_then(|left| tracked_key(analysis, left))
             {
-                when_true.remove(analysis.text(tested));
+                forget(&mut when_true, &tested);
             }
             (when_true, after)
         }
@@ -62,9 +72,9 @@ pub(super) fn branch_states(analysis: &mut Analysis<'_, '_>, node: Node<'_>, sta
                 .map(|name| analysis.text(name).to_owned());
             if let (Some(name), Some(argument)) = (
                 name,
-                first_argument(node).filter(|argument| argument.kind() == IDENTIFIER),
+                first_argument(node).and_then(|argument| tracked_key(analysis, argument)),
             ) {
-                guard_by_call(&name, analysis.text(argument), &mut when_true, &mut when_false);
+                guard_by_call(&name, &argument, &mut when_true, &mut when_false);
             }
             (when_true, when_false)
         }
@@ -87,7 +97,7 @@ fn binary_condition(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: Stat
         return (state.clone(), state);
     };
     match operator {
-        AND => {
+        AND | EAGER_AND => {
             let (left_true, left_false) = branch_states(analysis, left, state);
             let (right_true, right_false) = branch_states(analysis, right, left_true);
             (
@@ -95,7 +105,7 @@ fn binary_condition(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: Stat
                 join(Some(left_false), Some(right_false)).unwrap_or_default(),
             )
         }
-        OR => {
+        OR | EAGER_OR => {
             let (left_true, left_false) = branch_states(analysis, left, state);
             let (right_true, right_false) = branch_states(analysis, right, left_false);
             (
@@ -105,8 +115,8 @@ fn binary_condition(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: Stat
         }
         EQUAL | NOT_EQUAL => {
             let tested = match (left.kind(), right.kind()) {
-                (IDENTIFIER, NULL) => Some(left),
-                (NULL, IDENTIFIER) => Some(right),
+                (_, NULL) => tracked_key(analysis, left),
+                (NULL, _) => tracked_key(analysis, right),
                 _ => None,
             };
             let after = analysis.expression(node, state);
@@ -114,7 +124,7 @@ fn binary_condition(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: Stat
                 return (after.clone(), after);
             };
             let mut present = after.clone();
-            present.remove(analysis.text(tested));
+            forget(&mut present, &tested);
             if operator == NOT_EQUAL {
                 (present, after)
             } else {
@@ -129,9 +139,9 @@ fn binary_condition(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: Stat
 }
 fn guard_by_call(name: &str, tested: &str, when_true: &mut State, when_false: &mut State) {
     if TRUE_MEANS_PRESENT.contains(&name) {
-        when_true.remove(tested);
+        forget(when_true, tested);
     } else if FALSE_MEANS_PRESENT.contains(&name) {
-        when_false.remove(tested);
+        forget(when_false, tested);
     }
 }
 
@@ -165,6 +175,37 @@ pub(super) fn without_cast(value: Node<'_>) -> Node<'_> {
     current
 }
 
+// `checkState(x != null, ...)` sigue sólo si la condición da verdadero.
+pub(super) fn asserted_condition(
+    analysis: &mut Analysis<'_, '_>,
+    call: Node<'_>,
+    condition: Node<'_>,
+    state: State,
+) -> State {
+    let mut current = branch_states(analysis, condition, state).0;
+    for argument in call
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|argument| argument.id() != condition.id())
+    {
+        current = analysis.expression(argument, current);
+    }
+    current
+}
+
+// La condición de una sentencia que falla si da falso: `checkState(x != null, "...")`.
+pub(super) fn condition_asserted<'tree>(expression: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
+    let name = expression
+        .child_by_field_name(NAME_FIELD)
+        .filter(|_| expression.kind() == INVOCATION)?;
+    FAILS_WHEN_FALSE
+        .contains(&text(name, source))
+        .then(|| first_argument(expression))
+        .flatten()
+}
+
 // Una sentencia que asegura que la variable no es null: `requireNonNull(x)`, `assertNotNull(x)`,
 // `assertThat(x).isNotNull()`.
 pub(super) fn asserted_present<'tree>(expression: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
@@ -172,7 +213,7 @@ pub(super) fn asserted_present<'tree>(expression: Node<'tree>, source: &[u8]) ->
         return None;
     }
     let name = text(expression.child_by_field_name(NAME_FIELD)?, source);
-    let argument = if ASSERTS_PRESENT.contains(&name) {
+    if ASSERTS_PRESENT.contains(&name) {
         first_argument(expression)
     } else if name == IS_NOT_NULL {
         expression
@@ -186,6 +227,5 @@ pub(super) fn asserted_present<'tree>(expression: Node<'tree>, source: &[u8]) ->
             .and_then(first_argument)
     } else {
         None
-    };
-    argument.filter(|argument| argument.kind() == IDENTIFIER)
+    }
 }

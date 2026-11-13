@@ -3,9 +3,10 @@ use tree_sitter::Node;
 use super::java::NAME_FIELD;
 use super::java_chains::argument_count;
 use super::java_null_flow::{
-    ARGUMENTS_FIELD, Analysis, COMMENTS, Dereference, IDENTIFIER, INVOCATION, NullFlow, OBJECT_FIELD, State,
+    ARGUMENTS_FIELD, Analysis, COMMENTS, Dereference, INVOCATION, NullFlow, OBJECT_FIELD, State,
 };
 use super::java_null_inference::{CallTarget, NullArgument, call_target};
+use super::java_null_keys::{forget, spellings, tracked_key};
 use crate::syntax::{named_children, one_based};
 
 const FIELD_ACCESS: &str = "field_access";
@@ -24,11 +25,14 @@ pub(super) fn passed(analysis: &mut Analysis<'_, '_>, call: Node<'_>, mut state:
         .into_iter()
         .filter(|argument| !COMMENTS.contains(&argument.kind()))
         .collect();
-    let passed: Vec<(usize, Node<'_>, usize)> = arguments
+    let passed: Vec<(usize, Node<'_>, String, usize)> = arguments
         .iter()
         .enumerate()
-        .filter(|(_, argument)| argument.kind() == IDENTIFIER)
-        .filter_map(|(index, argument)| Some((index, *argument, *state.get(analysis.text(*argument))?)))
+        .filter_map(|(index, argument)| {
+            let key = tracked_key(analysis, *argument)?;
+            let origin = *state.get(&key)?;
+            Some((index, *argument, key, origin))
+        })
         .collect();
     if passed.is_empty() {
         return state;
@@ -42,7 +46,7 @@ pub(super) fn passed(analysis: &mut Analysis<'_, '_>, call: Node<'_>, mut state:
         return state;
     };
     let arity = argument_count(call);
-    for (index, argument, origin) in passed {
+    for (index, argument, key, origin) in passed {
         let start = argument.start_position();
         let used = NullArgument {
             name: name.clone(),
@@ -67,33 +71,45 @@ pub(super) fn passed(analysis: &mut Analysis<'_, '_>, call: Node<'_>, mut state:
             arguments: Vec::new(),
             passed_before,
         };
-        state.insert(analysis.text(argument).to_owned(), analysis.flows.len());
+        for spelling in spellings(analysis, key) {
+            state.insert(spelling, analysis.flows.len());
+        }
         analysis.flows.push(after);
     }
     state
 }
 
+// IntelliJ marca la desreferencia de un campo en el calificador: en `this.x.y`, en `x`.
+fn qualifier_name(object: Node<'_>) -> Node<'_> {
+    object
+        .child_by_field_name(FIELD_FIELD)
+        .filter(|_| object.kind() == FIELD_ACCESS)
+        .unwrap_or(object)
+}
+
 pub(super) fn dereference(analysis: &mut Analysis<'_, '_>, node: Node<'_>, mut state: State) -> State {
     let (receiver, used) = match node.kind() {
-        INVOCATION | FIELD_ACCESS => (
+        INVOCATION => (
             node.child_by_field_name(OBJECT_FIELD),
-            node.child_by_field_name(if node.kind() == INVOCATION {
-                NAME_FIELD
-            } else {
-                FIELD_FIELD
-            }),
+            node.child_by_field_name(NAME_FIELD),
         ),
+        FIELD_ACCESS => {
+            let object = node.child_by_field_name(OBJECT_FIELD);
+            (object, object.map(qualifier_name))
+        }
         ARRAY_ACCESS => (
             node.child_by_field_name(ARRAY_FIELD),
             node.child_by_field_name(ARRAY_FIELD),
         ),
         _ => (None, None),
     };
-    let (Some(receiver), Some(used)) = (receiver.filter(|receiver| receiver.kind() == IDENTIFIER), used)
-    else {
+    let (Some(receiver), Some(used)) = (
+        receiver.and_then(|receiver| tracked_key(analysis, receiver)),
+        used,
+    ) else {
         return state;
     };
-    if let Some(origin) = state.remove(analysis.text(receiver)) {
+    if let Some(origin) = forget(&mut state, &receiver) {
         let start = used.start_position();
         let name = analysis.text(used).to_owned();
         if let Some(flow) = analysis.flows.get_mut(origin) {

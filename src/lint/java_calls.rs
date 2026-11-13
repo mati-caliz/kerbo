@@ -207,7 +207,7 @@ fn extract_method<'tree>(
     if let Some(body) = method.child_by_field_name(BODY_FIELD) {
         extracted
             .null_flows
-            .extend(null_flows(body, source, variables, imported));
+            .extend(null_flows(method, body, source, (variables, imported)));
         extracted
             .resources
             .extend(resource_candidates(body, source, variables));
@@ -320,7 +320,7 @@ pub fn has_modifier(node: Node<'_>, modifier: &str, source: &[u8]) -> bool {
     written || (modifier == PRIVATE && node.kind() == CONSTRUCTOR && in_enum(node))
 }
 
-fn annotated_with(node: Node<'_>, simple_name: &str, source: &[u8]) -> bool {
+pub(super) fn annotated_with(node: Node<'_>, simple_name: &str, source: &[u8]) -> bool {
     modifiers(node).is_some_and(|modifiers| {
         named_children(modifiers)
             .into_iter()

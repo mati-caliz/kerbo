@@ -43,6 +43,8 @@ mod java_null_marked_tests;
 #[cfg(test)]
 mod java_null_tests;
 #[cfg(test)]
+mod java_nullable_field_tests;
+#[cfg(test)]
 mod java_throw_abstract_tests;
 #[cfg(test)]
 mod java_throw_functional_tests;
