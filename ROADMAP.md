@@ -1717,10 +1717,11 @@ cerrarse se borra de acá.
   `integer` y clave primaria `serial`. Contra squawk 2.71 (`scripts/parity/rails/`, repos `maybe`,
   `chatwoot`, `mastodon`, `forem` y `discourse`): maybe 849 de 849; chatwoot 951 de 951 con 3 de más en
   `20250108211541`, donde la referencia falla en `create_captain_tables` por el tipo `vector` de
-  pgvector; mastodon 1.763 de 1.763; forem 3.556 de 3.556, sin nada de más; discourse 5.904 de 5.919
+  pgvector; mastodon 1.763 de 1.763; forem 3.556 de 3.556, sin nada de más; discourse 5.923 de 5.938
   (2026-11-13): las diferencias que quedan dependen de los datos de la base (`DB.query` y
   `pg_indexes` como guardia), de `CommentMigration` o de `BadgePostsViewManager`, y son aceptadas.
-  La referencia emula `DB` de mini_sql y carga los droppers de `lib/migration` del repo; kerbo
+  La referencia emula `DB` de mini_sql, carga los droppers y helpers de `lib/migration` del repo
+  y lee las constantes enteras de los modelos (`Flag::MAX_SYSTEM_FLAG_ID`) de su fuente; kerbo
   emite el mismo SQL para `DB.exec` sin parámetros y para `Migration::ColumnDropper` y
   `Migration::TableDropper` (`droppers.rs`). Los `.each` también recorren hashes literales
   (`{ posts: %i[a b] }.each { |table, columns| ... }`).
@@ -1738,8 +1739,8 @@ cerrarse se borra de acá.
   `add_column ..., :primary_key` antes de Rails 5.1 salen `serial NOT NULL PRIMARY KEY`.
   `scripts/parity/rails/dump.sh <repo>` deja el SQL de kerbo por migración para compararlo con la
   referencia. Pendientes:
-  - discourse: 58 migraciones siguen fallando en la referencia, casi todas por
-    `Migration::Helpers` y modelos de la aplicación; quedan fuera de la comparación.
+  - discourse: 28 migraciones siguen fallando en la referencia por modelos, `SiteSetting` e `I18n`
+    de la aplicación (y las que dependen de `TrustLevel[0]`); quedan fuera de la comparación.
   - `DB.exec` con parámetros (`:id`, `?`) no se evalúa: habría que sustituir los literales.
   - `index_exists?` con `where:` compara sólo las columnas, no el predicado.
   - Un `execute` con `ALTER TABLE ... RENAME` actualiza el esquema pero no emite los renames de

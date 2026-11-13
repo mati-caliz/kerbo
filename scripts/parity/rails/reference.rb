@@ -2,7 +2,8 @@
 # un Postgres vacío, sólo con ActiveRecord (sin la aplicación), y guarda el SQL que manda cada una en
 # /out/<migración>.sql, con BEGIN y COMMIT si corre en una transacción. Una migración que falla (usa
 # modelos, helpers de la aplicación o gemas que no están) se deshace y queda anotada en errores.txt.
-# DB emula la conexión de mini_sql que usa discourse, y los droppers de lib/migration se cargan del repo.
+# DB emula la conexión de mini_sql que usa discourse, y los droppers y helpers de lib/migration se cargan
+# del repo (el sitio cuenta como existente). Las constantes enteras de los modelos se leen de app/models o lib.
 require "active_record"
 require "fileutils"
 
@@ -32,12 +33,31 @@ class Anything
   end
 end
 
+module LiteralConstants
+  SOURCES = %w[/repo/app/models /repo/lib].freeze
+
+  def const_missing(name)
+    literal = literal_constant(name)
+    literal.nil? ? super : const_set(name, literal)
+  end
+
+  def literal_constant(name)
+    file = "#{ActiveSupport::Inflector.underscore(self.name)}.rb"
+    SOURCES.map { |directory| File.join(directory, file) }.select { |path| File.exist?(path) }.each do |path|
+      value = File.read(path)[/^\s*#{name} = (-?\d+)\s*$/, 1]
+      return value.to_i unless value.nil?
+    end
+    nil
+  end
+end
+
 module ApplicationModels
   def const_missing(name)
     return super unless name.to_s.match?(/\A[A-Z][A-Za-z0-9]*\z/)
 
     model = Class.new(ActiveRecord::Base)
     model.abstract_class = name == :ApplicationRecord
+    model.extend(LiteralConstants)
     Object.const_set(name, model)
   end
 end
@@ -95,10 +115,12 @@ module Migration
 end
 
 APPLICATION_LIBRARY = "/repo/lib"
-DROPPERS = %w[migration/column_dropper migration/table_dropper].freeze
+DROPPERS = %w[migration/column_dropper migration/table_dropper migration/helpers].freeze
+EXISTING_SITE_CREATION = Time.at(0)
 if File.directory?(File.join(APPLICATION_LIBRARY, "migration"))
   $LOAD_PATH.unshift(APPLICATION_LIBRARY)
   DROPPERS.each { |dropper| require dropper if File.exist?(File.join(APPLICATION_LIBRARY, "#{dropper}.rb")) }
+  Migration::Helpers.define_singleton_method(:site_created_at) { EXISTING_SITE_CREATION } if defined?(Migration::Helpers)
 end
 
 Rails = Anything.new
