@@ -1,7 +1,7 @@
 use super::chain_codec::{read_flow, write_flow};
 use super::codec::{Reader, Writer};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
-use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin};
+use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin, NullReturn};
 use crate::lint::java_null_inference::NullArgument;
 use crate::lint::java_owner::NullMarking;
 use crate::lint::java_receiver_arguments::{ArgumentNullness, ReceiverArguments};
@@ -25,6 +25,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
             }],
             unboxed: Some((12, 16)),
             passed_as: None,
+            returned: None,
         }),
         dereferences: vec![Dereference {
             name: "intValue".to_owned(),
@@ -44,6 +45,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
             receiver_arguments: ReceiverArguments::default(),
         }],
         passed_before: Vec::new(),
+        returns: Vec::new(),
     };
     let NullOrigin::Call(called) = &flow.origin else {
         unreachable!("el flujo de arriba sale de una llamada");
@@ -61,17 +63,12 @@ fn chains_and_null_flows_survive_the_round_trip() {
                 .collect(),
             unboxed: None,
             passed_as: flow.arguments.first().cloned().map(Box::new),
+            returned: None,
         }),
-        dereferences: Vec::new(),
-        arguments: Vec::new(),
         passed_before: flow.arguments.clone(),
+        ..NullFlow::new(NullOrigin::Literal)
     };
-    let field = NullFlow {
-        origin: NullOrigin::NullableField,
-        dereferences: Vec::new(),
-        arguments: Vec::new(),
-        passed_before: Vec::new(),
-    };
+    let field = NullFlow::new(NullOrigin::NullableField);
     let mut writer = Writer::default();
     write_flow(&mut writer, &flow);
     write_flow(&mut writer, &classes);
@@ -82,6 +79,34 @@ fn chains_and_null_flows_survive_the_round_trip() {
     assert_eq!(read_flow(&mut reader), Ok(classes));
     assert_eq!(read_flow(&mut reader), Ok(field));
     assert!(read_flow(&mut Reader::new(&[9])).is_err());
+}
+
+#[test]
+fn null_returns_survive_the_round_trip() {
+    let returned = |name: &str, marking| NullReturn {
+        name: name.to_owned(),
+        line: 20,
+        column: 16,
+        marking,
+    };
+    let literal = NullFlow {
+        returns: vec![returned("null", NullMarking::Marked)],
+        ..NullFlow::new(NullOrigin::Literal)
+    };
+    let call = NullFlow::new(NullOrigin::Call(Chain {
+        root: ChainRoot::Class("Converter".to_owned()),
+        steps: Vec::new(),
+        unboxed: None,
+        passed_as: None,
+        returned: Some(returned("convert(a)", NullMarking::Unspecified)),
+    }));
+    let mut writer = Writer::default();
+    write_flow(&mut writer, &literal);
+    write_flow(&mut writer, &call);
+    let bytes = writer.into_bytes();
+    let mut reader = Reader::new(&bytes);
+    assert_eq!(read_flow(&mut reader), Ok(literal));
+    assert_eq!(read_flow(&mut reader), Ok(call));
 }
 
 #[test]

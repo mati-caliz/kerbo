@@ -33,6 +33,7 @@ pub mod java_null_inference;
 mod java_null_keys;
 mod java_null_loops;
 mod java_null_origin;
+mod java_null_returns;
 mod java_null_uses;
 pub mod java_nullable_fields;
 mod java_optional;

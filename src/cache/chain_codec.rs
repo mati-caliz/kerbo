@@ -1,8 +1,9 @@
 use super::codec::{Corrupt, Reader, Writer};
+use super::declaration_codec::{read_marking, write_marking};
 use super::null_codec::{read_null_argument, write_null_argument};
 use super::summary_codec::{read_flag, write_flag};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
-use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin};
+use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin, NullReturn};
 use crate::lint::java_resources::ResourceOrigin;
 
 const ABSENT: u64 = 0;
@@ -14,6 +15,7 @@ const ORIGIN_CONSTRUCTION: u64 = 1;
 const NULL_FROM_CALL: u64 = 0;
 const NULL_FROM_FIELD: u64 = 1;
 const NULL_FROM_QUALIFIED_FIELD: u64 = 2;
+const NULL_FROM_LITERAL: u64 = 3;
 
 pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
     match &chain.root {
@@ -58,6 +60,23 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
         }
         None => writer.number(ABSENT),
     }
+    writer.list(chain.returned.as_slice(), write_null_return);
+}
+
+fn write_null_return(writer: &mut Writer, returned: &NullReturn) {
+    writer.text(&returned.name);
+    writer.size(returned.line);
+    writer.size(returned.column);
+    write_marking(writer, returned.marking);
+}
+
+fn read_null_return(reader: &mut Reader<'_>) -> Result<NullReturn, Corrupt> {
+    Ok(NullReturn {
+        name: reader.text()?,
+        line: reader.size()?,
+        column: reader.size()?,
+        marking: read_marking(reader)?,
+    })
 }
 
 pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
@@ -90,6 +109,7 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
             PRESENT => Some(Box::new(read_null_argument(reader)?)),
             _ => return Err(Corrupt),
         },
+        returned: reader.list(read_null_return)?.into_iter().next(),
     })
 }
 
@@ -103,6 +123,7 @@ fn read_optional_text(reader: &mut Reader<'_>) -> Result<Option<String>, Corrupt
 
 pub(super) fn write_flow(writer: &mut Writer, flow: &NullFlow) {
     match &flow.origin {
+        NullOrigin::Literal => writer.number(NULL_FROM_LITERAL),
         NullOrigin::Call(chain) => {
             writer.number(NULL_FROM_CALL);
             write_chain(writer, chain);
@@ -128,11 +149,13 @@ pub(super) fn write_flow(writer: &mut Writer, flow: &NullFlow) {
     });
     writer.list(&flow.arguments, write_null_argument);
     writer.list(&flow.passed_before, write_null_argument);
+    writer.list(&flow.returns, write_null_return);
 }
 
 pub(super) fn read_flow(reader: &mut Reader<'_>) -> Result<NullFlow, Corrupt> {
     Ok(NullFlow {
         origin: match reader.number()? {
+            NULL_FROM_LITERAL => NullOrigin::Literal,
             NULL_FROM_CALL => NullOrigin::Call(read_chain(reader)?),
             NULL_FROM_FIELD => NullOrigin::NullableField,
             NULL_FROM_QUALIFIED_FIELD => NullOrigin::QualifiedField {
@@ -152,6 +175,7 @@ pub(super) fn read_flow(reader: &mut Reader<'_>) -> Result<NullFlow, Corrupt> {
         })?,
         arguments: reader.list(read_null_argument)?,
         passed_before: reader.list(read_null_argument)?,
+        returns: reader.list(read_null_return)?,
     })
 }
 

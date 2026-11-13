@@ -50,6 +50,7 @@ rule_family!(JavaRule {
     NullArgument => "null-argument",
     AlreadyAssigned => "already-assigned",
     FailingCall => "failing-call",
+    NullableReturn => "nullable-return",
     OptionalGetWithoutIsPresent => "optional-get-without-is-present",
     AutoCloseableResource => "auto-closeable-resource",
     UnusedField => "unused-field",

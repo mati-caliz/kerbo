@@ -1,5 +1,6 @@
 use super::java_chains::Chain;
 use super::java_null_inference::NullArgument;
+use super::java_owner::NullMarking;
 
 // Un uso de una variable que quedaría sin proteger si la llamada que le dio su valor devolviera
 // null: el método o campo que se usa y dónde.
@@ -8,6 +9,17 @@ pub struct Dereference {
     pub name: String,
     pub line: usize,
     pub column: usize,
+}
+
+// Un valor que devuelve un método cuyo retorno sería no nulo bajo `@NullMarked` (o porque se anota
+// `@NonNull`): lo que se devuelve, dónde y la marca del método. Si el paquete lo marca se sabe en el
+// índice.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NullReturn {
+    pub name: String,
+    pub line: usize,
+    pub column: usize,
+    pub marking: NullMarking,
 }
 
 // Una variable asignada desde una llamada (`Cache cache = manager.getCache(nombre)`), los usos
@@ -20,14 +32,28 @@ pub struct NullFlow {
     pub dereferences: Vec<Dereference>,
     pub arguments: Vec<NullArgument>,
     pub passed_before: Vec<NullArgument>,
+    pub returns: Vec<NullReturn>,
 }
 
-// De dónde puede venir el null: una llamada que puede devolverlo, un campo anotado `@Nullable` o el
+impl NullFlow {
+    pub const fn new(origin: NullOrigin) -> Self {
+        Self {
+            origin,
+            dereferences: Vec::new(),
+            arguments: Vec::new(),
+            passed_before: Vec::new(),
+            returns: Vec::new(),
+        }
+    }
+}
+
+// De dónde puede venir el null: un `null` escrito, una llamada que puede devolverlo, un campo anotado `@Nullable` o el
 // campo de otro objeto, con el tipo de ese objeto como está escrito, el campo arreglo por el que se
 // llega a él si lo hay (`mapa.segmentos[0].tabla`) y si se volvió a leer después de una llamada
 // (entonces cuenta sólo si el campo es `volatile`, y eso se sabe en el índice).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NullOrigin {
+    Literal,
     Call(Chain),
     NullableField,
     QualifiedField {

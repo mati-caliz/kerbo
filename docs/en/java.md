@@ -103,6 +103,11 @@ From IntelliJ's inspections, kerbo does:
   IntelliJ infers from its body (an `if` that throws) or knows by heart (`Validate`, Spring's
   `Assert`, the JUnit and TestNG assertions). In tests, not inside a `try` with `catch`,
   `assertThrows` or `@Test(expected = ...)`.
+- `DataFlowIssue`, the null return (`nullable-return`): a method whose return is non-null by
+  `@NullMarked` (on the package, the class or the ones enclosing it) or by `@NonNull` that returns
+  a literal `null`, an unchecked `@Nullable` variable or field, or a call that may return null.
+  Primitives, `void`/`Void`, `@Nullable` or `@ParametricNullness` returns and type variables with
+  a `@Nullable` bound do not count.
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` chained to
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` or `Optional.ofNullable(...)`.
 

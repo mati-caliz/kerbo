@@ -303,6 +303,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
         "Validate.isTrue(false, \"never\") always throws IllegalArgumentException.",
     ),
     RuleText::new(
+        "null (or something that may be) returned by a method that promises not to",
+        "return a value, or declare the return @Nullable if the method really returns null",
+        "Under @NullMarked (or with @NonNull) whatever the method does not annotate is non-null: returning null, a @Nullable field or a call that may return null breaks that promise, and whoever calls it does not check. Like IntelliJ's DataFlowIssue.",
+        "In a @NullMarked package, String name() { return null; } becomes @Nullable String name(), or returns a value.",
+    ),
+    RuleText::new(
         "Optional get() without checking it has a value",
         "use orElseThrow() with a message, orElse(...) or ifPresent(...)",
         "Chained to findFirst(), findAny(), max(), min() or ofNullable(), the Optional may be empty and get() throws NoSuchElementException without saying what was missing. Like IntelliJ's OptionalGetWithoutIsPresent.",

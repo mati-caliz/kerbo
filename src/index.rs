@@ -8,6 +8,7 @@ mod java_failing_calls;
 mod java_header;
 mod java_jdk;
 mod java_null_arguments;
+mod java_nullable_returns;
 mod java_nullness;
 mod java_parameter_nullness;
 mod java_project;
@@ -49,6 +50,8 @@ mod java_null_reread_tests;
 mod java_null_tests;
 #[cfg(test)]
 mod java_nullable_field_tests;
+#[cfg(test)]
+mod java_nullable_return_tests;
 #[cfg(test)]
 mod java_throw_abstract_tests;
 #[cfg(test)]

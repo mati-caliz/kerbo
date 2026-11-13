@@ -69,6 +69,13 @@ pub fn is_type_parameter_in_scope(node: Node<'_>, written: &str, source: &[u8]) 
         .any(|scope| declared_bound_is_nullable(scope, written, source).is_some())
 }
 
+// Si `written` es una variable de tipo en el alcance del nodo, si la declarada más cerca tiene un
+// límite `@Nullable`.
+pub fn type_parameter_admits_null(node: Node<'_>, written: &str, source: &[u8]) -> Option<bool> {
+    std::iter::successors(node.parent(), Node::parent)
+        .find_map(|scope| declared_bound_is_nullable(scope, written, source))
+}
+
 fn declared_bound_is_nullable(declaration: Node<'_>, written: &str, source: &[u8]) -> Option<bool> {
     named_children(declaration)
         .into_iter()

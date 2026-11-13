@@ -1592,9 +1592,10 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   commons-lang 2 de 2, ninguno de más. Calca los `new` (clases del proyecto y anónimas) y descarta
   el recurso que recibe otro `AutoCloseable` como argumento o receptor. Pendiente: medir con Qodana
   en guava y spring-boot, que no tienen corrida de esta regla.
-- `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned` y `failing-call`):
-  commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno de más en los dos.
-  En guava, 612 de los 972 (394 `data-flow-issue`, 193 `null-argument`, 25 `failing-call`), con 3
+- `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
+  `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
+  de más en los dos. En guava, 621 de los 972 (394 `data-flow-issue`, 193 `null-argument`, 25
+  `failing-call`, 9 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
   `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
@@ -1622,6 +1623,14 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   always fails, according to its method contracts" con las cláusulas `fail` que IntelliJ infiere
   del cuerpo y las escritas a mano de Validate, Spring Assert, JUnit y TestNG, con receptores
   calificados con el paquete y variables que un `if` chequeó no nulas.
+  `nullable-return` calca "'null' is returned by the method declared as @NullMarked" y "might
+  evaluate to null but is returned": un `null` escrito, una variable o campo `@Nullable` sin
+  chequear o una llamada que puede devolver null, devueltos por un método cuyo retorno es no nulo
+  por `@NullMarked` o `@NonNull` (no primitivo, `void`/`Void`, `@Nullable`, `@ParametricNullness`
+  ni variable de tipo con límite `@Nullable`). Falta en guava (16): las lambdas `t -> null` pasadas
+  a interfaces funcionales `@NullMarked` (TableCollectorsTest, FuturesTest, UnsignedBytes), los
+  campos `volatile` releídos (`return logger` en LazyLogger, `whenClosed` en ClosingFuture),
+  `convert(fromIterator.next())` dentro de una clase anónima y `uncheckedCastNullableTToT(...)`.
   Un método del proyecto que se declara `@Nullable` (también `@CheckForNull` y `char @Nullable []`)
   devuelve posiblemente null; la raíz de una cadena puede ser una constante traída con
   `import static` (un valor de enum o un campo estático); y una llamada que puede devolver null

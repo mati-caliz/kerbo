@@ -73,10 +73,8 @@ pub(super) fn passed(analysis: &mut Analysis<'_, '_>, call: Node<'_>, mut state:
         let mut passed_before = flow.passed_before.clone();
         passed_before.push(used);
         let after = NullFlow {
-            origin: flow.origin.clone(),
-            dereferences: Vec::new(),
-            arguments: Vec::new(),
             passed_before,
+            ..NullFlow::new(flow.origin.clone())
         };
         for spelling in spellings(analysis, key) {
             state.insert(spelling, analysis.flows.len());

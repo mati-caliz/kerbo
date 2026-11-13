@@ -131,12 +131,7 @@ pub(super) fn seed_nullable_fields(analysis: &mut Analysis<'_, '_>, method: Node
         for key in keys {
             state.insert(key, analysis.flows.len());
         }
-        analysis.flows.push(NullFlow {
-            origin: NullOrigin::NullableField,
-            dereferences: Vec::new(),
-            arguments: Vec::new(),
-            passed_before: Vec::new(),
-        });
+        analysis.flows.push(NullFlow::new(NullOrigin::NullableField));
     }
     state
 }
@@ -168,17 +163,12 @@ fn seed_qualified_fields(analysis: &mut Analysis<'_, '_>, method: Node<'_>, stat
             },
         ));
         state.insert(key, analysis.flows.len());
-        analysis.flows.push(NullFlow {
-            origin: NullOrigin::QualifiedField {
-                owner,
-                via,
-                field,
-                after_call: false,
-            },
-            dereferences: Vec::new(),
-            arguments: Vec::new(),
-            passed_before: Vec::new(),
-        });
+        analysis.flows.push(NullFlow::new(NullOrigin::QualifiedField {
+            owner,
+            via,
+            field,
+            after_call: false,
+        }));
     }
 }
 
@@ -211,12 +201,7 @@ pub(super) fn forget_fields(
         for key in keys {
             state.insert(key, analysis.flows.len());
         }
-        analysis.flows.push(NullFlow {
-            origin,
-            dereferences: Vec::new(),
-            arguments: Vec::new(),
-            passed_before: Vec::new(),
-        });
+        analysis.flows.push(NullFlow::new(origin));
     }
     state
 }

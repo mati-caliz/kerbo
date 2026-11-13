@@ -5,6 +5,8 @@ use tree_sitter::Node;
 use super::java::{NAME_FIELD, text};
 use super::java_null_checks::{checked_expression, is_stable_call};
 use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
+use super::java_null_origin::NullReturn;
+use super::java_null_returns::returned_by_method;
 use super::java_receiver_arguments::receiver_arguments;
 use super::java_receivers::{StaticImports, Variables, enclosing_types};
 use super::java_throws::ArgumentKind;
@@ -55,13 +57,15 @@ pub struct ChainStep {
 // `respuesta.getBody().error()`: la raíz y los pasos en orden. Interesan las de al menos dos pasos,
 // donde el resultado de una llamada se usa para llamar a otra, y las que terminan desempaquetadas
 // (`return jdbc.queryForObject(...)` en un método que devuelve `long`), con dónde empiezan, y las
-// que se pasan directo como argumento de otra llamada (`Splitter.on(PATH_SEPARATOR.value())`).
+// que se pasan directo como argumento de otra llamada (`Splitter.on(PATH_SEPARATOR.value())`) o
+// las devuelve un método no nulo (`return convert(a)`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chain {
     pub root: ChainRoot,
     pub steps: Vec<ChainStep>,
     pub unboxed: Option<(usize, usize)>,
     pub passed_as: Option<Box<NullArgument>>,
+    pub returned: Option<NullReturn>,
 }
 
 // Lo que se sabe del archivo hasta el punto que se recorre: lo que ya se chequeó contra null (por
@@ -199,11 +203,14 @@ pub fn chain_of(
     facts.remember_dereferenced(invocation, source);
     let unboxed = unboxed_at(invocation, source);
     let passed_as = facts.passed_as(invocation, source);
-    (steps.len() > 1 || unboxed.is_some() || passed_as.is_some()).then_some(Chain {
+    let returned = returned_by_method(invocation, source);
+    let interesting = steps.len() > 1 || unboxed.is_some() || passed_as.is_some() || returned.is_some();
+    interesting.then_some(Chain {
         root,
         steps,
         unboxed,
         passed_as,
+        returned,
     })
 }
 
@@ -215,6 +222,7 @@ pub fn origin_chain(invocation: Node<'_>, source: &[u8], variables: &Variables) 
         steps,
         unboxed: None,
         passed_as: None,
+        returned: None,
     })
 }
 

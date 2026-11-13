@@ -75,7 +75,7 @@ pub(super) fn reaches(
 ) -> bool {
     let origin_may_be_null = match &flow.origin {
         NullOrigin::Call(chain) => may_return_null(types, library, summary, chain),
-        NullOrigin::NullableField => true,
+        NullOrigin::NullableField | NullOrigin::Literal => true,
         NullOrigin::QualifiedField {
             owner,
             via,

@@ -9,11 +9,13 @@ use super::java_null_conditions::{
 };
 use super::java_null_keys::{forget, forget_fields, join, seed_nullable_fields, spellings, tracked_key};
 use super::java_null_loops::runs_at_least_once;
+use super::java_null_returns::{method_marking, note_return};
 use super::java_null_uses::{dereference, passed};
+use super::java_owner::NullMarking;
 use super::java_receivers::{StaticImports, Variables};
 use crate::syntax::named_children;
 
-pub use super::java_null_origin::{Dereference, NullFlow, NullOrigin};
+pub use super::java_null_origin::{Dereference, NullFlow, NullOrigin, NullReturn};
 
 pub(super) const IDENTIFIER: &str = "identifier";
 pub(super) const INVOCATION: &str = "method_invocation";
@@ -81,6 +83,7 @@ pub(super) struct Analysis<'source, 'context> {
     pub(super) flows: Vec<NullFlow>,
     pub(super) partners: HashMap<String, String>,
     pub(super) forgettable: Vec<(Vec<String>, NullOrigin)>,
+    pub(super) return_marking: Option<NullMarking>,
 }
 
 // Recorre el cuerpo de un método como lo haría IntelliJ, sin compilar: cada variable asignada
@@ -103,13 +106,16 @@ pub fn null_flows(
         flows: Vec::new(),
         partners: HashMap::new(),
         forgettable: Vec::new(),
+        return_marking: method_marking(method, source),
     };
     let entry = seed_nullable_fields(&mut analysis, method);
     analysis.statement(body, entry);
     analysis
         .flows
         .into_iter()
-        .filter(|flow| !flow.dereferences.is_empty() || !flow.arguments.is_empty())
+        .filter(|flow| {
+            !flow.dereferences.is_empty() || !flow.arguments.is_empty() || !flow.returns.is_empty()
+        })
         .collect()
 }
 
@@ -189,6 +195,7 @@ impl Analysis<'_, '_> {
             SWITCH => Some(self.expression(node, state)),
             kind if TRY_STATEMENTS.contains(&kind) => self.try_statement(node, state),
             kind if EXITS.contains(&kind) => {
+                note_return(self, node, &state);
                 for child in named_children(node) {
                     self.expression(child, state.clone());
                 }
@@ -278,12 +285,7 @@ impl Analysis<'_, '_> {
             let chain = (value.kind() == INVOCATION)
                 .then(|| origin_chain(value, self.source, self.variables))
                 .flatten()?;
-            self.flows.push(NullFlow {
-                origin: NullOrigin::Call(chain),
-                dereferences: Vec::new(),
-                arguments: Vec::new(),
-                passed_before: Vec::new(),
-            });
+            self.flows.push(NullFlow::new(NullOrigin::Call(chain)));
             Some(self.flows.len() - 1)
         });
         if let Some(origin) = origin {

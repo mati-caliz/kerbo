@@ -3,6 +3,7 @@ use super::java_dereference::nullable_dereferences;
 use super::java_escapes::{PackageTypes, escaped_types};
 use super::java_failing_calls::failing_calls;
 use super::java_null_arguments::null_arguments;
+use super::java_nullable_returns::nullable_returns;
 use super::java_nullness::{ProjectTypes, unannotated_overrides};
 use super::java_project::{IndexedSummary, Project, key_of};
 use super::java_resources::unclosed_resources;
@@ -36,6 +37,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
             let mut in_file = tainted.next().unwrap_or_default();
             in_file.extend(nullable_dereferences(&types, library, summary));
             in_file.extend(null_arguments(&types, library, summary));
+            in_file.extend(nullable_returns(&types, library, summary));
             in_file.extend(failing_calls(&types, library, summary, file.in_tests));
             in_file.extend(unclosed_resources(&types, library, summary));
             in_file.extend(escaped_types(&package_types, summary));

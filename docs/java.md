@@ -105,6 +105,11 @@ De las inspecciones de IntelliJ, kerbo hace:
   el contrato que IntelliJ infiere del cuerpo (un `if` que tira) o conoce de memoria (`Validate`,
   el `Assert` de Spring, las aserciones de JUnit y TestNG). En los tests, no dentro de un `try` con
   `catch`, de `assertThrows` ni de `@Test(expected = ...)`.
+- `DataFlowIssue`, el retorno nulo (`nullable-return`): un método cuyo retorno es no nulo por
+  `@NullMarked` (del paquete, la clase o las que la encierran) o por `@NonNull` que devuelve un
+  `null` escrito, una variable o campo `@Nullable` sin chequear o una llamada que puede devolver
+  null. No cuentan los primitivos, `void`/`Void`, los retornos `@Nullable` o `@ParametricNullness`
+  ni las variables de tipo con límite `@Nullable`.
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` encadenado a
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` u `Optional.ofNullable(...)`.
 
