@@ -1,11 +1,12 @@
 use super::java::{Declaration, JavaSummary, NullInference, Position, lint_at};
 use super::java_jdk::{is_always_defined, jdk_method};
-use super::java_null_arguments::{accepts, non_null_parameter, reaches};
+use super::java_null_arguments::{accepts, non_null_parameter, project_owners, reaches};
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body, ReturnType};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
+use crate::lint::java_null_inference::NullArgument;
 use crate::lint::java_nullable_fields::ReturnNullness;
 use crate::lint::java_owner::OwnerKind;
 use crate::rules::JavaRule;
@@ -50,6 +51,7 @@ pub fn nullable_dereferences(
                 .collect::<Vec<_>>()
         })
         .collect();
+    findings.extend(unboxed_arguments(types, library, summary));
     for flow in &summary.null_flows {
         if reaches(types, library, summary, flow) {
             findings.extend(
@@ -85,6 +87,49 @@ pub(super) fn known_not_null(
             .passed_before
             .iter()
             .any(|argument| non_null_parameter(types, library, summary, argument).is_some())
+}
+
+// Una llamada que puede devolver null pasada a un parámetro primitivo de un método del proyecto se
+// desempaqueta (`quitar(replica, cola.poll())`): todas las sobrecargas que la pueden recibir lo
+// declaran primitivo.
+fn unboxed_arguments(types: &ProjectTypes<'_>, library: &Library, summary: &JavaSummary) -> Vec<LintFinding> {
+    summary
+        .chains
+        .iter()
+        .filter_map(|chain| {
+            let argument = chain.passed_as.as_deref()?;
+            let last = chain.steps.last()?;
+            let unboxed = takes_primitive(types, library, summary, argument)
+                && may_return_null(types, library, summary, chain)
+                && !known_not_null(types, library, summary, last);
+            unboxed.then(|| report(argument.line, argument.column, &last.name))
+        })
+        .collect()
+}
+
+fn takes_primitive(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    argument: &NullArgument,
+) -> bool {
+    project_owners(types, library, summary, argument)
+        .iter()
+        .find_map(|owner| {
+            let found: Vec<bool> = types
+                .declarations_of(owner)
+                .filter(|(_, declaration)| {
+                    declaration.is_constructor == argument.is_constructor
+                        && declaration.name == argument.name
+                        && declaration.arity == Arity::Fixed
+                        && declaration.parameters.len() == argument.arity
+                })
+                .filter_map(|(_, declaration)| declaration.parameters.get(argument.index))
+                .map(|parameter| !parameter.accepts_null)
+                .collect();
+            (!found.is_empty()).then_some(found)
+        })
+        .is_some_and(|primitive| primitive.iter().all(|is_primitive| *is_primitive))
 }
 
 fn report(line: usize, column: usize, name: &str) -> LintFinding {

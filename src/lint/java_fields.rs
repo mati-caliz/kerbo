@@ -9,6 +9,7 @@ use super::java_receivers::simple_type_name;
 use crate::syntax::named_children;
 
 const FIELD: &str = "field_declaration";
+const VOLATILE: &str = "volatile";
 const INTERFACE_FIELD: &str = "constant_declaration";
 const FIELD_DECLARATIONS: &[&str] = &[FIELD, INTERFACE_FIELD];
 const VARIABLE_DECLARATOR: &str = "variable_declarator";
@@ -45,9 +46,25 @@ pub struct DeclaredField<'tree> {
     pub name_node: Node<'tree>,
     pub visibility: Visibility,
     pub is_static: bool,
+    pub volatility: Volatility,
     pub type_name: String,
     pub annotations: Vec<String>,
     pub owner: Owner,
+}
+
+// Si el campo es `volatile`: IntelliJ olvida lo que sabe de uno así en cada llamada.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Volatility {
+    Volatile,
+    Stable,
+}
+
+pub fn volatility_of(declaration: Node<'_>, source: &[u8]) -> Volatility {
+    if has_modifier(declaration, VOLATILE, source) {
+        Volatility::Volatile
+    } else {
+        Volatility::Stable
+    }
 }
 
 pub fn declared_fields<'tree>(nodes: &[Node<'tree>], source: &[u8]) -> Vec<DeclaredField<'tree>> {
@@ -59,6 +76,7 @@ pub fn declared_fields<'tree>(nodes: &[Node<'tree>], source: &[u8]) -> Vec<Decla
             let is_static =
                 declaration.kind() == INTERFACE_FIELD || has_modifier(declaration, STATIC, source);
             let annotations = annotation_names(declaration, source);
+            let volatility = volatility_of(declaration, source);
             let type_name = declaration
                 .child_by_field_name(TYPE_FIELD)
                 .map(|written| simple_type_name(text(written, source)))
@@ -71,6 +89,7 @@ pub fn declared_fields<'tree>(nodes: &[Node<'tree>], source: &[u8]) -> Vec<Decla
                     name_node,
                     visibility,
                     is_static,
+                    volatility,
                     type_name: type_name.clone(),
                     annotations: annotations.clone(),
                     owner: owner.clone(),

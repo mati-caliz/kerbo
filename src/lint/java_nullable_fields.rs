@@ -4,6 +4,7 @@ use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_calls::annotated_with;
+use super::java_fields::{Volatility, volatility_of};
 use crate::syntax::{descendants, named_children};
 
 const NULLABLE: &str = "Nullable";
@@ -22,6 +23,8 @@ const PARAMETERS_FIELD: &str = "parameters";
 const IDENTIFIER: &str = "identifier";
 const INFERRED_PARAMETERS: &str = "inferred_parameters";
 const OPEN_BRACKET: char = '[';
+const QUALIFIER_SEPARATOR: char = '.';
+const ANNOTATION_KINDS: &[&str] = &["marker_annotation", "annotation"];
 const ANONYMOUS_CLASS_OWNER: &str = "object_creation_expression";
 const DECLARING: &[&str] = &[
     "variable_declarator",
@@ -50,25 +53,26 @@ pub fn return_nullness(method: Option<Node<'_>>, source: &[u8]) -> ReturnNullnes
 }
 
 // Las claves con las que el flujo sigue a cada campo `@Nullable` que el método ve: `this.x` siempre
-// y `x` si el método no declara nada con ese nombre. Las dos de un mismo campo van juntas.
-pub(super) fn nullable_field_keys(method: Node<'_>, source: &[u8]) -> Vec<Vec<String>> {
+// y `x` si el método no declara nada con ese nombre. Las dos de un mismo campo van juntas, con si
+// el campo es `volatile`.
+pub(super) fn nullable_field_keys(method: Node<'_>, source: &[u8]) -> Vec<(Vec<String>, Volatility)> {
     let declared = declared_names(method, source);
     nullable_fields(method, source)
         .into_iter()
-        .map(|field| {
+        .map(|(field, volatility)| {
             let mut keys = vec![format!("{THIS_PREFIX}{field}")];
             if !declared.contains(&field) {
                 keys.push(field);
             }
-            keys
+            (keys, volatility)
         })
         .collect()
 }
 
 // Los campos `@Nullable` de las clases que encierran al método, de adentro hacia afuera: un campo
 // de una clase de más adentro tapa al del mismo nombre de una de afuera.
-fn nullable_fields(method: Node<'_>, source: &[u8]) -> Vec<String> {
-    let mut nullable_by_name: HashMap<String, bool> = HashMap::new();
+fn nullable_fields(method: Node<'_>, source: &[u8]) -> Vec<(String, Volatility)> {
+    let mut nullable_by_name: HashMap<String, Option<Volatility>> = HashMap::new();
     let mut current = method.parent();
     while let Some(node) = current {
         if CLASS_BODIES.contains(&node.kind()) {
@@ -86,23 +90,27 @@ fn nullable_fields(method: Node<'_>, source: &[u8]) -> Vec<String> {
     }
     nullable_by_name
         .into_iter()
-        .filter_map(|(name, nullable)| nullable.then_some(name))
+        .filter_map(|(name, nullable)| nullable.map(|volatility| (name, volatility)))
         .collect()
 }
 
-// Los campos que declara el cuerpo de una clase y si cada uno es `@Nullable`.
-fn declared_fields(body: Node<'_>, source: &[u8]) -> Vec<(String, bool)> {
+// Los campos que declara el cuerpo de una clase y, si son `@Nullable`, si son `volatile`.
+fn declared_fields(body: Node<'_>, source: &[u8]) -> Vec<(String, Option<Volatility>)> {
     named_children(body)
         .into_iter()
         .filter(|child| child.kind() == FIELD_DECLARATION)
-        .flat_map(named_children)
-        .filter(|child| child.kind() == VARIABLE_DECLARATOR)
-        .filter_map(|declarator| {
-            let name = declarator.child_by_field_name(NAME_FIELD)?;
-            Some((
-                text(name, source).to_owned(),
-                declares_nullable(declarator, source),
-            ))
+        .flat_map(|declaration| {
+            let volatility = volatility_of(declaration, source);
+            named_children(declaration)
+                .into_iter()
+                .filter(|child| child.kind() == VARIABLE_DECLARATOR)
+                .filter_map(move |declarator| {
+                    let name = declarator.child_by_field_name(NAME_FIELD)?;
+                    Some((
+                        text(name, source).to_owned(),
+                        declares_nullable(declarator, source).then_some(volatility),
+                    ))
+                })
         })
         .collect()
 }
@@ -127,9 +135,20 @@ pub fn declares_nullable_type(declaration: Node<'_>, source: &[u8]) -> bool {
             .child_by_field_name(DIMENSIONS_FIELD)
             .is_some_and(|dimensions| outer_dimension(text(dimensions, source)).contains(NULLABLE));
     }
-    annotated_with(declaration, NULLABLE, source)
-        || annotated_with(declaration, CHECK_FOR_NULL, source)
-        || has_nullable_last_segment(written, source)
+    [NULLABLE, CHECK_FOR_NULL].into_iter().any(|annotation| {
+        annotated_with(declaration, annotation, source)
+            || annotated_after_type_parameters(declaration, annotation, source)
+    }) || has_nullable_last_segment(written, source)
+}
+
+// En `<T> @Nullable T get()` la anotación va después de los parámetros de tipo, fuera de los
+// modificadores.
+fn annotated_after_type_parameters(declaration: Node<'_>, simple_name: &str, source: &[u8]) -> bool {
+    named_children(declaration)
+        .into_iter()
+        .filter(|child| ANNOTATION_KINDS.contains(&child.kind()))
+        .filter_map(|annotation| annotation.child_by_field_name(NAME_FIELD))
+        .any(|name| text(name, source).rsplit(QUALIFIER_SEPARATOR).next() == Some(simple_name))
 }
 
 // En `char[] @Nullable []` la anotación habla de los elementos: el arreglo es el de antes del primer `[`.

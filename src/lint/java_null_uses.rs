@@ -14,6 +14,10 @@ const FIELD_ACCESS: &str = "field_access";
 const ARRAY_ACCESS: &str = "array_access";
 const FIELD_FIELD: &str = "field";
 const ARRAY_FIELD: &str = "array";
+const CAST: &str = "cast_expression";
+const TYPE_FIELD: &str = "type";
+const VALUE_FIELD: &str = "value";
+const PRIMITIVE_TYPES: &[&str] = &["integral_type", "floating_point_type", "boolean_type"];
 
 // Las variables posiblemente null que la llamada recibe como argumento. Siguen en el estado, en
 // un flujo nuevo que recuerda la llamada: si el método no las desreferencia, el uso que viene
@@ -104,6 +108,10 @@ pub(super) fn dereference(analysis: &mut Analysis<'_, '_>, node: Node<'_>, mut s
             node.child_by_field_name(ARRAY_FIELD),
             node.child_by_field_name(ARRAY_FIELD),
         ),
+        CAST if casts_to_primitive(node) => (
+            node.child_by_field_name(VALUE_FIELD),
+            node.child_by_field_name(VALUE_FIELD),
+        ),
         _ => (None, None),
     };
     let (Some(receiver), Some(used)) = (
@@ -124,4 +132,10 @@ pub(super) fn dereference(analysis: &mut Analysis<'_, '_>, node: Node<'_>, mut s
         }
     }
     state
+}
+
+// `(int) valor` desempaqueta el valor: si es null, falla como una desreferencia.
+fn casts_to_primitive(cast: Node<'_>) -> bool {
+    cast.child_by_field_name(TYPE_FIELD)
+        .is_some_and(|written| PRIMITIVE_TYPES.contains(&written.kind()))
 }

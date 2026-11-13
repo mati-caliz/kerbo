@@ -3,15 +3,16 @@ use std::collections::HashMap;
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
-use super::java_chains::{Chain, origin_chain};
+use super::java_chains::origin_chain;
 use super::java_null_conditions::{
     asserted_condition, asserted_present, branch_states, condition_asserted, is_logical, without_cast,
 };
-use super::java_null_inference::NullArgument;
-use super::java_null_keys::{forget, join, seed_nullable_fields, spellings, tracked_key};
+use super::java_null_keys::{forget, forget_fields, join, seed_nullable_fields, spellings, tracked_key};
 use super::java_null_uses::{dereference, passed};
 use super::java_receivers::{StaticImports, Variables};
 use crate::syntax::named_children;
+
+pub use super::java_null_origin::{Dereference, NullFlow, NullOrigin};
 
 pub(super) const IDENTIFIER: &str = "identifier";
 pub(super) const INVOCATION: &str = "method_invocation";
@@ -69,36 +70,6 @@ pub(super) const EQUAL: &str = "==";
 pub(super) const NOT_EQUAL: &str = "!=";
 pub(super) const COMMENTS: &[&str] = &["line_comment", "block_comment"];
 
-// Un uso de una variable que quedaría sin proteger si la llamada que le dio su valor devolviera
-// null: el método o campo que se usa y dónde.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Dereference {
-    pub name: String,
-    pub line: usize,
-    pub column: usize,
-}
-
-// Una variable asignada desde una llamada (`Cache cache = manager.getCache(nombre)`), los usos
-// que no tienen un chequeo de null por delante en ningún camino y las llamadas a las que se pasa
-// sin chequear. Después de pasarla a una llamada, los usos van a otro flujo que recuerda esa
-// llamada: si el parámetro resulta no nulo, IntelliJ ya la da por presente.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NullFlow {
-    pub origin: NullOrigin,
-    pub dereferences: Vec<Dereference>,
-    pub arguments: Vec<NullArgument>,
-    pub passed_before: Vec<NullArgument>,
-}
-
-// De dónde puede venir el null: una llamada que puede devolverlo, un campo anotado `@Nullable` o el
-// campo de otro objeto, con el tipo de ese objeto como está escrito.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NullOrigin {
-    Call(Chain),
-    NullableField,
-    QualifiedField { owner: String, field: String },
-}
-
 // Las variables que podrían ser null en un punto del método, con la asignación que lo causó.
 pub(super) type State = HashMap<String, usize>;
 
@@ -108,6 +79,7 @@ pub(super) struct Analysis<'source, 'context> {
     pub(super) imported: &'context StaticImports,
     pub(super) flows: Vec<NullFlow>,
     pub(super) partners: HashMap<String, String>,
+    pub(super) forgettable: Vec<(Vec<String>, NullOrigin)>,
 }
 
 // Recorre el cuerpo de un método como lo haría IntelliJ, sin compilar: cada variable asignada
@@ -129,6 +101,7 @@ pub fn null_flows(
         imported,
         flows: Vec::new(),
         partners: HashMap::new(),
+        forgettable: Vec::new(),
     };
     let entry = seed_nullable_fields(&mut analysis, method);
     analysis.statement(body, entry);
@@ -383,9 +356,11 @@ impl Analysis<'_, '_> {
         if kind == INVOCATION || kind == CREATION {
             current = passed(self, node, current);
         }
-        if let Some(asserted) =
-            asserted_present(node, self.source).and_then(|argument| tracked_key(self, argument))
-        {
+        let asserted = asserted_present(node, self.source);
+        if kind == INVOCATION && asserted.is_none() {
+            current = forget_fields(self, node, current);
+        }
+        if let Some(asserted) = asserted.and_then(|argument| tracked_key(self, argument)) {
             forget(&mut current, &asserted);
         }
         if receiver.is_some() {

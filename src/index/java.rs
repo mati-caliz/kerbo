@@ -12,7 +12,9 @@ use crate::lint::java_chains::Chain;
 use crate::lint::java_constants::{Constant, declared_constants};
 use crate::lint::java_contract_calls::{ContractCall, contract_calls_in};
 use crate::lint::java_contracts::{Clause, fail_clauses};
-use crate::lint::java_fields::{DeclaredField, declared_fields, used_identifiers, written_only_identifiers};
+use crate::lint::java_fields::{
+    DeclaredField, Volatility, declared_fields, used_identifiers, written_only_identifiers,
+};
 use crate::lint::java_generics::{Generics, generics_of};
 use crate::lint::java_inference::{dereferenced_first, unconditionally_dereferenced};
 use crate::lint::java_lambda_targets::{LambdaTargets, lambda_targets_of};
@@ -116,6 +118,7 @@ pub struct Field {
     pub annotations: Vec<String>,
     pub owner: Owner,
     pub is_nullable: bool,
+    pub volatility: Volatility,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -325,6 +328,7 @@ fn field_of(field: DeclaredField<'_>, source: &[u8]) -> Field {
         position: position_of(field.name_node),
         visibility: field.visibility,
         is_static: field.is_static,
+        volatility: field.volatility,
         type_name: field.type_name,
         annotations: field.annotations,
         owner: field.owner,

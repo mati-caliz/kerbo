@@ -42,6 +42,8 @@ mod java_failing_calls_tests;
 #[cfg(test)]
 mod java_null_marked_tests;
 #[cfg(test)]
+mod java_null_reread_tests;
+#[cfg(test)]
 mod java_null_tests;
 #[cfg(test)]
 mod java_nullable_field_tests;

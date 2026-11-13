@@ -6,6 +6,7 @@ use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body};
+use crate::lint::java_fields::Volatility;
 use crate::lint::java_null_flow::{NullFlow, NullOrigin};
 use crate::lint::java_null_inference::{ARRAY_SUFFIX, NullArgument};
 use crate::lint::java_receiver_arguments::ArgumentNullness;
@@ -75,9 +76,17 @@ pub(super) fn reaches(
     let origin_may_be_null = match &flow.origin {
         NullOrigin::Call(chain) => may_return_null(types, library, summary, chain),
         NullOrigin::NullableField => true,
-        NullOrigin::QualifiedField { owner, field } => {
-            is_nullable_field(types, library, summary, (owner, field))
-        }
+        NullOrigin::QualifiedField {
+            owner,
+            via,
+            field,
+            after_call,
+        } => is_nullable_field(
+            types,
+            library,
+            summary,
+            (owner, via.as_deref(), field, *after_call),
+        ),
     };
     origin_may_be_null
         && flow
@@ -86,20 +95,58 @@ pub(super) fn reaches(
             .all(|argument| non_null_parameter(types, library, summary, argument).is_none())
 }
 
-// Si el campo que declara la clase del proyecto (o una de arriba en el proyecto) es `@Nullable`.
+// Si el campo que declara la clase del proyecto (o una de arriba en el proyecto) es `@Nullable` y,
+// leído de nuevo después de una llamada, si es `volatile`. Con un campo arreglo en el medio, el
+// campo es del tipo de sus elementos.
 fn is_nullable_field(
     types: &ProjectTypes<'_>,
     library: &Library,
     summary: &JavaSummary,
-    (owner, field): (&str, &str),
+    (owner, via, field, after_call): (&str, Option<&str>, &str, bool),
 ) -> bool {
-    let Resolved::Project(owner) = resolve(types, library, summary, owner) else {
+    let Resolved::Project(mut owner) = resolve(types, library, summary, owner) else {
         return false;
     };
+    if let Some(via) = via {
+        let Some((declaring, array)) = project_lineage(types, library, &owner)
+            .iter()
+            .find_map(|class| types.field_of(class, via))
+        else {
+            return false;
+        };
+        let Resolved::Project(element) = resolve(types, library, declaring, &array.type_name) else {
+            return false;
+        };
+        owner = element;
+    }
     project_lineage(types, library, &owner)
         .iter()
         .find_map(|class| types.field_of(class, field))
-        .is_some_and(|(_, declared)| declared.is_nullable)
+        .is_some_and(|(_, declared)| {
+            declared.is_nullable && (!after_call || declared.volatility == Volatility::Volatile)
+        })
+}
+
+// Las clases del proyecto donde buscar el método que recibe el argumento, de la más cercana a la
+// más lejana. Vacío si el receptor es de una librería o no se sabe.
+pub(super) fn project_owners(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    argument: &NullArgument,
+) -> Vec<String> {
+    match &argument.receiver {
+        Receiver::Type(written) => match resolve(types, library, summary, written) {
+            Resolved::Project(owner) if argument.is_constructor => vec![owner],
+            Resolved::Project(owner) => project_lineage(types, library, &owner),
+            Resolved::Library(_) => Vec::new(),
+        },
+        Receiver::Scope(enclosing) => enclosing
+            .iter()
+            .flat_map(|owner| project_lineage(types, library, owner))
+            .collect(),
+        Receiver::Unknown => Vec::new(),
+    }
 }
 
 pub(super) fn non_null_parameter(
@@ -108,18 +155,12 @@ pub(super) fn non_null_parameter(
     summary: &JavaSummary,
     argument: &NullArgument,
 ) -> Option<String> {
-    let owners: Vec<String> = match &argument.receiver {
-        Receiver::Type(written) => match resolve(types, library, summary, written) {
-            Resolved::Project(owner) if argument.is_constructor => vec![owner],
-            Resolved::Project(owner) => project_lineage(types, library, &owner),
-            Resolved::Library(class) => return library_non_null(library, &class, argument),
-        },
-        Receiver::Scope(enclosing) => enclosing
-            .iter()
-            .flat_map(|owner| project_lineage(types, library, owner))
-            .collect(),
-        Receiver::Unknown => return None,
-    };
+    if let Receiver::Type(written) = &argument.receiver
+        && let Resolved::Library(class) = resolve(types, library, summary, written)
+    {
+        return library_non_null(library, &class, argument);
+    }
+    let owners = project_owners(types, library, summary, argument);
     let candidates = owners.iter().find_map(|owner| {
         let mut found: Vec<(&JavaSummary, &Declaration, &Parameter, Slot)> = types
             .declarations_of(owner)

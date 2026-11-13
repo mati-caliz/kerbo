@@ -52,6 +52,9 @@ const NOT_NULL_KINDS: &[&str] = &[
 const TEST_ANNOTATION: &str = "Test";
 const EXPECTED_ELEMENTS: &[&str] = &["expected", "expectedExceptions"];
 const ASSERT_THROWS: &str = "assertThrows";
+const JUNIT4_ASSERT: &str = "org.junit.Assert";
+const JUNIT4_ASSERT_CLASS: &str = "Assert";
+const OBJECT_FIELD: &str = "object";
 const IF: &str = "if_statement";
 const CONDITION_FIELD: &str = "condition";
 const CONSEQUENCE_FIELD: &str = "consequence";
@@ -164,7 +167,7 @@ fn contract_call(
         arguments,
         line: one_based(position.row),
         column: one_based(position.column),
-        exception_expected: exception_expected(call, source),
+        exception_expected: exception_expected(call, source, imports),
     })
 }
 
@@ -296,12 +299,13 @@ fn ancestors(node: Node<'_>) -> impl Iterator<Item = Node<'_>> {
 }
 
 // Calca `TestUtils.isExceptionExpected` de IntelliJ: dentro de un `try` con `catch`, de una lambda
-// pasada a `assertThrows` o de un `@Test(expected = ...)` se espera que la llamada falle.
-fn exception_expected(call: Node<'_>, source: &[u8]) -> bool {
+// pasada a `assertThrows` o de un `@Test(expected = ...)` se espera que la llamada falle. El
+// `assertThrows` de JUnit 4 (`org.junit.Assert`) no cuenta: IntelliJ sólo conoce el de JUnit 5.
+fn exception_expected(call: Node<'_>, source: &[u8], imports: &StaticImports) -> bool {
     for ancestor in ancestors(call) {
         match ancestor.kind() {
             METHOD | CONSTRUCTOR => return expects_exception(ancestor, source),
-            LAMBDA if is_assert_throws_argument(ancestor, source) => return true,
+            LAMBDA if is_assert_throws_argument(ancestor, source, imports) => return true,
             TRY | TRY_WITH_RESOURCES
                 if named_children(ancestor).iter().any(|child| child.kind() == CATCH) =>
             {
@@ -313,7 +317,7 @@ fn exception_expected(call: Node<'_>, source: &[u8]) -> bool {
     false
 }
 
-fn is_assert_throws_argument(lambda: Node<'_>, source: &[u8]) -> bool {
+fn is_assert_throws_argument(lambda: Node<'_>, source: &[u8], imports: &StaticImports) -> bool {
     let Some(list) = ancestors(lambda).find(|node| node.kind() != PARENTHESIZED) else {
         return false;
     };
@@ -323,7 +327,15 @@ fn is_assert_throws_argument(lambda: Node<'_>, source: &[u8]) -> bool {
                 && invocation
                     .child_by_field_name(NAME_FIELD)
                     .is_some_and(|name| text(name, source) == ASSERT_THROWS)
+                && !is_junit4_assertion(invocation, source, imports)
         })
+}
+
+fn is_junit4_assertion(invocation: Node<'_>, source: &[u8], imports: &StaticImports) -> bool {
+    invocation.child_by_field_name(OBJECT_FIELD).map_or_else(
+        || imports.imported_class(invocation, source) == Some(JUNIT4_ASSERT),
+        |object| simple_type_name(text(object, source)) == JUNIT4_ASSERT_CLASS,
+    )
 }
 
 fn expects_exception(callable: Node<'_>, source: &[u8]) -> bool {

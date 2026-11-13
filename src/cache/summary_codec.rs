@@ -13,6 +13,7 @@ use crate::index::java::{CallSite, Field, JavaSummary, Position};
 use crate::index::java_exposure::{DeclaredType, Exposure};
 use crate::lint::java_calls::{ResultUse, Visibility};
 use crate::lint::java_constants::Constant;
+use crate::lint::java_fields::Volatility;
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
 
@@ -83,6 +84,7 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
         writer.list(&field.annotations, |writer, name| writer.text(name));
         write_owner(writer, &field.owner);
         write_flag(writer, field.is_nullable);
+        write_flag(writer, field.volatility == Volatility::Volatile);
     });
     writer.list(&summary.identifiers, |writer, name| writer.text(name));
     writer.list(&summary.written_only, |writer, name| writer.text(name));
@@ -150,18 +152,7 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
                 visibility: read_visibility(reader)?,
             })
         })?,
-        fields: reader.list(|reader| {
-            Ok(Field {
-                name: reader.text()?,
-                position: read_position(reader)?,
-                visibility: read_visibility(reader)?,
-                is_static: read_flag(reader)?,
-                type_name: reader.text()?,
-                annotations: reader.list(Reader::text)?,
-                owner: read_owner(reader)?,
-                is_nullable: read_flag(reader)?,
-            })
-        })?,
+        fields: reader.list(read_field)?,
         identifiers: reader.list(Reader::text)?,
         written_only: reader.list(Reader::text)?,
         taints: read_taints(reader)?,
@@ -206,6 +197,24 @@ pub(super) fn read_visibility(reader: &mut Reader<'_>) -> Result<Visibility, Cor
         PUBLIC => Ok(Visibility::Public),
         _ => Err(Corrupt),
     }
+}
+
+fn read_field(reader: &mut Reader<'_>) -> Result<Field, Corrupt> {
+    Ok(Field {
+        name: reader.text()?,
+        position: read_position(reader)?,
+        visibility: read_visibility(reader)?,
+        is_static: read_flag(reader)?,
+        type_name: reader.text()?,
+        annotations: reader.list(Reader::text)?,
+        owner: read_owner(reader)?,
+        is_nullable: read_flag(reader)?,
+        volatility: if read_flag(reader)? {
+            Volatility::Volatile
+        } else {
+            Volatility::Stable
+        },
+    })
 }
 
 pub(super) fn write_receiver(writer: &mut Writer, receiver: &Receiver) {

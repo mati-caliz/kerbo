@@ -1795,7 +1795,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned` y `failing-call`):
   commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno de más en los dos.
-  En guava, 479 de los 972 (301 `data-flow-issue`, 177 `null-argument`, 1 `failing-call`), con 3
+  En guava, 572 de los 972 (369 `data-flow-issue`, 178 `null-argument`, 25 `failing-call`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
   `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
@@ -1834,6 +1834,16 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   String`, un comodín u otra variable de tipo, ni si el método declara su propia variable. Una
   variable que el archivo declara con tipos distintos toma el tipo de la lambda o el método más
   cercano que la declara.
+  Después de cada llamada que no es pura, un campo `@Nullable` y `volatile` (propio o de otra
+  variable, como `segment.table`) vuelve a poder ser null: IntelliJ olvida lo que sabía de él. Los
+  que no son `volatile` no se olvidan (Qodana no los vuelve a marcar en TreeMultiset ni en
+  LinkedHashMultimapTest). Un campo `@Nullable` puede alcanzarse por un elemento de un arreglo que es
+  campo de una variable (`map.segments[0].table`). Desempaquetan lo que puede ser null un casteo a
+  primitivo (`(int) mmHeap.peek()`, también de una variable), una cuenta (`queue.poll() ^ x`; no
+  `+` ni `==`) y pasarlo a un parámetro primitivo de un método del proyecto. El `@Nullable` de un
+  método genérico puede ir después de sus parámetros de tipo (`<T> @Nullable T getInstance`). El
+  `assertThrows` de JUnit 4 (`org.junit.Assert`) no da por esperada la excepción: IntelliJ sólo
+  conoce el de JUnit 5, y Qodana marca `checkArgument(false)` adentro del de JUnit 4.
   Falta:
   - `assertNull` sobre lo que devuelve un método del proyecto (5 en commons-lang, sobre
     `getIfEmpty`, `getIfBlank` y `applyNonNull`): IntelliJ marca la de 3 argumentos y no la de 4
@@ -1848,6 +1858,10 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     (`List.set` sobre `Collections.unmodifiableList`) en TestWithParametersTest.
   - El flujo de nulos sigue un solo flujo por variable: al juntar ramas queda el más viejo. Dos
     asignaciones distintas en ramas distintas no se siguen a la vez.
+  - guava: el desempaquetado en lambdas (`i -> i + 1` sobre un `Function<Integer, ...>`), el de
+    `Map.get` de interfaces del proyecto que heredan de `Map` (`bimap.get(...)`), el de
+    `expected.asLong` (campo `@Nullable` de otra clase sin variable de tipo conocido) y el de un
+    `getInstance` cuyo receptor es un campo heredado.
   - guava: los receptores que son campos heredados o getters (`collection`, `getMap()` en los
     testers de testlib, `held.escape(null)`, `getEscaper().escape(null)`), la inferencia por
     contexto (`Suppliers.ofInstance(null)`, `immutableEntry(null, 1)` pasado a `builder.put`), los

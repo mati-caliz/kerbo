@@ -30,6 +30,7 @@ mod java_null_conditions;
 pub mod java_null_flow;
 pub mod java_null_inference;
 mod java_null_keys;
+mod java_null_origin;
 mod java_null_uses;
 pub mod java_nullable_fields;
 mod java_optional;

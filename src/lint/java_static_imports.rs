@@ -83,7 +83,7 @@ impl StaticImports {
             })
     }
 
-    fn imported_class(&self, invocation: Node<'_>, source: &[u8]) -> Option<&str> {
+    pub fn imported_class(&self, invocation: Node<'_>, source: &[u8]) -> Option<&str> {
         if invocation.child_by_field_name(OBJECT_FIELD).is_some() {
             return None;
         }

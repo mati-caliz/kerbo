@@ -108,10 +108,17 @@ pub(super) fn write_flow(writer: &mut Writer, flow: &NullFlow) {
             write_chain(writer, chain);
         }
         NullOrigin::NullableField => writer.number(NULL_FROM_FIELD),
-        NullOrigin::QualifiedField { owner, field } => {
+        NullOrigin::QualifiedField {
+            owner,
+            via,
+            field,
+            after_call,
+        } => {
             writer.number(NULL_FROM_QUALIFIED_FIELD);
             writer.text(owner);
+            writer.list(via.as_slice(), |writer, name| writer.text(name));
             writer.text(field);
+            writer.number(u64::from(*after_call));
         }
     }
     writer.list(&flow.dereferences, |writer, used| {
@@ -130,7 +137,9 @@ pub(super) fn read_flow(reader: &mut Reader<'_>) -> Result<NullFlow, Corrupt> {
             NULL_FROM_FIELD => NullOrigin::NullableField,
             NULL_FROM_QUALIFIED_FIELD => NullOrigin::QualifiedField {
                 owner: reader.text()?,
+                via: reader.list(Reader::text)?.into_iter().next(),
                 field: reader.text()?,
+                after_call: reader.number()? != 0,
             },
             _ => return Err(Corrupt),
         },

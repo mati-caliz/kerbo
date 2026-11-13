@@ -68,7 +68,11 @@ final class Checks {
 "#;
 
 fn findings(in_tests: bool) -> Vec<String> {
-    let summary = summary_of(CHECKS);
+    findings_in(CHECKS, in_tests)
+}
+
+fn findings_in(source: &str, in_tests: bool) -> Vec<String> {
+    let summary = summary_of(source);
     let files = [IndexedSummary {
         summary: &summary,
         in_tests,
@@ -113,4 +117,29 @@ fn a_test_that_expects_the_exception_is_not_reported() {
             "54:13 absent",
         ]
     );
+}
+
+const ASSERT_THROWS: &str = r"package app;
+
+import static org.junit.Assert.assertThrows;
+
+final class Legacy {
+    static void require(boolean condition) {
+        if (!condition) {
+            throw new IllegalStateException();
+        }
+    }
+
+    void expected() {
+        assertThrows(IllegalStateException.class, () -> require(false));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> require(false));
+    }
+}
+";
+
+// IntelliJ sólo espera la excepción en una lambda pasada al `assertThrows` de JUnit 5: el de JUnit 4
+// (`org.junit.Assert`) no la saca del aviso.
+#[test]
+fn only_the_junit5_assert_throws_expects_the_exception() {
+    assert_eq!(findings_in(ASSERT_THROWS, true), ["13:57 require"]);
 }
