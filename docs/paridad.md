@@ -202,9 +202,16 @@ En Django se lee la lista `operations` de cada migración y se arma el SQL que d
 para Postgres (Django 6.1): el estado de los modelos sale de reproducir las migraciones anteriores
 de cada app, con las claves foráneas a otras apps, las tablas intermedias de los `ManyToManyField`,
 los índices `_like` de los `CharField` y los nombres truncados con el hash de Django. `RunSQL` aporta
-su propio SQL y `SeparateDatabaseAndState` sólo lo de `database_operations`. Contra squawk 2.71
-sobre el `sqlmigrate` real de las 23 migraciones de `django.contrib`: los 89 avisos, por archivo,
-regla y cantidad, ninguno de más (`scripts/parity/django/`).
+su propio SQL y `SeparateDatabaseAndState` sólo lo de `database_operations`. Se reconocen los
+motores basados en django_zero_downtime_migrations (como el de sentry) y lo que su schema editor
+agrega. Contra squawk 2.71 sobre el `sqlmigrate` real, por archivo, regla y cantidad, ninguno de
+más: los 89 avisos de `django.contrib`, 4.296 de saleor, 1.016 de zulip, 1.315 de wagtail y 5.544
+de sentry (`scripts/parity/django/`). Lo que ningún repo usa (comentarios, collations,
+`contrib.postgres`, el paso a `BigAutoField`, M2M que cambian de modelo) se mide en casos
+sintéticos (`scripts/parity/django/casos`) con una referencia que aplica cada migración, así sale
+también lo que Django resuelve mirando la base. Un `AlterField` sobre una clave foránea sigue a
+`sqlmigrate`: no borra ni rehace la restricción, como sí hace un `migrate` real. Las apps de
+terceros (`auth`, `contenttypes`) no se ven: no están en el repo.
 
 En Rails se recorre el `change` (o el `up`) de la clase que hereda de `Migration`, con tree-sitter-ruby,
 y se arma el SQL que manda ActiveRecord 8 a Postgres: `create_table` y `change_table` con sus
@@ -212,7 +219,11 @@ columnas, referencias, índices y restricciones, los `add_*`, `remove_*`, `renam
 `execute` con su SQL (heredoc o string), `reversible` y `up_only` por la rama `up`, y los métodos
 propios de la migración. `disable_ddl_transaction!` saca el `BEGIN`. La referencia es squawk 2.71
 sobre el SQL que ActiveRecord manda de verdad al aplicar las migraciones en orden sobre un Postgres
-vacío (`scripts/parity/rails/`): en maybe, chatwoot y mastodon coinciden los 3.563 avisos; en forem, 3.540 de 3.556.
+vacío (`scripts/parity/rails/`): maybe 849 de 849, chatwoot 1.016 de 1.016, mastodon 1.763 de 1.763,
+forem 3.556 de 3.556 y discourse 5.923 de 5.938, ninguno de más. Lo que falta en discourse depende
+de los datos de la base o de clases de la aplicación, y las migraciones que llaman a modelos o
+settings de la app quedan fuera porque la referencia no los tiene. La referencia emula `DB` de
+mini_sql y `t.vector` de neighbor, y carga los helpers de `lib/migration` del repo.
 Las migraciones anteriores a Rails 5.1 arman ids `integer`, como hacía Rails. Cada migración
 se evalúa con el esquema que dejan las anteriores del mismo directorio, así salen los
 `ALTER INDEX ... RENAME` que Rails agrega al renombrar una tabla o una columna y se saltea lo que

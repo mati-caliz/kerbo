@@ -201,9 +201,25 @@ For Django, kerbo reads each migration's `operations` list and builds the SQL `s
 print for Postgres (Django 6.1): the model state comes from replaying the app's earlier migrations,
 with foreign keys into other apps, the through tables of `ManyToManyField`, the `_like` indexes of
 `CharField` and names truncated with Django's hash. `RunSQL` contributes its own SQL and
-`SeparateDatabaseAndState` only its `database_operations`. Against squawk 2.71 on the real
-`sqlmigrate` output of the 23 `django.contrib` migrations: all 89 reports, by file, rule and count,
-none extra (`scripts/parity/django/`).
+`SeparateDatabaseAndState` only its `database_operations`. Engines built on
+django_zero_downtime_migrations (like sentry's) are recognized, along with what their schema editor
+adds. Against squawk 2.71 on the real `sqlmigrate` output, by file, rule and count, none extra: all
+89 reports of `django.contrib`, 4,296 of saleor, 1,016 of zulip, 1,315 of wagtail and 5,544 of
+sentry (`scripts/parity/django/`). What no repo uses (comments, collations, `contrib.postgres`,
+moving to `BigAutoField`, M2M fields changing their target) is measured on synthetic cases
+(`scripts/parity/django/casos`) against a reference that applies each migration, so what Django
+resolves by looking at the database comes out too. An `AlterField` on a foreign key follows
+`sqlmigrate`: it does not drop and rebuild the constraint the way a real `migrate` does. Third-party
+apps (`auth`, `contenttypes`) are not seen: they are not in the repo.
+
+For Rails, kerbo walks the `change` (or `up`) of the class inheriting from `Migration` with
+tree-sitter-ruby and builds the SQL ActiveRecord 8 sends to Postgres, replaying the schema left by
+the earlier migrations of the same directory. The reference is squawk 2.71 on the SQL ActiveRecord
+really sends when applying the migrations in order on an empty Postgres (`scripts/parity/rails/`):
+maybe 849 of 849, chatwoot 1,016 of 1,016, mastodon 1,763 of 1,763, forem 3,556 of 3,556 and
+discourse 5,923 of 5,938, none extra. What discourse is missing depends on database data or
+application classes; migrations calling the app's models or settings are left out because the
+reference does not have them.
 
 **Dockerfile.** `Dockerfile`, `Containerfile`, `Dockerfile.*` and `*.Dockerfile`, against
 [hadolint](https://github.com/hadolint/hadolint): every DL rule hadolint ships turned on (59),
