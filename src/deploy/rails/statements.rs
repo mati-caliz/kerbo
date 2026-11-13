@@ -68,7 +68,7 @@ pub fn statement(method: &str, table: &str, arguments: &Arguments<'_>, source: &
         "add_timestamps" => vec![add_timestamps(table, arguments, source)],
         "remove_timestamps" => vec![remove_columns(
             table,
-            &[CREATED_AT.to_owned(), UPDATED_AT.to_owned()],
+            &[UPDATED_AT.to_owned(), CREATED_AT.to_owned()],
         )],
         "drop_table" => vec![drop_table(table, arguments, source)],
         "enable_extension" => vec![format!("CREATE EXTENSION IF NOT EXISTS {}", quote(table))],

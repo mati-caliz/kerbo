@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use super::arguments::{self, Arguments, name, names};
 use super::ddl::singularize;
 use super::schema::Schema;
+use super::schema_table::IndexQuery;
 use crate::syntax::named_children;
 
 pub const CONDITIONALS: &[&str] = &["if", "unless", "elsif", "if_modifier", "unless_modifier"];
@@ -21,6 +22,7 @@ const INDEX_NAME_EXISTS: &str = "index_name_exists?";
 const FOREIGN_KEY_EXISTS: &str = "foreign_key_exists?";
 const NAME: &str = "name";
 const COLUMN: &str = "column";
+const UNIQUE: &str = "unique";
 const ID_SUFFIX: &str = "_id";
 
 struct Guard<'context> {
@@ -92,7 +94,11 @@ impl Guard<'_> {
         }
         if method == INDEX_NAME_EXISTS {
             let index = parsed.name_at(1, self.source)?;
-            return self.schema.index_exists(&table, &[], Some(&index));
+            let query = IndexQuery {
+                name: Some(&index),
+                ..IndexQuery::default()
+            };
+            return self.schema.index_exists(&table, &query);
         }
         let named = parsed.keyword_name(NAME, self.source);
         if method == INDEX_EXISTS {
@@ -104,7 +110,12 @@ impl Guard<'_> {
             if columns.is_empty() && parsed.positional.len() > 1 {
                 return None;
             }
-            return self.schema.index_exists(&table, &columns, named.as_deref());
+            let query = IndexQuery {
+                columns: &columns,
+                name: named.as_deref(),
+                unique: parsed.has(UNIQUE).then(|| parsed.is_true(UNIQUE)),
+            };
+            return self.schema.index_exists(&table, &query);
         }
         if method != FOREIGN_KEY_EXISTS {
             return None;

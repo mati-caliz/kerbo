@@ -4,7 +4,9 @@
 # modelos, helpers de la aplicación o gemas que no están) se deshace y queda anotada en errores.txt.
 # DB emula la conexión de mini_sql que usa discourse, y los droppers y helpers de lib/migration se cargan
 # del repo (el sitio cuenta como existente). Las constantes enteras de los modelos se leen de app/models o lib.
+# `t.vector` es la columna de pgvector que agrega la gema neighbor.
 require "active_record"
+require "active_record/connection_adapters/postgresql_adapter"
 require "fileutils"
 
 MIGRATIONS = Dir["/repo/db/migrate/*.rb"].sort
@@ -123,6 +125,26 @@ if File.directory?(File.join(APPLICATION_LIBRARY, "migration"))
   Migration::Helpers.define_singleton_method(:site_created_at) { EXISTING_SITE_CREATION } if defined?(Migration::Helpers)
 end
 
+module VectorColumns
+  def vector(*names, **options)
+    names.each { |name| column(name, :vector, **options) }
+  end
+end
+
+ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition.include(VectorColumns)
+ActiveRecord::ConnectionAdapters::PostgreSQL::Table.include(VectorColumns)
+
+module VectorTypes
+  VECTOR = "vector"
+
+  def type_to_sql(type, limit: nil, **options)
+    return super unless type.to_s == VECTOR
+
+    limit ? "#{VECTOR}(#{limit})" : VECTOR
+  end
+end
+
+ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.prepend(VectorTypes)
 Rails = Anything.new
 ActiveRecord::Migration.include(ApplicationHelpers)
 ActiveRecord::Migration.singleton_class.prepend(ApplicationModels)

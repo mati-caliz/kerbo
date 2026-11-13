@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::ddl::{index_name, quote};
-use super::schema_table::{Index, PrimaryKey, TABLE_CONSTRAINTS, Table, rename_index};
+use super::schema_table::{Index, IndexQuery, PrimaryKey, TABLE_CONSTRAINTS, Table, rename_index};
 use super::sql_tokens::{Cursor, Token, statements};
 
 const PRIMARY_KEY_SUFFIX: &str = "_pkey";
@@ -67,11 +67,9 @@ impl Schema {
         }
     }
 
-    pub fn index_exists(&self, table: &str, columns: &[String], name: Option<&str>) -> Option<bool> {
+    pub fn index_exists(&self, table: &str, query: &IndexQuery<'_>) -> Option<bool> {
         self.check(table, |found| {
-            found.indexes.iter().any(|index| {
-                name.is_none_or(|name| index.name == name) && (columns.is_empty() || index.columns == columns)
-            })
+            found.indexes.iter().any(|index| query.matches(index))
         })
     }
 
@@ -153,9 +151,9 @@ impl Schema {
     }
 
     fn create(&mut self, cursor: &mut Cursor<'_>) {
-        cursor.keyword("unique");
+        let unique = cursor.keyword("unique");
         if cursor.keyword("index") {
-            self.create_index(cursor);
+            self.create_index(cursor, unique);
             return;
         }
         cursor.skip_until_keyword("table");
@@ -164,7 +162,7 @@ impl Schema {
         }
     }
 
-    fn create_index(&mut self, cursor: &mut Cursor<'_>) {
+    fn create_index(&mut self, cursor: &mut Cursor<'_>, unique: bool) {
         cursor.keyword("concurrently");
         cursor.keywords(&["if", "not", "exists"]);
         let Some(name) = cursor.identifier().filter(|name| name != "on") else {
@@ -182,7 +180,11 @@ impl Schema {
             .collect();
         let indexes = &mut self.tables.entry(table).or_default().indexes;
         indexes.retain(|index| index.name != name);
-        indexes.push(Index { name, columns });
+        indexes.push(Index {
+            name,
+            columns,
+            unique,
+        });
     }
 
     fn create_table(&mut self, cursor: &mut Cursor<'_>) {

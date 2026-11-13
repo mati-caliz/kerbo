@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Deja una carpeta de corpus copiada en un volumen de Docker y escribe el nombre del volumen. En
 # Windows, leer miles de archivos desde una carpeta montada es lo más lento de Docker Desktop; desde
-# un volumen, no. La copia se rehace sólo si cambió el commit de algún repo de la carpeta. Dos
+# un volumen, no. La copia se rehace sólo si cambió el commit de algún repo de la carpeta, o el
+# contenido de las que no son repos (los casos sintéticos de scripts/parity/casos.sh). Dos
 # sesiones a la vez se turnan con una carpeta de lock al lado del corpus: si copiaran juntas, el
 # borrado de una se come lo que copia la otra. Cada carril (carpeta `kerbo-<carril>`) usa su propio
 # volumen, `<nombre>-<carril>` (`principal` para la carpeta `kerbo`): si compartieran uno, la copia de un carril lo vaciaba en medio de la
@@ -26,7 +27,10 @@ until mkdir "$lock" 2>/dev/null; do
   sleep "$LOCK_POLL_SECONDS"
 done
 trap 'rmdir "$lock" 2>/dev/null || true' EXIT
-key="$(for repo in "$folder"/*/; do git -C "$repo" rev-parse HEAD 2>/dev/null || basename "$repo"; done |
+contents() { (cd "$1" && find . -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum); }
+key="$(for repo in "$folder"/*/; do
+  if [ -e "${repo}.git" ]; then git -C "$repo" rev-parse HEAD; else contents "$repo"; fi
+done |
   sha256sum | cut -c1-16)"
 stored="$(MSYS_NO_PATHCONV=1 docker run --rm -v "$volume:/to" "$HELPER_IMAGE" cat /to/.clave 2>/dev/null || true)"
 if [ "$stored" != "$key" ]; then

@@ -102,7 +102,10 @@ fn unrolls_hashes_of_dropped_columns_into_the_dropper_statements() {
         "    Migration::ColumnDropper.mark_readonly(:posts, :reply_id)\n",
         "    Migration::TableDropper.read_only_table(\"archived\")\n",
         "    DB.exec(\"DROP INDEX IF EXISTS index_posts_on_raw\")\n",
-        "    DB.exec(\"DELETE FROM posts WHERE id = :id\", id: 1)",
+        "    DB.exec(\"DELETE FROM posts WHERE id = :id AND raw = :raw::text\", id: 1_000, raw: \"it's\")\n",
+        "    DB.exec(\"UPDATE posts SET hidden = ? WHERE topic_id = ? AND note = '\\\\?'\", true, nil)\n",
+        "    DB.exec(\"DELETE FROM topics WHERE id = :missing\", id: 1)\n",
+        "    DB.exec(\"DELETE FROM tags WHERE id = ?\", tag.id)",
     ));
     for expected in [
         "DROP FUNCTION IF EXISTS discourse_functions.raise_posts_avg_time_readonly() CASCADE",
@@ -115,7 +118,16 @@ fn unrolls_hashes_of_dropped_columns_into_the_dropper_statements() {
     ] {
         assert!(sql.contains(expected), "falta {expected} en:\n{sql}");
     }
-    assert!(!sql.contains("DELETE FROM posts"), "{sql}");
+    assert!(
+        sql.contains("DELETE FROM posts WHERE id = 1000 AND raw = 'it''s'::text"),
+        "{sql}"
+    );
+    assert!(
+        sql.contains("UPDATE posts SET hidden = TRUE WHERE topic_id = NULL AND note = '?'"),
+        "{sql}"
+    );
+    assert!(!sql.contains("DELETE FROM topics"), "{sql}");
+    assert!(!sql.contains("DELETE FROM tags"), "{sql}");
 }
 
 #[test]

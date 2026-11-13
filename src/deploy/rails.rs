@@ -1,4 +1,6 @@
 mod arguments;
+mod bindings;
+mod change_table;
 mod columns;
 mod ddl;
 mod droppers;
@@ -58,6 +60,7 @@ const MINI_SQL_CONNECTION: &str = "DB";
 const MINI_SQL_EXECUTE: &str = "exec";
 const CREATE_TABLE: &str = "create_table";
 const CHANGE_TABLE: &str = "change_table";
+const BULK: &str = "bulk";
 const IF_EXISTS: &str = "if_exists";
 const REMOVE_INDEX: &str = "remove_index";
 const INDEX_NAME: &str = "name";
@@ -236,7 +239,7 @@ impl<'tree> Walker<'tree, '_> {
         }
         let list = call.child_by_field_name("arguments");
         if method == EXECUTE {
-            self.execute(list);
+            self.execute(list, false);
             return;
         }
         let parsed = Arguments::parse(list, self.source).with_compatibility(self.compatibility);
@@ -270,8 +273,10 @@ impl<'tree> Walker<'tree, '_> {
         let list = call.child_by_field_name("arguments");
         if RECEIVER_BLOCKS.contains(&method) {
             self.walk_block(call);
-        } else if method == EXECUTE || is_mini_sql_execution(receiver, method, list) {
-            self.execute(list);
+        } else if method == EXECUTE {
+            self.execute(list, false);
+        } else if receiver == MINI_SQL_CONNECTION && method == MINI_SQL_EXECUTE {
+            self.execute(list, true);
         } else if let Some(statements) = droppers::statements(receiver, method, list, self.source) {
             let origin = self.call_origin(call);
             for statement in statements {
@@ -293,7 +298,14 @@ impl<'tree> Walker<'tree, '_> {
         let block = call.child_by_field_name("block");
         match method {
             CREATE_TABLE => tables::create_table(&table, &shifted, block, self.source),
-            CHANGE_TABLE => tables::change_table(&table, block, self.compatibility, self.source),
+            CHANGE_TABLE => {
+                let change = change_table::ChangeTable {
+                    block,
+                    compatibility: self.compatibility,
+                    bulk: shifted.is_true(BULK),
+                };
+                change_table::change_table(&table, &change, self.source)
+            }
             CREATE_JOIN_TABLE => tables::create_join_table(&table, &shifted, block, self.source),
             REMOVE_INDEX => self.remove_index(&table, &shifted),
             _ => statements::statement(method, &table, &shifted, self.source).unwrap_or_default(),
@@ -311,10 +323,12 @@ impl<'tree> Walker<'tree, '_> {
         )]
     }
 
-    fn execute(&mut self, list: Option<Node<'tree>>) {
-        let Some(argument) = list.and_then(|list| named_children(list).into_iter().next()) else {
+    fn execute(&mut self, list: Option<Node<'tree>>, binds_parameters: bool) {
+        let mut given = list.map(named_children).unwrap_or_default().into_iter();
+        let Some(argument) = given.next() else {
             return;
         };
+        let parameters: Vec<_> = given.collect();
         let (sql, start) = if let Some(body) = heredoc_body(argument) {
             (heredoc_text(body, self.source), body)
         } else if let Some((sql, body)) = self.filtered_heredoc(argument) {
@@ -329,6 +343,14 @@ impl<'tree> Walker<'tree, '_> {
             )
         } else {
             return;
+        };
+        let sql = if binds_parameters {
+            let Some(sql) = bindings::bound(&sql, &parameters, self.source) else {
+                return;
+            };
+            sql
+        } else {
+            sql
         };
         let sql = sql.trim_end().trim_end_matches(';');
         self.schema.apply(sql);
@@ -356,12 +378,6 @@ impl<'tree> Walker<'tree, '_> {
         }
         Some((sql, body))
     }
-}
-
-fn is_mini_sql_execution(receiver: &str, method: &str, list: Option<Node<'_>>) -> bool {
-    receiver == MINI_SQL_CONNECTION
-        && method == MINI_SQL_EXECUTE
-        && list.is_some_and(|list| list.named_child_count() == 1)
 }
 
 #[cfg(test)]

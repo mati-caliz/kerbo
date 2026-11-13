@@ -166,7 +166,7 @@ fn renders_change_table_operations() {
         "DROP INDEX \"index_users_on_handle\"",
         "\"team_id\" bigint",
         "CHECK (age > 0)",
-        "DROP COLUMN \"created_at\", DROP COLUMN \"updated_at\"",
+        "DROP COLUMN \"updated_at\", DROP COLUMN \"created_at\"",
     ] {
         assert!(sql.contains(expected), "falta {expected} en:\n{sql}");
     }
@@ -283,4 +283,30 @@ fn renders_integer_primary_key_columns_as_serial() {
         added.contains("ADD \"id\" serial NOT NULL PRIMARY KEY;"),
         "{added}"
     );
+}
+
+#[test]
+fn combines_column_changes_of_bulk_change_tables() {
+    let sql = migration(concat!(
+        "    change_table :accounts, bulk: true do |t|\n",
+        "      t.string :nick, null: false, default: \"\"\n",
+        "      t.remove :legacy\n",
+        "      t.change :age, :bigint\n",
+        "      t.change_default :name, from: nil, to: \"anonymous\"\n",
+        "      t.change_null :name, false\n",
+        "      t.index :nick\n",
+        "      t.timestamps null: true\n",
+        "      t.rename :name, :full_name\n",
+        "      t.remove_timestamps\n",
+        "    end",
+    ));
+    for expected in [
+        "ALTER TABLE \"accounts\" ADD \"nick\" character varying DEFAULT '' NOT NULL, DROP COLUMN \"legacy\", ALTER COLUMN \"age\" TYPE bigint, ALTER COLUMN \"name\" SET DEFAULT 'anonymous';",
+        "ALTER TABLE \"accounts\" ALTER COLUMN \"name\" SET NOT NULL;",
+        "ALTER TABLE \"accounts\" ADD \"created_at\" timestamp(6), ADD \"updated_at\" timestamp(6);",
+        "RENAME COLUMN \"name\" TO \"full_name\";",
+        "ALTER TABLE \"accounts\" DROP COLUMN \"updated_at\", DROP COLUMN \"created_at\";",
+    ] {
+        assert!(sql.contains(expected), "falta {expected} en:\n{sql}");
+    }
 }

@@ -5,9 +5,6 @@ use super::columns::{Column, column, default};
 use super::ddl::{ForeignKey, check_name, create_index, quote, singularize};
 use super::migration::Compatibility;
 use super::references::{column_index, reference};
-use super::statements::{
-    add_reference, add_timestamps, change_column, remove_columns, remove_index, rename_column,
-};
 use crate::syntax::named_children;
 
 const ID: &str = "id";
@@ -35,11 +32,6 @@ const REFERENCES: &[&str] = &["references", "belongs_to"];
 const INDEX: &str = "index";
 const FOREIGN_KEY: &str = "foreign_key";
 const CHECK_CONSTRAINT: &str = "check_constraint";
-const REMOVE: &str = "remove";
-const RENAME: &str = "rename";
-const CHANGE: &str = "change";
-const REMOVE_INDEX: &str = "remove_index";
-const REMOVE_TIMESTAMPS: &str = "remove_timestamps";
 const RECEIVER: &str = "receiver";
 const METHOD: &str = "method";
 const ARGUMENTS: &str = "arguments";
@@ -263,14 +255,14 @@ fn create_table_with(
     statements
 }
 
-fn indexes_for(table: &str, added: &[Column], options: &Arguments<'_>, source: &[u8]) -> Vec<String> {
+pub fn indexes_for(table: &str, added: &[Column], options: &Arguments<'_>, source: &[u8]) -> Vec<String> {
     added
         .iter()
         .filter_map(|column| column_index(table, std::slice::from_ref(&column.name), options, source))
         .collect()
 }
 
-fn reference_names(arguments: &Arguments<'_>, source: &[u8]) -> Vec<String> {
+pub fn reference_names(arguments: &Arguments<'_>, source: &[u8]) -> Vec<String> {
     arguments
         .positional
         .iter()
@@ -296,55 +288,4 @@ pub fn check_constraint(table: &str, arguments: &Arguments<'_>, source: &[u8]) -
         .keyword_name(NAME, source)
         .unwrap_or_else(|| check_name(table, &expression));
     Some(format!("CONSTRAINT {name} CHECK ({expression})"))
-}
-
-pub fn change_table(
-    table: &str,
-    block: Option<Node<'_>>,
-    compatibility: Compatibility,
-    source: &[u8],
-) -> Vec<String> {
-    let table = table.to_owned();
-    let alter = format!("ALTER TABLE {}", quote(&table));
-    let mut statements = Vec::new();
-    for call in block_calls(block, compatibility, source) {
-        let method = call.method.as_str();
-        let options = &call.arguments;
-        match method {
-            TIMESTAMPS => statements.push(add_timestamps(&table, options, source)),
-            REMOVE_TIMESTAMPS => statements.push(remove_columns(
-                &table,
-                &[CREATED_AT.to_owned(), UPDATED_AT.to_owned()],
-            )),
-            REMOVE => statements.push(remove_columns(&table, &reference_names(options, source))),
-            RENAME => statements.extend(rename_column(&table, options, source)),
-            CHANGE => statements.extend(change_column(&table, options, source)),
-            REMOVE_INDEX => statements.push(remove_index(&table, options, source)),
-            INDEX => statements.extend(
-                options
-                    .positional
-                    .first()
-                    .map(|columns| create_index(&table, *columns, options, source)),
-            ),
-            CHECK_CONSTRAINT => statements.extend(
-                check_constraint(&table, options, source)
-                    .map(|constraint| format!("{alter} ADD {constraint}")),
-            ),
-            _ if REFERENCES.contains(&method) => {
-                for name in reference_names(options, source) {
-                    statements.extend(add_reference(&table, &name, options, source));
-                }
-            }
-            _ => {
-                let added = columns(method, options, source);
-                statements.extend(
-                    added
-                        .iter()
-                        .map(|column| format!("{alter} ADD {}", column.render())),
-                );
-                statements.extend(indexes_for(&table, &added, options, source));
-            }
-        }
-    }
-    statements
 }

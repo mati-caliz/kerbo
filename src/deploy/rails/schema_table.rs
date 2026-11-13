@@ -19,6 +19,22 @@ pub fn rename_index(from: &str, to: &str) -> String {
 pub struct Index {
     pub name: String,
     pub columns: Vec<String>,
+    pub unique: bool,
+}
+
+#[derive(Debug, Default)]
+pub struct IndexQuery<'query> {
+    pub columns: &'query [String],
+    pub name: Option<&'query str>,
+    pub unique: Option<bool>,
+}
+
+impl IndexQuery<'_> {
+    pub fn matches(&self, index: &Index) -> bool {
+        self.name.is_none_or(|name| index.name == name)
+            && (self.columns.is_empty() || index.columns == self.columns)
+            && self.unique.is_none_or(|unique| index.unique == unique)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -111,7 +127,11 @@ impl Table {
                 .into_iter()
                 .filter_map(Cursor::single_identifier)
                 .collect();
-            self.indexes.push(Index { name, columns });
+            self.indexes.push(Index {
+                name,
+                columns,
+                unique: true,
+            });
         }
     }
 

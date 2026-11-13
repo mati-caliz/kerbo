@@ -227,3 +227,20 @@ fn columns_of_tables_without_a_definition_stay_unknown() {
     assert_eq!(schema.column_exists("items", "name"), None);
     assert_eq!(schema.column_exists("copies", "name"), None);
 }
+
+#[test]
+fn compares_uniqueness_and_ignores_the_predicate_in_index_guards() {
+    let sql = complete(concat!(
+        "    create_table :posts, id: :bigserial\n",
+        "    add_index :posts, :a, unique: true\n",
+        "    add_index :posts, :b\n",
+        "    remove_index :posts, :a if index_exists?(:posts, :a, unique: false)\n",
+        "    remove_index :posts, :b if index_exists?(:posts, :b, unique: false)\n",
+        "    add_index :posts, :c unless index_exists?(:posts, :c, where: \"c > 0\")\n",
+        "    add_index :posts, :a, name: \"partial_a\" unless index_exists?(:posts, :a, where: \"a > 0\")",
+    ));
+    assert!(!sql.contains("DROP INDEX \"index_posts_on_a\""), "{sql}");
+    assert!(sql.contains("DROP INDEX \"index_posts_on_b\""), "{sql}");
+    assert!(sql.contains("\"index_posts_on_c\""), "{sql}");
+    assert!(!sql.contains("\"partial_a\""), "{sql}");
+}
