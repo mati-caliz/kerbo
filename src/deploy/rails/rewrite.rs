@@ -5,10 +5,13 @@ use tree_sitter::{Node, Parser, Tree};
 use super::arguments::{name, raw};
 use super::{locals, loops};
 use crate::language::Language;
+use crate::syntax::named_children;
 
 const INTEGER: &str = "integer";
 const SYMBOL_KINDS: &[&str] = &["simple_symbol", "delimited_symbol", "bare_symbol"];
 const UNSAFE_CHARACTERS: &[char] = &['"', '\\', '#', '\n'];
+const LIST_KINDS: &[(&str, &str)] = &[("string_array", "%w"), ("symbol_array", "%i")];
+const LIST_SEPARATOR: &str = " ";
 const NEWLINE: u8 = b'\n';
 
 pub struct Expansion {
@@ -34,6 +37,7 @@ impl Expansion {
 pub struct Value {
     pub literal: String,
     pub text: String,
+    pub interpolable: bool,
 }
 
 impl Value {
@@ -74,7 +78,25 @@ pub fn value(node: Node<'_>, source: &[u8]) -> Option<Value> {
         kind if SYMBOL_KINDS.contains(&kind) => format!(":\"{text}\""),
         _ => format!("\"{text}\""),
     };
-    Some(Value { literal, text })
+    Some(Value {
+        literal,
+        text,
+        interpolable: true,
+    })
+}
+
+pub fn list_value(node: Node<'_>, source: &[u8]) -> Option<Value> {
+    let (_, prefix) = LIST_KINDS.iter().find(|(kind, _)| *kind == node.kind())?;
+    let elements = named_children(node)
+        .into_iter()
+        .map(|element| name(element, source).filter(|text| !text.contains(UNSAFE_CHARACTERS)))
+        .collect::<Option<Vec<_>>>()?;
+    let literal = format!("{prefix}[{}]", elements.join(LIST_SEPARATOR));
+    Some(Value {
+        text: literal.clone(),
+        literal,
+        interpolable: false,
+    })
 }
 
 pub struct Emitter<'source> {

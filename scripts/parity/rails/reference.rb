@@ -2,6 +2,7 @@
 # un Postgres vacío, sólo con ActiveRecord (sin la aplicación), y guarda el SQL que manda cada una en
 # /out/<migración>.sql, con BEGIN y COMMIT si corre en una transacción. Una migración que falla (usa
 # modelos, helpers de la aplicación o gemas que no están) se deshace y queda anotada en errores.txt.
+# DB emula la conexión de mini_sql que usa discourse, y los droppers de lib/migration se cargan del repo.
 require "active_record"
 require "fileutils"
 
@@ -39,6 +40,65 @@ module ApplicationModels
     model.abstract_class = name == :ApplicationRecord
     Object.const_set(name, model)
   end
+end
+
+class Row
+  def initialize(columns)
+    @columns = columns
+  end
+
+  def method_missing(name, *)
+    @columns.fetch(name.to_s) { super }
+  end
+
+  def respond_to_missing?(name, *)
+    @columns.key?(name.to_s) || super
+  end
+end
+
+module DB
+  def self.sql_fragment(sql, *params)
+    params.empty? ? sql : ActiveRecord::Base.sanitize_sql_array([sql, *params])
+  end
+
+  def self.result(sql, params)
+    ActiveRecord::Base.connection.execute(sql_fragment(sql, *params))
+  end
+
+  def self.exec(sql, *params)
+    result(sql, params).cmd_tuples
+  end
+
+  def self.query(sql, *params)
+    result(sql, params).map { |columns| Row.new(columns) }
+  end
+
+  def self.query_single(sql, *params)
+    result(sql, params).values.flatten
+  end
+
+  def self.query_hash(sql, *params)
+    result(sql, params).to_a
+  end
+
+  def self.query_array(sql, *params)
+    result(sql, params).values
+  end
+end
+
+module Migration
+  module SafeMigrate
+    def self.enable!; end
+
+    def self.disable!; end
+  end
+end
+
+APPLICATION_LIBRARY = "/repo/lib"
+DROPPERS = %w[migration/column_dropper migration/table_dropper].freeze
+if File.directory?(File.join(APPLICATION_LIBRARY, "migration"))
+  $LOAD_PATH.unshift(APPLICATION_LIBRARY)
+  DROPPERS.each { |dropper| require dropper if File.exist?(File.join(APPLICATION_LIBRARY, "#{dropper}.rb")) }
 end
 
 Rails = Anything.new

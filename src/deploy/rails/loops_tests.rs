@@ -92,3 +92,37 @@ fn maps_unrolled_lines_to_the_original_rows() {
     assert_eq!(row_of("remove_column"), vec![Some(3), Some(3)]);
     assert_eq!(row_of("drop_table"), vec![Some(5)]);
 }
+
+#[test]
+fn unrolls_hashes_of_dropped_columns_into_the_dropper_statements() {
+    let sql = render(concat!(
+        "    DROPPED = { posts: %i[\n      avg_time\n      image_url\n    ], tags: %i[topic_count] }\n",
+        "    DROPPED.each { |table, columns| Migration::ColumnDropper.execute_drop(table, columns) }\n",
+        "    %i[old_posts].each { |table| Migration::TableDropper.execute_drop(table) }\n",
+        "    Migration::ColumnDropper.mark_readonly(:posts, :reply_id)\n",
+        "    Migration::TableDropper.read_only_table(\"archived\")\n",
+        "    DB.exec(\"DROP INDEX IF EXISTS index_posts_on_raw\")\n",
+        "    DB.exec(\"DELETE FROM posts WHERE id = :id\", id: 1)",
+    ));
+    for expected in [
+        "DROP FUNCTION IF EXISTS discourse_functions.raise_posts_avg_time_readonly() CASCADE",
+        "DROP FUNCTION IF EXISTS raise_posts_image_url_readonly() CASCADE",
+        "ALTER TABLE tags DROP COLUMN IF EXISTS topic_count",
+        "DROP TABLE IF EXISTS old_posts",
+        "WHEN (NEW.reply_id IS NOT NULL)",
+        "CREATE TRIGGER archived_readonly",
+        "DROP INDEX IF EXISTS index_posts_on_raw",
+    ] {
+        assert!(sql.contains(expected), "falta {expected} en:\n{sql}");
+    }
+    assert!(!sql.contains("DELETE FROM posts"), "{sql}");
+}
+
+#[test]
+fn keeps_loops_that_interpolate_a_list() {
+    let source = wrapped(
+        "    { posts: %i[a b] }.each { |table, columns| execute \"SELECT #{columns} FROM #{table}\" }",
+    );
+    let tree = parse(&source).expect("el parser devuelve un árbol");
+    assert!(expand(tree.root_node(), source.as_bytes()).is_none());
+}

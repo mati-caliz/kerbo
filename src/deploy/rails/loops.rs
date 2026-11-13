@@ -3,7 +3,7 @@ use std::ops::Range;
 use tree_sitter::Node;
 
 use super::arguments::{heredoc_body, raw};
-use super::rewrite::{Emitter, Expansion, Value, parse, value};
+use super::rewrite::{Emitter, Expansion, Value, list_value, parse, value};
 use crate::syntax::{descendants, named_children};
 
 const CALL: &str = "call";
@@ -11,6 +11,8 @@ const EACH: &str = "each";
 const FREEZE: &str = "freeze";
 const ARRAY: &str = "array";
 const ARRAY_KINDS: &[&str] = &[ARRAY, "string_array", "symbol_array"];
+const HASH: &str = "hash";
+const PAIR: &str = "pair";
 const COMMENT: &str = "comment";
 const ASSIGNMENT: &str = "assignment";
 const CONSTANT: &str = "constant";
@@ -101,6 +103,17 @@ fn unrolled(node: Node<'_>, root: Node<'_>, source: &[u8]) -> Option<Unrolled> {
         .map(|element| bindings(element, names.len(), source))
         .collect::<Option<Vec<_>>>()?;
     let occurrences = occurrences(root, &body, &names, source)?;
+    let interpolates_a_list = occurrences.iter().any(|occurrence| {
+        occurrence.interpolated
+            && iterations.iter().any(|values| {
+                values
+                    .get(occurrence.parameter)
+                    .is_some_and(|value| !value.interpolable)
+            })
+    });
+    if interpolates_a_list {
+        return None;
+    }
     Some(Unrolled {
         range: node.start_byte()..node.end_byte(),
         body,
@@ -114,7 +127,7 @@ fn elements<'tree>(receiver: Node<'tree>, root: Node<'tree>, source: &[u8]) -> O
         CONSTANT => constant_value(root, &raw(receiver, source), source)?,
         _ => without_freeze(receiver, source),
     };
-    if !ARRAY_KINDS.contains(&list.kind()) {
+    if !(ARRAY_KINDS.contains(&list.kind()) || list.kind() == HASH) {
         return None;
     }
     let elements: Vec<_> = named_children(list)
@@ -152,15 +165,24 @@ fn bindings(element: Node<'_>, parameters: usize, source: &[u8]) -> Option<Vec<V
     if parameters == 1 {
         return Some(vec![value(element, source)?]);
     }
-    let parts: Vec<_> = (element.kind() == ARRAY)
-        .then(|| named_children(element))?
-        .into_iter()
-        .filter(|part| part.kind() != COMMENT)
-        .collect();
+    let parts: Vec<_> = match element.kind() {
+        ARRAY => named_children(element),
+        PAIR => vec![
+            element.child_by_field_name("key")?,
+            element.child_by_field_name("value")?,
+        ],
+        _ => return None,
+    }
+    .into_iter()
+    .filter(|part| part.kind() != COMMENT)
+    .collect();
     if parts.len() != parameters {
         return None;
     }
-    parts.into_iter().map(|part| value(part, source)).collect()
+    parts
+        .into_iter()
+        .map(|part| value(part, source).or_else(|| list_value(part, source)))
+        .collect()
 }
 
 enum Visit {

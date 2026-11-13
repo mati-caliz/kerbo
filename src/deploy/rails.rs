@@ -1,6 +1,7 @@
 mod arguments;
 mod columns;
 mod ddl;
+mod droppers;
 mod guards;
 mod history;
 mod locals;
@@ -53,6 +54,8 @@ const HEREDOC_FILTERS: &[&str] = &[SQUISH, "strip_heredoc"];
 const CREATE_JOIN_TABLE: &str = "create_join_table";
 const DOWN_DIRECTION: &str = "down";
 const EXECUTE: &str = "execute";
+const MINI_SQL_CONNECTION: &str = "DB";
+const MINI_SQL_EXECUTE: &str = "exec";
 const CREATE_TABLE: &str = "create_table";
 const CHANGE_TABLE: &str = "change_table";
 const IF_EXISTS: &str = "if_exists";
@@ -216,12 +219,8 @@ impl<'tree> Walker<'tree, '_> {
         else {
             return;
         };
-        if call.child_by_field_name("receiver").is_some() {
-            if RECEIVER_BLOCKS.contains(&method.as_str()) {
-                self.walk_block(call);
-            } else if method == EXECUTE {
-                self.execute(call.child_by_field_name("arguments"));
-            }
+        if let Some(receiver) = call.child_by_field_name("receiver") {
+            self.receiver_call(call, &arguments::raw(receiver, self.source), &method);
             return;
         }
         if method == DOWN_DIRECTION {
@@ -241,10 +240,7 @@ impl<'tree> Walker<'tree, '_> {
             return;
         }
         let parsed = Arguments::parse(list, self.source).with_compatibility(self.compatibility);
-        let origin = Origin::Call {
-            line: self.original_line(call.start_position().row),
-            column: one_based(call.start_position().column),
-        };
+        let origin = self.call_origin(call);
         let table = parsed
             .positional
             .first()
@@ -259,6 +255,28 @@ impl<'tree> Walker<'tree, '_> {
             self.script.push(&statement, origin);
             for follow_up in follow_ups {
                 self.script.push(&follow_up, origin);
+            }
+        }
+    }
+
+    fn call_origin(&self, call: Node<'tree>) -> Origin {
+        Origin::Call {
+            line: self.original_line(call.start_position().row),
+            column: one_based(call.start_position().column),
+        }
+    }
+
+    fn receiver_call(&mut self, call: Node<'tree>, receiver: &str, method: &str) {
+        let list = call.child_by_field_name("arguments");
+        if RECEIVER_BLOCKS.contains(&method) {
+            self.walk_block(call);
+        } else if method == EXECUTE || is_mini_sql_execution(receiver, method, list) {
+            self.execute(list);
+        } else if let Some(statements) = droppers::statements(receiver, method, list, self.source) {
+            let origin = self.call_origin(call);
+            for statement in statements {
+                self.schema.apply(&statement);
+                self.script.push(&statement, origin);
             }
         }
     }
@@ -338,6 +356,12 @@ impl<'tree> Walker<'tree, '_> {
         }
         Some((sql, body))
     }
+}
+
+fn is_mini_sql_execution(receiver: &str, method: &str, list: Option<Node<'_>>) -> bool {
+    receiver == MINI_SQL_CONNECTION
+        && method == MINI_SQL_EXECUTE
+        && list.is_some_and(|list| list.named_child_count() == 1)
 }
 
 #[cfg(test)]
