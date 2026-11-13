@@ -82,6 +82,7 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
         writer.text(&field.type_name);
         writer.list(&field.annotations, |writer, name| writer.text(name));
         write_owner(writer, &field.owner);
+        write_flag(writer, field.is_nullable);
     });
     writer.list(&summary.identifiers, |writer, name| writer.text(name));
     writer.list(&summary.written_only, |writer, name| writer.text(name));
@@ -158,6 +159,7 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
                 type_name: reader.text()?,
                 annotations: reader.list(Reader::text)?,
                 owner: read_owner(reader)?,
+                is_nullable: read_flag(reader)?,
             })
         })?,
         identifiers: reader.list(Reader::text)?,

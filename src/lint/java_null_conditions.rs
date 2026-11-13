@@ -28,6 +28,7 @@ const FAILS_WHEN_FALSE: &[&str] = &[
 ];
 const EAGER_AND: &str = "&";
 const EAGER_OR: &str = "|";
+const ASSIGNMENT: &str = "assignment_expression";
 
 // Los estados si la condición da verdadero y si da falso.
 pub(super) fn branch_states(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) -> (State, State) {
@@ -115,8 +116,8 @@ fn binary_condition(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: Stat
         }
         EQUAL | NOT_EQUAL => {
             let tested = match (left.kind(), right.kind()) {
-                (_, NULL) => tracked_key(analysis, left),
-                (NULL, _) => tracked_key(analysis, right),
+                (_, NULL) => compared_key(analysis, left),
+                (NULL, _) => compared_key(analysis, right),
                 _ => None,
             };
             let after = analysis.expression(node, state);
@@ -137,6 +138,17 @@ fn binary_condition(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: Stat
         }
     }
 }
+// Lo que se compara contra null: en `(x = campo) != null` el chequeo vale para `x`.
+fn compared_key(analysis: &Analysis<'_, '_>, compared: Node<'_>) -> Option<String> {
+    let inner = without_cast(compared);
+    let target = if inner.kind() == ASSIGNMENT {
+        inner.child_by_field_name(LEFT_FIELD)?
+    } else {
+        inner
+    };
+    tracked_key(analysis, target)
+}
+
 fn guard_by_call(name: &str, tested: &str, when_true: &mut State, when_false: &mut State) {
     if TRUE_MEANS_PRESENT.contains(&name) {
         forget(when_true, tested);

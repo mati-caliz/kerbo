@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::java_null_flow::{Analysis, IDENTIFIER, NullFlow, NullOrigin, OBJECT_FIELD, State};
 use super::java_nullable_fields::nullable_field_keys;
+use crate::syntax::descendants;
 
 const FIELD_ACCESS: &str = "field_access";
 const THIS: &str = "this";
@@ -32,14 +33,20 @@ pub(super) fn join(first: Option<State>, second: Option<State>) -> Option<State>
     }
 }
 
-// El nombre con que el estado sigue a la expresión: una variable o `this.campo`.
+// El nombre con que el estado sigue a la expresión: una variable, `this.campo` o el campo de una
+// variable de tipo conocido (`segmento.tabla`).
 pub(super) fn tracked_key(analysis: &Analysis<'_, '_>, node: Node<'_>) -> Option<String> {
     match node.kind() {
         IDENTIFIER => Some(analysis.text(node).to_owned()),
         FIELD_ACCESS => {
             let object = node.child_by_field_name(OBJECT_FIELD)?;
             let field = node.child_by_field_name(FIELD_FIELD)?;
-            (object.kind() == THIS).then(|| format!("{THIS}.{}", analysis.text(field)))
+            match object.kind() {
+                THIS => Some(format!("{THIS}.{}", analysis.text(field))),
+                IDENTIFIER => qualified_owner(analysis, object)
+                    .map(|_| format!("{}.{}", analysis.text(object), analysis.text(field))),
+                _ => None,
+            }
         }
         _ => None,
     }
@@ -51,9 +58,19 @@ pub(super) fn spellings(analysis: &Analysis<'_, '_>, key: String) -> Vec<String>
     std::iter::once(key).chain(partner).collect()
 }
 
-// Al entrar al método, cada campo `@Nullable` que ve puede ser null.
+// El tipo con que se declara la variable que califica un campo.
+fn qualified_owner<'context>(
+    analysis: &Analysis<'_, 'context>,
+    object: Node<'_>,
+) -> Option<&'context String> {
+    analysis.variables.get(analysis.text(object))?.as_ref()
+}
+
+// Al entrar al método, cada campo `@Nullable` que ve puede ser null. Los campos de otras variables
+// (`segmento.tabla`) también: si su clase los declara `@Nullable` se sabe recién en el índice.
 pub(super) fn seed_nullable_fields(analysis: &mut Analysis<'_, '_>, method: Node<'_>) -> State {
     let mut state = State::new();
+    seed_qualified_fields(analysis, method, &mut state);
     for keys in nullable_field_keys(method, analysis.source) {
         if let [qualified, bare] = keys.as_slice() {
             analysis.partners.insert(qualified.clone(), bare.clone());
@@ -70,4 +87,38 @@ pub(super) fn seed_nullable_fields(analysis: &mut Analysis<'_, '_>, method: Node
         });
     }
     state
+}
+
+fn seed_qualified_fields(analysis: &mut Analysis<'_, '_>, method: Node<'_>, state: &mut State) {
+    for access in descendants(method)
+        .into_iter()
+        .filter(|node| node.kind() == FIELD_ACCESS)
+    {
+        let (Some(object), Some(field)) = (
+            access.child_by_field_name(OBJECT_FIELD),
+            access.child_by_field_name(FIELD_FIELD),
+        ) else {
+            continue;
+        };
+        if object.kind() != IDENTIFIER {
+            continue;
+        }
+        let Some(owner) = qualified_owner(analysis, object).cloned() else {
+            continue;
+        };
+        let key = format!("{}.{}", analysis.text(object), analysis.text(field));
+        if state.contains_key(&key) {
+            continue;
+        }
+        state.insert(key, analysis.flows.len());
+        analysis.flows.push(NullFlow {
+            origin: NullOrigin::QualifiedField {
+                owner,
+                field: analysis.text(field).to_owned(),
+            },
+            dereferences: Vec::new(),
+            arguments: Vec::new(),
+            passed_before: Vec::new(),
+        });
+    }
 }

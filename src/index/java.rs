@@ -20,6 +20,7 @@ use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_null_inference::{
     NullArgument, accepts_null, is_overridable, null_arguments_in, parameter_type_name, returns_null,
 };
+use crate::lint::java_nullable_fields::declares_nullable;
 use crate::lint::java_owner::{Owner, annotation_names};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
@@ -123,6 +124,7 @@ pub struct Field {
     pub type_name: String,
     pub annotations: Vec<String>,
     pub owner: Owner,
+    pub is_nullable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -211,9 +213,11 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
             .contract_calls
             .extend(contract_calls_in(top_level, &nodes, source));
         summary.constants.extend(declared_constants(&nodes, source));
-        summary
-            .fields
-            .extend(declared_fields(&nodes, source).into_iter().map(field_of));
+        summary.fields.extend(
+            declared_fields(&nodes, source)
+                .into_iter()
+                .map(|field| field_of(field, source)),
+        );
         summary.identifiers.extend(used_identifiers(&nodes, source));
         summary
             .written_only
@@ -345,8 +349,12 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
     }
 }
 
-fn field_of(field: DeclaredField<'_>) -> Field {
+fn field_of(field: DeclaredField<'_>, source: &[u8]) -> Field {
     Field {
+        is_nullable: field
+            .name_node
+            .parent()
+            .is_some_and(|declarator| declares_nullable(declarator, source)),
         name: field.name,
         position: position_of(field.name_node),
         visibility: field.visibility,

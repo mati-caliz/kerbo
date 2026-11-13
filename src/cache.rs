@@ -36,7 +36,7 @@ use crate::rules::RuleId;
 use crate::secrets::{PathProfile, SecretFinding};
 
 const FORMAT_DIRECTORY: &str = "analysis-v2";
-const FORMAT_VERSION: u64 = 70;
+const FORMAT_VERSION: u64 = 71;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisSubject<'subject> {

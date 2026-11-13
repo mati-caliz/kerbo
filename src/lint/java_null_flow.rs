@@ -90,11 +90,13 @@ pub struct NullFlow {
     pub passed_before: Vec<NullArgument>,
 }
 
-// De dónde puede venir el null: una llamada que puede devolverlo o un campo anotado `@Nullable`.
+// De dónde puede venir el null: una llamada que puede devolverlo, un campo anotado `@Nullable` o el
+// campo de otro objeto, con el tipo de ese objeto como está escrito.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NullOrigin {
     Call(Chain),
     NullableField,
+    QualifiedField { owner: String, field: String },
 }
 
 // Las variables que podrían ser null en un punto del método, con la asignación que lo causó.

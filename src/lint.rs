@@ -31,7 +31,7 @@ pub mod java_null_flow;
 pub mod java_null_inference;
 mod java_null_keys;
 mod java_null_uses;
-mod java_nullable_fields;
+pub mod java_nullable_fields;
 mod java_optional;
 mod java_order;
 pub mod java_owner;

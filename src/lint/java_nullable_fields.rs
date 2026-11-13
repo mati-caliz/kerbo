@@ -79,18 +79,25 @@ fn declared_fields(body: Node<'_>, source: &[u8]) -> Vec<(String, bool)> {
     named_children(body)
         .into_iter()
         .filter(|child| child.kind() == FIELD_DECLARATION)
-        .flat_map(|field| {
-            let nullable = is_nullable_field(field, source);
-            named_children(field)
-                .into_iter()
-                .filter(|child| child.kind() == VARIABLE_DECLARATOR)
-                .filter_map(move |declarator| {
-                    let name = declarator.child_by_field_name(NAME_FIELD)?;
-                    let whole_array = declarator.child_by_field_name(DIMENSIONS_FIELD).is_none();
-                    Some((text(name, source).to_owned(), nullable && whole_array))
-                })
+        .flat_map(named_children)
+        .filter(|child| child.kind() == VARIABLE_DECLARATOR)
+        .filter_map(|declarator| {
+            let name = declarator.child_by_field_name(NAME_FIELD)?;
+            Some((
+                text(name, source).to_owned(),
+                declares_nullable(declarator, source),
+            ))
         })
         .collect()
+}
+
+// Si la variable que declara un campo puede ser null: el campo es `@Nullable` y la variable no
+// agrega dimensiones (`@Nullable Object celdas[]` habla de los elementos).
+pub fn declares_nullable(declarator: Node<'_>, source: &[u8]) -> bool {
+    declarator.child_by_field_name(DIMENSIONS_FIELD).is_none()
+        && declarator
+            .parent()
+            .is_some_and(|field| is_nullable_field(field, source))
 }
 
 // Con anotaciones de tipo, `@Nullable Object[]` habla de los elementos: el arreglo es nulo sólo

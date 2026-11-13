@@ -13,6 +13,7 @@ const ORIGIN_CALL: u64 = 0;
 const ORIGIN_CONSTRUCTION: u64 = 1;
 const NULL_FROM_CALL: u64 = 0;
 const NULL_FROM_FIELD: u64 = 1;
+const NULL_FROM_QUALIFIED_FIELD: u64 = 2;
 
 pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
     match &chain.root {
@@ -95,6 +96,11 @@ pub(super) fn write_flow(writer: &mut Writer, flow: &NullFlow) {
             write_chain(writer, chain);
         }
         NullOrigin::NullableField => writer.number(NULL_FROM_FIELD),
+        NullOrigin::QualifiedField { owner, field } => {
+            writer.number(NULL_FROM_QUALIFIED_FIELD);
+            writer.text(owner);
+            writer.text(field);
+        }
     }
     writer.list(&flow.dereferences, |writer, used| {
         writer.text(&used.name);
@@ -110,6 +116,10 @@ pub(super) fn read_flow(reader: &mut Reader<'_>) -> Result<NullFlow, Corrupt> {
         origin: match reader.number()? {
             NULL_FROM_CALL => NullOrigin::Call(read_chain(reader)?),
             NULL_FROM_FIELD => NullOrigin::NullableField,
+            NULL_FROM_QUALIFIED_FIELD => NullOrigin::QualifiedField {
+                owner: reader.text()?,
+                field: reader.text()?,
+            },
             _ => return Err(Corrupt),
         },
         dereferences: reader.list(|reader| {

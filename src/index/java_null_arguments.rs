@@ -67,12 +67,31 @@ pub(super) fn reaches(
     let origin_may_be_null = match &flow.origin {
         NullOrigin::Call(chain) => may_return_null(types, library, summary, chain),
         NullOrigin::NullableField => true,
+        NullOrigin::QualifiedField { owner, field } => {
+            is_nullable_field(types, library, summary, (owner, field))
+        }
     };
     origin_may_be_null
         && flow
             .passed_before
             .iter()
             .all(|argument| non_null_parameter(types, library, summary, argument).is_none())
+}
+
+// Si el campo que declara la clase del proyecto (o una de arriba en el proyecto) es `@Nullable`.
+fn is_nullable_field(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    (owner, field): (&str, &str),
+) -> bool {
+    let Resolved::Project(owner) = resolve(types, library, summary, owner) else {
+        return false;
+    };
+    project_lineage(types, library, &owner)
+        .iter()
+        .find_map(|class| types.field_of(class, field))
+        .is_some_and(|(_, declared)| declared.is_nullable)
 }
 
 pub(super) fn non_null_parameter(

@@ -104,3 +104,51 @@ final class Guarded {
 fn a_guarded_nullable_field_is_not_reported() {
     assert_eq!(findings_in(GUARDED_FIELDS, "data-flow-issue"), ["12:16 tail()"]);
 }
+
+const QUALIFIED_FIELDS: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+
+final class Segment {
+    volatile @Nullable StringBuilder table;
+    @Nullable Object[] cells;
+    StringBuilder plain;
+}
+
+final class Reader {
+    int read(Segment segment) {
+        segment.plain.length();
+        segment.cells.clone();
+        return segment.table.length() + segment.table.length();
+    }
+
+    int copied(Segment segment) {
+        StringBuilder table = segment.table;
+        return table.length();
+    }
+
+    int checked(Segment segment) {
+        if (segment.table == null) {
+            return 0;
+        }
+        return segment.table.length();
+    }
+
+    void looped(Segment segment) {
+        StringBuilder table;
+        while ((table = segment.table) != null) {
+            table.setLength(0);
+        }
+    }
+}
+";
+
+// El campo `@Nullable` de otra clase del proyecto, leído desde una variable de ese tipo, se marca en
+// su primer uso sin chequeo, también copiado a una local; no si se chequea al asignarlo.
+#[test]
+fn a_nullable_field_of_another_object_is_reported() {
+    assert_eq!(
+        findings_in(QUALIFIED_FIELDS, "data-flow-issue"),
+        ["15:30 length()", "20:22 length()"]
+    );
+}
