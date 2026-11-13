@@ -201,3 +201,8 @@ uso = "migraciones de Rails contra squawk"
 url = "https://github.com/forem/forem.git"
 commit = "d9d366e2573bce951f6974fa84477fcbde3aebba"
 uso = "migraciones de Rails contra squawk"
+
+[repos.discourse]
+url = "https://github.com/discourse/discourse.git"
+commit = "bbf7ae277c0ea932887bf64ca6e0383d0c8ce088"
+uso = "migraciones de Rails contra squawk"

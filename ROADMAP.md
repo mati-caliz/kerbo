@@ -1715,12 +1715,17 @@ cerrarse se borra de acá.
   guardias `*_exists?` (también `column_exists?` sin tipo ni opciones; las columnas de una tabla que
   no se creó con lista de columnas quedan desconocidas). Migraciones de antes de Rails 5.1 (`Migration[4.2]` o sin versión) usan ids
   `integer` y clave primaria `serial`. Contra squawk 2.71 (`scripts/parity/rails/`, repos `maybe`,
-  `chatwoot`, `mastodon` y `forem`): maybe 849 de 849; chatwoot 951 de 951 con 3 de más en
+  `chatwoot`, `mastodon`, `forem` y `discourse`): maybe 849 de 849; chatwoot 951 de 951 con 3 de más en
   `20250108211541`, donde la referencia falla en `create_captain_tables` por el tipo `vector` de
-  pgvector; mastodon 1.763 de 1.763; forem 3.556 de 3.556, sin nada de más (2026-11-13). `create_table force: true`
+  pgvector; mastodon 1.763 de 1.763; forem 3.556 de 3.556, sin nada de más; discourse 5.083 de 5.155 con 14 de más, 37
+  diferencias en 22 migraciones (2026-11-13). `create_table force: true`
   borra sin `CASCADE`, los métodos de `Clase.class_eval do` cuentan como helpers, `remove_index` por
   columnas toma el nombre real del esquema, `add_column if_not_exists:` no escribe `IF NOT EXISTS` y
   `execute` con interpolación o escapes se evalúa. Pendientes:
+  - discourse: las llamadas dentro de `.each` sobre listas literales (`%w[...]`, `[[...]]`,
+    constantes) no se recorren: es la mayoría de las 37 diferencias. 293 migraciones fallan en la
+    referencia por `DB.exec`/`DB.query_single` (mini_sql) y `Migration::ColumnDropper`; quedan
+    fuera de la comparación.
   - `index_exists?` con `where:` compara sólo las columnas, no el predicado.
   - Un `execute` con `ALTER TABLE ... RENAME` actualiza el esquema pero no emite los renames de
     índices que Rails no haría (está bien), y el SQL crudo que no se entiende deja el esquema como
