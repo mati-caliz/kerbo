@@ -97,6 +97,7 @@ pub fn timestamp_columns(arguments: &Arguments<'_>, source: &[u8]) -> Vec<Column
                 .keyword(DEFAULT)
                 .and_then(|value| default(value, DATETIME, false, source)),
             not_null: !arguments.is_true(NULL),
+            primary_key: false,
         })
         .collect()
 }

@@ -269,3 +269,18 @@ fn follows_helpers_defined_in_class_eval_blocks() {
     ));
     assert!(sql.contains("ADD \"age\" integer"), "{sql}");
 }
+
+#[test]
+fn renders_integer_primary_key_columns_as_serial() {
+    let sql = render(
+        "class CreateStatuses < ActiveRecord::Migration[7.0]\n  def change\n    create_table :statuses, id: false do |t|\n      t.integer :user_id, primary_key: true, null: false\n    end\n  end\nend\n",
+    );
+    assert!(sql.contains("(\"user_id\" serial NOT NULL PRIMARY KEY)"), "{sql}");
+    let added = render(
+        "class AddIds < ActiveRecord::Migration[4.2]\n  def change\n    add_column :topic_users, :id, :primary_key\n  end\nend\n",
+    );
+    assert!(
+        added.contains("ADD \"id\" serial NOT NULL PRIMARY KEY;"),
+        "{added}"
+    );
+}

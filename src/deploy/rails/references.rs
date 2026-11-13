@@ -48,6 +48,7 @@ pub fn reference(table: &str, name: &str, arguments: &Arguments<'_>, source: &[u
         sql_type: id_type.to_owned(),
         default: None,
         not_null,
+        primary_key: false,
     }];
     let mut indexed = vec![id.clone()];
     if polymorphic {
@@ -56,6 +57,7 @@ pub fn reference(table: &str, name: &str, arguments: &Arguments<'_>, source: &[u
             sql_type: POLYMORPHIC_TYPE.to_owned(),
             default: None,
             not_null,
+            primary_key: false,
         });
         indexed.insert(0, kind);
     }

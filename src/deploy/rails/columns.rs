@@ -21,7 +21,7 @@ const RENAMED_TYPES: &[(&str, &str)] = &[
     ("string", VARCHAR),
     ("datetime", TIMESTAMP),
     ("binary", "bytea"),
-    ("primary_key", "bigserial primary key"),
+    (PRIMARY_KEY, "bigserial primary key"),
     ("timestamptz", "timestamp with time zone"),
 ];
 const VIRTUAL: &str = "virtual";
@@ -38,6 +38,10 @@ const AS: &str = "as";
 const STORED: &str = "stored";
 const ENUM: &str = "enum";
 const ENUM_TYPE: &str = "enum_type";
+const PRIMARY_KEY: &str = "primary_key";
+const INTEGER_PRIMARY_KEY: &str = "serial NOT NULL PRIMARY KEY";
+const PRIMARY_KEY_SUFFIX: &str = " PRIMARY KEY";
+const SERIAL_TYPES: &[(&str, &str)] = &[(INTEGER, "serial"), (BIGINT, "bigserial")];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Column {
@@ -45,6 +49,7 @@ pub struct Column {
     pub sql_type: String,
     pub default: Option<String>,
     pub not_null: bool,
+    pub primary_key: bool,
 }
 
 impl Column {
@@ -55,7 +60,11 @@ impl Column {
             .map(|default| format!(" DEFAULT {default}"))
             .unwrap_or_default();
         let not_null = if self.not_null { " NOT NULL" } else { "" };
-        format!("\"{}\" {}{default}{not_null}", self.name, self.sql_type)
+        let primary_key = if self.primary_key { PRIMARY_KEY_SUFFIX } else { "" };
+        format!(
+            "\"{}\" {}{default}{not_null}{primary_key}",
+            self.name, self.sql_type
+        )
     }
 }
 
@@ -72,6 +81,10 @@ pub fn column(kind: &str, name: String, arguments: &Arguments<'_>, source: &[u8]
     if is_array {
         sql_type.push_str(ARRAY_SUFFIX);
     }
+    let primary_key = arguments.is_true(PRIMARY_KEY);
+    if primary_key {
+        sql_type = serial(sql_type);
+    }
     if kind == VIRTUAL {
         let expression = arguments
             .keyword(AS)
@@ -85,9 +98,17 @@ pub fn column(kind: &str, name: String, arguments: &Arguments<'_>, source: &[u8]
         default: arguments
             .keyword(DEFAULT)
             .and_then(|value| default(value, &declared, is_array, source)),
-        not_null: arguments.is_false(NULL),
+        not_null: primary_key || arguments.is_false(NULL),
         sql_type,
+        primary_key,
     }
+}
+
+fn serial(sql_type: String) -> String {
+    SERIAL_TYPES
+        .iter()
+        .find_map(|(integer, serial)| (*integer == sql_type).then(|| (*serial).to_owned()))
+        .unwrap_or(sql_type)
 }
 
 pub fn sql_type(declared: &str, arguments: &Arguments<'_>, source: &[u8]) -> String {
@@ -104,6 +125,9 @@ pub fn sql_type(declared: &str, arguments: &Arguments<'_>, source: &[u8]) -> Str
         return arguments
             .keyword_name(ENUM_TYPE, source)
             .map_or_else(|| ENUM.to_owned(), |name| format!("\"{name}\""));
+    }
+    if declared == PRIMARY_KEY && arguments.integer_ids {
+        return INTEGER_PRIMARY_KEY.to_owned();
     }
     if declared == DECIMAL {
         return decimal(arguments, source);
