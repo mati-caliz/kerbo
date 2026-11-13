@@ -5,6 +5,7 @@ use tree_sitter::Node;
 
 mod comprehension;
 mod local_calls;
+mod postgres_operations;
 mod raw_sql;
 
 use super::computed_names::name_text;
@@ -25,6 +26,7 @@ use crate::deploy::python_calls::Call;
 use crate::syntax::named_children;
 use comprehension::{ReadOperation, expanded_comprehension};
 use local_calls::{factory_operation, module_function_operation};
+use postgres_operations::postgres_operation;
 use raw_sql::{run_python, run_sql};
 
 const MIGRATION_CLASS: &str = "Migration";
@@ -34,25 +36,15 @@ const DEPENDENCIES: &str = "dependencies";
 const RUN_BEFORE: &str = "run_before";
 const CONCURRENTLY: &str = "Concurrently";
 const ADD_FIELD: &str = "AddField";
+const NOT_VALID_CONSTRAINT: &str = "AddConstraintNotValid";
 const CONCATENATION: &str = "binary_operator";
 const RUN_PYTHON: &str = "RunPython";
-const GENERIC_EXTENSION: &str = "CreateExtension";
 const SAFE_DELETE_MODEL: &str = "SafeDeleteModel";
 const SAFE_REMOVE_FIELD: &str = "SafeRemoveField";
 const SAFE_RUN_SQL: &str = "SafeRunSQL";
 const DELETION_ACTION: &str = "deletion_action";
 const MOVE_TO_PENDING: &str = "MOVE_TO_PENDING";
 const PURGE: &str = "DELETE";
-const NAMED_EXTENSIONS: &[(&str, &str)] = &[
-    ("BloomExtension", "bloom"),
-    ("BtreeGinExtension", "btree_gin"),
-    ("BtreeGistExtension", "btree_gist"),
-    ("CITextExtension", "citext"),
-    ("CryptoExtension", "pgcrypto"),
-    ("HStoreExtension", "hstore"),
-    ("TrigramExtension", "pg_trgm"),
-    ("UnaccentExtension", "unaccent"),
-];
 
 #[derive(Debug, Clone, Copy)]
 pub struct Reader<'context> {
@@ -267,7 +259,6 @@ impl<'context> Scope<'context> {
             }),
             "AlterModelOptions" => self.alter_options(call),
             "RunSQL" | SAFE_RUN_SQL => run_sql(self, call),
-            GENERIC_EXTENSION => string_argument(call, 0, "name").map(Operation::CreateExtension),
             "SeparateDatabaseAndState" => Some(Operation::Separate {
                 database: argument(call, 0, "database_operations")
                     .map(|node| self.database_operations(node))
@@ -276,11 +267,7 @@ impl<'context> Scope<'context> {
                     .map(|node| self.operations(node))
                     .unwrap_or_default(),
             }),
-            method => NAMED_EXTENSIONS
-                .iter()
-                .find(|(class, _)| *class == method)
-                .map(|(_, name)| Operation::CreateExtension((*name).to_owned()))
-                .or_else(|| self.index_operation(call)),
+            _ => postgres_operation(call).or_else(|| self.index_operation(call)),
         }
     }
 
@@ -302,11 +289,18 @@ impl<'context> Scope<'context> {
                 model,
                 new: string_argument(call, 1, "new_name")?,
                 old: call.keyword("old_name").and_then(|node| text(node, self.source)),
+                old_fields: call.keyword("old_fields").map_or_else(Vec::new, |node| {
+                    elements(node)
+                        .into_iter()
+                        .filter_map(|field| text(field, self.source))
+                        .collect()
+                }),
             }),
-            "AddConstraint" => Some(Operation::AddConstraint {
+            method @ ("AddConstraint" | NOT_VALID_CONSTRAINT) => Some(Operation::AddConstraint {
                 model,
                 constraint: argument(call, 1, "constraint")
                     .and_then(|node| constraint(node, self.expression_context()))?,
+                not_valid: method == NOT_VALID_CONSTRAINT,
             }),
             "RemoveConstraint" => Some(Operation::RemoveConstraint {
                 model,
@@ -364,6 +358,7 @@ impl<'context> Scope<'context> {
         for (key, value) in dictionary(options, self.source) {
             match key.as_str() {
                 "db_table" => model.db_table = text(value, self.source),
+                "db_table_comment" => model.table_comment = text(value, self.source),
                 "unique_together" => model.unique_together = unique_together(value, self.source),
                 "indexes" => model.indexes = indexes(value, self.expression_context()),
                 "constraints" => model.constraints = constraints(value, self.expression_context()),

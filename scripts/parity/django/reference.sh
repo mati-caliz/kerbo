@@ -59,7 +59,7 @@ MSYS_NO_PATHCONV=1 docker run --rm --network "$network" --cpus="$CPUS" -m "$MEMO
   -e REPO="$repo" -e DATABASE_HOST="$database" \
   -e DEPENDENCY_GROUPS="$dependency_groups" -e SYSTEM_PACKAGES="$system_packages" \
   -e DATABASE_DRIVER="$database_driver" "$PYTHON_IMAGE" bash -euo pipefail -c "
-    if [ \"\$REPO\" = django ]; then
+    if [ \"\$REPO\" = django ] || [ \"\$REPO\" = casos-django ]; then
       pip install -q 'django==$DJANGO_VERSION' 'psycopg[binary]' 'asgiref>=3.13' 'squawk-cli==$SQUAWK_VERSION' >/dev/null
     else
       apt-get update -qq >/dev/null && apt-get install -y -qq libmagic1 \$SYSTEM_PACKAGES >/dev/null

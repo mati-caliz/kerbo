@@ -140,6 +140,8 @@ pub fn field<'tree>(
     field.decimal_places = number("decimal_places");
     field.size = number("size");
     field.db_column = call.keyword("db_column").and_then(|value| text(value, source));
+    field.db_comment = call.keyword("db_comment").and_then(|value| text(value, source));
+    field.db_collation = call.keyword("db_collation").and_then(|value| text(value, source));
     let enum_member = |value: Node<'_>| member_literal(constant_value(value, owner), source, owner.apps_root);
     field.default = call.keyword("default").map_or(FieldDefault::Unset, |value| {
         enum_member(value).map_or_else(

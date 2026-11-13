@@ -99,6 +99,8 @@ pub struct Field {
     pub default: FieldDefault,
     pub db_default: Option<String>,
     pub db_column: Option<String>,
+    pub db_comment: Option<String>,
+    pub db_collation: Option<String>,
     pub relation: Option<Relation>,
     pub element: Option<Box<Self>>,
 }
@@ -116,6 +118,8 @@ impl Field {
             default: FieldDefault::Unset,
             db_default: None,
             db_column: None,
+            db_comment: None,
+            db_collation: None,
             relation: None,
             element: None,
         }
@@ -222,6 +226,7 @@ pub struct Constraint {
 pub struct Model {
     pub key: ModelKey,
     pub db_table: Option<String>,
+    pub table_comment: Option<String>,
     pub fields: Vec<Field>,
     pub unique_together: Vec<Vec<String>>,
     pub indexes: Vec<Index>,
@@ -237,6 +242,7 @@ impl Model {
         Self {
             key,
             db_table: None,
+            table_comment: None,
             fields: Vec::new(),
             unique_together: Vec::new(),
             indexes: Vec::new(),

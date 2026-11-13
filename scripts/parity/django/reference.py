@@ -3,7 +3,9 @@
 
 Cada repo dice en REPOS qué carpeta agrega al path y o bien qué apps instala, o bien qué módulo de
 settings propio usa (el repo se instala con pip y su base sale de DATABASE_URL). Una migración que no se puede
-convertir (importa algo que falta, o consulta la base) queda anotada en errores.txt.
+convertir (importa algo que falta, o consulta la base) queda anotada en errores.txt. Con "apply", cada migración
+se aplica después de convertirla, así lo que Django resuelve mirando la base (nombres de restricciones e índices
+sin nombre) sale como en un `migrate` real.
 """
 
 import io
@@ -26,6 +28,11 @@ REPOS = {
             "django.contrib.flatpages",
             "django.contrib.redirects",
         ],
+    },
+    "casos-django": {
+        "path": "/repo",
+        "apps": ["django.contrib.postgres", "casos"],
+        "apply": True,
     },
     "saleor": {
         "path": "/repo",
@@ -126,9 +133,14 @@ def sql_of(app, name):
 
 
 def converted(migration):
+    from django.core.management import call_command
+
     app, name = migration
     try:
-        return app, name, sql_of(app, name), None
+        sql = sql_of(app, name)
+        if REPOS[os.environ["REPO"]].get("apply"):
+            call_command("migrate", app, name, verbosity=0)
+        return app, name, sql, None
     except Exception as problem:  # noqa: BLE001 - cada migración que falla se anota y se sigue
         return app, name, None, f"{app} {name}: {type(problem).__name__}: {problem}"
 

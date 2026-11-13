@@ -1697,17 +1697,23 @@ cerrarse se borra de acá.
     migraciones nombran (`users.models.AuthenticatorConfig` → `jsonb`) y `db_default` de un dict
     no vacío en un `JSONField` (`'{"period": "14d"}'::jsonb`); `operations` como comprensión de
     lista sobre una constante del módulo, con `RunSQL` de una función local que devuelve un
-    f-string. Lo que queda, sólo SQL, sin cambiar avisos:
-    - sentry 0001: un `CREATE EXTENSION IF NOT EXISTS btree_gist` de más en la referencia, que
-      emite el schema editor propio (`MakeBtreeGistSchemaEditor` en `sentry/db/postgres/schema.py`)
-      antes de cada `ExclusionConstraint`. Es de un solo proyecto; emularlo sería leer ese editor.
-    - Las apps de terceros (`auth`, `contenttypes`, `sessions`, `sites`) quedan fuera.
-  - Lo que `sqlmigrate` saca de la base o del grafo y kerbo todavía no: el paso de `AutoField` a
-    `BigAutoField` con el `ALTER` de las claves foráneas que lo apuntan (`rels_to_update`), los
-    borrados que Django resuelve por introspección (restricciones sin nombre conocido),
-    `RenameIndex` sin `old_name`, los `AlterField` de un `ManyToManyField` a otro, las
-    operaciones de `django.contrib.postgres` fuera de las restricciones, y `db_collation` y
-    `db_comment`.
+    f-string. El `CREATE EXTENSION IF NOT EXISTS btree_gist` que el schema editor de sentry emite
+    antes de cada `ExclusionConstraint` sale igual cuando el motor del proyecto lo hace
+    (`EditorQuirks::ensures_btree_gist`). Las apps de terceros (`auth`, `contenttypes`, `sessions`,
+    `sites`) quedan fuera.
+  - Hecho (2026-11-13), medido en los casos sintéticos de `scripts/parity/django/casos`
+    (`casos-django`, 63 de 63; su referencia aplica cada migración después de convertirla, así sale
+    lo que Django resuelve mirando la base): `db_comment`, `db_collation`, `db_table_comment` y
+    `AlterModelTableComment`; el paso de `AutoField` a `BigAutoField` con las claves foráneas que lo
+    apuntan (`rels_to_update`, `related.rs`); el `AlterField` de un `ManyToManyField` a otro, que
+    renombra la tabla intermedia y repunta su clave (`many_to_many.rs`); `CreateCollation`,
+    `RemoveCollation`, `AddConstraintNotValid` y `ValidateConstraint`; los `unique_together` que se
+    borran y `RenameIndex` con `old_fields`, con los nombres que Django les dio al crearlos; y los
+    lookups `__regex`/`__iregex` en las condiciones.
+  - Decisión abierta: un `AlterField` sobre una clave foránea, en un `migrate` real, borra la
+    restricción y la vuelve a crear; `sqlmigrate` sobre la base vacía de la referencia no, y kerbo
+    sigue a `sqlmigrate`. Seguir al `migrate` real pide regenerar las referencias de los repos
+    aplicando cada migración.
 - Rails (2026-11-11): tree-sitter-ruby y el SQL de ActiveRecord 8 para Postgres armado desde
   `db/migrate/*.rb` (`src/deploy/rails/`). Cada migración se evalúa con el esquema que dejan las
   anteriores del mismo directorio (`history.rs` y `schema.rs`: tablas, columnas, índices, clave

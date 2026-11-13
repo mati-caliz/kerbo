@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use super::dependencies::SWAPPABLE_SETTING_APP;
-use super::model::{Class, Field, Flag, Model, ModelKey, Relation};
+use super::model::{Class, Field, Flag, Index, Model, ModelKey, Relation};
 use super::names::truncated_table;
 use super::operations::{Deletion, Operation};
 
@@ -138,7 +138,7 @@ impl State {
                     self.apply(app, &located.operation);
                 }
             }
-            Operation::RunSql(_) | Operation::CreateExtension(_) => {}
+            Operation::RunSql(_) | Operation::CreateExtension(_) | Operation::Statement { .. } => {}
             Operation::AddField { model, .. }
             | Operation::RemoveField { model, .. }
             | Operation::AlterField { model, .. }
@@ -220,6 +220,21 @@ fn change(model: &mut Model, operation: &Operation) {
         Operation::AlterManaged { managed, .. } => model.managed = *managed,
         Operation::AddIndex { index, .. } => model.indexes.push(index.clone()),
         Operation::RemoveIndex { name, .. } => model.indexes.retain(|index| index.name != *name),
+        Operation::RenameIndex {
+            old: None,
+            old_fields,
+            new,
+            ..
+        } => model.indexes.push(Index {
+            name: new.clone(),
+            fields: old_fields.clone(),
+            expressions: Vec::new(),
+            include: Vec::new(),
+            condition: None,
+            method: None,
+            opclasses: Vec::new(),
+            storage: Vec::new(),
+        }),
         Operation::RenameIndex { old, new, .. } => {
             if let Some(index) = model
                 .indexes
@@ -238,6 +253,7 @@ fn change(model: &mut Model, operation: &Operation) {
         | Operation::RenameModel { .. }
         | Operation::RunSql(_)
         | Operation::CreateExtension(_)
+        | Operation::Statement { .. }
         | Operation::Separate { .. } => {}
     }
 }

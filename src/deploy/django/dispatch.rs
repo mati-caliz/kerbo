@@ -1,14 +1,22 @@
 use super::alter::{FieldChange, alter_field as alter_column};
-use super::deferred::{IndexKind, Kind, Statement};
+use super::columns::db_type;
+use super::deferred::{IndexKind, Kind, Statement, unique_together_name};
+use super::many_to_many::{Side, alter_many_to_many};
 use super::model::{Constraint, ConstraintKind, Model, ModelKey};
-use super::names::quoted;
+use super::names::{index_name, quoted};
 use super::operations::{Deletion, Located, Migration, Operation};
+use super::related;
 use super::rename;
 use super::schema::{Editor, columns_of};
 use super::state::State;
 use super::table_constraints::{constraint_definition, named_index, unique_index};
+use super::zero_downtime::BTREE_GIST_EXTENSION;
 use crate::deploy::Violation;
 use crate::deploy::script::Origin;
+
+pub const TABLE_PLACEHOLDER: &str = "{table}";
+const NOT_VALID: &str = " NOT VALID";
+const INDEX_TOGETHER_SUFFIX: &str = "_idx";
 
 #[derive(Debug, Clone, Copy)]
 struct Context<'context> {
@@ -109,6 +117,14 @@ fn render(editor: &mut Editor, context: Context<'_>, operation: &Operation) {
         Operation::CreateExtension(name) => {
             editor.execute(&format!("CREATE EXTENSION IF NOT EXISTS {}", quoted(name)));
         }
+        Operation::Statement { model, sql } => match model {
+            None => editor.execute(sql),
+            Some(model) => {
+                if let Some(owner) = context.new_model(model) {
+                    editor.execute(&sql.replace(TABLE_PLACEHOLDER, &quoted(&owner.table())));
+                }
+            }
+        },
         Operation::RenameModel { old, new } => rename_model(editor, context, old, new),
         Operation::AlterModelTable { model, .. } => rename_model(editor, context, model, model),
         Operation::AddField { .. }
@@ -175,6 +191,7 @@ fn render_field(editor: &mut Editor, context: Context<'_>, operation: &Operation
         | Operation::RemoveConstraint { .. }
         | Operation::RunSql(_)
         | Operation::CreateExtension(_)
+        | Operation::Statement { .. }
         | Operation::Separate { .. } => {}
     }
 }
@@ -186,7 +203,29 @@ fn alter_field(editor: &mut Editor, context: Context<'_>, model: &str, (old_name
     let (Some(old), Some(new)) = (old_model.field(old_name), new_model.field(new_name)) else {
         return;
     };
+    if old.is_many_to_many() && new.is_many_to_many() {
+        let old_side = Side {
+            owner: old_model,
+            field: old,
+            state: context.before,
+        };
+        let new_side = Side {
+            owner: new_model,
+            field: new,
+            state: context.after,
+        };
+        alter_many_to_many(editor, &old_side, &new_side);
+        return;
+    }
     let table = new_model.table();
+    let retypes_key =
+        old.primary_key() && new.primary_key() && db_type(old, context.before) != db_type(new, context.after);
+    let incoming = if retypes_key {
+        related::incoming(&new_model.key, context.before, context.after)
+    } else {
+        Vec::new()
+    };
+    related::drop_constraints(editor, &incoming, (&old_model.table(), &old.column()));
     alter_column(
         editor,
         FieldChange {
@@ -197,6 +236,8 @@ fn alter_field(editor: &mut Editor, context: Context<'_>, model: &str, (old_name
             after: context.after,
         },
     );
+    related::alter_types(editor, &incoming, context.before, context.after);
+    related::rebuild_constraints(editor, &incoming, (&table, &new.column()));
 }
 
 fn render_meta(editor: &mut Editor, context: Context<'_>, operation: &Operation) {
@@ -226,16 +267,38 @@ fn render_meta(editor: &mut Editor, context: Context<'_>, operation: &Operation)
                 editor.execute(&format!("DROP INDEX {concurrent}IF EXISTS {}", quoted(name)));
             }
         }
-        Operation::RenameIndex { model, old, new } => {
+        Operation::RenameIndex {
+            model,
+            old,
+            old_fields,
+            new,
+        } => {
+            let old = old.clone().or_else(|| {
+                context
+                    .old_model(model)
+                    .map(|owner| unnamed_index_name(owner, old_fields))
+            });
             if context.new_model(model).is_some()
                 && let Some(old) = old
             {
-                editor.execute(&format!("ALTER INDEX {} RENAME TO {}", quoted(old), quoted(new)));
+                editor.execute(&format!("ALTER INDEX {} RENAME TO {}", quoted(&old), quoted(new)));
             }
         }
-        Operation::AddConstraint { model, constraint } => {
+        Operation::AddConstraint {
+            model,
+            constraint,
+            not_valid,
+        } => {
             if let Some(owner) = context.new_model(model) {
-                add_constraint(editor, owner, constraint);
+                let exclusion = matches!(constraint.kind, ConstraintKind::Exclusion { .. });
+                if exclusion
+                    && editor
+                        .zero_downtime()
+                        .is_some_and(|backend| backend.editor.ensures_btree_gist)
+                {
+                    editor.execute(BTREE_GIST_EXTENSION);
+                }
+                add_constraint(editor, owner, constraint, *not_valid);
             }
         }
         Operation::RemoveConstraint { model, name } => remove_constraint(editor, context, model, name),
@@ -250,6 +313,7 @@ fn render_meta(editor: &mut Editor, context: Context<'_>, operation: &Operation)
         | Operation::AlterManaged { .. }
         | Operation::RunSql(_)
         | Operation::CreateExtension(_)
+        | Operation::Statement { .. }
         | Operation::Separate { .. } => {}
     }
 }
@@ -259,6 +323,15 @@ fn alter_unique_together(editor: &mut Editor, context: Context<'_>, model: &str,
         return;
     };
     let table = new_model.table();
+    for set in old_model.unique_together.iter().filter(|set| !sets.contains(set)) {
+        let columns = columns_of(old_model, set);
+        let columns: Vec<&str> = columns.iter().map(String::as_str).collect();
+        editor.execute(&format!(
+            "ALTER TABLE {} DROP CONSTRAINT {}",
+            quoted(&old_model.table()),
+            quoted(&unique_together_name(&old_model.table(), &columns))
+        ));
+    }
     for set in sets.iter().filter(|set| !old_model.unique_together.contains(set)) {
         editor.run(&Statement::on_columns(
             &table,
@@ -268,10 +341,26 @@ fn alter_unique_together(editor: &mut Editor, context: Context<'_>, model: &str,
     }
 }
 
-fn add_constraint(editor: &mut Editor, owner: &Model, constraint: &Constraint) {
+fn unnamed_index_name(owner: &Model, fields: &[String]) -> String {
+    let columns = columns_of(owner, fields);
+    let columns: Vec<&str> = columns.iter().map(String::as_str).collect();
+    let single_indexed_field = match fields {
+        [field] => owner.field(field).is_some_and(super::model::Field::db_index),
+        _ => false,
+    };
+    let suffix = if single_indexed_field {
+        ""
+    } else {
+        INDEX_TOGETHER_SUFFIX
+    };
+    index_name(&owner.table(), &columns, suffix)
+}
+
+fn add_constraint(editor: &mut Editor, owner: &Model, constraint: &Constraint, not_valid: bool) {
+    let validity = if not_valid { NOT_VALID } else { "" };
     match constraint_definition(owner, constraint) {
         Some(definition) => editor.execute(&format!(
-            "ALTER TABLE {} ADD CONSTRAINT {} {definition}",
+            "ALTER TABLE {} ADD CONSTRAINT {} {definition}{validity}",
             quoted(&owner.table()),
             quoted(&constraint.name)
         )),

@@ -219,6 +219,10 @@ pub fn foreign_key_name(table: &str, columns: &[&str], to_table: &str, to_column
     index_name(table, columns, &format!("_fk_{to_table}_{to_column}"))
 }
 
+pub fn unique_together_name(table: &str, columns: &[&str]) -> String {
+    index_name(table, columns, UNIQUE_SUFFIX)
+}
+
 pub fn like_index_name(table: &str, column: &str) -> String {
     index_name(table, &[column], LIKE_SUFFIX)
 }

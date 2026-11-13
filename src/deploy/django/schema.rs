@@ -1,16 +1,17 @@
 use std::mem;
 
 use super::columns::{
-    bare_definition, check, definition, effective_default, has_like_index, identity, like_operator_class,
+    bare_definition, check, column_comment, definition, effective_default, has_like_index, identity,
+    like_operator_class,
 };
 use super::deferred::{IndexKind, Kind, Statement, foreign_key_name};
 use super::field_defaults::NOW_SQL;
-use super::model::{Constraint, Field, Model};
-use super::names::{index_name, quoted};
+use super::model::{Constraint, ConstraintKind, Field, Model};
+use super::names::{index_name, quoted, sql_string};
 use super::state::State;
 use super::table_constraints::named_index;
 use super::table_constraints::{constraint_definition, unique_index};
-use super::zero_downtime::{Backend, translate};
+use super::zero_downtime::{BTREE_GIST_EXTENSION, Backend, translate};
 use crate::deploy::Violation;
 use crate::deploy::script::{Origin, Script};
 
@@ -126,6 +127,17 @@ impl Editor {
                 Kind::Unique,
             ));
         }
+        let has_exclusion = model
+            .constraints
+            .iter()
+            .any(|constraint| matches!(constraint.kind, ConstraintKind::Exclusion { .. }));
+        if has_exclusion
+            && self
+                .zero_downtime
+                .is_some_and(|backend| backend.editor.ensures_btree_gist)
+        {
+            self.execute(BTREE_GIST_EXTENSION);
+        }
         let mut definitions: Vec<String> = model
             .local_fields()
             .map(|field| self.column_definition(model, field, state))
@@ -139,6 +151,16 @@ impl Editor {
             quoted(&table),
             definitions.join(", ")
         ));
+        if let Some(comment) = &model.table_comment {
+            self.execute(&format!(
+                "COMMENT ON TABLE {} IS {}",
+                quoted(&table),
+                sql_string(comment)
+            ));
+        }
+        for field in model.local_fields().filter(|field| field.db_comment.is_some()) {
+            self.execute(&column_comment(&table, field));
+        }
         for field in model.local_fields() {
             self.defer_field_indexes(&table, field, state);
         }
@@ -262,6 +284,9 @@ impl Editor {
             self.execute(&format!(
                 "ALTER TABLE {quoted_table} ALTER COLUMN {column} DROP DEFAULT"
             ));
+        }
+        if field.db_comment.is_some() {
+            self.execute(&column_comment(&table, field));
         }
         self.defer_field_indexes(&table, field, state);
     }

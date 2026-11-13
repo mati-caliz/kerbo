@@ -21,6 +21,7 @@ mod graph;
 mod operations;
 mod references;
 mod rendering;
+mod synthetic_cases;
 
 #[derive(Debug, Default)]
 struct MemoryLoader {

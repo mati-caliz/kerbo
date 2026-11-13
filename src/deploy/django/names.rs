@@ -6,6 +6,30 @@ const TABLE_DIGEST_LENGTH: usize = 4;
 const HASH_PART_SHARE: usize = 3;
 const INVALID_START_PREFIX: char = 'D';
 const UNDERSCORE: char = '_';
+const SQL_QUOTE: &str = "'";
+const ESCAPED_SQL_QUOTE: &str = "''";
+
+const BACKSLASH: &str = "\\";
+const DOUBLED_BACKSLASH: &str = "\\\\";
+const ESCAPE_STRING_PREFIX: &str = "E";
+
+pub fn escaped_literal(sql: &str) -> String {
+    if sql.contains(BACKSLASH) {
+        format!(
+            "{ESCAPE_STRING_PREFIX}{}",
+            sql.replace(BACKSLASH, DOUBLED_BACKSLASH)
+        )
+    } else {
+        sql.to_owned()
+    }
+}
+
+pub fn sql_string(value: &str) -> String {
+    format!(
+        "{SQL_QUOTE}{}{SQL_QUOTE}",
+        value.replace(SQL_QUOTE, ESCAPED_SQL_QUOTE)
+    )
+}
 
 pub fn quoted(name: &str) -> String {
     format!("\"{name}\"")

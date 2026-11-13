@@ -2,7 +2,7 @@ use tree_sitter::Node;
 
 use super::constants::Constants;
 use super::model::{Class, Field, Model};
-use super::names::quoted;
+use super::names::{escaped_literal, quoted};
 use super::values::{boolean, elements, is_sequence, quoted_literal, raw, text};
 use crate::deploy::python_calls::Call;
 
@@ -32,6 +32,7 @@ const CONNECTOR_KEYWORD: &str = "_connector";
 const NEGATED_KEYWORD: &str = "_negated";
 const AND_CONNECTOR: &str = "AND";
 const OR_CONNECTOR: &str = "OR";
+const REGEX_OPERATORS: &[(&str, &str)] = &[("regex", "~"), ("iregex", "~*")];
 const COMPARISONS: &[(&str, &str)] = &[("gt", ">"), ("gte", ">="), ("lt", "<"), ("lte", "<=")];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -338,6 +339,10 @@ fn lookup_sql(field: &Field, column: &str, lookup: &str, value: &Value) -> Optio
                 }
             }
             (!rendered.is_empty()).then(|| format!("{column} IN ({})", rendered.join(", ")))
+        }
+        (pattern, Value::Literal(sql)) if REGEX_OPERATORS.iter().any(|(name, _)| *name == pattern) => {
+            let (_, operator) = REGEX_OPERATORS.iter().find(|(name, _)| *name == pattern)?;
+            Some(format!("{column}::text {operator}  {}", escaped_literal(sql)))
         }
         (BITS_SET, rhs) => Some(format!("{column} & {} != 0", scalar(rhs)?)),
         (BITS_CLEAR, rhs) => Some(format!("{column} & {} = 0", scalar(rhs)?)),

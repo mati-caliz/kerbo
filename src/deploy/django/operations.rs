@@ -61,11 +61,13 @@ pub enum Operation {
     RenameIndex {
         model: String,
         old: Option<String>,
+        old_fields: Vec<String>,
         new: String,
     },
     AddConstraint {
         model: String,
         constraint: Constraint,
+        not_valid: bool,
     },
     RemoveConstraint {
         model: String,
@@ -73,6 +75,10 @@ pub enum Operation {
     },
     RunSql(Vec<SqlChunk>),
     CreateExtension(String),
+    Statement {
+        model: Option<String>,
+        sql: String,
+    },
     Separate {
         database: Vec<Located>,
         state: Vec<Located>,

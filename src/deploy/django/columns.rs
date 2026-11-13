@@ -1,6 +1,6 @@
 use super::field_defaults::{SANITIZED_NULL_DEFAULT, automatic_now_default};
 use super::model::{Class, Field, FieldDefault, Flag};
-use super::names::quoted;
+use super::names::{quoted, sql_string};
 use super::state::State;
 
 const VARCHAR: &str = "varchar";
@@ -235,8 +235,25 @@ pub fn definition(field: &Field, state: &State, include_default: bool) -> String
     parts.join(" ")
 }
 
+pub fn collated_type(field: &Field, state: &State) -> String {
+    let base = db_type(field, state);
+    field.db_collation.as_ref().map_or_else(
+        || base.clone(),
+        |collation| format!("{base} COLLATE {}", quoted(collation)),
+    )
+}
+
+pub fn column_comment(table: &str, field: &Field) -> String {
+    format!(
+        "COMMENT ON COLUMN {}.{} IS {}",
+        quoted(table),
+        quoted(&field.column()),
+        sql_string(field.db_comment.as_deref().unwrap_or_default())
+    )
+}
+
 pub fn bare_definition(field: &Field, state: &State, include_default: bool) -> String {
-    let mut parts = vec![db_type(field, state)];
+    let mut parts = vec![collated_type(field, state)];
     if let Some(database_default) = &field.db_default {
         parts.push(format!("DEFAULT {database_default}"));
     } else if include_default && let Some(default) = effective_default(field) {

@@ -25,11 +25,19 @@ const PRIMARY_KEY: &str = "PRIMARY KEY ";
 const NOT_VALID: &str = " NOT VALID";
 const DEFERRABLE: &str = " DEFERRABLE";
 const COLUMNS_START: char = '(';
+pub const BTREE_GIST_EXTENSION: &str = "CREATE EXTENSION IF NOT EXISTS btree_gist";
+const EXCLUSION_CONSTRAINT: &str = "ExclusionConstraint";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Backend {
     pub every_migration: bool,
+    pub editor: EditorQuirks,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct EditorQuirks {
     pub drops_not_null_check: bool,
+    pub ensures_btree_gist: bool,
 }
 
 pub fn backend(sources: &[String], source_root: &Path) -> Option<Backend> {
@@ -37,7 +45,7 @@ pub fn backend(sources: &[String], source_root: &Path) -> Option<Backend> {
     if engine.starts_with(PACKAGE) {
         return Some(Backend {
             every_migration: true,
-            drops_not_null_check: false,
+            editor: EditorQuirks::default(),
         });
     }
     let package = module_file(source_root, &engine)?;
@@ -50,9 +58,14 @@ pub fn backend(sources: &[String], source_root: &Path) -> Option<Backend> {
         .collect();
     texts.iter().any(|text| text.contains(PACKAGE)).then(|| Backend {
         every_migration: false,
-        drops_not_null_check: texts
-            .iter()
-            .any(|text| text.contains(NOT_NULL_SUFFIX) && text.contains(DROPS_IF_EXISTS)),
+        editor: EditorQuirks {
+            drops_not_null_check: texts
+                .iter()
+                .any(|text| text.contains(NOT_NULL_SUFFIX) && text.contains(DROPS_IF_EXISTS)),
+            ensures_btree_gist: texts
+                .iter()
+                .any(|text| text.contains(BTREE_GIST_EXTENSION) && text.contains(EXCLUSION_CONSTRAINT)),
+        },
     })
 }
 

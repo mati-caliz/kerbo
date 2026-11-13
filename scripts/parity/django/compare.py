@@ -21,6 +21,7 @@ REPO = HERE.parent.parent.parent
 PARITY = pathlib.Path(os.environ.get("KERBO_PARITY", REPO / ".parity"))
 APPS_ROOTS = {
     "django": "django/django/contrib",
+    "casos-django": "casos-django",
     "saleor": "saleor/saleor",
     "zulip": "zulip",
     "wagtail": "wagtail",
