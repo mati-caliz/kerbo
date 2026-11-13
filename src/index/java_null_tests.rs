@@ -219,11 +219,19 @@ fn findings(rule: &str) -> Vec<String> {
 }
 
 pub(super) fn findings_in(source: &str, rule: &str) -> Vec<String> {
-    let summary = summary_of(source);
-    let files = [IndexedSummary {
-        summary: &summary,
-        in_tests: false,
-    }];
+    findings_in_files(&[source], rule)
+}
+
+// Los hallazgos de varios archivos indexados juntos, como si fueran un mismo proyecto.
+pub(super) fn findings_in_files(sources: &[&str], rule: &str) -> Vec<String> {
+    let summaries: Vec<_> = sources.iter().map(|source| summary_of(source)).collect();
+    let files: Vec<_> = summaries
+        .iter()
+        .map(|summary| IndexedSummary {
+            summary,
+            in_tests: false,
+        })
+        .collect();
     let library = Library::load(&[]).with_jdk(fixture_jdk());
     project_lints(&files, &library)
         .into_iter()

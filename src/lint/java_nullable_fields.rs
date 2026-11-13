@@ -7,6 +7,7 @@ use super::java_calls::annotated_with;
 use crate::syntax::{descendants, named_children};
 
 const NULLABLE: &str = "Nullable";
+const CHECK_FOR_NULL: &str = "CheckForNull";
 const THIS_PREFIX: &str = "this.";
 const CLASS_BODIES: &[&str] = &["class_body", "enum_body_declarations"];
 const FIELD_DECLARATION: &str = "field_declaration";
@@ -32,6 +33,21 @@ const DECLARING: &[&str] = &[
     "type_pattern",
     "record_pattern_component",
 ];
+
+// Si la firma del método declara que el retorno puede ser null.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReturnNullness {
+    Unannotated,
+    Nullable,
+}
+
+pub fn return_nullness(method: Option<Node<'_>>, source: &[u8]) -> ReturnNullness {
+    if method.is_some_and(|declaration| declares_nullable_type(declaration, source)) {
+        ReturnNullness::Nullable
+    } else {
+        ReturnNullness::Unannotated
+    }
+}
 
 // Las claves con las que el flujo sigue a cada campo `@Nullable` que el método ve: `this.x` siempre
 // y `x` si el método no declara nada con ese nombre. Las dos de un mismo campo van juntas.
@@ -97,13 +113,13 @@ pub fn declares_nullable(declarator: Node<'_>, source: &[u8]) -> bool {
     declarator.child_by_field_name(DIMENSIONS_FIELD).is_none()
         && declarator
             .parent()
-            .is_some_and(|field| is_nullable_field(field, source))
+            .is_some_and(|field| declares_nullable_type(field, source))
 }
 
-// Con anotaciones de tipo, `@Nullable Object[]` habla de los elementos: el arreglo es nulo sólo
-// con `Object @Nullable []`.
-fn is_nullable_field(field: Node<'_>, source: &[u8]) -> bool {
-    let Some(written) = field.child_by_field_name(TYPE_FIELD) else {
+// Si el campo o el método declara su tipo `@Nullable` o `@CheckForNull`. Con anotaciones de tipo,
+// `@Nullable Object[]` habla de los elementos: el arreglo es nulo sólo con `Object @Nullable []`.
+pub fn declares_nullable_type(declaration: Node<'_>, source: &[u8]) -> bool {
+    let Some(written) = declaration.child_by_field_name(TYPE_FIELD) else {
         return false;
     };
     if written.kind() == ARRAY_TYPE {
@@ -111,7 +127,9 @@ fn is_nullable_field(field: Node<'_>, source: &[u8]) -> bool {
             .child_by_field_name(DIMENSIONS_FIELD)
             .is_some_and(|dimensions| outer_dimension(text(dimensions, source)).contains(NULLABLE));
     }
-    annotated_with(field, NULLABLE, source) || has_nullable_last_segment(written, source)
+    annotated_with(declaration, NULLABLE, source)
+        || annotated_with(declaration, CHECK_FOR_NULL, source)
+        || has_nullable_last_segment(written, source)
 }
 
 // En `char[] @Nullable []` la anotación habla de los elementos: el arreglo es el de antes del primer `[`.

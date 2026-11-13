@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::java::text;
 use super::java_null_inference::parameter_type_name;
+use super::java_nullable_fields::declares_nullable_type;
 use crate::syntax::named_children;
 
 const TYPE_PARAMETERS: &str = "type_parameters";
@@ -12,16 +13,21 @@ const NULLABLE: &str = "Nullable";
 const TYPE_FIELD: &str = "type";
 const GENERIC_TYPE: &str = "generic_type";
 const SCOPED_TYPE_IDENTIFIER: &str = "scoped_type_identifier";
+const ARRAY_TYPE: &str = "array_type";
 
 // Si el tipo calificado del parámetro lleva `@Nullable` en su último tramo (`Spliterator.@Nullable
-// OfInt`, `java.util.@Nullable Optional<T>`), donde la anotación no queda entre los modificadores.
+// OfInt`, `java.util.@Nullable Optional<T>`), o si es un arreglo `char @Nullable []`, donde la
+// anotación no queda entre los modificadores.
 pub fn has_nullable_qualified_type(name: Node<'_>, source: &[u8]) -> bool {
-    let Some(written) = name
-        .parent()
-        .and_then(|parameter| parameter.child_by_field_name(TYPE_FIELD))
-    else {
+    let Some(parameter) = name.parent() else {
         return false;
     };
+    let Some(written) = parameter.child_by_field_name(TYPE_FIELD) else {
+        return false;
+    };
+    if written.kind() == ARRAY_TYPE {
+        return declares_nullable_type(parameter, source);
+    }
     let qualified = if written.kind() == GENERIC_TYPE {
         named_children(written).into_iter().next()
     } else {
@@ -55,6 +61,12 @@ fn closest_bound_is_nullable(name: Node<'_>, source: &[u8]) -> Option<bool> {
         current = node.parent();
     }
     None
+}
+
+// Si `written` es una variable de tipo declarada en el método o en las clases que encierran al nodo.
+pub fn is_type_parameter_in_scope(node: Node<'_>, written: &str, source: &[u8]) -> bool {
+    std::iter::successors(node.parent(), Node::parent)
+        .any(|scope| declared_bound_is_nullable(scope, written, source).is_some())
 }
 
 fn declared_bound_is_nullable(declaration: Node<'_>, written: &str, source: &[u8]) -> Option<bool> {

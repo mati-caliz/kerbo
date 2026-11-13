@@ -5,6 +5,7 @@ use super::summary_codec::{
 };
 use crate::index::java::{Declaration, Dereferenced, NullInference, Parameter, ParameterNullness, Reading};
 use crate::lint::java_calls::{Arity, Body, ReturnType, Returns};
+use crate::lint::java_nullable_fields::ReturnNullness;
 use crate::lint::java_owner::{NullMarking, Owner, OwnerKind};
 
 const INFERENCE_OVERRIDABLE: u64 = 0;
@@ -23,8 +24,9 @@ const OWNER_RECORD: u64 = 3;
 const OWNER_ANNOTATION: u64 = 4;
 const OWNER_LOCAL: u64 = 5;
 const NULLNESS_UNANNOTATED: u64 = 0;
-const NULLNESS_ANNOTATED: u64 = 1;
+const NULLNESS_NULLABLE: u64 = 1;
 const NULLNESS_NULLABLE_VARIABLE: u64 = 2;
+const NULLNESS_NON_NULL: u64 = 3;
 const MARKING_UNSPECIFIED: u64 = 0;
 const MARKING_MARKED: u64 = 1;
 const MARKING_UNMARKED: u64 = 2;
@@ -41,6 +43,7 @@ pub(super) fn write_declaration(writer: &mut Writer, declaration: &Declaration) 
     write_flag(writer, declaration.overrides);
     write_flag(writer, declaration.body == Body::Written);
     write_flag(writer, declaration.arity == Arity::Variadic);
+    write_flag(writer, declaration.return_nullness == ReturnNullness::Nullable);
     match &declaration.returns {
         Returns::Nothing => writer.number(RETURNS_NOTHING),
         Returns::Always(value) => {
@@ -68,7 +71,8 @@ pub(super) fn write_declaration(writer: &mut Writer, declaration: &Declaration) 
         write_position(writer, &parameter.position);
         writer.number(match parameter.nullness {
             ParameterNullness::Unannotated => NULLNESS_UNANNOTATED,
-            ParameterNullness::Annotated => NULLNESS_ANNOTATED,
+            ParameterNullness::Nullable => NULLNESS_NULLABLE,
+            ParameterNullness::NonNull => NULLNESS_NON_NULL,
             ParameterNullness::NullableVariable => NULLNESS_NULLABLE_VARIABLE,
         });
         writer.number(match parameter.dereferenced {
@@ -101,11 +105,24 @@ pub(super) fn write_owner(writer: &mut Writer, owner: &Owner) {
     });
     writer.text(&owner.name);
     writer.list(&owner.annotations, |writer, name| writer.text(name));
-    writer.number(match owner.null_marking {
+    write_marking(writer, owner.null_marking);
+}
+
+pub(super) fn write_marking(writer: &mut Writer, marking: NullMarking) {
+    writer.number(match marking {
         NullMarking::Unspecified => MARKING_UNSPECIFIED,
         NullMarking::Marked => MARKING_MARKED,
         NullMarking::Unmarked => MARKING_UNMARKED,
     });
+}
+
+pub(super) fn read_marking(reader: &mut Reader<'_>) -> Result<NullMarking, Corrupt> {
+    Ok(match reader.number()? {
+        MARKING_UNSPECIFIED => NullMarking::Unspecified,
+        MARKING_MARKED => NullMarking::Marked,
+        MARKING_UNMARKED => NullMarking::Unmarked,
+        _ => return Err(Corrupt),
+    })
 }
 
 pub(super) fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, Corrupt> {
@@ -125,6 +142,11 @@ pub(super) fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, C
             Arity::Variadic
         } else {
             Arity::Fixed
+        },
+        return_nullness: if read_flag(reader)? {
+            ReturnNullness::Nullable
+        } else {
+            ReturnNullness::Unannotated
         },
         returns: match reader.number()? {
             RETURNS_NOTHING => Returns::Nothing,
@@ -152,7 +174,8 @@ pub(super) fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, C
                 position: read_position(reader)?,
                 nullness: match reader.number()? {
                     NULLNESS_UNANNOTATED => ParameterNullness::Unannotated,
-                    NULLNESS_ANNOTATED => ParameterNullness::Annotated,
+                    NULLNESS_NULLABLE => ParameterNullness::Nullable,
+                    NULLNESS_NON_NULL => ParameterNullness::NonNull,
                     NULLNESS_NULLABLE_VARIABLE => ParameterNullness::NullableVariable,
                     _ => return Err(Corrupt),
                 },
@@ -191,11 +214,6 @@ pub(super) fn read_owner(reader: &mut Reader<'_>) -> Result<Owner, Corrupt> {
         },
         name: reader.text()?,
         annotations: reader.list(Reader::text)?,
-        null_marking: match reader.number()? {
-            MARKING_UNSPECIFIED => NullMarking::Unspecified,
-            MARKING_MARKED => NullMarking::Marked,
-            MARKING_UNMARKED => NullMarking::Unmarked,
-            _ => return Err(Corrupt),
-        },
+        null_marking: read_marking(reader)?,
     })
 }

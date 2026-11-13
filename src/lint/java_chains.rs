@@ -5,6 +5,7 @@ use tree_sitter::Node;
 use super::java::{NAME_FIELD, text};
 use super::java_null_checks::{checked_expression, is_stable_call};
 use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
+use super::java_receiver_arguments::receiver_arguments;
 use super::java_receivers::{StaticImports, Variables, enclosing_types};
 use super::java_throws::ArgumentKind;
 use super::java_unboxing::unboxed_at;
@@ -53,12 +54,14 @@ pub struct ChainStep {
 
 // `respuesta.getBody().error()`: la raíz y los pasos en orden. Interesan las de al menos dos pasos,
 // donde el resultado de una llamada se usa para llamar a otra, y las que terminan desempaquetadas
-// (`return jdbc.queryForObject(...)` en un método que devuelve `long`), con dónde empiezan.
+// (`return jdbc.queryForObject(...)` en un método que devuelve `long`), con dónde empiezan, y las
+// que se pasan directo como argumento de otra llamada (`Splitter.on(PATH_SEPARATOR.value())`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chain {
     pub root: ChainRoot,
     pub steps: Vec<ChainStep>,
     pub unboxed: Option<(usize, usize)>,
+    pub passed_as: Option<Box<NullArgument>>,
 }
 
 // Lo que se sabe del archivo hasta el punto que se recorre: lo que ya se chequeó contra null (por
@@ -97,6 +100,7 @@ impl NullFacts {
         else {
             return;
         };
+        let receiver_arguments = receiver_arguments(node, source);
         for (index, argument) in arguments.iter().enumerate() {
             if argument.kind() != INVOCATION {
                 continue;
@@ -112,6 +116,7 @@ impl NullFacts {
                 column: one_based(start.column),
                 cast: None,
                 exact: false,
+                receiver_arguments: receiver_arguments.clone(),
             };
             self.passed
                 .entry(compact(text(*argument, source)))
@@ -152,6 +157,17 @@ impl NullFacts {
         self.checked.contains(&compact(text(expression, source)))
     }
 
+    // La llamada que recibe la expresión como uno de sus argumentos, si la recibe así.
+    fn passed_as(&self, expression: Node<'_>, source: &[u8]) -> Option<Box<NullArgument>> {
+        let start = expression.start_position();
+        self.passed
+            .get(&compact(text(expression, source)))?
+            .iter()
+            .map(|(_, used)| used)
+            .find(|used| used.line == one_based(start.row) && used.column == one_based(start.column))
+            .map(|used| Box::new(used.clone()))
+    }
+
     fn passed_before(&self, expression: Node<'_>, source: &[u8]) -> Vec<NullArgument> {
         self.passed
             .get(&compact(text(expression, source)))
@@ -182,7 +198,13 @@ pub fn chain_of(
     let (root, steps) = walk(invocation, source, variables, facts)?;
     facts.remember_dereferenced(invocation, source);
     let unboxed = unboxed_at(invocation, source);
-    (steps.len() > 1 || unboxed.is_some()).then_some(Chain { root, steps, unboxed })
+    let passed_as = facts.passed_as(invocation, source);
+    (steps.len() > 1 || unboxed.is_some() || passed_as.is_some()).then_some(Chain {
+        root,
+        steps,
+        unboxed,
+        passed_as,
+    })
 }
 
 // La cadena que da valor a una variable, de un paso o más (`manager.getCache(nombre)`).
@@ -192,6 +214,7 @@ pub fn origin_chain(invocation: Node<'_>, source: &[u8], variables: &Variables) 
         root,
         steps,
         unboxed: None,
+        passed_as: None,
     })
 }
 

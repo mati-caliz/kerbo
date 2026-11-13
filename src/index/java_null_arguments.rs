@@ -1,13 +1,14 @@
 use super::java::{
     Declaration, Dereferenced, JavaSummary, NullInference, Parameter, ParameterNullness, Position, lint_at,
 };
-use super::java_dereference::may_return_null;
+use super::java_dereference::{known_not_null, may_return_null};
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body};
 use crate::lint::java_null_flow::{NullFlow, NullOrigin};
 use crate::lint::java_null_inference::{ARRAY_SUFFIX, NullArgument};
+use crate::lint::java_receiver_arguments::ArgumentNullness;
 use crate::lint::java_receivers::{Receiver, simple_type_name};
 use crate::rules::JavaRule;
 
@@ -25,8 +26,8 @@ const LIBRARY_NON_NULL: &[(&str, &str, usize, usize, &str)] = &[
 // Calca el "Passing 'null' argument to parameter annotated as non-null" de DataFlowIssue con lo que
 // IntelliJ infiere sin anotaciones: un parámetro que el método desreferencia en todos los caminos es
 // no nulo, si nadie puede redefinir el método. Con sobrecargas, todas tienen que coincidir. También
-// el "Argument might be null": una variable asignada desde una llamada que puede devolver null y
-// pasada así a ese parámetro.
+// el "Argument might be null": una llamada que puede devolver null, o una variable asignada desde
+// una, pasada así a ese parámetro.
 pub fn null_arguments(
     types: &ProjectTypes<'_>,
     library: &Library,
@@ -38,10 +39,17 @@ pub fn null_arguments(
         .filter(|flow| !flow.arguments.is_empty())
         .filter(|flow| reaches(types, library, summary, flow))
         .flat_map(|flow| &flow.arguments);
+    let nullable_calls = summary.chains.iter().filter_map(|chain| {
+        let argument = chain.passed_as.as_deref()?;
+        let last = chain.steps.last()?;
+        (may_return_null(types, library, summary, chain) && !known_not_null(types, library, summary, last))
+            .then_some(argument)
+    });
     summary
         .null_arguments
         .iter()
         .chain(possibly_null)
+        .chain(nullable_calls)
         .filter_map(|argument| {
             let parameter = non_null_parameter(types, library, summary, argument)?;
             Some(lint_at(
@@ -134,7 +142,8 @@ pub(super) fn non_null_parameter(
         .iter()
         .map(|(declaring, declaration, parameter, slot)| {
             (*slot == Slot::Whole && inferred_non_null(declaration, parameter, argument)
-                || marked_non_null(types, declaring, declaration, parameter))
+                || marked_non_null(types, declaring, declaration, parameter)
+                || substituted_non_null(types, summary, (*declaring, *declaration, *parameter), argument))
             .then(|| parameter.name.clone())
         });
     let first = names.next()??;
@@ -142,11 +151,12 @@ pub(super) fn non_null_parameter(
 }
 
 // Lo que IntelliJ infiere sin anotaciones: el método lo desreferencia antes que nada y nadie lo
-// puede redefinir (o se sabe cuál se llama).
+// puede redefinir (o se sabe cuál se llama), y no lo declara `@Nullable`.
 fn inferred_non_null(declaration: &Declaration, parameter: &Parameter, argument: &NullArgument) -> bool {
     (declaration.inference != NullInference::Overridable || argument.exact)
         && declaration.body == Body::Written
         && parameter.dereferenced == Dereferenced::AlwaysFirst
+        && parameter.nullness != ParameterNullness::Nullable
 }
 
 // Bajo `@NullMarked`, un parámetro sin anotar es no nulo salvo que su tipo sea una variable que
@@ -159,6 +169,50 @@ fn marked_non_null(
 ) -> bool {
     types.is_null_marked(declaring, &declaration.owner)
         && parameter.nullness == ParameterNullness::Unannotated
+}
+
+// Bajo `@NullMarked` de los dos lados, un parámetro cuyo tipo es una variable de tipo de la clase
+// que admite null deja de admitirlo si el receptor se declara con un tipo concreto en su lugar
+// (`Multiset<String> ms` en `ms.setCount(null, 1, 0)`).
+fn substituted_non_null(
+    types: &ProjectTypes<'_>,
+    caller: &JavaSummary,
+    (declaring, declaration, parameter): (&JavaSummary, &Declaration, &Parameter),
+    argument: &NullArgument,
+) -> bool {
+    let receiver = &argument.receiver_arguments;
+    let declared_on_receiver = match &argument.receiver {
+        Receiver::Type(written) => simple_type_name(written) == declaration.owner.name,
+        Receiver::Scope(_) | Receiver::Unknown => false,
+    };
+    if parameter.nullness != ParameterNullness::NullableVariable
+        || !declared_on_receiver
+        || !types.is_null_marked(declaring, &declaration.owner)
+        || !types.is_marked(caller, receiver.marking)
+        || declares_method_variable(declaring, declaration, &parameter.type_name)
+    {
+        return false;
+    }
+    declaring
+        .generics
+        .types
+        .iter()
+        .find(|generics| generics.name == declaration.owner.name)
+        .and_then(|generics| {
+            generics
+                .parameters
+                .iter()
+                .position(|name| *name == parameter.type_name)
+        })
+        .is_some_and(|position| receiver.arguments.get(position) == Some(&ArgumentNullness::Concrete))
+}
+
+fn declares_method_variable(declaring: &JavaSummary, declaration: &Declaration, variable: &str) -> bool {
+    declaring.generics.methods.iter().any(|method| {
+        method.line == declaration.position.line
+            && method.column == declaration.position.column
+            && method.parameters.iter().any(|name| name == variable)
+    })
 }
 
 // Si la sobrecarga puede recibir este `null`: un primitivo no, y con un casteo sólo la del tipo

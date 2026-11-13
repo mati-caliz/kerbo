@@ -124,13 +124,14 @@ fn null_arguments(sources: &[&str]) -> Vec<String> {
 }
 
 // Bajo `@NullMarked` del paquete, un parámetro sin anotar es no nulo aunque el método no tenga
-// cuerpo: no si dice `@Nullable`, si su tipo es una variable que admite null o si el tipo dice
-// `@NullUnmarked`, ni si el tipo calificado lleva `@Nullable` en su último tramo.
+// cuerpo: no si dice `@Nullable`, si su tipo es una variable que admite null (salvo que el
+// receptor la fije en un tipo concreto, como `Box<String>`) o si el tipo dice `@NullUnmarked`, ni
+// si el tipo calificado lleva `@Nullable` en su último tramo.
 #[test]
 fn null_marked_parameters_are_non_null_unless_they_admit_null() {
     assert_eq!(
         null_arguments(&[PACKAGE_INFO, MARKED]),
-        ["34:21 text", "36:23 value", "40:18 name"]
+        ["34:21 text", "36:23 value", "39:17 element", "40:18 name"]
     );
 }
 
@@ -161,4 +162,35 @@ fn null_reaches_type_variables_through_casts_and_varargs_elements() {
         ]
     );
     assert_eq!(null_arguments(&[BUILDER]), Vec::<String>::new());
+}
+
+const COUNTS: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+
+interface Counts<E extends @Nullable Object> {
+    int setCount(E element, int count);
+
+    <E extends @Nullable Object> int other(E element);
+}
+
+class Uses {
+    void calls(Counts<String> strings, Counts<@Nullable String> nullable, Counts<?> unknown) {
+        strings.setCount(null, 1);
+        nullable.setCount(null, 1);
+        unknown.setCount(null, 1);
+        strings.other(null);
+    }
+
+    <E extends @Nullable Object> void generic(Counts<E> own) {
+        own.setCount(null, 1);
+    }
+}
+";
+
+// Una variable de tipo que admite null deja de admitirlo con un argumento concreto en el receptor:
+// no con uno `@Nullable`, un comodín, otra variable de tipo o una variable del propio método.
+#[test]
+fn a_concrete_type_argument_makes_a_nullable_type_variable_non_null() {
+    assert_eq!(null_arguments(&[PACKAGE_INFO, COUNTS]), ["13:26 element"]);
 }

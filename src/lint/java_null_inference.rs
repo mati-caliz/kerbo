@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use super::java::{CONSTRUCTOR, FINAL, PRIVATE, STATIC, has_modifier, is_type_declaration, text};
 use super::java_chains::argument_count;
 use super::java_exact_receivers::ExactReceivers;
+use super::java_receiver_arguments::{ReceiverArguments, receiver_arguments};
 use super::java_receivers::{Receiver, StaticImports, Variables, simple_type_name, variable_types};
 use crate::syntax::{named_children, one_based};
 
@@ -56,6 +57,7 @@ pub struct NullArgument {
     pub column: usize,
     pub cast: Option<String>,
     pub exact: bool,
+    pub receiver_arguments: ReceiverArguments,
 }
 
 // Si algún `return` del método devuelve `null`, directo o en una rama de un ternario: IntelliJ
@@ -322,7 +324,8 @@ fn null_arguments(call: Node<'_>, source: &[u8], context: &CallContext<'_>) -> V
             .filter(|object| object.kind() == IDENTIFIER)
             .is_some_and(|object| context.exactly_constructed.contains(object, source));
     let arity = argument_count(call);
-    call.child_by_field_name(ARGUMENTS_FIELD)
+    let mut found: Vec<NullArgument> = call
+        .child_by_field_name(ARGUMENTS_FIELD)
         .map(named_children)
         .unwrap_or_default()
         .into_iter()
@@ -340,7 +343,15 @@ fn null_arguments(call: Node<'_>, source: &[u8], context: &CallContext<'_>) -> V
                 column: one_based(literal.column),
                 cast: cast_type(argument, source),
                 exact,
+                receiver_arguments: ReceiverArguments::default(),
             })
         })
-        .collect()
+        .collect();
+    if !found.is_empty() {
+        let arguments = receiver_arguments(call, source);
+        for argument in &mut found {
+            argument.receiver_arguments = arguments.clone();
+        }
+    }
+    found
 }

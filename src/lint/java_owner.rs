@@ -52,8 +52,9 @@ pub struct Owner {
 // Lo que dice de nulos la declaración más cercana que lo diga (el miembro o un tipo que lo
 // encierra): `@NullMarked` o `@NonNullApi` dan por no nulo lo que no se anota, `@NullUnmarked` lo
 // deshace. Si nadie dice nada, decide el paquete.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum NullMarking {
+    #[default]
     Unspecified,
     Marked,
     Unmarked,
@@ -114,7 +115,7 @@ pub fn owner_of(member: Node<'_>, source: &[u8]) -> Owner {
     }
 }
 
-fn null_marking_of(member: Node<'_>, source: &[u8]) -> NullMarking {
+pub fn null_marking_of(member: Node<'_>, source: &[u8]) -> NullMarking {
     let mut current = Some(member);
     while let Some(node) = current {
         let annotations = annotation_names(node, source);

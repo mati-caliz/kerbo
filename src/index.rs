@@ -9,6 +9,7 @@ mod java_header;
 mod java_jdk;
 mod java_null_arguments;
 mod java_nullness;
+mod java_parameter_nullness;
 mod java_project;
 mod java_resources;
 mod java_rules;

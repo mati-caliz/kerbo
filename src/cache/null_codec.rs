@@ -1,8 +1,10 @@
 use super::codec::{Corrupt, Reader, Writer};
+use super::declaration_codec::{read_marking, write_marking};
 use super::summary_codec::{read_receiver, write_receiver};
 use crate::lint::java_contract_calls::{CallTarget, ContractCall};
 use crate::lint::java_contracts::Constraint;
 use crate::lint::java_null_inference::NullArgument;
+use crate::lint::java_receiver_arguments::{ArgumentNullness, ReceiverArguments};
 
 const CONSTRAINT_ANY: u64 = 0;
 const CONSTRAINT_NULL: u64 = 1;
@@ -12,6 +14,9 @@ const CONSTRAINT_FALSE: u64 = 4;
 const TARGET_CONSTRUCTOR: u64 = 0;
 const TARGET_METHOD: u64 = 1;
 const TARGET_IMPORTED_METHOD: u64 = 2;
+const ARGUMENT_CONCRETE: u64 = 0;
+const ARGUMENT_NULLABLE: u64 = 1;
+const ARGUMENT_UNKNOWN: u64 = 2;
 
 pub fn write_null_argument(writer: &mut Writer, argument: &NullArgument) {
     writer.text(&argument.name);
@@ -23,6 +28,14 @@ pub fn write_null_argument(writer: &mut Writer, argument: &NullArgument) {
     writer.size(argument.column);
     writer.list(argument.cast.as_slice(), |writer, cast| writer.text(cast));
     writer.number(u64::from(argument.exact));
+    write_marking(writer, argument.receiver_arguments.marking);
+    writer.list(&argument.receiver_arguments.arguments, |writer, nullness| {
+        writer.number(match nullness {
+            ArgumentNullness::Concrete => ARGUMENT_CONCRETE,
+            ArgumentNullness::Nullable => ARGUMENT_NULLABLE,
+            ArgumentNullness::Unknown => ARGUMENT_UNKNOWN,
+        });
+    });
 }
 
 pub fn read_null_argument(reader: &mut Reader<'_>) -> Result<NullArgument, Corrupt> {
@@ -36,6 +49,15 @@ pub fn read_null_argument(reader: &mut Reader<'_>) -> Result<NullArgument, Corru
         column: reader.size()?,
         cast: reader.list(Reader::text)?.into_iter().next(),
         exact: reader.number()? != 0,
+        receiver_arguments: ReceiverArguments {
+            marking: read_marking(reader)?,
+            arguments: reader.list(|reader| match reader.number()? {
+                ARGUMENT_CONCRETE => Ok(ArgumentNullness::Concrete),
+                ARGUMENT_NULLABLE => Ok(ArgumentNullness::Nullable),
+                ARGUMENT_UNKNOWN => Ok(ArgumentNullness::Unknown),
+                _ => Err(Corrupt),
+            })?,
+        },
     })
 }
 

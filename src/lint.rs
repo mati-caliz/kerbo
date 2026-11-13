@@ -36,6 +36,7 @@ mod java_optional;
 mod java_order;
 pub mod java_owner;
 mod java_padding;
+pub mod java_receiver_arguments;
 pub mod java_receivers;
 pub mod java_resources;
 mod java_results;

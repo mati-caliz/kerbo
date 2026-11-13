@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use super::java::{Declaration, Dereferenced, Field, JavaSummary, ParameterNullness, lint_at};
+use super::java::{Declaration, Dereferenced, Field, JavaSummary, lint_at};
 use super::java_project::IndexedSummary;
 use crate::jvm::class_file::ClassFile;
 use crate::jvm::library::Library;
@@ -55,7 +55,12 @@ impl<'summary> ProjectTypes<'summary> {
     // Si lo que declara un tipo del proyecto sin anotar es no nulo: por `@NullMarked` en él, en uno
     // que lo encierra o en su paquete.
     pub fn is_null_marked(&self, summary: &JavaSummary, owner: &Owner) -> bool {
-        match owner.null_marking {
+        self.is_marked(summary, owner.null_marking)
+    }
+
+    // Si el código del archivo con esa marca da por no nulo lo que no se anota.
+    pub fn is_marked(&self, summary: &JavaSummary, marking: NullMarking) -> bool {
+        match marking {
             NullMarking::Marked => true,
             NullMarking::Unmarked => false,
             NullMarking::Unspecified => self.null_marked_packages.contains(summary.package.as_str()),
@@ -209,7 +214,7 @@ fn unannotated_parameters(declaration: &Declaration, method: &Method, label: &st
         .iter()
         .zip(&method.parameter_annotations)
         .filter(|(parameter, inherited)| {
-            parameter.nullness != ParameterNullness::Annotated
+            !parameter.nullness.is_annotated()
                 && parameter.dereferenced == Dereferenced::No
                 && !inherited.iter().any(|annotation| is_nullable(annotation))
         })

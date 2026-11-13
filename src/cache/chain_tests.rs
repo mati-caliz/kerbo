@@ -3,6 +3,8 @@ use super::codec::{Reader, Writer};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin};
 use crate::lint::java_null_inference::NullArgument;
+use crate::lint::java_owner::NullMarking;
+use crate::lint::java_receiver_arguments::{ArgumentNullness, ReceiverArguments};
 use crate::lint::java_receivers::Receiver;
 
 #[test]
@@ -22,6 +24,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
                 passed_before: Vec::new(),
             }],
             unboxed: Some((12, 16)),
+            passed_as: None,
         }),
         dereferences: vec![Dereference {
             name: "intValue".to_owned(),
@@ -38,6 +41,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
             column: 30,
             cast: None,
             exact: false,
+            receiver_arguments: ReceiverArguments::default(),
         }],
         passed_before: Vec::new(),
     };
@@ -56,6 +60,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
                 })
                 .collect(),
             unboxed: None,
+            passed_as: flow.arguments.first().cloned().map(Box::new),
         }),
         dereferences: Vec::new(),
         arguments: Vec::new(),
@@ -143,6 +148,14 @@ fn null_arguments_survive_the_round_trip() {
         column: 88,
         cast: Some("boolean[][]".to_owned()),
         exact: false,
+        receiver_arguments: ReceiverArguments {
+            marking: NullMarking::Marked,
+            arguments: vec![
+                ArgumentNullness::Concrete,
+                ArgumentNullness::Nullable,
+                ArgumentNullness::Unknown,
+            ],
+        },
     };
     let mut writer = Writer::default();
     write_null_argument(&mut writer, &argument);

@@ -4,7 +4,7 @@ use tree_sitter::Node;
 
 use super::java_exposure::{DeclaredType, Exposure, exposures};
 use super::java_header::{imported_paths, package_annotations, package_of};
-use crate::lint::java::VARIABLE_DECLARATOR;
+use super::java_parameter_nullness::parameter_nullness;
 use crate::lint::java_calls::{
     Arity, Body, Call, Callable, ResultUse, ReturnType, Returns, TYPE_DECLARATIONS, Visibility, extract,
 };
@@ -20,25 +20,24 @@ use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_null_inference::{
     NullArgument, accepts_null, is_overridable, null_arguments_in, parameter_type_name, returns_null,
 };
-use crate::lint::java_nullable_fields::declares_nullable;
-use crate::lint::java_owner::{Owner, annotation_names};
+use crate::lint::java_nullable_fields::{ReturnNullness, declares_nullable, return_nullness};
+use crate::lint::java_owner::Owner;
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
 use crate::lint::java_throws::MethodThrows;
-use crate::lint::java_type_variables::{
-    has_nullable_qualified_type, has_nullable_type_variable, is_type_variable,
-};
+use crate::lint::java_type_variables::is_type_variable;
 use crate::lint::taint::TaintMethod;
 use crate::lint::{LintFinding, LintKind};
 use crate::rules::JavaRule;
 use crate::syntax::descendants;
 use crate::syntax::{named_children, one_based};
 
+pub use super::java_parameter_nullness::ParameterNullness;
+
 const BODY_FIELD: &str = "body";
 const IDENTIFIER: &str = "identifier";
 // Los componentes de un record son sus campos: siempre se usan.
 const RECORD: &str = "record_declaration";
-const NULLNESS_ANNOTATIONS: &[&str] = &["Nullable", "NonNull", "NotNull", "Nonnull", "CheckForNull"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Position {
@@ -56,15 +55,6 @@ pub struct Parameter {
     pub type_name: String,
     pub type_variable: bool,
     pub accepts_null: bool,
-}
-
-// Lo que el parámetro dice de su nulabilidad: una anotación (`@Nullable`, `@NonNull`...), nada, o
-// nada pero con un tipo que es una variable que admite null (`<T extends @Nullable Object>`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParameterNullness {
-    Unannotated,
-    Annotated,
-    NullableVariable,
 }
 
 // Si el cuerpo del método nombra al parámetro (un método sin cuerpo o un record, siempre).
@@ -112,6 +102,7 @@ pub struct Declaration {
     pub annotations: Vec<String>,
     pub owner: Owner,
     pub fail_clauses: Vec<Clause>,
+    pub return_nullness: ReturnNullness,
 }
 
 // Un campo tal como lo necesita el índice para saber si alguien lo usa.
@@ -228,32 +219,6 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
     summary
 }
 
-// Si el parámetro dice algo de su nulabilidad (`@Nullable`, `@NonNull`, `@NotNull`...).
-fn declares_nullness(name: Node<'_>, source: &[u8]) -> bool {
-    name.parent()
-        .and_then(|parent| {
-            if parent.kind() == VARIABLE_DECLARATOR {
-                parent.parent()
-            } else {
-                Some(parent)
-            }
-        })
-        .map(|parameter| annotation_names(parameter, source))
-        .unwrap_or_default()
-        .iter()
-        .any(|annotation| NULLNESS_ANNOTATIONS.contains(&annotation.as_str()))
-}
-
-fn parameter_nullness(name: Node<'_>, source: &[u8]) -> ParameterNullness {
-    if declares_nullness(name, source) || has_nullable_qualified_type(name, source) {
-        ParameterNullness::Annotated
-    } else if has_nullable_type_variable(name, source) {
-        ParameterNullness::NullableVariable
-    } else {
-        ParameterNullness::Unannotated
-    }
-}
-
 // Los nombres que se leen en el cuerpo: un parámetro que no aparece no se usa.
 fn read_names(callable: &Callable<'_>, source: &[u8]) -> HashSet<String> {
     callable
@@ -306,6 +271,7 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
     };
     Declaration {
         fail_clauses,
+        return_nullness: return_nullness(method, source),
         name: callable.name,
         scope: scope.to_owned(),
         position: position_of(callable.name_node),

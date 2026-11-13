@@ -104,6 +104,32 @@ pub fn declared_arguments(usage: Node<'_>, name: &str, source: &[u8]) -> Option<
         .filter(|arguments| !arguments.is_empty())
 }
 
+// El tipo escrito con que se declara una variable: en la lambda o el método que la usa más cercano
+// que la declare, si no en la clase de nivel superior. Si ahí se declara con tipos distintos o sin
+// tipo escrito, no se sabe.
+pub fn declared_type<'tree>(usage: Node<'tree>, name: &str, source: &[u8]) -> Option<Node<'tree>> {
+    let top_level = ancestors(usage)
+        .filter(|node| TYPE_DECLARATIONS.contains(&node.kind()))
+        .last();
+    let declarations = ancestors(usage)
+        .filter(|node| METHODS.contains(&node.kind()))
+        .chain(top_level)
+        .map(|scope| {
+            descendants(scope)
+                .into_iter()
+                .flat_map(declared_by)
+                .filter(|(variable, _)| text(*variable, source) == name)
+                .map(|(_, written)| written)
+                .collect::<Vec<_>>()
+        })
+        .find(|found| !found.is_empty())?;
+    let first = declarations.first().copied().flatten()?;
+    declarations
+        .iter()
+        .all(|written| written.is_some_and(|other| text(other, source) == text(first, source)))
+        .then_some(first)
+}
+
 fn ancestors(node: Node<'_>) -> impl Iterator<Item = Node<'_>> {
     std::iter::successors(node.parent(), Node::parent)
 }
@@ -181,7 +207,11 @@ pub fn receiver_of(invocation: Node<'_>, source: &[u8], variables: &Variables) -
                 None if name.starts_with(|first: char| first.is_ascii_uppercase()) => {
                     Receiver::Type(name.to_owned())
                 }
-                Some(None) | None => Receiver::Unknown,
+                Some(None) => declared_type(object, name, source)
+                    .map(|written| simple_type_name(text(written, source)))
+                    .filter(|declared| declared != INFERRED)
+                    .map_or(Receiver::Unknown, Receiver::Type),
+                None => Receiver::Unknown,
             }
         }
         FIELD_ACCESS

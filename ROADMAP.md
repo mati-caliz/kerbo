@@ -1790,8 +1790,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned` y `failing-call`):
   commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno de más en los dos.
-  En guava, 368 de los 972 (229 `data-flow-issue`, 138 `null-argument`, 1 `failing-call`), ninguno
-  de más. Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
+  En guava, 479 de los 972 (301 `data-flow-issue`, 177 `null-argument`, 1 `failing-call`), con 3
+  `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
   `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
   calificador. El campo de una variable de tipo conocido (`segment.table`) entra al flujo con su
@@ -1803,8 +1803,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   arreglo): el elemento sólo es no nulo por `@NullMarked`, no por desreferencias del cuerpo. Lo
   que falta de guava, lo más grande: campos `@Nullable` calificados con un acceso a arreglo
   (`map.segments[0].table`), el estado que IntelliJ olvida en cada llamada (marca dos veces el
-  mismo campo con un `segment.expand()` en el medio), getters `@Nullable` de interfaces del proyecto, campos
-  `volatile` que IntelliJ olvida en cada llamada, receptores heredados o getters para el JDK, `ConcurrentMap.putIfAbsent`/`replace`/`remove`, `Multiset.setCount`. Bajo `@NullMarked`/`@NonNullApi` (del paquete, la clase o las que la encierran, cortado
+  mismo campo con un `segment.expand()` en el medio), campos
+  `volatile` que IntelliJ olvida en cada llamada, receptores heredados o getters para el JDK, `ConcurrentMap.putIfAbsent`/`replace`/`remove`. Bajo `@NullMarked`/`@NonNullApi` (del paquete, la clase o las que la encierran, cortado
   por `@NullUnmarked`) un parámetro sin anotar es no nulo aunque el método se pueda redefinir; no
   si su tipo es una variable con límite `@Nullable` o el tipo calificado lleva `@Nullable` en su
   último tramo (`Spliterator.@Nullable OfInt`). Un método traído con `import static` explícito se
@@ -1818,6 +1818,17 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   always fails, according to its method contracts" con las cláusulas `fail` que IntelliJ infiere
   del cuerpo y las escritas a mano de Validate, Spring Assert, JUnit y TestNG, con receptores
   calificados con el paquete y variables que un `if` chequeó no nulas.
+  Un método del proyecto que se declara `@Nullable` (también `@CheckForNull` y `char @Nullable []`)
+  devuelve posiblemente null; la raíz de una cadena puede ser una constante traída con
+  `import static` (un valor de enum o un campo estático); y una llamada que puede devolver null
+  pasada directo a un parámetro no nulo da "Argument might be null" (`Splitter.on(X.value())`).
+  Un parámetro anotado `@Nullable` (también `char @Nullable []`) no se infiere no nulo por
+  desreferenciarlo. Bajo `@NullMarked` del que llama y del método, un parámetro cuyo tipo es una
+  variable de la clase con límite `@Nullable` es no nulo si el receptor se declara con un tipo
+  concreto en ese lugar (`Multiset<String> ms` en `ms.setCount(null, 1, 0)`); no con `@Nullable
+  String`, un comodín u otra variable de tipo, ni si el método declara su propia variable. Una
+  variable que el archivo declara con tipos distintos toma el tipo de la lambda o el método más
+  cercano que la declara.
   Falta:
   - `assertNull` sobre lo que devuelve un método del proyecto (5 en commons-lang, sobre
     `getIfEmpty`, `getIfBlank` y `applyNonNull`): IntelliJ marca la de 3 argumentos y no la de 4
@@ -1833,11 +1844,17 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   - El flujo de nulos sigue un solo flujo por variable: al juntar ramas queda el más viejo. Dos
     asignaciones distintas en ramas distintas no se siguen a la vez.
   - guava: los receptores que son campos heredados o getters (`collection`, `getMap()` en los
-    testers de testlib) para los parámetros no nulos del JDK, la inferencia por contexto
-    (`Suppliers.ofInstance(null)`), los tipos genéricos `K`/`V` no nulos de
-    `ConcurrentMap.putIfAbsent`/`replace`/`remove` con null, el "Argument might be null" de `e0()`/`e1()`, el `@Nullable` de un método
-    de interfaz del proyecto (`ReferenceEntry.getValueReference()` en LocalCacheTest) y las
-    desreferencias de `getSubscriber()`.
+    testers de testlib, `held.escape(null)`, `getEscaper().escape(null)`), la inferencia por
+    contexto (`Suppliers.ofInstance(null)`, `immutableEntry(null, 1)` pasado a `builder.put`), los
+    tipos genéricos `K`/`V` no nulos de `ConcurrentMap.putIfAbsent`/`replace`/`remove` y de las
+    interfaces del JDK (`Comparator<Integer>.compare`, `Map<Integer, Integer>.put`), el
+    "Argument might be null" de `e0()`/`e1()` (variable de tipo con límite `@Nullable` devuelta
+    dentro de una clase anónima), el de una llamada encadenada como receptor
+    (`Splitter.on(...).split(X.value())`), el de `parseInt`/`Ints.tryParse` y las desreferencias
+    de `getSubscriber()`.
+  - guava, 3 de más en LocalCacheTest (1062, 2408, 2449): el `entry` que devuelve `getEntry`.
+    IntelliJ le infiere un contrato `null -> null` y no marca después el argumento; kerbo no
+    infiere contratos sobre lo que devuelve un método.
   - Las sobrecargas del proyecto se eligen por el tipo exacto de los argumentos que se conocen
     (variables y casteos); un subtipo no elige la sobrecarga más específica.
   - La asignación repetida sólo se sigue en línea recta dentro de un bloque: falta la que viene

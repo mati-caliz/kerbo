@@ -6,6 +6,8 @@ use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body, ReturnType};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
+use crate::lint::java_nullable_fields::ReturnNullness;
+use crate::lint::java_owner::OwnerKind;
 use crate::rules::JavaRule;
 
 const QUALIFIER_SEPARATOR: char = '.';
@@ -72,7 +74,7 @@ pub(super) fn may_return_null(
 }
 
 // Si antes se chequeó contra null o se pasó a un parámetro que no puede ser null.
-fn known_not_null(
+pub(super) fn known_not_null(
     types: &ProjectTypes<'_>,
     library: &Library,
     summary: &JavaSummary,
@@ -103,8 +105,7 @@ fn nullable_steps(
     summary: &JavaSummary,
     chain: &Chain,
 ) -> Vec<bool> {
-    let (ChainRoot::Instance(root) | ChainRoot::Class(root)) = &chain.root;
-    let mut current = resolve(types, library, summary, root);
+    let mut current = resolve_root(types, library, summary, &chain.root);
     let mut nullable = Vec::new();
     for step in &chain.steps {
         if let Resolved::Project(owner) = &current
@@ -166,8 +167,51 @@ fn nullable_steps(
     nullable
 }
 
-// Un paso que va a un método del proyecto (de la clase o de las de arriba en el proyecto): IntelliJ
-// lo infiere `@Nullable` si devuelve `null` en algún `return` y nadie puede redefinirlo. Sigue por
+// El tipo de la raíz: el de la variable, la clase, o el de una constante importada con
+// `import static` (`OS_NAME.value()`), que es un valor de su enum o un campo estático.
+fn resolve_root(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    root: &ChainRoot,
+) -> Resolved {
+    match root {
+        ChainRoot::Instance(written) => resolve(types, library, summary, written),
+        ChainRoot::Class(written) => imported_constant(types, library, summary, written)
+            .unwrap_or_else(|| resolve(types, library, summary, written)),
+    }
+}
+
+fn imported_constant(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    name: &str,
+) -> Option<Resolved> {
+    if types.is_declared(name) {
+        return None;
+    }
+    let imported_from = summary.static_imports.iter().find_map(|path| {
+        let (owner, member) = path.rsplit_once(QUALIFIER_SEPARATOR)?;
+        (member == name).then_some(owner)
+    })?;
+    let Resolved::Project(owner) = resolve(types, library, summary, imported_from) else {
+        return None;
+    };
+    if let Some((declaring, field)) = types.field_of(&owner, name) {
+        return field
+            .is_static
+            .then(|| resolve(types, library, declaring, &field.type_name));
+    }
+    let is_enum = types
+        .declarations_of(&owner)
+        .any(|(_, declaration)| declaration.owner.kind == OwnerKind::Enum);
+    is_enum.then_some(Resolved::Project(owner))
+}
+
+// Un paso que va a un método del proyecto (de la clase o de las de arriba en el proyecto): es
+// `@Nullable` si lo declara así, o si IntelliJ lo infiere: devuelve `null` en algún `return` y
+// nadie puede redefinirlo. Sigue por
 // el tipo que declara, si todas las sobrecargas dicen el mismo. Como Java, una sobrecarga de aridad
 // fija gana a una varargs, y la que declara justo el tipo conocido de cada argumento gana al resto.
 fn project_step(
@@ -200,7 +244,9 @@ fn project_step(
         (!chosen.is_empty()).then_some(chosen)
     })?;
     let is_nullable = candidates.iter().all(|(_, declaration)| {
-        declaration.inference == NullInference::ClosedReturnsNull && declaration.body == Body::Written
+        declaration.return_nullness == ReturnNullness::Nullable
+            || (declaration.inference == NullInference::ClosedReturnsNull
+                && declaration.body == Body::Written)
     });
     let mut returned = candidates.iter().map(|(declaring, declaration)| {
         (declaration.return_type == ReturnType::Reference)

@@ -51,6 +51,13 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
         }
         None => writer.number(ABSENT),
     }
+    match &chain.passed_as {
+        Some(argument) => {
+            writer.number(PRESENT);
+            write_null_argument(writer, argument);
+        }
+        None => writer.number(ABSENT),
+    }
 }
 
 pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
@@ -76,6 +83,11 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
         unboxed: match reader.number()? {
             ABSENT => None,
             PRESENT => Some((reader.size()?, reader.size()?)),
+            _ => return Err(Corrupt),
+        },
+        passed_as: match reader.number()? {
+            ABSENT => None,
+            PRESENT => Some(Box::new(read_null_argument(reader)?)),
             _ => return Err(Corrupt),
         },
     })
