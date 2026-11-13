@@ -3,6 +3,8 @@ mod columns;
 mod ddl;
 mod guards;
 mod history;
+mod loops;
+mod migration;
 mod references;
 mod schema;
 mod schema_table;
@@ -18,7 +20,7 @@ use tree_sitter::Node;
 
 use super::Violation;
 use super::script::{Origin, Script};
-use crate::syntax::{descendants, named_children, one_based};
+use crate::syntax::{named_children, one_based};
 use arguments::{Arguments, heredoc_body, heredoc_text, name};
 use schema::Schema;
 
@@ -28,15 +30,9 @@ pub const EXTENSION: &str = "rb";
 
 const DATABASE_DIRECTORY: &str = "db";
 const MIGRATE_DIRECTORY: &str = "migrate";
-const CLASS: &str = "class";
-const METHOD: &str = "method";
-const SINGLETON_METHOD: &str = "singleton_method";
 const CALL: &str = "call";
-const CLASS_EVAL: &str = "class_eval";
 const IDENTIFIER: &str = "identifier";
 const STRING: &str = "string";
-const MIGRATION_MARKER: &str = "Migration";
-const DISABLE_TRANSACTION: &str = "disable_ddl_transaction!";
 const ENTRY_POINTS: &[&str] = &["change", "up"];
 const WRAPPERS: &[&str] = &[
     "safety_assured",
@@ -52,10 +48,6 @@ const RETURN: &str = "return";
 const SQUISH: &str = "squish";
 const HEREDOC_FILTERS: &[&str] = &[SQUISH, "strip_heredoc"];
 const CREATE_JOIN_TABLE: &str = "create_join_table";
-const VERSION_OPEN: char = '[';
-const VERSION_CLOSE: char = ']';
-const VERSION_SEPARATOR: char = '.';
-const FIRST_BIGINT_VERSION: (u32, u32) = (5, 1);
 const DOWN_DIRECTION: &str = "down";
 const EXECUTE: &str = "execute";
 const CREATE_TABLE: &str = "create_table";
@@ -99,14 +91,34 @@ pub fn violations(root: Node<'_>, source: &[u8], path: Option<&Path>) -> Vec<Vio
 }
 
 fn evaluate(root: Node<'_>, source: &[u8], schema: Schema) -> Option<(Script, Schema)> {
-    let class = migration_class(root, source)?;
-    let transactional = !disables_transaction(class, source);
+    if let Some(expansion) = loops::expand(root, source)
+        && let Some(tree) = loops::parse(&expansion.source)
+    {
+        return evaluate_tree(
+            tree.root_node(),
+            expansion.source.as_bytes(),
+            schema,
+            expansion.rows,
+        );
+    }
+    evaluate_tree(root, source, schema, Vec::new())
+}
+
+fn evaluate_tree(
+    root: Node<'_>,
+    source: &[u8],
+    schema: Schema,
+    rows: Vec<usize>,
+) -> Option<(Script, Schema)> {
+    let class = migration::migration_class(root, source)?;
+    let transactional = !migration::disables_transaction(class, source);
     let mut walker = Walker {
         source,
-        integer_ids: uses_integer_ids(class, source),
+        rows,
+        integer_ids: migration::uses_integer_ids(class, source),
         returned: false,
         uncertain: 0,
-        helpers: helpers(root, class, source),
+        helpers: migration::helpers(root, class, source),
         visiting: HashSet::new(),
         schema,
         script: if transactional {
@@ -129,79 +141,9 @@ fn evaluate(root: Node<'_>, source: &[u8], schema: Schema) -> Option<(Script, Sc
     Some((script, walker.schema))
 }
 
-fn migration_class<'tree>(root: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
-    descendants(root).into_iter().find(|node| {
-        node.kind() == CLASS
-            && node
-                .child_by_field_name("superclass")
-                .is_some_and(|superclass| arguments::raw(superclass, source).contains(MIGRATION_MARKER))
-    })
-}
-
-fn uses_integer_ids(class: Node<'_>, source: &[u8]) -> bool {
-    let superclass = class
-        .child_by_field_name("superclass")
-        .map(|superclass| arguments::raw(superclass, source))
-        .unwrap_or_default();
-    let Some(version) = superclass
-        .split_once(VERSION_OPEN)
-        .and_then(|(_, rest)| rest.split_once(VERSION_CLOSE))
-        .map(|(version, _)| version)
-    else {
-        return true;
-    };
-    let mut parts = version
-        .split(VERSION_SEPARATOR)
-        .map(|part| part.trim().parse::<u32>().unwrap_or_default());
-    let major = parts.next().unwrap_or_default();
-    let minor = parts.next().unwrap_or_default();
-    (major, minor) < FIRST_BIGINT_VERSION
-}
-
-fn disables_transaction(class: Node<'_>, source: &[u8]) -> bool {
-    descendants(class)
-        .into_iter()
-        .any(|node| node.kind() == IDENTIFIER && arguments::raw(node, source) == DISABLE_TRANSACTION)
-}
-
-fn helpers<'tree>(root: Node<'tree>, class: Node<'tree>, source: &[u8]) -> HashMap<String, Node<'tree>> {
-    let mut found = HashMap::new();
-    let class_name = class
-        .child_by_field_name("name")
-        .map(|name| arguments::raw(name, source));
-    let reopened = descendants(root)
-        .into_iter()
-        .filter(|node| is_class_eval_of(*node, class_name.as_deref(), source))
-        .filter_map(|call| call.child_by_field_name("block")?.child_by_field_name("body"));
-    for body in class.child_by_field_name("body").into_iter().chain(reopened) {
-        found.extend(methods(body, source));
-    }
-    found
-}
-
-fn is_class_eval_of(node: Node<'_>, class_name: Option<&str>, source: &[u8]) -> bool {
-    node.kind() == CALL
-        && node
-            .child_by_field_name("method")
-            .is_some_and(|method| arguments::raw(method, source) == CLASS_EVAL)
-        && node
-            .child_by_field_name("receiver")
-            .is_some_and(|receiver| Some(arguments::raw(receiver, source).as_str()) == class_name)
-}
-
-fn methods<'tree>(body: Node<'tree>, source: &[u8]) -> Vec<(String, Node<'tree>)> {
-    named_children(body)
-        .into_iter()
-        .filter(|node| [METHOD, SINGLETON_METHOD].contains(&node.kind()))
-        .filter_map(|method| {
-            let method_name = arguments::raw(method.child_by_field_name("name")?, source);
-            Some((method_name, method.child_by_field_name("body")?))
-        })
-        .collect()
-}
-
 struct Walker<'tree, 'source> {
     source: &'source [u8],
+    rows: Vec<usize>,
     integer_ids: bool,
     returned: bool,
     uncertain: usize,
@@ -212,6 +154,10 @@ struct Walker<'tree, 'source> {
 }
 
 impl<'tree> Walker<'tree, '_> {
+    fn original_line(&self, row: usize) -> usize {
+        one_based(self.rows.get(row).copied().unwrap_or(row))
+    }
+
     fn walk(&mut self, node: Node<'tree>) {
         if self.returned {
             return;
@@ -293,7 +239,7 @@ impl<'tree> Walker<'tree, '_> {
         }
         let parsed = Arguments::parse(list, self.source).with_integer_ids(self.integer_ids);
         let origin = Origin::Call {
-            line: one_based(call.start_position().row),
+            line: self.original_line(call.start_position().row),
             column: one_based(call.start_position().column),
         };
         let table = parsed
@@ -368,7 +314,7 @@ impl<'tree> Walker<'tree, '_> {
         self.script.push(
             sql,
             Origin::Execute {
-                first_line: one_based(start.start_position().row),
+                first_line: self.original_line(start.start_position().row),
                 script_line: 0,
             },
         );
@@ -391,6 +337,8 @@ impl<'tree> Walker<'tree, '_> {
     }
 }
 
+#[cfg(test)]
+mod loops_tests;
 #[cfg(test)]
 mod schema_tests;
 #[cfg(test)]
