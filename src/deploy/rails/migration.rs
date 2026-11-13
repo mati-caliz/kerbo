@@ -17,6 +17,14 @@ const VERSION_OPEN: char = '[';
 const VERSION_CLOSE: char = ']';
 const VERSION_SEPARATOR: char = '.';
 const FIRST_BIGINT_VERSION: (u32, u32) = (5, 1);
+const FIRST_INDEXED_REFERENCES_VERSION: (u32, u32) = (5, 0);
+const UNVERSIONED: (u32, u32) = (0, 0);
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Compatibility {
+    pub integer_ids: bool,
+    pub indexed_references: bool,
+}
 
 pub fn migration_class<'tree>(root: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
     descendants(root).into_iter().find(|node| {
@@ -27,7 +35,15 @@ pub fn migration_class<'tree>(root: Node<'tree>, source: &[u8]) -> Option<Node<'
     })
 }
 
-pub fn uses_integer_ids(class: Node<'_>, source: &[u8]) -> bool {
+pub fn compatibility(class: Node<'_>, source: &[u8]) -> Compatibility {
+    let version = version(class, source);
+    Compatibility {
+        integer_ids: version < FIRST_BIGINT_VERSION,
+        indexed_references: version >= FIRST_INDEXED_REFERENCES_VERSION,
+    }
+}
+
+fn version(class: Node<'_>, source: &[u8]) -> (u32, u32) {
     let superclass = class
         .child_by_field_name("superclass")
         .map(|superclass| raw(superclass, source))
@@ -37,14 +53,14 @@ pub fn uses_integer_ids(class: Node<'_>, source: &[u8]) -> bool {
         .and_then(|(_, rest)| rest.split_once(VERSION_CLOSE))
         .map(|(version, _)| version)
     else {
-        return true;
+        return UNVERSIONED;
     };
     let mut parts = version
         .split(VERSION_SEPARATOR)
         .map(|part| part.trim().parse::<u32>().unwrap_or_default());
     let major = parts.next().unwrap_or_default();
     let minor = parts.next().unwrap_or_default();
-    (major, minor) < FIRST_BIGINT_VERSION
+    (major, minor)
 }
 
 pub fn disables_transaction(class: Node<'_>, source: &[u8]) -> bool {

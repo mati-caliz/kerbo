@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use super::arguments::{Arguments, names, text};
 use super::columns::{Column, column, default};
 use super::ddl::{ForeignKey, check_name, create_index, quote, singularize};
+use super::migration::Compatibility;
 use super::references::{column_index, reference};
 use super::statements::{
     add_reference, add_timestamps, change_column, remove_columns, remove_index, rename_column,
@@ -10,6 +11,7 @@ use super::statements::{
 use crate::syntax::named_children;
 
 const ID: &str = "id";
+const JOIN_SEPARATOR: char = '_';
 const PRIMARY_KEY: &str = "primary_key";
 const IF_NOT_EXISTS: &str = "if_not_exists";
 const FORCE: &str = "force";
@@ -63,7 +65,7 @@ pub struct TableCall<'tree> {
 
 pub fn block_calls<'tree>(
     block: Option<Node<'tree>>,
-    integer_ids: bool,
+    compatibility: Compatibility,
     source: &[u8],
 ) -> Vec<TableCall<'tree>> {
     let Some(block) = block else {
@@ -78,7 +80,7 @@ pub fn block_calls<'tree>(
             Some(TableCall {
                 method: super::arguments::raw(statement.child_by_field_name(METHOD)?, source),
                 arguments: Arguments::parse(statement.child_by_field_name(ARGUMENTS), source)
-                    .with_integer_ids(integer_ids),
+                    .with_compatibility(compatibility),
             })
         })
         .collect()
@@ -114,7 +116,7 @@ fn primary_key(arguments: &Arguments<'_>, source: &[u8]) -> Option<String> {
         Some(UUID) => UUID_PRIMARY_KEY,
         Some(declared) if SERIAL_TYPES.contains(&declared) => SERIAL_PRIMARY_KEY,
         Some(declared) if BIGSERIAL_TYPES.contains(&declared) => BIGSERIAL_PRIMARY_KEY,
-        _ if arguments.integer_ids => SERIAL_PRIMARY_KEY,
+        _ if arguments.compatibility.integer_ids => SERIAL_PRIMARY_KEY,
         _ => DEFAULT_PRIMARY_KEY,
     };
     Some(format!("{} {definition}", quote(&name)))
@@ -143,11 +145,10 @@ pub fn create_join_table(
     let Some(second) = arguments.name_at(0, source) else {
         return Vec::new();
     };
-    let mut joined = [first.to_owned(), second];
-    joined.sort();
     let table = arguments
         .keyword_name(TABLE_NAME, source)
-        .unwrap_or_else(|| joined.join("_"));
+        .unwrap_or_else(|| join_table_name(first, &second));
+    let joined = [first.to_owned(), second];
     let column_options = arguments
         .keyword(COLUMN_OPTIONS)
         .map(|options| Arguments::parse(Some(options), source))
@@ -157,7 +158,7 @@ pub fn create_join_table(
     } else {
         format!(" {NOT_NULL}")
     };
-    let id_type = if arguments.integer_ids {
+    let id_type = if arguments.compatibility.integer_ids {
         INTEGER_ID_TYPE
     } else {
         BIGINT_ID_TYPE
@@ -182,6 +183,20 @@ pub fn create_join_table(
     )
 }
 
+fn join_table_name(first: &str, second: &str) -> String {
+    let (lower, upper) = if first <= second {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    let shared = lower
+        .rmatch_indices(JOIN_SEPARATOR)
+        .map(|(offset, _)| offset + JOIN_SEPARATOR.len_utf8())
+        .find(|end| *end < lower.len() && *end < upper.len() && upper.starts_with(&lower[..*end]));
+    let suffix = shared.map_or(upper, |end| &upper[end..]);
+    format!("{lower}{JOIN_SEPARATOR}{suffix}")
+}
+
 fn create_table_with(
     new_table: NewTable,
     arguments: &Arguments<'_>,
@@ -200,7 +215,7 @@ fn create_table_with(
     }
     let mut constraints = Vec::new();
     let mut indexes = Vec::new();
-    for call in block_calls(block, arguments.integer_ids, source) {
+    for call in block_calls(block, arguments.compatibility, source) {
         let method = call.method.as_str();
         let options = &call.arguments;
         if method == TIMESTAMPS {
@@ -283,11 +298,16 @@ pub fn check_constraint(table: &str, arguments: &Arguments<'_>, source: &[u8]) -
     Some(format!("CONSTRAINT {name} CHECK ({expression})"))
 }
 
-pub fn change_table(table: &str, block: Option<Node<'_>>, integer_ids: bool, source: &[u8]) -> Vec<String> {
+pub fn change_table(
+    table: &str,
+    block: Option<Node<'_>>,
+    compatibility: Compatibility,
+    source: &[u8],
+) -> Vec<String> {
     let table = table.to_owned();
     let alter = format!("ALTER TABLE {}", quote(&table));
     let mut statements = Vec::new();
-    for call in block_calls(block, integer_ids, source) {
+    for call in block_calls(block, compatibility, source) {
         let method = call.method.as_str();
         let options = &call.arguments;
         match method {

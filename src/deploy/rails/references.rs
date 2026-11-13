@@ -38,7 +38,7 @@ pub fn reference(table: &str, name: &str, arguments: &Arguments<'_>, source: &[u
                 .iter()
                 .find_map(|(rails, sql)| (*rails == declared).then_some(*sql))
         })
-        .unwrap_or(if arguments.integer_ids {
+        .unwrap_or(if arguments.compatibility.integer_ids {
             INTEGER_TYPE
         } else {
             DEFAULT_TYPE
@@ -62,11 +62,24 @@ pub fn reference(table: &str, name: &str, arguments: &Arguments<'_>, source: &[u
         indexed.insert(0, kind);
     }
     Reference {
-        index: index(table, &indexed, arguments.keyword(INDEX), source),
+        index: reference_index(table, &indexed, arguments, source),
         foreign_key: (!polymorphic)
             .then(|| foreign_key(name, id, arguments.keyword(FOREIGN_KEY), source))
             .flatten(),
         columns,
+    }
+}
+
+fn reference_index(
+    table: &str,
+    columns: &[String],
+    arguments: &Arguments<'_>,
+    source: &[u8],
+) -> Option<String> {
+    if arguments.compatibility.indexed_references {
+        index(table, columns, arguments.keyword(INDEX), source)
+    } else {
+        column_index(table, columns, arguments, source)
     }
 }
 

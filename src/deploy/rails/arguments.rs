@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use tree_sitter::Node;
 
+use super::migration::Compatibility;
 use crate::syntax::named_children;
 
 const PAIR: &str = "pair";
@@ -38,7 +39,7 @@ const UNKNOWN_VALUE: &str = "''";
 pub struct Arguments<'tree> {
     pub positional: Vec<Node<'tree>>,
     pub keywords: HashMap<String, Node<'tree>>,
-    pub integer_ids: bool,
+    pub compatibility: Compatibility,
 }
 
 impl<'tree> Arguments<'tree> {
@@ -69,13 +70,13 @@ impl<'tree> Arguments<'tree> {
         Self {
             positional: self.positional.iter().skip(1).copied().collect(),
             keywords: self.keywords.clone(),
-            integer_ids: self.integer_ids,
+            compatibility: self.compatibility,
         }
     }
 
     #[must_use]
-    pub const fn with_integer_ids(mut self, integer_ids: bool) -> Self {
-        self.integer_ids = integer_ids;
+    pub const fn with_compatibility(mut self, compatibility: Compatibility) -> Self {
+        self.compatibility = compatibility;
         self
     }
 

@@ -1,5 +1,6 @@
 use super::evaluate;
-use super::loops::{expand, parse};
+use super::loops::expand;
+use super::rewrite::parse;
 use super::schema::Schema;
 
 fn wrapped(body: &str) -> String {

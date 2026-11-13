@@ -1,9 +1,9 @@
 use std::ops::Range;
 
-use tree_sitter::{Node, Parser, Tree};
+use tree_sitter::Node;
 
-use super::arguments::{heredoc_body, name, raw};
-use crate::language::Language;
+use super::arguments::{heredoc_body, raw};
+use super::rewrite::{Emitter, Expansion, Value, parse, value};
 use crate::syntax::{descendants, named_children};
 
 const CALL: &str = "call";
@@ -11,8 +11,6 @@ const EACH: &str = "each";
 const FREEZE: &str = "freeze";
 const ARRAY: &str = "array";
 const ARRAY_KINDS: &[&str] = &[ARRAY, "string_array", "symbol_array"];
-const SYMBOL_KINDS: &[&str] = &["simple_symbol", "delimited_symbol", "bare_symbol"];
-const INTEGER: &str = "integer";
 const COMMENT: &str = "comment";
 const ASSIGNMENT: &str = "assignment";
 const CONSTANT: &str = "constant";
@@ -22,21 +20,9 @@ const BLOCK_PARAMETERS: &str = "block_parameters";
 const HEREDOC_BEGINNING: &str = "heredoc_beginning";
 const BLOCK_CLOSINGS: &[&str] = &["end", "}"];
 const FLOW_CHANGES: &[&str] = &["next", "break", "redo", "retry", "return"];
-const UNSAFE_CHARACTERS: &[char] = &['"', '\\', '#', '\n'];
 const REPETITION_SEPARATOR: &str = "\n";
-const NEWLINE: u8 = b'\n';
 const MAXIMUM_PASSES: usize = 4;
 const MAXIMUM_ELEMENTS: usize = 64;
-
-pub struct Expansion {
-    pub source: String,
-    pub rows: Vec<usize>,
-}
-
-struct Value {
-    literal: String,
-    text: String,
-}
 
 struct Occurrence {
     range: Range<usize>,
@@ -51,12 +37,6 @@ struct Unrolled {
     occurrences: Vec<Occurrence>,
 }
 
-pub fn parse(source: &str) -> Option<Tree> {
-    let mut parser = Parser::new();
-    parser.set_language(&Language::Rails.grammar()?).ok()?;
-    parser.parse(source, None)
-}
-
 pub fn expand(root: Node<'_>, source: &[u8]) -> Option<Expansion> {
     let mut current = pass(root, source)?;
     for _ in 1..MAXIMUM_PASSES {
@@ -66,15 +46,7 @@ pub fn expand(root: Node<'_>, source: &[u8]) -> Option<Expansion> {
         let Some(next) = pass(tree.root_node(), current.source.as_bytes()) else {
             break;
         };
-        let rows = next
-            .rows
-            .iter()
-            .map(|row| current.rows.get(*row).copied().unwrap_or(*row))
-            .collect();
-        current = Expansion {
-            source: next.source,
-            rows,
-        };
+        current = current.then(next);
     }
     Some(current)
 }
@@ -101,7 +73,7 @@ fn pass(root: Node<'_>, source: &[u8]) -> Option<Expansion> {
     let mut position = 0;
     for unrolled in &outermost {
         emitter.original(position..unrolled.range.start);
-        emitter.repeat(unrolled);
+        repeat(&mut emitter, unrolled);
         position = unrolled.range.end;
     }
     emitter.original(position..source.len());
@@ -152,7 +124,7 @@ fn elements<'tree>(receiver: Node<'tree>, root: Node<'tree>, source: &[u8]) -> O
     (elements.len() <= MAXIMUM_ELEMENTS).then_some(elements)
 }
 
-fn without_freeze<'tree>(node: Node<'tree>, source: &[u8]) -> Node<'tree> {
+pub fn without_freeze<'tree>(node: Node<'tree>, source: &[u8]) -> Node<'tree> {
     let frozen = node.kind() == CALL
         && node
             .child_by_field_name("method")
@@ -189,23 +161,6 @@ fn bindings(element: Node<'_>, parameters: usize, source: &[u8]) -> Option<Vec<V
         return None;
     }
     parts.into_iter().map(|part| value(part, source)).collect()
-}
-
-fn value(node: Node<'_>, source: &[u8]) -> Option<Value> {
-    let text = if node.kind() == INTEGER {
-        raw(node, source)
-    } else {
-        name(node, source)?
-    };
-    if text.contains(UNSAFE_CHARACTERS) {
-        return None;
-    }
-    let literal = match node.kind() {
-        INTEGER => text.clone(),
-        kind if SYMBOL_KINDS.contains(&kind) => format!(":\"{text}\""),
-        _ => format!("\"{text}\""),
-    };
-    Some(Value { literal, text })
 }
 
 enum Visit {
@@ -271,12 +226,12 @@ fn visit(node: Node<'_>, body: &Range<usize>, names: &[String], source: &[u8]) -
     }
 }
 
-fn is_interpolated_alone(node: Node<'_>) -> bool {
+pub fn is_interpolated_alone(node: Node<'_>) -> bool {
     node.parent()
         .is_some_and(|parent| parent.kind() == INTERPOLATION && parent.named_child_count() == 1)
 }
 
-fn is_method_name(node: Node<'_>) -> bool {
+pub fn is_method_name(node: Node<'_>) -> bool {
     node.parent().is_some_and(|parent| {
         parent.kind() == CALL
             && parent.child_by_field_name("receiver").is_some()
@@ -284,91 +239,27 @@ fn is_method_name(node: Node<'_>) -> bool {
     })
 }
 
-fn is_assigned(node: Node<'_>) -> bool {
+pub fn is_assigned(node: Node<'_>) -> bool {
     node.parent().is_some_and(|parent| {
         parent.kind().ends_with(ASSIGNMENT) && parent.child_by_field_name("left") == Some(node)
     })
 }
 
-struct Emitter<'source> {
-    source: &'source [u8],
-    line_starts: Vec<usize>,
-    text: String,
-    rows: Vec<usize>,
-}
-
-impl<'source> Emitter<'source> {
-    fn new(source: &'source [u8]) -> Self {
-        let line_starts = std::iter::once(0)
-            .chain(
-                source
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, byte)| **byte == NEWLINE)
-                    .map(|(offset, _)| offset + 1),
-            )
-            .collect();
-        Self {
-            source,
-            line_starts,
-            text: String::new(),
-            rows: vec![0],
+fn repeat(emitter: &mut Emitter<'_>, unrolled: &Unrolled) {
+    let row = emitter.row_of(unrolled.body.start);
+    for (index, values) in unrolled.iterations.iter().enumerate() {
+        if index > 0 {
+            emitter.inserted(REPETITION_SEPARATOR, row);
         }
-    }
-
-    fn row_of(&self, offset: usize) -> usize {
-        self.line_starts
-            .partition_point(|start| *start <= offset)
-            .saturating_sub(1)
-    }
-
-    fn original(&mut self, range: Range<usize>) {
-        let mut row = self.row_of(range.start);
-        let piece = String::from_utf8_lossy(self.source.get(range).unwrap_or_default()).into_owned();
-        for _ in piece.matches(char::from(NEWLINE)) {
-            row += 1;
-            self.rows.push(row);
+        let mut position = unrolled.body.start;
+        for occurrence in &unrolled.occurrences {
+            emitter.original(position..occurrence.range.start);
+            let replacement = values
+                .get(occurrence.parameter)
+                .map_or("", |value| value.rendered(occurrence.interpolated));
+            emitter.inserted(replacement, row);
+            position = occurrence.range.end;
         }
-        self.text.push_str(&piece);
+        emitter.original(position..unrolled.body.end);
     }
-
-    fn inserted(&mut self, text: &str, row: usize) {
-        for _ in text.matches(char::from(NEWLINE)) {
-            self.rows.push(row);
-        }
-        self.text.push_str(text);
-    }
-
-    fn repeat(&mut self, unrolled: &Unrolled) {
-        let row = self.row_of(unrolled.body.start);
-        for (index, values) in unrolled.iterations.iter().enumerate() {
-            if index > 0 {
-                self.inserted(REPETITION_SEPARATOR, row);
-            }
-            let mut position = unrolled.body.start;
-            for occurrence in &unrolled.occurrences {
-                self.original(position..occurrence.range.start);
-                self.text.push_str(replacement(values, occurrence));
-                position = occurrence.range.end;
-            }
-            self.original(position..unrolled.body.end);
-        }
-    }
-
-    fn finish(self) -> Expansion {
-        Expansion {
-            source: self.text,
-            rows: self.rows,
-        }
-    }
-}
-
-fn replacement<'value>(values: &'value [Value], occurrence: &Occurrence) -> &'value str {
-    values.get(occurrence.parameter).map_or("", |value| {
-        if occurrence.interpolated {
-            value.text.as_str()
-        } else {
-            value.literal.as_str()
-        }
-    })
 }

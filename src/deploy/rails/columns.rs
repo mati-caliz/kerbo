@@ -126,7 +126,7 @@ pub fn sql_type(declared: &str, arguments: &Arguments<'_>, source: &[u8]) -> Str
             .keyword_name(ENUM_TYPE, source)
             .map_or_else(|| ENUM.to_owned(), |name| format!("\"{name}\""));
     }
-    if declared == PRIMARY_KEY && arguments.integer_ids {
+    if declared == PRIMARY_KEY && arguments.compatibility.integer_ids {
         return INTEGER_PRIMARY_KEY.to_owned();
     }
     if declared == DECIMAL {

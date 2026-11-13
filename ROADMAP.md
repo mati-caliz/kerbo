@@ -1717,19 +1717,24 @@ cerrarse se borra de acá.
   `integer` y clave primaria `serial`. Contra squawk 2.71 (`scripts/parity/rails/`, repos `maybe`,
   `chatwoot`, `mastodon`, `forem` y `discourse`): maybe 849 de 849; chatwoot 951 de 951 con 3 de más en
   `20250108211541`, donde la referencia falla en `create_captain_tables` por el tipo `vector` de
-  pgvector; mastodon 1.763 de 1.763; forem 3.556 de 3.556, sin nada de más; discourse 5.134 de 5.155 con 14 de más, 21
-  diferencias (2026-11-13). Los `.each` sobre listas literales o constantes asignadas a una lista
-  (`%w[...]`, `[[0, "a", "b"]]` con varios parámetros, anidados) se desenrollan sobre el fuente y se
-  vuelve a parsear, con las líneas mapeadas al original (`loops.rs`). `create_table force: true`
+  pgvector; mastodon 1.763 de 1.763; forem 3.556 de 3.556, sin nada de más; discourse 5.145 de 5.155,
+  sin nada de más (2026-11-13): las 10 que faltan son `20140827044811` y `20240820123404`, aceptadas.
+  Las migraciones sin versión o anteriores a `Migration[5.0]` no indexan `t.references` por defecto.
+  El fuente se reescribe y se vuelve a parsear, con las líneas mapeadas al original (`rewrite.rs`):
+  los `.each` sobre listas literales o constantes asignadas a una lista (`%w[...]`,
+  `[[0, "a", "b"]]` con varios parámetros, anidados) se desenrollan (`loops.rs`), y las variables
+  locales y constantes asignadas una vez a un literal se reemplazan donde se usan, igual que
+  `Rails.env.test? ? a : b`, que toma la rama de producción (`locals.rs`). `create_join_table` nombra
+  la tabla como Rails, sin repetir el prefijo común (`web_hook_event_types_hooks`), y `rename_table`
+  sólo renombra `_pkey` y la secuencia si la clave primaria tiene default. `create_table force: true`
   borra sin `CASCADE`, los métodos de `Clase.class_eval do` cuentan como helpers, `remove_index` por
   columnas toma el nombre real del esquema, `add_column if_not_exists:` no escribe `IF NOT EXISTS` y
   `execute` con interpolación o escapes se evalúa. `t.integer ..., primary_key: true` y
-  `add_column ..., :primary_key` antes de Rails 5.1 salen `serial NOT NULL PRIMARY KEY`. Pendientes:
-  - discourse: variables locales con literales (`table = :views`, `flag_ids = "..."`,
-    `column = "#{period}_..."` dentro de un bucle), `#{Rails.env.test? ? "" : "CONCURRENTLY"}` en
-    `execute`, el nombre de tabla de `create_join_table` y `prefer-robust-stmts` con `remove_index if_exists:` y renames de más en `20121018103721`. 293 migraciones fallan en la
-    referencia por `DB.exec`/`DB.query_single` (mini_sql) y `Migration::ColumnDropper`; quedan
-    fuera de la comparación.
+  `add_column ..., :primary_key` antes de Rails 5.1 salen `serial NOT NULL PRIMARY KEY`.
+  `scripts/parity/rails/dump.sh <repo>` deja el SQL de kerbo por migración para compararlo con la
+  referencia. Pendientes:
+  - discourse: 293 migraciones fallan en la referencia por `DB.exec`/`DB.query_single` (mini_sql) y
+    `Migration::ColumnDropper`; quedan fuera de la comparación.
   - `index_exists?` con `where:` compara sólo las columnas, no el predicado.
   - Un `execute` con `ALTER TABLE ... RENAME` actualiza el esquema pero no emite los renames de
     índices que Rails no haría (está bien), y el SQL crudo que no se entiende deja el esquema como

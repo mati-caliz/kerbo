@@ -7,6 +7,13 @@ use super::sql_tokens::{Cursor, Token, statements};
 const PRIMARY_KEY_SUFFIX: &str = "_pkey";
 const SEQUENCE_SUFFIX: &str = "_seq";
 const SERIAL_TYPES: &[&str] = &["serial", "bigserial", "smallserial"];
+const KEY_DEFAULTS: &[&str] = &[
+    "nextval",
+    "gen_random_uuid",
+    "uuid_generate_v4",
+    "uuid_generate_v1",
+    "identity",
+];
 const COLUMN_LIST_OPEN: char = '(';
 
 #[derive(Debug, Clone, Default)]
@@ -198,7 +205,12 @@ impl Schema {
                 table.add_constraint(constraint, &mut element);
             } else if element.contains_sequence(&["primary", "key"]) {
                 let serial = SERIAL_TYPES.iter().any(|kind| element.contains(kind));
-                table.primary_key = element.identifier().map(|column| PrimaryKey { column, serial });
+                let defaulted = serial || KEY_DEFAULTS.iter().any(|default| element.contains(default));
+                table.primary_key = element.identifier().map(|column| PrimaryKey {
+                    column,
+                    serial,
+                    defaulted,
+                });
             }
         }
         table.columns = lists_columns.then_some(columns);
@@ -232,7 +244,11 @@ impl Schema {
             )];
         };
         let mut follow_ups = Vec::new();
-        if let Some(primary_key) = &table.primary_key {
+        if let Some(primary_key) = table
+            .primary_key
+            .as_ref()
+            .filter(|primary_key| primary_key.defaulted)
+        {
             follow_ups.push(rename_index(
                 &format!("{from}{PRIMARY_KEY_SUFFIX}"),
                 &format!("{to}{PRIMARY_KEY_SUFFIX}"),

@@ -25,6 +25,7 @@ pub struct Index {
 pub struct PrimaryKey {
     pub column: String,
     pub serial: bool,
+    pub defaulted: bool,
 }
 
 #[derive(Debug, Clone)]

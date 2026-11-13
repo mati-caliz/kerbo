@@ -187,7 +187,7 @@ fn uses_integer_ids_before_rails_five_one() {
     assert!(sql.contains("CREATE TABLE \"posts\" (\"id\" serial NOT NULL PRIMARY KEY, \"user_id\" integer)"));
     let join = versioned("5.0", "    create_join_table :tags, :statuses");
     assert!(join.contains(
-        "CREATE TABLE \"statuses_tags\" (\"status_id\" integer NOT NULL, \"tag_id\" integer NOT NULL)"
+        "CREATE TABLE \"statuses_tags\" (\"tag_id\" integer NOT NULL, \"status_id\" integer NOT NULL)"
     ));
 }
 

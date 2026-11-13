@@ -3,9 +3,11 @@ mod columns;
 mod ddl;
 mod guards;
 mod history;
+mod locals;
 mod loops;
 mod migration;
 mod references;
+mod rewrite;
 mod schema;
 mod schema_table;
 mod sha256;
@@ -22,6 +24,7 @@ use super::Violation;
 use super::script::{Origin, Script};
 use crate::syntax::{named_children, one_based};
 use arguments::{Arguments, heredoc_body, heredoc_text, name};
+use migration::Compatibility;
 use schema::Schema;
 
 pub use history::fingerprint;
@@ -91,8 +94,8 @@ pub fn violations(root: Node<'_>, source: &[u8], path: Option<&Path>) -> Vec<Vio
 }
 
 fn evaluate(root: Node<'_>, source: &[u8], schema: Schema) -> Option<(Script, Schema)> {
-    if let Some(expansion) = loops::expand(root, source)
-        && let Some(tree) = loops::parse(&expansion.source)
+    if let Some(expansion) = rewrite::rewritten(root, source)
+        && let Some(tree) = rewrite::parse(&expansion.source)
     {
         return evaluate_tree(
             tree.root_node(),
@@ -115,7 +118,7 @@ fn evaluate_tree(
     let mut walker = Walker {
         source,
         rows,
-        integer_ids: migration::uses_integer_ids(class, source),
+        compatibility: migration::compatibility(class, source),
         returned: false,
         uncertain: 0,
         helpers: migration::helpers(root, class, source),
@@ -144,7 +147,7 @@ fn evaluate_tree(
 struct Walker<'tree, 'source> {
     source: &'source [u8],
     rows: Vec<usize>,
-    integer_ids: bool,
+    compatibility: Compatibility,
     returned: bool,
     uncertain: usize,
     helpers: HashMap<String, Node<'tree>>,
@@ -237,7 +240,7 @@ impl<'tree> Walker<'tree, '_> {
             self.execute(list);
             return;
         }
-        let parsed = Arguments::parse(list, self.source).with_integer_ids(self.integer_ids);
+        let parsed = Arguments::parse(list, self.source).with_compatibility(self.compatibility);
         let origin = Origin::Call {
             line: self.original_line(call.start_position().row),
             column: one_based(call.start_position().column),
@@ -272,7 +275,7 @@ impl<'tree> Walker<'tree, '_> {
         let block = call.child_by_field_name("block");
         match method {
             CREATE_TABLE => tables::create_table(&table, &shifted, block, self.source),
-            CHANGE_TABLE => tables::change_table(&table, block, self.integer_ids, self.source),
+            CHANGE_TABLE => tables::change_table(&table, block, self.compatibility, self.source),
             CREATE_JOIN_TABLE => tables::create_join_table(&table, &shifted, block, self.source),
             REMOVE_INDEX => self.remove_index(&table, &shifted),
             _ => statements::statement(method, &table, &shifted, self.source).unwrap_or_default(),
@@ -338,7 +341,11 @@ impl<'tree> Walker<'tree, '_> {
 }
 
 #[cfg(test)]
+mod dump_tests;
+#[cfg(test)]
 mod loops_tests;
+#[cfg(test)]
+mod rewrite_tests;
 #[cfg(test)]
 mod schema_tests;
 #[cfg(test)]
