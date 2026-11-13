@@ -38,6 +38,7 @@
     "**/scripts/check-go-coverage.sh",
     "**/scripts/identifiers.mjs",
     "**/scripts/layers/**",
+    "**/scripts/licenses/**",
     "**/scripts/verify-compose.sh",
     "**/scripts/verify-docker.sh",
     "**/scripts/verify-duplication.sh",
