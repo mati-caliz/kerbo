@@ -36,6 +36,8 @@ mod ecmascript_taint_tests;
 #[cfg(test)]
 mod go_taint_tests;
 #[cfg(test)]
+mod java_deserialization_tests;
+#[cfg(test)]
 mod java_escapes_tests;
 #[cfg(test)]
 mod java_failing_calls_tests;

@@ -1594,7 +1594,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned` y `failing-call`):
   commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno de más en los dos.
-  En guava, 572 de los 972 (369 `data-flow-issue`, 178 `null-argument`, 25 `failing-call`), con 3
+  En guava, 612 de los 972 (394 `data-flow-issue`, 193 `null-argument`, 25 `failing-call`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
   `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
@@ -1643,6 +1643,12 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   método genérico puede ir después de sus parámetros de tipo (`<T> @Nullable T getInstance`). El
   `assertThrows` de JUnit 4 (`org.junit.Assert`) no da por esperada la excepción: IntelliJ sólo
   conoce el de JUnit 5, y Qodana marca `checkArgument(false)` adentro del de JUnit 4.
+  En el `readResolve()` de una clase que implementa `Serializable` sin declarar
+  `readObject(ObjectInputStream)`, todo campo de instancia no primitivo de esa clase puede ser null,
+  aunque esté anotado (`PlainDescriptor.isPossiblyNonInitialized`: la deserialización no pasa por el
+  constructor). Sólo se reconoce el `Serializable` escrito en la propia clase, no el heredado. Un
+  `for (i = 0; i < a.length; ...)` precedido en el bloque por un `if (a.length == 0)` que sale da
+  al menos una vuelta.
   Falta:
   - `assertNull` sobre lo que devuelve un método del proyecto (5 en commons-lang, sobre
     `getIfEmpty`, `getIfBlank` y `applyNonNull`): IntelliJ marca la de 3 argumentos y no la de 4

@@ -8,6 +8,7 @@ use super::java_null_conditions::{
     asserted_condition, asserted_present, branch_states, condition_asserted, is_logical, without_cast,
 };
 use super::java_null_keys::{forget, forget_fields, join, seed_nullable_fields, spellings, tracked_key};
+use super::java_null_loops::runs_at_least_once;
 use super::java_null_uses::{dereference, passed};
 use super::java_receivers::{StaticImports, Variables};
 use crate::syntax::named_children;
@@ -151,6 +152,9 @@ impl Analysis<'_, '_> {
                 let after_body = field(BODY_FIELD).and_then(|body| self.statement(body, when_true));
                 if let (Some(update), Some(after)) = (field(UPDATE_FIELD), after_body.clone()) {
                     self.expression(update, after);
+                }
+                if kind == FOR && after_body.is_some() && runs_at_least_once(node, self.source) {
+                    return after_body;
                 }
                 join(Some(when_false), after_body)
             }

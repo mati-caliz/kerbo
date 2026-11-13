@@ -2,8 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use tree_sitter::Node;
 
+use super::java::has_modifier;
 use super::java::{NAME_FIELD, text};
 use super::java_calls::annotated_with;
+use super::java_deserialization::resolved_without_construction;
 use super::java_fields::{Volatility, volatility_of};
 use crate::syntax::{descendants, named_children};
 
@@ -12,6 +14,8 @@ const CHECK_FOR_NULL: &str = "CheckForNull";
 const THIS_PREFIX: &str = "this.";
 const CLASS_BODIES: &[&str] = &["class_body", "enum_body_declarations"];
 const FIELD_DECLARATION: &str = "field_declaration";
+const STATIC: &str = "static";
+const PRIMITIVE_TYPES: &[&str] = &["integral_type", "floating_point_type", "boolean_type"];
 const VARIABLE_DECLARATOR: &str = "variable_declarator";
 const TYPE_FIELD: &str = "type";
 const DIMENSIONS_FIELD: &str = "dimensions";
@@ -70,13 +74,20 @@ pub(super) fn nullable_field_keys(method: Node<'_>, source: &[u8]) -> Vec<(Vec<S
 }
 
 // Los campos `@Nullable` de las clases que encierran al método, de adentro hacia afuera: un campo
-// de una clase de más adentro tapa al del mismo nombre de una de afuera.
+// de una clase de más adentro tapa al del mismo nombre de una de afuera. En un `readResolve` sin
+// `readObject`, todos los de instancia de su clase.
 fn nullable_fields(method: Node<'_>, source: &[u8]) -> Vec<(String, Volatility)> {
     let mut nullable_by_name: HashMap<String, Option<Volatility>> = HashMap::new();
+    let deserialized = resolved_without_construction(method, source);
     let mut current = method.parent();
     while let Some(node) = current {
         if CLASS_BODIES.contains(&node.kind()) {
-            for (name, nullable) in declared_fields(node, source) {
+            let fields = if deserialized == Some(node) {
+                instance_reference_fields(node, source)
+            } else {
+                declared_fields(node, source)
+            };
+            for (name, nullable) in fields {
                 nullable_by_name.entry(name).or_insert(nullable);
             }
             if node
@@ -110,6 +121,31 @@ fn declared_fields(body: Node<'_>, source: &[u8]) -> Vec<(String, Option<Volatil
                         text(name, source).to_owned(),
                         declares_nullable(declarator, source).then_some(volatility),
                     ))
+                })
+        })
+        .collect()
+}
+
+// Los campos de instancia que no son de un tipo primitivo (`int conteos[]` es un arreglo), todos
+// posiblemente null.
+fn instance_reference_fields(body: Node<'_>, source: &[u8]) -> Vec<(String, Option<Volatility>)> {
+    named_children(body)
+        .into_iter()
+        .filter(|child| child.kind() == FIELD_DECLARATION && !has_modifier(*child, STATIC))
+        .flat_map(|declaration| {
+            let volatility = volatility_of(declaration, source);
+            let is_primitive = declaration
+                .child_by_field_name(TYPE_FIELD)
+                .is_some_and(|written| PRIMITIVE_TYPES.contains(&written.kind()));
+            named_children(declaration)
+                .into_iter()
+                .filter(|child| child.kind() == VARIABLE_DECLARATOR)
+                .filter(move |declarator| {
+                    !is_primitive || declarator.child_by_field_name(DIMENSIONS_FIELD).is_some()
+                })
+                .filter_map(move |declarator| {
+                    let name = declarator.child_by_field_name(NAME_FIELD)?;
+                    Some((text(name, source).to_owned(), Some(volatility)))
                 })
         })
         .collect()
