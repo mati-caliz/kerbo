@@ -3,7 +3,7 @@
 # pasa por línea de comandos para que el Cargo.toml del repo no pueda aflojarlos.
 too-many-lines-threshold = 80
 too-many-arguments-threshold = 4
-cognitive-complexity-threshold = 15
+cognitive-complexity-threshold = 12
 excessive-nesting-threshold = 4
 max-fn-params-bools = 1
 max-struct-bools = 2
