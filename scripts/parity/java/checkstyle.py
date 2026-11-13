@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 """Corre Checkstyle con sun_checks.xml sobre un repo del corpus y lo compara con kerbo, por regla,
 archivo y línea (las columnas de Checkstyle expanden los tabs a 8, las de kerbo cuentan bytes).
-Checkstyle avisa dos veces el mismo token cuando falta el blanco de los dos lados; kerbo, una.
+Checkstyle avisa dos veces el mismo token cuando falta el blanco de los dos lados; kerbo, una: de
+los dos lados se cuenta una vez cada regla en cada posición. Lo que ignora configs/<repo>.kerbo.toml
+tampoco se cuenta de Checkstyle.
 
     python scripts/parity/java/checkstyle.py commons-lang
     python scripts/parity/java/checkstyle.py junit4 --skip-checkstyle
@@ -11,12 +13,14 @@ Necesita el .jar `all` de la versión de versions.toml en .parity/checkstyle/ (s
 """
 
 import collections
+import fnmatch
 import json
 import os
 import pathlib
 import re
 import subprocess
 import sys
+import tomllib
 import urllib.request
 import xml.etree.ElementTree as ElementTree
 
@@ -25,10 +29,7 @@ PARITY = pathlib.Path(os.environ.get("KERBO_PARITY", ROOT / ".parity"))
 VERSIONS = ROOT / "scripts" / "parity" / "versions.py"
 JAR_URL = "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-{version}/checkstyle-{version}-all.jar"
 NAME_EXCEPTIONS = {"AvoidStarImport": "star-import", "FinalParameters": "final-parameter", "UnusedImports": "unused-import", "RegexpSingleline": "trailing-spaces"}
-NOT_MEASURED = {
-    "LineLength", "Indentation", "MagicNumber", "FileLength", "MethodLength", "ParameterNumber", "JavadocPackage",
-    "JavadocVariable", "MissingJavadocMethod", "JavadocMethod", "JavadocType", "InvalidJavadocPosition",
-}
+NOT_MEASURED = {"LineLength", "Indentation", "MagicNumber", "FileLength", "MethodLength", "ParameterNumber"}
 SHOWN = 15
 
 
@@ -63,8 +64,17 @@ def run_checkstyle(repo, folder, jar):
     return output
 
 
+def ignored_patterns(repo):
+    configuration = ROOT / "scripts" / "parity" / "java" / "configs" / f"{repo}.kerbo.toml"
+    if not configuration.exists():
+        return []
+    ignores = tomllib.loads(configuration.read_text(encoding="utf-8")).get("ignore", [])
+    return [pattern for ignore in ignores for pattern in ignore["paths"]]
+
+
 def checkstyle_findings(output, repo):
     corpus = (PARITY / "corpus" / repo).resolve()
+    ignored = ignored_patterns(repo)
     seen = set()
     found = collections.defaultdict(collections.Counter)
     for file in ElementTree.parse(output).getroot():
@@ -72,7 +82,8 @@ def checkstyle_findings(output, repo):
         for error in file:
             name = error.get("source").rsplit(".", 1)[-1].removesuffix("Check")
             position = (kebab(name), path, int(error.get("line")), error.get("column"))
-            if name not in NOT_MEASURED and path.endswith(".java") and position not in seen:
+            measured = name not in NOT_MEASURED and path.endswith(".java")
+            if measured and position not in seen and not any(fnmatch.fnmatch(path, pattern) for pattern in ignored):
                 seen.add(position)
                 found[position[0]][position[1:3]] += 1
     return found
@@ -80,9 +91,12 @@ def checkstyle_findings(output, repo):
 
 def kerbo_findings(repo, rules):
     found = collections.defaultdict(collections.Counter)
+    seen = set()
     for item in json.loads((PARITY / "qodana" / repo / "kerbo.json").read_text(encoding="utf-8")):
-        if item["rule"] in rules:
-            found[item["rule"]][(item["path"].removeprefix("./"), item["line"])] += 1
+        position = (item["rule"], item["path"].removeprefix("./"), item["line"], item["column"])
+        if item["rule"] in rules and position not in seen:
+            seen.add(position)
+            found[position[0]][position[1:3]] += 1
     return found
 
 

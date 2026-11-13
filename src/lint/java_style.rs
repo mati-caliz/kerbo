@@ -27,6 +27,14 @@ const INTEGER_LITERALS: &[&str] = &[
 const LOWER_ELL: char = 'l';
 const UPPER_ELL: &str = "L";
 const SEMICOLON: &str = ";";
+pub const JAVADOC_RULES: [JavaRule; 6] = [
+    JavaRule::JavadocVariable,
+    JavaRule::MissingJavadocMethod,
+    JavaRule::JavadocMethod,
+    JavaRule::JavadocType,
+    JavaRule::JavadocPackage,
+    JavaRule::InvalidJavadocPosition,
+];
 const STATEMENT_LISTS: &[&str] = &["block", "constructor_body", "switch_block_statement_group"];
 const BODY_FIELDS: &[&str] = &["body", "consequence", "alternative"];
 const WORD_SEPARATOR: char = '_';
@@ -215,7 +223,8 @@ fn is_constant_case(name: &str) -> bool {
 
 pub fn relaxed_by(preset: Preset) -> Vec<RuleId> {
     match preset {
-        Preset::Strict | Preset::Recommended => Vec::new(),
+        Preset::Strict => Vec::new(),
+        Preset::Recommended => JAVADOC_RULES.into_iter().map(RuleId::Java).collect(),
         Preset::Minimal => JavaRule::ALL.into_iter().map(RuleId::Java).collect(),
     }
 }

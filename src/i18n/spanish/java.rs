@@ -1,3 +1,4 @@
+use super::javadoc;
 use crate::i18n::catalog::RuleText;
 use crate::rules::JavaRule;
 
@@ -7,7 +8,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "Checkstyle la marca con sun_checks.xml.",
     "Ver la documentación de Checkstyle.",
 );
-const TEXTS: [RuleText; JavaRule::ALL.len()] = [
+const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT] = [
     RuleText::new(
         "Tipo con un nombre que no es PascalCase",
         "nombralo con mayúscula inicial, letras y números",
@@ -365,5 +366,7 @@ const TEXTS: [RuleText; JavaRule::ALL.len()] = [
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {
-    TEXTS.get(rule.position()).copied().unwrap_or(UNKNOWN)
+    javadoc::rule_text(rule)
+        .or_else(|| TEXTS.get(rule.position()).copied())
+        .unwrap_or(UNKNOWN)
 }

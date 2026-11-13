@@ -1,5 +1,6 @@
 use tree_sitter::Parser;
 
+use super::java_style::JAVADOC_RULES;
 use super::{LINT_RULES, LintFinding, LintKind, find_lints};
 use crate::analysis::SourceUnit;
 use crate::fix::{apply, compatible, edits_of};
@@ -245,6 +246,7 @@ fn declarations_flow_and_text_match_checkstyle() {
             matches!(rule, RuleId::Java(java)
                 if !DESIGN_JAVA_RULES.contains(&java)
                     && !SPACING_JAVA_RULES.contains(&java)
+                    && !JAVADOC_RULES.contains(&java)
                     && java != JavaRule::SameParameterValue)
         }),
         expected(include_str!("fixtures/Shapes.checkstyle")),

@@ -390,4 +390,5 @@ fn the_flag_wins_over_the_configuration_and_the_locale() {
     assert_eq!(flagged.resolve(Some(Lang::Spanish)), Lang::English);
 }
 
+mod javadoc;
 mod security;

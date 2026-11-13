@@ -1,9 +1,7 @@
-use std::collections::{HashMap, hash_map::Entry};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
-use tree_sitter::Parser;
 
 use crate::analysis::{FileAnalysis, ParseFailed, SourceUnit, analyze_unit};
 use crate::cache::{AnalysisCache, AnalysisSubject, CacheKey};
@@ -18,9 +16,12 @@ use crate::macro_rules::MacroIndex;
 use crate::rules::{Diagnostic, FileIdentity, evaluate};
 use crate::suppressions::{Suppressed, split_with_shell_rc};
 use crate::{deploy, shell};
+use parsers::{ParserPool, parser_for};
 
 mod go_packages;
 mod go_typed;
+mod java_packages;
+mod parsers;
 mod pooling;
 mod project;
 mod walk;
@@ -49,28 +50,6 @@ pub struct ScanRequest<'request> {
     pub overrides: &'request [LimitOverride],
     pub config: &'request Config,
     pub cache: Option<&'request AnalysisCache>,
-}
-
-#[derive(Default)]
-struct ParserPool {
-    parsers: HashMap<Language, Parser>,
-}
-
-impl ParserPool {
-    fn parser(&mut self, language: Language) -> Result<&mut Parser, String> {
-        match self.parsers.entry(language) {
-            Entry::Occupied(entry) => Ok(entry.into_mut()),
-            Entry::Vacant(entry) => Ok(entry.insert(parser_for(language)?)),
-        }
-    }
-}
-
-fn parser_for(language: Language) -> Result<Parser, String> {
-    let mut parser = Parser::new();
-    if let Some(grammar) = language.grammar() {
-        parser.set_language(&grammar).map_err(|error| error.to_string())?;
-    }
-    Ok(parser)
 }
 
 #[derive(Debug)]
@@ -132,6 +111,9 @@ pub fn scan(request: &ScanRequest<'_>) -> ScanOutcome {
         cache.persist();
     }
     outcome.diagnostics.extend(pooling::duplicate_diagnostics(pooled));
+    outcome
+        .diagnostics
+        .extend(java_packages::diagnostics(&files, request));
     go_packages::drop_package_names(&mut outcome.diagnostics, &go_packages);
     failures.extend(go_typed::confirm_typed_findings(
         &mut outcome.diagnostics,

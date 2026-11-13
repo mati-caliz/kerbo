@@ -25,6 +25,10 @@ pub mod java_generics;
 mod java_hidden;
 mod java_implicit_constructor;
 pub mod java_inference;
+mod java_javadoc;
+mod java_javadoc_checks;
+mod java_javadoc_scope;
+mod java_javadoc_tags;
 pub mod java_lambda_targets;
 mod java_null_checks;
 mod java_null_conditions;
@@ -83,6 +87,17 @@ pub enum ImportRedundancy {
     Duplicate { first_line: usize },
 }
 
+// Lo que JavadocMethod y JavadocType de Checkstyle encuentran en las etiquetas de un Javadoc que sí
+// existe: el sujeto es la etiqueta (`@param x`, `@return`, `{@inheritDoc}`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JavadocTagProblem {
+    Missing,
+    Unused,
+    Duplicate,
+    Unknown,
+    InvalidInheritDoc,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LintKind {
     UnusedImport,
@@ -96,6 +111,7 @@ pub enum LintKind {
     Go(GoRule),
     Java(JavaRule),
     Taint(TaintRule),
+    Javadoc(JavaRule, JavadocTagProblem),
 }
 
 impl LintKind {
@@ -110,7 +126,7 @@ impl LintKind {
             Self::FinalClass => RuleId::FinalClass,
             Self::Python(rule) => RuleId::Python(rule),
             Self::Go(rule) => RuleId::Go(rule),
-            Self::Java(rule) => RuleId::Java(rule),
+            Self::Java(rule) | Self::Javadoc(rule, _) => RuleId::Java(rule),
             Self::Taint(rule) => RuleId::Taint(rule),
         }
     }
@@ -198,6 +214,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     findings.extend(java_shapes::reported(&nodes, source));
     findings.extend(java_flow::reported(&nodes, source));
     findings.extend(java_text::reported(&nodes, source));
+    findings.extend(java_javadoc::reported(&nodes, source));
     findings.extend(java_design::reported(&nodes, source));
     findings.extend(java_order::reported(&nodes, source));
     findings.extend(java_hidden::reported(root, source));
@@ -232,5 +249,7 @@ pub fn finding_at(kind: LintKind, start: Point, subject: &str, fix: Option<Fix>)
 
 #[cfg(test)]
 mod java_inspection_tests;
+#[cfg(test)]
+mod java_javadoc_tests;
 #[cfg(test)]
 mod tests;

@@ -29,6 +29,16 @@ method named like its class; an interface field is a constant; `serialVersionUID
 the patterns are ASCII, so an `ñ` in a name is flagged; `WhitespaceAround` also flags empty braces
 written together (`{}`), as `sun_checks` does. `minimal` does not ask for them.
 
+The Javadoc ones from `sun_checks.xml` are asked for only by `strict`: `JavadocVariable`
+(`javadoc-variable`), `MissingJavadocMethod`, `JavadocMethod`, `JavadocType`, `JavadocPackage` and
+`InvalidJavadocPosition`. kerbo reads block tags like Checkstyle's Javadoc tree: an at sign at the
+start of the line and outside an inline tag, so an `@Override` inside `{@snippet : ...}` is not a
+tag. `JavadocPackage` is reported once per folder without `package-info.java`, on the first file in
+alphabetical order, and `module-info.java` does not count. A varargs parameter with an annotation
+before the dots (`Object @Nullable ... args`) is read even though tree-sitter does not parse it. The
+only thing not mimicked is Javadoc that Checkstyle cannot parse (a bare `<N, E>` it takes for HTML):
+Checkstyle reports the parse error under the rule's name and kerbo does not.
+
 ## IntelliJ inspections
 
 From IntelliJ's inspections, kerbo does:

@@ -60,6 +60,12 @@ rule_family!(JavaRule {
     BooleanMethodIsAlwaysInverted => "boolean-method-is-always-inverted",
     FieldMayBeFinal => "field-may-be-final",
     RedundantThrows => "redundant-throws",
+    JavadocVariable => "javadoc-variable",
+    MissingJavadocMethod => "missing-javadoc-method",
+    JavadocMethod => "javadoc-method",
+    JavadocType => "javadoc-type",
+    JavadocPackage => "javadoc-package",
+    InvalidJavadocPosition => "invalid-javadoc-position",
 });
 
 pub const fn wrap_java<'slots>(slots: &'slots mut [RuleId], rules: &[JavaRule]) -> &'slots mut [RuleId] {

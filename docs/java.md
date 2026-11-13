@@ -30,6 +30,16 @@ reacomodar líneas). Siguen a Checkstyle en lo que no se ve: `MethodName` no mir
 `WhitespaceAround` también marca las llaves vacías pegadas (`{}`), como `sun_checks`. `minimal`
 no las pide.
 
+Las de Javadoc de `sun_checks.xml` sólo las pide `strict`: `JavadocVariable` (`javadoc-variable`),
+`MissingJavadocMethod`, `JavadocMethod`, `JavadocType`, `JavadocPackage` e
+`InvalidJavadocPosition`. kerbo lee las etiquetas de bloque como el árbol de Javadoc de Checkstyle:
+una arroba al principio de la línea y fuera de un tag inline, así que un `@Override` adentro de
+`{@snippet : ...}` no es una etiqueta. `JavadocPackage` se avisa una vez por carpeta sin
+`package-info.java`, en el primer archivo por orden alfabético, y `module-info.java` no cuenta. Un
+varargs con anotación antes de los puntos (`Object @Nullable ... args`) se lee aunque tree-sitter no
+lo entienda. Lo único que no se imita son los Javadoc que Checkstyle no puede parsear (un `<N, E>`
+suelto que toma por HTML): Checkstyle avisa el error de parseo con el nombre de la regla y kerbo no.
+
 ## Inspecciones de IntelliJ
 
 De las inspecciones de IntelliJ, kerbo hace:

@@ -11,6 +11,7 @@ mod explanations;
 mod fixes;
 mod go;
 mod java;
+mod javadoc;
 mod shell;
 
 const ANONYMOUS_FUNCTION: &str = "(anónima)";
@@ -233,6 +234,7 @@ impl Catalog for Spanish {
             LintKind::Go(rule) => with_subject(go::go(rule).description, subject),
             LintKind::Java(rule) => with_subject(java::java(rule).description, subject),
             LintKind::Taint(rule) => with_subject(taint::taint(rule).description, subject),
+            LintKind::Javadoc(_, problem) => javadoc::tag_problem(problem, subject),
         }
     }
 

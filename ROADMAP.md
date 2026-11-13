@@ -1717,15 +1717,12 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     paridad contra typescript-eslint igual que las demás.
 - Un JDK de `jlink --compress` no se lee.
 
-### 15. Java: Javadoc, paridad con PMD y Qodana, y la API nueva
+### 15. Java: paridad con PMD y Qodana, y la API nueva
 
-Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_checks.xml`.
+Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_checks.xml`. Las seis de
+Javadoc ya están (en `docs/java.md`): commons-lang y junit4 coinciden con Checkstyle 14.4 en todo
+`sun_checks.xml`, y guava, sin `android/`, en 67.527 de 67.552.
 
-- Las reglas de Javadoc de `sun_checks.xml`, por frecuencia sobre Guava, spring-boot,
-  commons-lang y junit4: `JavadocVariable` (29.407), `MissingJavadocMethod` (27.721),
-  `JavadocMethod` (19.370), `JavadocType` (1.921), `JavadocPackage` (1.508),
-  `InvalidJavadocPosition` (13). Piden leer el Javadoc como árbol; tree-sitter lo deja como un
-  comentario.
 - La misma paridad contra PMD para quien usa el quickstart en vez de Checkstyle:
   `UnnecessaryImport` resuelve tipos con el classpath y no va a coincidir sin las firmas de la
   etapa 9; `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal`, sí.

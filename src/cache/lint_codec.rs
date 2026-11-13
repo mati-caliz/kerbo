@@ -1,6 +1,6 @@
 use super::codec::{Corrupt, Reader, Writer};
 use crate::fix::{Fix, TextEdit, TextPoint};
-use crate::lint::{ImportRedundancy, LintFinding, LintKind};
+use crate::lint::{ImportRedundancy, JavadocTagProblem, LintFinding, LintKind};
 use crate::rules::PythonRule;
 use crate::rules::{EslintRule, GoRule, JavaRule, TaintRule};
 
@@ -17,6 +17,14 @@ const ESLINT: u64 = 9;
 const GO: u64 = 10;
 const JAVA: u64 = 11;
 const TAINT: u64 = 12;
+const JAVADOC: u64 = 13;
+const JAVADOC_PROBLEMS: [JavadocTagProblem; 5] = [
+    JavadocTagProblem::Missing,
+    JavadocTagProblem::Unused,
+    JavadocTagProblem::Duplicate,
+    JavadocTagProblem::Unknown,
+    JavadocTagProblem::InvalidInheritDoc,
+];
 const NO_FIX: u64 = 0;
 const WITH_FIX: u64 = 1;
 const WITH_UNSAFE_FIX: u64 = 2;
@@ -81,6 +89,7 @@ fn write_kind(writer: &mut Writer, kind: LintKind) {
         LintKind::Go(_) => GO,
         LintKind::Java(_) => JAVA,
         LintKind::Taint(_) => TAINT,
+        LintKind::Javadoc(..) => JAVADOC,
     };
     writer.number(code);
     match kind {
@@ -90,6 +99,15 @@ fn write_kind(writer: &mut Writer, kind: LintKind) {
         LintKind::Go(rule) => writer.size(rule.position()),
         LintKind::Java(rule) => writer.size(rule.position()),
         LintKind::Taint(rule) => writer.size(rule.position()),
+        LintKind::Javadoc(rule, problem) => {
+            writer.size(rule.position());
+            writer.size(
+                JAVADOC_PROBLEMS
+                    .iter()
+                    .position(|known| *known == problem)
+                    .unwrap_or_default(),
+            );
+        }
         LintKind::UnusedImport
         | LintKind::RedundantImport(ImportRedundancy::JavaLang | ImportRedundancy::SamePackage)
         | LintKind::StarImport
@@ -120,6 +138,10 @@ fn read_kind(reader: &mut Reader<'_>) -> Result<LintKind, Corrupt> {
         GO => LintKind::Go(*GoRule::ALL.get(reader.size()?).ok_or(Corrupt)?),
         JAVA => LintKind::Java(*JavaRule::ALL.get(reader.size()?).ok_or(Corrupt)?),
         TAINT => LintKind::Taint(*TaintRule::ALL.get(reader.size()?).ok_or(Corrupt)?),
+        JAVADOC => LintKind::Javadoc(
+            *JavaRule::ALL.get(reader.size()?).ok_or(Corrupt)?,
+            *JAVADOC_PROBLEMS.get(reader.size()?).ok_or(Corrupt)?,
+        ),
         _ => return Err(Corrupt),
     })
 }
