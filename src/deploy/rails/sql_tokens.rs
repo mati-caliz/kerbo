@@ -197,6 +197,18 @@ impl<'tokens> Cursor<'tokens> {
         matched
     }
 
+    pub fn at_symbol(&self, symbol: char) -> bool {
+        self.tokens.first() == Some(&Token::Symbol(symbol))
+    }
+
+    pub fn at_keyword(&self, keyword: &str) -> bool {
+        self.tokens.first().is_some_and(|token| token.is(keyword))
+    }
+
+    pub fn at_any_keyword(&self, keywords: &[&str]) -> bool {
+        keywords.iter().any(|keyword| self.at_keyword(keyword))
+    }
+
     pub fn contains(&self, keyword: &str) -> bool {
         self.tokens.iter().any(|token| token.is(keyword))
     }

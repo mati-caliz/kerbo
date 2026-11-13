@@ -194,3 +194,36 @@ fn reads_word_arrays_in_index_guards() {
         "{sql}"
     );
 }
+
+#[test]
+fn follows_columns_in_existence_guards() {
+    let sql = complete(concat!(
+        "    create_table :posts do |t|\n",
+        "      t.string :title\n",
+        "    end\n",
+        "    add_column :posts, :body, :text\n",
+        "    rename_column :posts, :title, :headline\n",
+        "    remove_column :posts, :body\n",
+        "    add_column :posts, :kept_headline, :text if column_exists?(:posts, :headline)\n",
+        "    add_column :posts, :stale_title, :text if column_exists?(:posts, :title)\n",
+        "    add_column :posts, :stale_body, :text if connection.column_exists?(:posts, :body)\n",
+        "    add_column :posts, :fresh_body, :text unless column_exists?(:posts, :body)\n",
+        "    add_column :posts, :typed, :text if column_exists?(:posts, :id, :bigint)\n",
+        "    add_column :ghosts, :never, :text if column_exists?(:ghosts, :id)",
+    ));
+    for expected in ["\"kept_headline\"", "\"fresh_body\"", "\"typed\""] {
+        assert!(sql.contains(expected), "falta {expected} en:\n{sql}");
+    }
+    for unexpected in ["\"stale_title\"", "\"stale_body\"", "\"never\""] {
+        assert!(!sql.contains(unexpected), "sobra {unexpected} en:\n{sql}");
+    }
+}
+
+#[test]
+fn columns_of_tables_without_a_definition_stay_unknown() {
+    let mut schema = Schema::complete();
+    schema.apply("CREATE INDEX \"index_items_on_name\" ON \"items\" (\"name\")");
+    schema.apply("CREATE TABLE \"copies\" AS SELECT * FROM \"items\"");
+    assert_eq!(schema.column_exists("items", "name"), None);
+    assert_eq!(schema.column_exists("copies", "name"), None);
+}

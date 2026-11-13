@@ -5,6 +5,7 @@ mod guards;
 mod history;
 mod references;
 mod schema;
+mod schema_table;
 mod sha256;
 mod sql_tokens;
 mod statements;

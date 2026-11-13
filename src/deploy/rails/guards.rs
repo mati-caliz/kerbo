@@ -14,6 +14,8 @@ const PARENTHESIZED: &str = "parenthesized_statements";
 const CALL: &str = "call";
 const CONNECTION: &str = "connection";
 const TABLE_EXISTS: &[&str] = &["table_exists?", "data_source_exists?"];
+const COLUMN_EXISTS: &str = "column_exists?";
+const COLUMN_EXISTS_ARITY: usize = 2;
 const INDEX_EXISTS: &str = "index_exists?";
 const INDEX_NAME_EXISTS: &str = "index_name_exists?";
 const FOREIGN_KEY_EXISTS: &str = "foreign_key_exists?";
@@ -79,6 +81,14 @@ impl Guard<'_> {
         let table = name(*parsed.positional.first()?, self.source)?;
         if TABLE_EXISTS.contains(&method.as_str()) {
             return self.schema.table_exists(&table);
+        }
+        if method == COLUMN_EXISTS {
+            if parsed.positional.len() != COLUMN_EXISTS_ARITY || !parsed.keywords.is_empty() {
+                return None;
+            }
+            return self
+                .schema
+                .column_exists(&table, &parsed.name_at(1, self.source)?);
         }
         if method == INDEX_NAME_EXISTS {
             let index = parsed.name_at(1, self.source)?;
