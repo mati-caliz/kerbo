@@ -1,13 +1,13 @@
 use tree_sitter::Node;
 
 use super::java::NAME_FIELD;
+use super::java_called_receivers::receiver_facts;
 use super::java_chains::argument_count;
 use super::java_null_flow::{
     ARGUMENTS_FIELD, Analysis, COMMENTS, Dereference, INVOCATION, NullFlow, OBJECT_FIELD, State,
 };
 use super::java_null_inference::{CallTarget, NullArgument, call_target};
 use super::java_null_keys::{forget, spellings, tracked_key};
-use super::java_receiver_arguments::receiver_arguments;
 use crate::syntax::{named_children, one_based};
 
 const FIELD_ACCESS: &str = "field_access";
@@ -51,7 +51,7 @@ pub(super) fn passed(analysis: &mut Analysis<'_, '_>, call: Node<'_>, mut state:
         return state;
     };
     let arity = argument_count(call);
-    let receiver_arguments = receiver_arguments(call, analysis.source);
+    let receiver_arguments = receiver_facts(call, analysis.source, analysis.imported, analysis.variables);
     for (index, argument, key, origin) in passed {
         let start = argument.start_position();
         let used = NullArgument {

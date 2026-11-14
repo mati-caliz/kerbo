@@ -3,7 +3,7 @@ use super::java::{
 };
 use super::java_dereference::{known_not_null, may_return_null};
 use super::java_inferred_arguments::context_inferred_non_null;
-use super::java_library_arguments::{inherited_library_class, library_substituted_non_null};
+use super::java_library_arguments::{called_type, inherited_library_class, library_substituted_non_null};
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
@@ -27,6 +27,8 @@ const LIBRARY_NON_NULL: &[(&str, &str, usize, usize, &str)] = &[
     ("java.util.Map", "merge", 3, 1, "value"),
     ("java.util.Map", "merge", 3, 2, "remappingFunction"),
     ("java.util.List", "addAll", 2, 1, "c"),
+    ("java.io.File", "File", 1, 0, "pathname"),
+    ("java.nio.file.Paths", "get", 1, 0, "first"),
     ("java.util.concurrent.ConcurrentMap", "remove", 2, 0, "key"),
 ];
 
@@ -184,6 +186,15 @@ pub(super) fn non_null_parameter(
                 types.is_marked(summary, argument.receiver_arguments.marking),
             )
         });
+    }
+    if argument.receiver == Receiver::Unknown
+        && let Some(called) = &argument.receiver_arguments.called
+        && let Some(returned) = called_type(types, library, summary, called)
+    {
+        let mut through_returned = argument.clone();
+        through_returned.receiver = Receiver::Type(returned);
+        through_returned.receiver_arguments.called = None;
+        return non_null_parameter(types, library, summary, &through_returned);
     }
     if argument.receiver == Receiver::Unknown
         && let Some(member) = &argument.receiver_arguments.inherited

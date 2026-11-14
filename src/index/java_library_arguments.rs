@@ -2,8 +2,11 @@ use super::java::JavaSummary;
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::generics::{Generic, class_signature, method_signature};
 use crate::jvm::library::Library;
+use crate::jvm::method::Method;
+use crate::lint::java_called_receivers::CalledReceiver;
 use crate::lint::java_null_inference::NullArgument;
 use crate::lint::java_receiver_arguments::{ArgumentNullness, InheritedMember};
+use crate::lint::java_receivers::Receiver;
 
 // Bajo `@NullMarked` del que llama, el parámetro de un método de librería cuyo tipo es una variable
 // de la clase no admite null si el receptor se declara con un tipo no nulo en su lugar
@@ -100,4 +103,41 @@ fn declared_member_type<'summary>(
     types
         .field_of(class, &member.name)
         .map(|(declaring, field)| (declaring, field.type_name.clone()))
+}
+
+// El tipo que devuelve la llamada que hace de receptor (`Splitter.on(x)` devuelve `Splitter`), si
+// todas las sobrecargas que puede llamar devuelven el mismo: del proyecto, por su nombre; de
+// librería, con su paquete.
+pub(super) fn called_type(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    called: &CalledReceiver,
+) -> Option<String> {
+    let Receiver::Type(written) = &called.receiver else {
+        return None;
+    };
+    let returned: Vec<String> = match resolve(types, library, summary, written) {
+        Resolved::Project(owner) => project_lineage(types, library, &owner)
+            .iter()
+            .map(|class| {
+                types
+                    .declarations_of(class)
+                    .filter(|(_, declaration)| {
+                        !declaration.is_constructor
+                            && declaration.name == called.name
+                            && declaration.parameters.len() == called.arity
+                    })
+                    .map(|(_, declaration)| declaration.returned.clone())
+                    .collect::<Vec<_>>()
+            })
+            .find(|found| !found.is_empty())?,
+        Resolved::Library(class) => library
+            .overloads(&class, &called.name, called.arity)
+            .iter()
+            .map(Method::return_class)
+            .collect::<Option<_>>()?,
+    };
+    let first = returned.first()?;
+    returned.iter().all(|other| other == first).then(|| first.clone())
 }

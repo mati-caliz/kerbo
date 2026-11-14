@@ -1,11 +1,12 @@
 use tree_sitter::Node;
 
 use super::java::{CONSTRUCTOR, FINAL, PRIVATE, STATIC, has_modifier, is_type_declaration, text};
+use super::java_called_receivers::receiver_facts;
 use super::java_chains::argument_count;
 use super::java_exact_receivers::ExactReceivers;
 use super::java_lambda_returns::{LambdaReturn, lambda_returns_in};
 use super::java_nested_arguments::{NestedNull, enclosing_argument};
-use super::java_receiver_arguments::{ReceiverArguments, receiver_arguments};
+use super::java_receiver_arguments::ReceiverArguments;
 use super::java_receivers::{Receiver, StaticImports, Variables, simple_type_name, variable_types};
 use crate::syntax::{named_children, one_based};
 
@@ -379,6 +380,6 @@ pub(super) fn argument_of_call(
         column: one_based(start.column),
         cast: None,
         exact,
-        receiver_arguments: receiver_arguments(call, source),
+        receiver_arguments: receiver_facts(call, source, context.imported, context.variables),
     })
 }

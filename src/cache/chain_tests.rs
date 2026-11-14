@@ -1,5 +1,6 @@
 use super::chain_codec::{read_flow, write_flow};
 use super::codec::{Reader, Writer};
+use crate::lint::java_called_receivers::CalledReceiver;
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin, NullReturn};
 use crate::lint::java_null_inference::NullArgument;
@@ -189,6 +190,11 @@ fn null_arguments_survive_the_round_trip() {
                 name: "getList".to_owned(),
                 getter: true,
             }),
+            called: Some(Box::new(CalledReceiver {
+                name: "on".to_owned(),
+                arity: 1,
+                receiver: Receiver::Type("Splitter".to_owned()),
+            })),
         },
     };
     let mut writer = Writer::default();

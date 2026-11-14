@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::java::text;
+use super::java_called_receivers::CalledReceiver;
 use super::java_owner::{NullMarking, null_marking_of};
 use super::java_receivers::{declared_type, enclosing_types};
 use super::java_type_variables::type_parameter_admits_null;
@@ -33,6 +34,7 @@ pub struct ReceiverArguments {
     pub marking: NullMarking,
     pub arguments: Vec<ArgumentNullness>,
     pub inherited: Option<InheritedMember>,
+    pub called: Option<Box<CalledReceiver>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,7 +77,7 @@ pub fn receiver_arguments(call: Node<'_>, source: &[u8]) -> ReceiverArguments {
     ReceiverArguments {
         marking: null_marking_of(call, source),
         arguments,
-        inherited: None,
+        ..ReceiverArguments::default()
     }
 }
 

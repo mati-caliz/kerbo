@@ -1,6 +1,7 @@
 use super::codec::{Corrupt, Reader, Writer};
 use super::declaration_codec::{read_marking, write_marking};
 use super::summary_codec::{read_receiver, write_receiver};
+use crate::lint::java_called_receivers::CalledReceiver;
 use crate::lint::java_contract_calls::{CallTarget, ContractCall};
 use crate::lint::java_contracts::Constraint;
 use crate::lint::java_null_inference::NullArgument;
@@ -46,6 +47,11 @@ pub fn write_null_argument(writer: &mut Writer, argument: &NullArgument) {
             writer.number(u64::from(member.getter));
         },
     );
+    writer.list(argument.receiver_arguments.called.as_slice(), |writer, called| {
+        writer.text(&called.name);
+        writer.size(called.arity);
+        write_receiver(writer, &called.receiver);
+    });
 }
 
 pub fn read_null_argument(reader: &mut Reader<'_>) -> Result<NullArgument, Corrupt> {
@@ -75,6 +81,16 @@ pub fn read_null_argument(reader: &mut Reader<'_>) -> Result<NullArgument, Corru
                         name: reader.text()?,
                         getter: reader.number()? != 0,
                     })
+                })?
+                .into_iter()
+                .next(),
+            called: reader
+                .list(|reader| {
+                    Ok(Box::new(CalledReceiver {
+                        name: reader.text()?,
+                        arity: reader.size()?,
+                        receiver: read_receiver(reader)?,
+                    }))
                 })?
                 .into_iter()
                 .next(),

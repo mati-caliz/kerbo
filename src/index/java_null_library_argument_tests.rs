@@ -290,3 +290,48 @@ fn a_nullable_type_argument_of_the_receiver_reaches_what_the_method_returns() {
     found.sort();
     assert_eq!(found, ["16:21 length()", "18:22 length()", "20:22 hashCode()"]);
 }
+
+const CALLED_RECEIVER: &str = r#"package app;
+
+import java.io.File;
+import java.util.List;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+final class Splitter {
+    static Splitter on(String separator) {
+        return new Splitter();
+    }
+
+    Iterable<String> split(CharSequence text) {
+        return List.of();
+    }
+}
+
+@NullMarked
+final class Reader {
+    @Nullable String value() {
+        return null;
+    }
+
+    @Nullable String path() {
+        return null;
+    }
+
+    void read() {
+        Splitter.on(",").split(value());
+        Splitter.on(",").split(null);
+        new File(path());
+    }
+}
+"#;
+
+// Un receptor que es otra llamada sobre un tipo conocido se resuelve por lo que devuelve, y
+// `new File(...)` no admite null (anotación externa).
+#[test]
+fn a_called_receiver_is_resolved_by_what_it_returns() {
+    let mut found = findings_in(CALLED_RECEIVER, "null-argument");
+    found.sort();
+    assert_eq!(found, ["30:32 text", "31:32 text", "32:18 pathname"]);
+}

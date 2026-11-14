@@ -3,12 +3,12 @@ use std::collections::{HashMap, HashSet};
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
+use super::java_called_receivers::receiver_facts;
 use super::java_chain_uses::{field_read_at, nullable_root_arguments};
 use super::java_null_checks::{checked_expression, is_stable_call};
 use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
 use super::java_null_origin::NullReturn;
 use super::java_null_returns::returned_by_method;
-use super::java_receiver_arguments::receiver_arguments;
 use super::java_receivers::{StaticImports, Variables, enclosing_types};
 use super::java_throws::ArgumentKind;
 use super::java_unboxing::unboxed_at;
@@ -107,7 +107,7 @@ impl NullFacts {
         else {
             return;
         };
-        let receiver_arguments = receiver_arguments(node, source);
+        let receiver_arguments = receiver_facts(node, source, imported, variables);
         for (index, argument) in arguments.iter().enumerate() {
             if argument.kind() != INVOCATION {
                 continue;
