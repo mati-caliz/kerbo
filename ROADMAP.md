@@ -1594,7 +1594,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 759 de los 972 (445 `data-flow-issue`, 268 `null-argument`, 25
+  de más en los dos. En guava, 773 de los 972 (459 `data-flow-issue`, 268 `null-argument`, 25
   `failing-call`, 21 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
@@ -1616,7 +1616,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   busca en la clase del import, y un tipo calificado, entre los del proyecto antes que en las
   librerías. Una llamada pasada antes a un parámetro que el método desreferencia queda no nula
   después (por el texto de la expresión), y un getter sin argumentos ya desreferenciado también,
-  mientras la cadena no tenga argumentos y no se reasigne la variable. `File.getParent` y
+  mientras la cadena no tenga argumentos y no se reasigne la variable. Un `poll()` o `peek()` dentro de un `while`/`if` que chequea `!cola.isEmpty()` no avisa (IntelliJ sigue el tamaño), y la raíz de una cadena declarada con tipos distintos en el archivo toma el tipo del alcance del uso. `File.getParent` y
   `getParentFile` no cuentan como nulos: Qodana no los marca nunca. Del JDK, los parámetros que
   sus anotaciones externas dan por no nulos (`Future.get`, `Collection.addAll`/`removeAll`/...,
   `Map.putAll`), también en las clases que los heredan. `failing-call` calca "The call to X

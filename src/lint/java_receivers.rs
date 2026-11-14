@@ -108,6 +108,13 @@ pub fn declared_arguments(usage: Node<'_>, name: &str, source: &[u8]) -> Option<
         .filter(|arguments| !arguments.is_empty())
 }
 
+// El nombre simple del tipo con que se declara la variable que se usa, salvo que sea `var`.
+pub fn declared_simple_type(usage: Node<'_>, name: &str, source: &[u8]) -> Option<String> {
+    declared_type(usage, name, source)
+        .map(|written| simple_type_name(text(written, source)))
+        .filter(|declared| declared != INFERRED)
+}
+
 // El tipo escrito con que se declara una variable: en la lambda o el método que la usa más cercano
 // que la declare, si no entre los campos de las clases que encierran el uso (de la más cercana a
 // la de nivel superior). Si ahí se declara con tipos distintos o sin tipo escrito, no se sabe.
@@ -224,10 +231,9 @@ pub fn receiver_of(invocation: Node<'_>, source: &[u8], variables: &Variables) -
                 None if name.starts_with(|first: char| first.is_ascii_uppercase()) => {
                     Receiver::Type(name.to_owned())
                 }
-                Some(None) => declared_type(object, name, source)
-                    .map(|written| simple_type_name(text(written, source)))
-                    .filter(|declared| declared != INFERRED)
-                    .map_or(Receiver::Unknown, Receiver::Type),
+                Some(None) => {
+                    declared_simple_type(object, name, source).map_or(Receiver::Unknown, Receiver::Type)
+                }
                 None => Receiver::Unknown,
             }
         }

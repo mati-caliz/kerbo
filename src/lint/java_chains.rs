@@ -4,12 +4,12 @@ use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_called_receivers::receiver_facts;
-use super::java_chain_uses::{field_read_at, nullable_root_arguments};
+use super::java_chain_uses::{field_read_at, guarded_by_non_empty, nullable_root_arguments};
 use super::java_null_checks::{checked_expression, is_stable_call};
 use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
 use super::java_null_origin::NullReturn;
 use super::java_null_returns::returned_by_method;
-use super::java_receivers::{StaticImports, Variables, enclosing_types};
+use super::java_receivers::{StaticImports, Variables, declared_simple_type, enclosing_types};
 use super::java_throws::ArgumentKind;
 use super::java_unboxing::unboxed_at;
 use crate::syntax::{named_children, one_based};
@@ -253,7 +253,7 @@ fn walk(
             arity: argument_count(current),
             line: one_based(start.row),
             column: one_based(start.column),
-            checked: facts.is_checked(current, source),
+            checked: facts.is_checked(current, source) || guarded_by_non_empty(current, source),
             class_arguments: class_arguments(current),
             text_arguments: text_arguments(current, source),
             argument_types: argument_types(current, source, variables),
@@ -287,7 +287,8 @@ fn walk(
             None if written.starts_with(|first: char| first.is_ascii_uppercase()) => {
                 ChainRoot::Class(written.to_owned())
             }
-            Some(None) | None => return None,
+            Some(None) => ChainRoot::Instance(declared_simple_type(object, written, source)?),
+            None => return None,
         };
         return Some((root, steps));
     }

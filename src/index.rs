@@ -54,6 +54,8 @@ mod java_null_library_argument_tests;
 #[cfg(test)]
 mod java_null_marked_tests;
 #[cfg(test)]
+mod java_null_reference_tests;
+#[cfg(test)]
 mod java_null_reread_tests;
 #[cfg(test)]
 mod java_null_tests;
