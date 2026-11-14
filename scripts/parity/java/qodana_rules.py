@@ -1,13 +1,15 @@
 #!/usr/bin/env python
-"""Compara las inspecciones de Qodana que tienen par en una regla de kerbo (imports sin usar y
-modificadores redundantes) con kerbo imitando a Checkstyle y a PMD, por regla, archivo y línea.
-Qodana avisa una vez por modificador y kerbo también, pero las columnas no coinciden: cuenta una
-vez cada regla en cada línea.
+"""Compara las inspecciones de Qodana que tienen par en una regla de kerbo (imports sin usar,
+modificadores redundantes y escapes Unicode de más) con kerbo imitando a Checkstyle y a PMD, por
+regla, archivo y línea. Las columnas no coinciden (Qodana cuenta caracteres, kerbo bytes): de los
+modificadores cuenta una vez cada línea, y de los escapes, cuántos hay en cada línea.
 
     scripts/parity/java/qodana.sh junit4 UNUSED_IMPORT,UnnecessaryModifier,FinalPrivateMethod,FinalStaticMethod,FinalMethodInFinalClass
     python scripts/parity/java/qodana_rules.py junit4
+    python scripts/parity/java/qodana_rules.py guava results-SequencedCollectionMethodCanBeUsed
 
-Necesita el SARIF de esa corrida (results-UNUSED_IMPORT) y kerbo.json y kerbo-pmd.json de kerbo.sh.
+Necesita el SARIF de esa corrida (results-UNUSED_IMPORT si no se dice otro) y kerbo.json y
+kerbo-pmd.json de kerbo.sh.
 """
 
 import collections
@@ -26,48 +28,57 @@ INSPECTIONS = {
     "FinalPrivateMethod": "redundant-modifier",
     "FinalStaticMethod": "redundant-modifier",
     "FinalMethodInFinalClass": "redundant-modifier",
+    "UnnecessaryUnicodeEscape": "unnecessary-unicode-escape",
 }
+COUNTED_PER_LINE = {"unnecessary-unicode-escape"}
 RESULTS = "results-UNUSED_IMPORT"
 REPORTS = {"Checkstyle": "kerbo.json", "PMD": "kerbo-pmd.json"}
 UNANALYZED = {"guava": ("android/",)}
 SHOWN = int(os.environ.get("SHOWN", "15"))
 
 
-def qodana_findings(repo):
-    results = json.loads((PARITY / repo / RESULTS / "qodana.sarif.json").read_text(encoding="utf-8"))
-    found = collections.defaultdict(dict)
+def qodana_findings(repo, results_folder):
+    results = json.loads((PARITY / repo / results_folder / "qodana.sarif.json").read_text(encoding="utf-8"))
+    found = collections.defaultdict(collections.Counter)
+    messages = {}
     for result in results["runs"][0].get("results", []):
         rule = INSPECTIONS.get(result["ruleId"])
         if rule:
             location = result["locations"][0]["physicalLocation"]
             key = (location["artifactLocation"]["uri"], location["region"]["startLine"])
-            found[rule][key] = f"{result['ruleId']}: {result['message']['text']}"
-    return found
+            found[rule][key] = found[rule][key] + 1 if rule in COUNTED_PER_LINE else 1
+            messages[key] = f"{result['ruleId']}: {result['message']['text']}"
+    return found, messages
 
 
 def kerbo_findings(repo, report):
-    found = collections.defaultdict(set)
+    found = collections.defaultdict(collections.Counter)
     for item in json.loads((PARITY / repo / report).read_text(encoding="utf-8")):
         path = item["path"].removeprefix("./")
-        if item["rule"] in INSPECTIONS.values() and not path.startswith(UNANALYZED.get(repo, ())):
-            found[item["rule"]].add((path, item["line"]))
+        rule = item["rule"]
+        if rule in INSPECTIONS.values() and not path.startswith(UNANALYZED.get(repo, ())):
+            key = (path, item["line"])
+            found[rule][key] = found[rule][key] + 1 if rule in COUNTED_PER_LINE else 1
     return found
 
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     repo = sys.argv[1]
-    reference = qodana_findings(repo)
+    reference, messages = qodana_findings(repo, sys.argv[2] if len(sys.argv) > 2 else RESULTS)
     for imitated, report in REPORTS.items():
         kerbo = kerbo_findings(repo, report)
         for rule in sorted(set(INSPECTIONS.values())):
-            missing = sorted(set(reference[rule]) - kerbo[rule])
-            extra = sorted(kerbo[rule] - set(reference[rule]))
-            print(f"{rule} imitando a {imitated}: Qodana {len(reference[rule])}, faltan {len(missing)}, sobran {len(extra)}")
-            for path, line in missing[:SHOWN]:
-                print(f"    faltan {path}:{line} {reference[rule][(path, line)]}")
-            for path, line in extra[:SHOWN]:
-                print(f"    sobran {path}:{line}")
+            if not reference[rule]:
+                continue
+            missing = reference[rule] - kerbo[rule]
+            extra = kerbo[rule] - reference[rule]
+            total = sum(reference[rule].values())
+            print(f"{rule} imitando a {imitated}: Qodana {total}, faltan {missing.total()}, sobran {extra.total()}")
+            for (path, line), count in sorted(missing.items())[:SHOWN]:
+                print(f"    faltan {path}:{line} x{count} {messages[(path, line)]}")
+            for (path, line), count in sorted(extra.items())[:SHOWN]:
+                print(f"    sobran {path}:{line} x{count}")
 
 
 if __name__ == "__main__":

@@ -160,6 +160,16 @@ De las inspecciones de IntelliJ, kerbo hace:
   Lee las firmas de los jars y las del JDK del `release` del proyecto (`JAVA_HOME` o el `java` del
   `PATH`). Como IntelliJ, no opina de un método con una llamada que no sabe resolver. Sin JDK no avisa.
 
+- `UnnecessaryUnicodeEscape` (`unnecessary-unicode-escape`): un `\u00e9` de un carácter que se
+  puede escribir tal cual, en cualquier parte del archivo (también en comentarios), y se arregla
+  escribiéndolo (un tab adentro de un string queda `\t`). Quedan los controles, los espacios
+  que no son el común, los invisibles, los sin asignar, los separadores de línea, las marcas
+  combinantes y U+FFFD; las categorías son las del JBR 25 que trae Qodana (Unicode 16). Tampoco se
+  marca lo que la codificación del archivo no puede escribir: la del proyecto
+  (`project.build.sourceEncoding` o `options.encoding`, o `[java] encoding`), salvo que el archivo
+  ya traiga UTF-8 fuera de ASCII, que entonces se lee como UTF-8, igual que en IntelliJ.
+  commons-lang (que declara ISO-8859-1) y guava coinciden con Qodana en los 23.120.
+
 - `AutoCloseableResource` (`auto-closeable-resource`): una llamada que crea algo que se cierra
   (un `InputStream`, una `Connection`, un `ResultSet`, un `ExecutorService`, un `HttpClient`...)
   fuera de un `try` con recursos: en una variable que no se cierra, no se devuelve ni se pasa a

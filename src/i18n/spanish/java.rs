@@ -363,6 +363,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT] = [
         "Quien llama tiene que atrapar o declarar una excepción que nunca llega, y el código de manejo que escribe no corre nunca. Como RedundantThrows de IntelliJ: si kerbo no puede resolver alguna llamada del método, no opina.",
         "void cargar() throws IOException { lista.clear(); } se vuelve void cargar() { lista.clear(); }.",
     ),
+    RuleText::new(
+        "Escape Unicode de un carácter que se puede escribir tal cual",
+        "escribí el carácter en vez del escape",
+        "Un \\u0041 obliga a buscar qué letra es; el archivo está en UTF-8 y el carácter se lee directo. Como UnnecessaryUnicodeEscape de IntelliJ: quedan los controles, los espacios raros, los invisibles, los sin asignar y las marcas combinantes, que no se ven bien escritos.",
+        "String nombre = \"Jos\\u00e9\"; se vuelve String nombre = \"José\";.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

@@ -60,6 +60,7 @@ rule_family!(JavaRule {
     BooleanMethodIsAlwaysInverted => "boolean-method-is-always-inverted",
     FieldMayBeFinal => "field-may-be-final",
     RedundantThrows => "redundant-throws",
+    UnnecessaryUnicodeEscape => "unnecessary-unicode-escape",
     JavadocVariable => "javadoc-variable",
     MissingJavadocMethod => "missing-javadoc-method",
     JavadocMethod => "javadoc-method",

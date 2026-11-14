@@ -65,6 +65,7 @@ mod java_tokens;
 pub mod java_type_arguments;
 pub mod java_type_variables;
 mod java_unboxing;
+mod java_unicode_escapes;
 mod java_wrap;
 mod modifiers;
 pub mod python;
@@ -232,6 +233,11 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     findings.extend(java_optional::reported(&nodes, source));
     findings.extend(java_already_assigned::reported(&nodes, source));
     findings.extend(java_final_fields::reported(root, source));
+    findings.extend(java_unicode_escapes::reported(
+        root,
+        source,
+        limits.java_encoding(),
+    ));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
     if limits.java_reference() == JavaReference::Pmd {
         java_pmd_suppressions::drop_suppressed(&mut findings, root, source);
@@ -260,5 +266,7 @@ mod java_inspection_tests;
 mod java_javadoc_tests;
 #[cfg(test)]
 mod java_pmd_tests;
+#[cfg(test)]
+mod java_unicode_escape_tests;
 #[cfg(test)]
 mod tests;

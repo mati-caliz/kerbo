@@ -44,6 +44,7 @@ errcheck_check_type_assertions = true  # como check-type-assertions: también `x
 
 [java]                            # opcional: a quién imitan redundant-modifier y final-class
 reference = "pmd"                 # checkstyle o pmd; si falta, se detecta (ver Java)
+encoding = "ISO-8859-1"          # UTF-8, ISO-8859-1 o US-ASCII; si falta, la del pom.xml o build.gradle
 ```
 
 | Preset | Archivo | Función | Ciclomática | Cognitiva | Parámetros |

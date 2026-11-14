@@ -3,7 +3,8 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::limits::JavaReference;
+use super::java_encoding;
+use crate::limits::{JavaReference, JavaSettings, SourceEncoding};
 
 const BUILD_FILES: [&str; 3] = ["pom.xml", "build.gradle", "build.gradle.kts"];
 const CONFIG_FOLDER: &str = "config";
@@ -33,15 +34,21 @@ const CHECKSTYLE: Tool = Tool {
 #[serde(deny_unknown_fields)]
 pub struct RawJava {
     reference: Option<JavaReference>,
+    encoding: Option<SourceEncoding>,
 }
 
 impl RawJava {
-    pub fn resolve(&self, root: &Path) -> JavaReference {
-        self.reference.unwrap_or_else(|| detected(root))
+    pub fn resolve(&self, root: &Path) -> JavaSettings {
+        JavaSettings {
+            reference: self.reference.unwrap_or_else(|| detected_reference(root)),
+            encoding: self
+                .encoding
+                .unwrap_or_else(|| java_encoding::detected(root, &BUILD_FILES)),
+        }
     }
 }
 
-pub fn detected(root: &Path) -> JavaReference {
+fn detected_reference(root: &Path) -> JavaReference {
     if uses(root, PMD) && !uses(root, CHECKSTYLE) {
         JavaReference::Pmd
     } else {

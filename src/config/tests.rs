@@ -3,7 +3,7 @@ use std::path::Path;
 use super::Config;
 use crate::i18n::Lang;
 use crate::language::Language;
-use crate::limits::JavaReference;
+use crate::limits::{JavaReference, SourceEncoding};
 use crate::rules::RuleId;
 use crate::test_support::TempTree;
 
@@ -199,5 +199,35 @@ reference = \"sonar\"
 "
         )
         .is_err()
+    );
+}
+
+fn java_encoding(files: &[(&str, &str)]) -> SourceEncoding {
+    let tree = TempTree::new(&format!("java-encoding-{}", files.len()));
+    for (path, contents) in files {
+        tree.write(path, contents);
+    }
+    Config::load(None, tree.path())
+        .expect("la configuración es válida")
+        .limits_for(Path::new("src/A.java"), Language::Java, false)
+        .java_encoding()
+}
+
+#[test]
+fn reads_the_source_encoding_from_the_build_or_the_config() {
+    const LATIN1_POM: &str =
+        "<properties><project.build.sourceEncoding>ISO-8859-1</project.build.sourceEncoding></properties>";
+    assert_eq!(java_encoding(&[]), SourceEncoding::Utf8);
+    assert_eq!(java_encoding(&[("pom.xml", LATIN1_POM)]), SourceEncoding::Latin1);
+    assert_eq!(
+        java_encoding(&[("build.gradle", "compileJava.options.encoding = 'US-ASCII'")]),
+        SourceEncoding::Ascii
+    );
+    assert_eq!(
+        java_encoding(&[
+            ("pom.xml", LATIN1_POM),
+            ("kerbo.toml", "[java]\nencoding = \"UTF-8\"\n")
+        ]),
+        SourceEncoding::Utf8
     );
 }

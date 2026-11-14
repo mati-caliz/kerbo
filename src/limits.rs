@@ -17,7 +17,7 @@ const FAMILY_WORDS: usize = (RuleId::ALL.len() - RuleId::CODE_RULES.len()).div_c
 pub struct Limits {
     values: [Option<u32>; RuleId::CODE_RULES.len()],
     silenced_families: [u64; FAMILY_WORDS],
-    java_reference: JavaReference,
+    java: JavaSettings,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Deserialize)]
@@ -28,12 +28,42 @@ pub enum JavaReference {
     Pmd,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Deserialize)]
+pub enum SourceEncoding {
+    #[default]
+    #[serde(rename = "UTF-8")]
+    Utf8,
+    #[serde(rename = "ISO-8859-1")]
+    Latin1,
+    #[serde(rename = "US-ASCII")]
+    Ascii,
+}
+
+impl SourceEncoding {
+    const LATIN1_LAST: u16 = 0xFF;
+    const ASCII_LAST: u16 = 0x7F;
+
+    pub const fn can_write(self, code: u16) -> bool {
+        match self {
+            Self::Utf8 => true,
+            Self::Latin1 => code <= Self::LATIN1_LAST,
+            Self::Ascii => code <= Self::ASCII_LAST,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct JavaSettings {
+    pub reference: JavaReference,
+    pub encoding: SourceEncoding,
+}
+
 impl Default for Limits {
     fn default() -> Self {
         Self {
             values: [None; RuleId::CODE_RULES.len()],
             silenced_families: [ALL_FAMILIES_SILENCED; FAMILY_WORDS],
-            java_reference: JavaReference::Checkstyle,
+            java: JavaSettings::default(),
         }
     }
 }
@@ -147,7 +177,7 @@ impl Limits {
         let mut limits = Self {
             values: [ALWAYS_REPORTED; RuleId::CODE_RULES.len()],
             silenced_families: [NO_FAMILY_SILENCED; FAMILY_WORDS],
-            java_reference: JavaReference::Checkstyle,
+            java: JavaSettings::default(),
         };
         let metrics = [
             (RuleId::FileLength, file),
@@ -198,11 +228,21 @@ impl Limits {
     }
 
     pub const fn java_reference(self) -> JavaReference {
-        self.java_reference
+        self.java.reference
     }
 
+    pub const fn java_encoding(self) -> SourceEncoding {
+        self.java.encoding
+    }
+
+    pub const fn with_java(mut self, java: JavaSettings) -> Self {
+        self.java = java;
+        self
+    }
+
+    #[cfg(test)]
     pub const fn with_java_reference(mut self, reference: JavaReference) -> Self {
-        self.java_reference = reference;
+        self.java.reference = reference;
         self
     }
 }

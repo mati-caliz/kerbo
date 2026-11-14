@@ -363,6 +363,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT] = [
         "Callers have to catch or declare an exception that never arrives, and the handling code they write never runs. Like IntelliJ's RedundantThrows: if kerbo cannot resolve some call in the method, it has no opinion.",
         "void load() throws IOException { list.clear(); } becomes void load() { list.clear(); }.",
     ),
+    RuleText::new(
+        "Unicode escape for a character that can be written as is",
+        "write the character instead of the escape",
+        "A \\u0041 makes the reader look up which letter it is; the file is UTF-8 and the character reads directly. Like IntelliJ's UnnecessaryUnicodeEscape: control characters, unusual spaces, invisible, unassigned and combining characters stay escaped, since they do not show well when written.",
+        "String name = \"Jos\\u00e9\"; becomes String name = \"José\";.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {
