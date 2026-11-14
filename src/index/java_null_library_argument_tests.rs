@@ -257,3 +257,36 @@ final class Caller {
 fn a_parametric_nullness_parameter_admits_null() {
     assert_eq!(findings_in(PARAMETRIC, "null-argument"), ["15:25 type"]);
 }
+
+const NULLABLE_ARGUMENTS: &str = r"package app;
+
+import java.util.List;
+import java.util.Queue;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+interface Box<T extends @Nullable Object> {
+    T get();
+}
+
+@NullMarked
+final class Reader {
+    void read(Box<@Nullable String> loose, Box<String> strict, List<@Nullable String> names, List<String> plain, Queue<String> queue) {
+        loose.get().length();
+        strict.get().length();
+        names.get(0).length();
+        plain.get(0).length();
+        queue.peek().hashCode();
+    }
+}
+";
+
+// Un método que devuelve una variable de la clase puede devolver null si el receptor la declaró
+// `@Nullable` en ese lugar, en el proyecto y en el JDK; y `Queue.peek` puede devolver null.
+#[test]
+fn a_nullable_type_argument_of_the_receiver_reaches_what_the_method_returns() {
+    let mut found = findings_in(NULLABLE_ARGUMENTS, "data-flow-issue");
+    found.sort();
+    assert_eq!(found, ["16:21 length()", "18:22 length()", "20:22 hashCode()"]);
+}

@@ -2,6 +2,7 @@ use super::java::{Declaration, JavaSummary, NullInference, Position, lint_at};
 use super::java_jdk::{is_always_defined, jdk_method};
 use super::java_null_arguments::{accepts, non_null_parameter, project_owners, reaches};
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
+use super::java_substituted_returns::returns_nullable_argument;
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body, ReturnType};
@@ -152,11 +153,18 @@ fn nullable_steps(
 ) -> Vec<bool> {
     let mut current = resolve_root(types, library, summary, &chain.root);
     let mut nullable = Vec::new();
-    for step in &chain.steps {
+    for (index, step) in chain.steps.iter().enumerate() {
+        let substituted: &[usize] = if index == 0 {
+            &chain.nullable_root_arguments
+        } else {
+            &[]
+        };
         if let Resolved::Project(owner) = &current
             && let Some((is_nullable, returned)) = project_step(types, library, owner, step)
         {
-            nullable.push(is_nullable);
+            nullable.push(
+                is_nullable || returns_nullable_argument(types, library, &current, (step, substituted)),
+            );
             let Some(returned) = returned else {
                 break;
             };
@@ -194,12 +202,15 @@ fn nullable_steps(
         let Some(first) = candidates.first() else {
             break;
         };
-        nullable.push(candidates.iter().all(|method| {
+        let annotated_nullable = candidates.iter().all(|method| {
             method
                 .return_annotations
                 .iter()
                 .any(|annotation| annotation.rsplit(QUALIFIER_SEPARATOR).next() == Some(NULLABLE))
-        }));
+        });
+        nullable.push(
+            annotated_nullable || returns_nullable_argument(types, library, &current, (step, substituted)),
+        );
         let returned = first.return_class();
         if candidates.iter().any(|method| method.return_class() != returned) {
             break;

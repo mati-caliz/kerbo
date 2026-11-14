@@ -26,6 +26,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
             dereferenced_at: Some((12, 16)),
             passed_as: None,
             returned: None,
+            nullable_root_arguments: vec![1],
         }),
         dereferences: vec![Dereference {
             name: "intValue".to_owned(),
@@ -64,6 +65,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
             dereferenced_at: None,
             passed_as: flow.arguments.first().cloned().map(Box::new),
             returned: None,
+            nullable_root_arguments: vec![1],
         }),
         passed_before: flow.arguments.clone(),
         ..NullFlow::new(NullOrigin::Literal)
@@ -99,6 +101,7 @@ fn null_returns_survive_the_round_trip() {
         dereferenced_at: None,
         passed_as: None,
         returned: Some(returned("convert(a)", NullMarking::Unspecified)),
+        nullable_root_arguments: Vec::new(),
     }));
     let mut writer = Writer::default();
     write_flow(&mut writer, &literal);

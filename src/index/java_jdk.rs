@@ -181,6 +181,8 @@ const METHODS: &[(&str, &str, usize, &str, bool)] = &[
     ("java.io.File", "getParent", 0, "java.lang.String", false),
     ("java.io.File", "listFiles", 0, "java.io.File[]", true),
     ("java.io.File", "list", 0, "java.lang.String[]", true),
+    ("java.util.Queue", "peek", 0, OBJECT, true),
+    ("java.util.Queue", "poll", 0, OBJECT, true),
 ];
 
 // Las propiedades que la JVM siempre define: `System.getProperty` de una de ellas no es null.

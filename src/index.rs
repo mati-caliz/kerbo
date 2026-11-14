@@ -17,6 +17,7 @@ mod java_parameter_nullness;
 mod java_project;
 mod java_resources;
 mod java_rules;
+mod java_substituted_returns;
 mod java_taint;
 mod java_throw_functional;
 mod java_throw_lambdas;

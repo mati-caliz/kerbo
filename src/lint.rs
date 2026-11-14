@@ -7,6 +7,7 @@ pub mod java;
 mod java_already_assigned;
 pub mod java_call_roots;
 pub mod java_calls;
+mod java_chain_uses;
 pub mod java_chains;
 pub mod java_constants;
 mod java_constructor_throws;

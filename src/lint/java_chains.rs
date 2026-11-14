@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
+use super::java_chain_uses::{field_read_at, nullable_root_arguments};
 use super::java_null_checks::{checked_expression, is_stable_call};
 use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
 use super::java_null_origin::NullReturn;
@@ -67,6 +68,7 @@ pub struct Chain {
     pub dereferenced_at: Option<(usize, usize)>,
     pub passed_as: Option<Box<NullArgument>>,
     pub returned: Option<NullReturn>,
+    pub nullable_root_arguments: Vec<usize>,
 }
 
 // Lo que se sabe del archivo hasta el punto que se recorre: lo que ya se chequeó contra null (por
@@ -188,18 +190,6 @@ fn compact(written: &str) -> String {
     written.split_whitespace().collect()
 }
 
-// Dónde empieza la llamada si lo que devuelve se usa para leer un campo (`getSubscriber().eventos`):
-// Qodana marca ahí la desreferencia.
-fn field_read_at(invocation: Node<'_>) -> Option<(usize, usize)> {
-    let parent = invocation.parent()?;
-    let reads_field = parent.kind() == FIELD_ACCESS
-        && parent
-            .child_by_field_name(OBJECT_FIELD)
-            .is_some_and(|object| object.id() == invocation.id());
-    let start = invocation.start_position();
-    reads_field.then(|| (one_based(start.row), one_based(start.column)))
-}
-
 // La cadena que termina en esta llamada, si no es parte de otra más larga ya vista. Una variable
 // asignada desde una llamada no se sigue: el código real la chequea con `if (x == null) return;` y
 // eso pide flujo de datos, no texto.
@@ -229,6 +219,7 @@ pub fn chain_of(
         dereferenced_at,
         passed_as,
         returned,
+        nullable_root_arguments: nullable_root_arguments(invocation, source),
     })
 }
 
@@ -241,6 +232,7 @@ pub fn origin_chain(invocation: Node<'_>, source: &[u8], variables: &Variables) 
         dereferenced_at: None,
         passed_as: None,
         returned: None,
+        nullable_root_arguments: nullable_root_arguments(invocation, source),
     })
 }
 
