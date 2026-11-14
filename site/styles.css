@@ -5,8 +5,9 @@
   --line: #262a31;
   --text: #ecedef;
   --text-soft: #a3a8b3;
-  --text-faint: #6f7480;
+  --text-faint: #7d828e;
   --kerb-red: #ff4d4f;
+  --kerb-red-button: #d92b2d;
   --kerb-white: #f4f4f5;
   --ok: #4ade80;
   --warn: #fbbf24;
@@ -49,7 +50,7 @@ header.nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srg
 }
 .btn:hover { transform: translateY(-1px); }
 .btn--solid { background: var(--kerb-white); color: var(--bg); }
-.btn--red { background: var(--kerb-red); color: #fff; }
+.btn--red { background: var(--kerb-red-button); color: #fff; }
 .btn--ghost { border-color: var(--line); color: var(--text); }
 .btn--ghost:hover { border-color: var(--text-faint); }
 .btn--small { padding: 8px 14px; font-size: 14px; }
