@@ -15,6 +15,7 @@
     "**/public/**",
     "**/*.min.js",
     "**/*.gen.go",
+    "**/src/lib/api/generated/**",
     "**/*.test.*",
     "**/*.spec.*",
     "**/*_test.go",
