@@ -30,6 +30,7 @@ INSPECTIONS = {
     "FinalMethodInFinalClass": "redundant-modifier",
     "UnnecessaryUnicodeEscape": "unnecessary-unicode-escape",
     "Java8ListSort": "java8-list-sort",
+    "SizeReplaceableByIsEmpty": "size-replaceable-by-is-empty",
 }
 COUNTED_PER_LINE = {"unnecessary-unicode-escape"}
 RESULTS = "results-UNUSED_IMPORT"

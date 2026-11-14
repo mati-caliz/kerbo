@@ -375,6 +375,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT] = [
         "Desde Java 8 la lista se ordena sola con List.sort, que algunas implementaciones hacen más rápido que copiar a un arreglo. Como Java8ListSort de IntelliJ: sólo con release 8 o más.",
         "Collections.sort(pedidos, porFecha); se vuelve pedidos.sort(porFecha);.",
     ),
+    RuleText::new(
+        "size() o length() comparado con 0 o 1 donde alcanza con isEmpty()",
+        "usá isEmpty(), negado si la comparación pregunta si hay algo",
+        "isEmpty() dice lo que se pregunta sin hacer la cuenta, y en algunas colecciones es más barato que contar. Como SizeReplaceableByIsEmpty de IntelliJ: sólo cuando el tipo declarado tiene isEmpty() (String, las colecciones y mapas de Java y de guava, CharSequence desde Java 15).",
+        "if (pedidos.size() == 0) se vuelve if (pedidos.isEmpty()), y nombre.length() > 0, !nombre.isEmpty().",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

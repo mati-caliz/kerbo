@@ -62,6 +62,7 @@ rule_family!(JavaRule {
     RedundantThrows => "redundant-throws",
     UnnecessaryUnicodeEscape => "unnecessary-unicode-escape",
     Java8ListSort => "java8-list-sort",
+    SizeReplaceableByIsEmpty => "size-replaceable-by-is-empty",
     JavadocVariable => "javadoc-variable",
     MissingJavadocMethod => "missing-javadoc-method",
     JavadocMethod => "javadoc-method",

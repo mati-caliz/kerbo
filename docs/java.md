@@ -175,6 +175,14 @@ De las inspecciones de IntelliJ, kerbo hace:
   declare su propio `sort`, o que también se importe `Arrays.sort` y el primer argumento sea un
   arreglo (declarado como `T[]`, un `new T[]` o un `toArray()`). Coincide con Qodana en guava (31).
 
+- `SizeReplaceableByIsEmpty` (`size-replaceable-by-is-empty`): `size()` o `length()` comparado con
+  0 o 1 de una forma que pregunta si está vacío (`== 0`, `< 1`, `> 0`, `!= 0`, `>= 1`, en cualquier
+  orden), y se arregla con `isEmpty()` o `!isEmpty()`. El número puede ser una constante `final` del
+  alcance. Sin resolver tipos: el receptor es una variable cuyo tipo declarado tiene `isEmpty()`
+  (las colecciones y mapas de `java.util` y de guava; `String` desde `release` 6 y `CharSequence`,
+  `StringBuilder` y `StringBuffer` desde 15), salvo adentro de la clase de ese mismo nombre.
+  Coincide con Qodana en el corpus (30).
+
 - `AutoCloseableResource` (`auto-closeable-resource`): una llamada que crea algo que se cierra
   (un `InputStream`, una `Connection`, un `ResultSet`, un `ExecutorService`, un `HttpClient`...)
   fuera de un `try` con recursos: en una variable que no se cierra, no se devuelve ni se pasa a
