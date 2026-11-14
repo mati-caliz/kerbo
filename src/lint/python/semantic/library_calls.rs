@@ -19,7 +19,7 @@ use crate::rules::PythonRule;
 const SUPPRESS: &str = "contextlib.suppress";
 const CONTEXT_VAR: &str = "contextvars.ContextVar";
 const DEFAULT: &str = "default";
-const REVERSIBLES: [&str; 3] = ["reversed", "set", "sorted"];
+const REVERSIBLE_CALLS: [&str; 3] = ["reversed", "set", "sorted"];
 const SLICE: &str = "slice";
 const REVERSE_STEP: &str = "-1";
 const SLICE_SEPARATOR: char = ':';
@@ -170,7 +170,7 @@ fn is_reversed_argument(model: &Model<'_>, source: &[u8], function: Node<'_>, gi
             matches!(parts.as_slice(), ["", "", REVERSE_STEP])
         });
     reversed
-        && REVERSIBLES
+        && REVERSIBLE_CALLS
             .iter()
             .any(|builtin| is_builtin_named(model, function, source, builtin))
 }

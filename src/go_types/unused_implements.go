@@ -48,11 +48,11 @@ func implements(V types.Type, T *types.Interface, msV *types.MethodSet) ([]*type
 		return nil, true
 	}
 
-	if ityp, _ := V.Underlying().(*types.Interface); ityp != nil {
+	if interfaceType, _ := V.Underlying().(*types.Interface); interfaceType != nil {
 		// TODO(dh): is this code reachable?
 		for mIndex := 0; mIndex < T.NumMethods(); mIndex++ {
 			m := T.Method(mIndex)
-			_, obj := lookupMethod(ityp, m.Pkg(), m.Name())
+			_, obj := lookupMethod(interfaceType, m.Pkg(), m.Name())
 			switch {
 			case obj == nil:
 				return nil, false
@@ -85,10 +85,10 @@ func implements(V types.Type, T *types.Interface, msV *types.MethodSet) ([]*type
 
 		sels = append(sels, sel)
 	}
-	for tparam, targ := range mapping {
+	for tparam, typeArgument := range mapping {
 		// This checks constraints on a best-effort basis, erring on the side
 		// of accepting too many types.
-		if !satisfiesConstraint(targ, tparam) {
+		if !satisfiesConstraint(typeArgument, tparam) {
 			return nil, false
 		}
 	}

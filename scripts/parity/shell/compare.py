@@ -45,8 +45,8 @@ for rule in rules:
     expected = {key for key in shellcheck if key[0] == rule}
     reported = {key for key in kerbo if key[0] == rule}
     missing = expected - reported
-    totals.update(coinciden=len(expected & reported), faltan=len(missing), sobran=len(reported - expected),
-                  faltan_en_archivos_analizados=sum(key[1] in analyzed for key in missing))
+    totals.update(matched=len(expected & reported), missing_count=len(missing), extra_count=len(reported - expected),
+                  missing_in_analyzed_files=sum(key[1] in analyzed for key in missing))
     if expected or reported:
         print(rule, 'coinciden', len(expected & reported), 'faltan', len(expected - reported), 'sobran', len(reported - expected))
     for key in sorted(expected - reported)[:6]:

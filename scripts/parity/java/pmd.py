@@ -119,13 +119,13 @@ def main():
         missing = reference[rule] - kerbo[rule]
         extra = kerbo[rule] - reference[rule]
         total = sum(reference[rule].values())
-        totals.update(coinciden=total - sum(missing.values()), faltan=sum(missing.values()), sobran=sum(extra.values()))
+        totals.update(matched=total - sum(missing.values()), missing_count=sum(missing.values()), extra_count=sum(extra.values()))
         status = "igual" if not missing and not extra else f"faltan {sum(missing.values())}, sobran {sum(extra.values())}"
         print(f"{rule}: PMD {total}, {status}")
         for title, diff in (("faltan", missing), ("sobran", extra)):
             for (path, line), count in sorted(diff.items())[:SHOWN]:
                 print(f"    {title} {path}:{line} x{count}")
-    print(f"== {repo}: {totals['coinciden']} coinciden, {totals['faltan']} faltan, {totals['sobran']} de más")
+    print(f"== {repo}: {totals['matched']} coinciden, {totals['missing_count']} faltan, {totals['extra_count']} de más")
 
 
 if __name__ == "__main__":

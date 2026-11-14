@@ -56,11 +56,11 @@ const SEMICOLON: &str = ";";
 pub fn reported(nodes: &[Node<'_>], lines: &Lines<'_>) -> Vec<LintFinding> {
     let mut findings = Vec::new();
     for &node in nodes {
-        findings.extend(left_curlies(node, lines));
+        findings.extend(left_braces(node, lines));
         match node.kind() {
             BLOCK | CONSTRUCTOR_BODY => {
                 let closing = last_child(node).filter(|child| child.kind() == CLOSE_CURLY);
-                findings.extend(right_curlies_in(&statements(node), closing.map(Next::of), lines));
+                findings.extend(right_braces_in(&statements(node), closing.map(Next::of), lines));
             }
             SWITCH_BLOCK => findings.extend(switch_groups(node, lines)),
             _ => {}
@@ -87,7 +87,7 @@ fn first_child(node: Node<'_>) -> Option<Node<'_>> {
 // Las llaves que mira LeftCurly: las de los tipos y el switch, y las de los bloques que son cuerpo
 // de un método, un control de flujo, un catch, una lambda o un case. Un bloque suelto o de
 // inicialización no entra.
-fn left_curlies(node: Node<'_>, lines: &Lines<'_>) -> Vec<LintFinding> {
+fn left_braces(node: Node<'_>, lines: &Lines<'_>) -> Vec<LintFinding> {
     if TYPE_BODIES.contains(&node.kind()) {
         return first_child(node)
             .filter(|brace| brace.kind() == OPEN_CURLY)
@@ -176,12 +176,12 @@ fn switch_groups(switch_block: Node<'_>, lines: &Lines<'_>) -> Vec<LintFinding> 
                 .copied()
                 .or(closing)
                 .map(Next::of);
-            right_curlies_in(&statements(*group), after, lines)
+            right_braces_in(&statements(*group), after, lines)
         })
         .collect()
 }
 
-fn right_curlies_in(statements: &[Node<'_>], tail: Option<Next>, lines: &Lines<'_>) -> Vec<LintFinding> {
+fn right_braces_in(statements: &[Node<'_>], tail: Option<Next>, lines: &Lines<'_>) -> Vec<LintFinding> {
     statements
         .iter()
         .enumerate()
@@ -191,31 +191,31 @@ fn right_curlies_in(statements: &[Node<'_>], tail: Option<Next>, lines: &Lines<'
                 .copied()
                 .map(Next::of)
                 .or(tail);
-            multi_block_curlies(*statement, next, lines)
+            multi_block_braces(*statement, next, lines)
         })
         .collect()
 }
 
-fn multi_block_curlies(statement: Node<'_>, next: Option<Next>, lines: &Lines<'_>) -> Vec<LintFinding> {
+fn multi_block_braces(statement: Node<'_>, next: Option<Next>, lines: &Lines<'_>) -> Vec<LintFinding> {
     let kind = statement.kind();
     if kind == IF {
-        return if_curlies(statement, next, lines);
+        return if_braces(statement, next, lines);
     }
     if TRY_STATEMENTS.contains(&kind) {
-        return try_curlies(statement, next, lines);
+        return try_braces(statement, next, lines);
     }
     if NESTING_STATEMENTS.contains(&kind) {
         return statement
             .child_by_field_name(BODY_FIELD)
             .or_else(|| statements(statement).into_iter().last())
             .filter(|body| body.kind() == IF || TRY_STATEMENTS.contains(&body.kind()))
-            .map(|body| multi_block_curlies(body, next, lines))
+            .map(|body| multi_block_braces(body, next, lines))
             .unwrap_or_default();
     }
     Vec::new()
 }
 
-fn if_curlies(statement: Node<'_>, next: Option<Next>, lines: &Lines<'_>) -> Vec<LintFinding> {
+fn if_braces(statement: Node<'_>, next: Option<Next>, lines: &Lines<'_>) -> Vec<LintFinding> {
     let mut findings = Vec::new();
     let else_keyword = children(statement).into_iter().find(|child| child.kind() == ELSE);
     let consequence = statement.child_by_field_name(CONSEQUENCE_FIELD);
@@ -230,20 +230,20 @@ fn if_curlies(statement: Node<'_>, next: Option<Next>, lines: &Lines<'_>) -> Vec
                 lines,
             ));
         } else {
-            findings.extend(multi_block_curlies(consequence, after_consequence, lines));
+            findings.extend(multi_block_braces(consequence, after_consequence, lines));
         }
     }
     if let Some(alternative) = alternative {
         if alternative.kind() == BLOCK {
             findings.extend(closing_curly(alternative, next, true, lines));
         } else {
-            findings.extend(multi_block_curlies(alternative, next, lines));
+            findings.extend(multi_block_braces(alternative, next, lines));
         }
     }
     findings
 }
 
-fn try_curlies(statement: Node<'_>, next: Option<Next>, lines: &Lines<'_>) -> Vec<LintFinding> {
+fn try_braces(statement: Node<'_>, next: Option<Next>, lines: &Lines<'_>) -> Vec<LintFinding> {
     let mut parts: Vec<(Node<'_>, Node<'_>)> = Vec::new();
     if let Some(body) = statement.child_by_field_name(BODY_FIELD) {
         parts.push((body, body));
