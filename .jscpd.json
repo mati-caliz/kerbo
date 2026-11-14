@@ -2,6 +2,7 @@
   "format": ["typescript", "tsx", "javascript", "jsx", "python", "go", "rust", "bash"],
   "minTokens": 50,
   "gitignore": true,
+  "ignorePattern": ["\\bimport\\s[^;]*;"],
   "ignore": [
     "**/node_modules/**",
     "**/dist/**",
@@ -13,6 +14,7 @@
     "**/.venv/**",
     "**/vendor/**",
     "**/public/**",
+    "**/.design-sync/**",
     "**/*.min.js",
     "**/*.gen.go",
     "**/src/lib/api/generated/**",
