@@ -52,7 +52,8 @@ GO_RUST_LITERALS = re.compile(
     re.DOTALL,
 )
 IDENTIFIER = re.compile(r"(?<![A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*")
-WORD_BOUNDARIES = (re.compile(r"([a-z0-9])([A-Z])"), re.compile(r"([A-Z]+)([A-Z][a-z])"))
+WORD_BOUNDARIES = (re.compile(r"([a-zà-ÿ0-9])([A-Z])"), re.compile(r"([A-Z]+)([A-Z][a-z])"))
+LETTER_RUN = re.compile(r"[^\W\d_]+")
 
 
 def executable(name: str) -> str:
@@ -169,9 +170,7 @@ def words_of(identifier: str) -> list[str]:
     spaced = identifier
     for boundary in WORD_BOUNDARIES:
         spaced = boundary.sub(r"\1 \2", spaced)
-    return [
-        word.lower() for word in re.split(r"[^A-Za-z]+", spaced) if len(word) >= MINIMUM_WORD_LENGTH
-    ]
+    return [word.lower() for word in LETTER_RUN.findall(spaced) if len(word) >= MINIMUM_WORD_LENGTH]
 
 
 def identifiers_by_file(repo: Path, files: list[Path]) -> dict[Path, set[str]]:
