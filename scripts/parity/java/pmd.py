@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Corre PMD con las reglas del quickstart que kerbo imita sobre un repo del corpus y lo compara con
-kerbo, por regla, archivo y línea. PMD avisa una vez por declaración con todos los modificadores de
+kerbo, por regla, archivo y línea. UnnecessaryImport junta lo que en kerbo son unused-import y
+redundant-import. PMD avisa una vez por declaración con todos los modificadores de
 más y kerbo uno por modificador: de los dos lados cuenta una vez cada regla en cada línea. Lo que ignora configs/<repo>.kerbo.toml tampoco se cuenta de PMD.
 
     python scripts/parity/java/pmd.py junit4
@@ -30,9 +31,11 @@ PARITY = pathlib.Path(os.environ.get("KERBO_PARITY", ROOT / ".parity"))
 VERSIONS = ROOT / "scripts" / "parity" / "versions.py"
 ZIP_URL = "https://github.com/pmd/pmd/releases/download/pmd_releases%2F{version}/pmd-dist-{version}-bin.zip"
 RULES = {
+    "category/java/codestyle.xml/UnnecessaryImport": "unused-import",
     "category/java/codestyle.xml/UnnecessaryModifier": "redundant-modifier",
     "category/java/design.xml/ClassWithOnlyPrivateConstructorsShouldBeFinal": "final-class",
 }
+KERBO_ALIASES = {"redundant-import": "unused-import"}
 SHOWN = int(os.environ.get("SHOWN", "15"))
 
 
@@ -81,8 +84,9 @@ def pmd_findings(output, repo):
 def kerbo_findings(repo):
     found = collections.defaultdict(collections.Counter)
     for item in json.loads((PARITY / "qodana" / repo / "kerbo-pmd.json").read_text(encoding="utf-8")):
-        if item["rule"] in RULES.values():
-            found[item["rule"]][(item["path"].removeprefix("./"), item["line"])] = 1
+        rule = KERBO_ALIASES.get(item["rule"], item["rule"])
+        if rule in RULES.values():
+            found[rule][(item["path"].removeprefix("./"), item["line"])] = 1
     return found
 
 
@@ -97,7 +101,7 @@ def write_golden(fixture, launcher):
     report = json.loads(output.read_text(encoding="utf-8"))
     output.unlink()
     found = sorted({(violation["beginline"], names[violation["rule"]]) for file in report["files"] for violation in file["violations"]})
-    fixture.with_suffix(".pmd").write_text("".join(f"{line} {rule}\n" for line, rule in found), encoding="utf-8")
+    fixture.with_suffix(".pmd").write_text("".join(f"{line} {rule}\n" for line, rule in found), encoding="utf-8", newline="\n")
 
 
 def main():

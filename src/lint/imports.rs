@@ -6,7 +6,10 @@ use super::java::{PROGRAM, STATIC, children, qualified_name};
 use super::references::referenced_names;
 use super::{ImportRedundancy, LintFinding, LintKind, finding};
 use crate::fix::Fix;
+use crate::limits::JavaReference;
 use crate::syntax::{named_children, one_based};
+
+mod javadoc;
 
 const IMPORT: &str = "import_declaration";
 const PACKAGE: &str = "package_declaration";
@@ -46,7 +49,7 @@ impl Import<'_> {
     }
 }
 
-pub fn reported(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
+pub fn reported(root: Node<'_>, source: &[u8], reference: JavaReference) -> Vec<LintFinding> {
     if root.kind() != PROGRAM {
         return Vec::new();
     }
@@ -56,7 +59,7 @@ pub fn reported(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
     }
     let mut findings = star_imports(&imports);
     findings.extend(redundant_imports(root, &imports, source));
-    findings.extend(unused_imports(root, &imports, source));
+    findings.extend(unused_imports(root, &imports, source, reference));
     findings
 }
 
@@ -130,12 +133,29 @@ fn redundant_imports(root: Node<'_>, imports: &[Import<'_>], source: &[u8]) -> V
     findings
 }
 
-fn unused_imports(root: Node<'_>, imports: &[Import<'_>], source: &[u8]) -> Vec<LintFinding> {
+fn unused_imports(
+    root: Node<'_>,
+    imports: &[Import<'_>],
+    source: &[u8],
+    reference: JavaReference,
+) -> Vec<LintFinding> {
     let referenced: HashSet<&str> = referenced_names(root, source);
+    let documented = match reference {
+        JavaReference::Checkstyle => HashSet::new(),
+        JavaReference::Pmd => javadoc::referenced_names(root, source),
+    };
+    let is_unused = |import: &Import<'_>| {
+        let name = import.simple_name();
+        let used = referenced.contains(name) || documented.contains(name);
+        match reference {
+            JavaReference::Checkstyle => !used || is_java_lang_class(&import.text),
+            JavaReference::Pmd => !used,
+        }
+    };
     imports
         .iter()
         .filter(|import| !import.is_star)
-        .filter(|import| !referenced.contains(import.simple_name()) || is_java_lang_class(&import.text))
+        .filter(|import| is_unused(import))
         .map(|import| {
             finding(
                 LintKind::UnusedImport,

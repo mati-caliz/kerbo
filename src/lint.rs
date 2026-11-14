@@ -208,7 +208,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     if family_off && LINT_RULES.iter().all(|&rule| limits.get(rule).is_none()) {
         return Vec::new();
     }
-    let mut findings = imports::reported(root, source);
+    let mut findings = imports::reported(root, source, limits.java_reference());
     findings.extend(modifiers::reported(root, source, limits.java_reference()));
     findings.extend(final_parameters::reported(root, source));
     findings.extend(final_class::reported(root, source, limits.java_reference()));

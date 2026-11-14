@@ -42,13 +42,17 @@ suelto que toma por HTML): Checkstyle avisa el error de parseo con el nombre de 
 
 ## PMD
 
-`RedundantModifier` y `FinalClass` tienen su par en el quickstart de PMD 7 (`UnnecessaryModifier` y
-`ClassWithOnlyPrivateConstructorsShouldBeFinal`), pero no avisan lo mismo, así que
-`redundant-modifier` y `final-class` imitan a uno o al otro según `[java] reference` de
-`kerbo.toml`. Si falta, kerbo imita a PMD cuando el build lo usa y no usa Checkstyle
+`UnusedImports`, `RedundantImport`, `RedundantModifier` y `FinalClass` tienen su par en el
+quickstart de PMD 7 (`UnnecessaryImport`, que junta los dos primeros, `UnnecessaryModifier` y
+`ClassWithOnlyPrivateConstructorsShouldBeFinal`), pero no avisan lo mismo, así que esas reglas
+imitan a uno o al otro según `[java] reference` de `kerbo.toml`. Si falta, kerbo imita a PMD cuando el build lo usa y no usa Checkstyle
 (`maven-pmd-plugin` en el `pom.xml`, el plugin `pmd` de Gradle, una carpeta `config/pmd` o un
 `pmd*.xml` en la raíz), y a Checkstyle en cualquier otro caso. Imitando a PMD:
 
+- Un import que sólo nombra el Javadoc (`{@link}`, `{@linkplain}`, `{@value}`, `@see`, `@throws`,
+  `@exception`, los tipos de los parámetros de `#metodo(...)`, el `target` de un `@link` en un
+  snippet y los links de un comentario `///`) está usado, y uno de `java.lang` que se usa no se
+  marca como sin usar (sí como redundante).
 - No se marca el `public` del constructor de una clase que no es pública, ni `strictfp`, ni el
   `final` de los parámetros de un método abstracto o de una variable `_`.
 - `final` sobra en un método de un enum sin constantes con cuerpo y en el de un record; el `public`
@@ -60,7 +64,13 @@ suelto que toma por HTML): Checkstyle avisa el error de parseo con el nombre de 
 - El aviso va en la línea del nombre de la declaración y no en la de su primera anotación, y
   `@SuppressWarnings("all")`, `"PMD"` o `"PMD.<regla>"` y un `// NOPMD` lo callan.
 
-junit4, commons-lang y guava (sin `android/`) coinciden con PMD 7.29 en las dos reglas.
+junit4, commons-lang y guava (sin `android/`) coinciden con PMD 7.29 en los modificadores y las
+clases finales. En los imports faltan los que PMD sabe innecesarios porque resuelve tipos: un `*`
+del que no se usa nada y un tipo anidado que ya llega heredado (2 en junit4, 11 en guava).
+
+Contra Qodana, imitando a PMD, los imports coinciden y en los modificadores faltan sólo dos
+inspecciones que no tienen ni Checkstyle ni PMD: `static` y `final` juntos en un método
+(`FinalStaticMethod`) y `transient` en un campo estático.
 
 ## Inspecciones de IntelliJ
 

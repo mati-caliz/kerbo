@@ -12,14 +12,28 @@ fn like_pmd() -> Limits {
 }
 
 fn is_pmd_rule(rule: RuleId) -> bool {
-    [RuleId::RedundantModifier, RuleId::FinalClass].contains(&rule)
+    [
+        RuleId::RedundantModifier,
+        RuleId::FinalClass,
+        RuleId::UnusedImport,
+        RuleId::RedundantImport,
+    ]
+    .contains(&rule)
+}
+
+fn as_pmd_rule(rule: RuleId) -> RuleId {
+    if rule == RuleId::RedundantImport {
+        RuleId::UnusedImport
+    } else {
+        rule
+    }
 }
 
 fn rendered_lines(findings: &[LintFinding]) -> Vec<String> {
     let mut lines: Vec<(usize, &str)> = findings
         .iter()
         .filter(|finding| is_pmd_rule(finding.kind.rule()))
-        .map(|finding| (finding.line, finding.kind.rule().as_str()))
+        .map(|finding| (finding.line, as_pmd_rule(finding.kind.rule()).as_str()))
         .collect();
     lines.sort_unstable();
     lines.dedup();

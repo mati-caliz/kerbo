@@ -1,8 +1,22 @@
 package fixtures;
 
+import java.io.IOException;
 import java.io.StringReader;
+import java.lang.String;
+import java.util.Collection;
+import java.util.Deque;
 import java.util.List;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
+/**
+ * Usa {@link Map} y {@linkplain List#of(Collection[]) listas}.
+ *
+ * @see Set
+ * @throws IOException nunca
+ */
 public class Pmd {
     private Pmd() {
     }
