@@ -142,7 +142,7 @@ fn receiver_substitutes_non_null(
 
 // Los métodos del proyecto que puede llamar la llamada, con el parámetro que recibe el argumento
 // entero, de la clase más cercana que los declara.
-fn project_candidates<'summary>(
+pub(super) fn project_candidates<'summary>(
     types: &ProjectTypes<'summary>,
     library: &Library,
     summary: &JavaSummary,

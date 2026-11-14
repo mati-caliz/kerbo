@@ -2,6 +2,7 @@ use super::java::{Declaration, JavaSummary, NullInference, Position, lint_at};
 use super::java_jdk::{is_always_defined, jdk_method};
 use super::java_null_arguments::{accepts, non_null_parameter, project_owners, reaches};
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
+use super::java_reference_unboxing::unboxed_references;
 use super::java_substituted_returns::returns_nullable_argument;
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
@@ -53,6 +54,7 @@ pub fn nullable_dereferences(
         })
         .collect();
     findings.extend(unboxed_arguments(types, library, summary));
+    findings.extend(unboxed_references(types, library, summary));
     for flow in &summary.null_flows {
         if reaches(types, library, summary, flow) {
             findings.extend(
@@ -133,7 +135,7 @@ fn takes_primitive(
         .is_some_and(|primitive| primitive.iter().all(|is_primitive| *is_primitive))
 }
 
-fn report(line: usize, column: usize, name: &str) -> LintFinding {
+pub(super) fn report(line: usize, column: usize, name: &str) -> LintFinding {
     lint_at(
         JavaRule::DataFlowIssue,
         &Position { line, column },

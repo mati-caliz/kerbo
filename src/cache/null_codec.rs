@@ -4,6 +4,7 @@ use super::summary_codec::{read_receiver, write_receiver};
 use crate::lint::java_called_receivers::CalledReceiver;
 use crate::lint::java_contract_calls::{CallTarget, ContractCall};
 use crate::lint::java_contracts::Constraint;
+use crate::lint::java_nested_arguments::{NestedNull, ReferenceArgument};
 use crate::lint::java_null_inference::NullArgument;
 use crate::lint::java_receiver_arguments::{ArgumentNullness, InheritedMember, ReceiverArguments};
 
@@ -156,4 +157,38 @@ fn read_target(reader: &mut Reader<'_>) -> Result<CallTarget, Corrupt> {
         TARGET_IMPORTED_METHOD => Ok(CallTarget::ImportedMethod),
         _ => Err(Corrupt),
     }
+}
+
+pub fn write_nested_nulls(writer: &mut Writer, nested_nulls: &[NestedNull]) {
+    writer.list(nested_nulls, |writer, nested| {
+        write_null_argument(writer, &nested.inner);
+        write_null_argument(writer, &nested.outer);
+    });
+}
+
+pub fn read_nested_nulls(reader: &mut Reader<'_>) -> Result<Vec<NestedNull>, Corrupt> {
+    reader.list(|reader| {
+        Ok(NestedNull {
+            inner: read_null_argument(reader)?,
+            outer: read_null_argument(reader)?,
+        })
+    })
+}
+
+pub fn write_references(writer: &mut Writer, references: &[ReferenceArgument]) {
+    writer.list(references, |writer, reference| {
+        write_null_argument(writer, &reference.argument);
+        writer.text(&reference.owner);
+        writer.text(&reference.method);
+    });
+}
+
+pub fn read_references(reader: &mut Reader<'_>) -> Result<Vec<ReferenceArgument>, Corrupt> {
+    reader.list(|reader| {
+        Ok(ReferenceArgument {
+            argument: read_null_argument(reader)?,
+            owner: reader.text()?,
+            method: reader.text()?,
+        })
+    })
 }

@@ -5,11 +5,12 @@ use super::java_called_receivers::receiver_facts;
 use super::java_chains::argument_count;
 use super::java_exact_receivers::ExactReceivers;
 use super::java_lambda_returns::{LambdaReturn, lambda_returns_in};
-use super::java_nested_arguments::{NestedNull, enclosing_argument};
+use super::java_nested_arguments::{NestedNull, ReferenceArgument, enclosing_argument, reference_argument};
 use super::java_receiver_arguments::ReceiverArguments;
 use super::java_receivers::{Receiver, StaticImports, Variables, simple_type_name, variable_types};
 use crate::syntax::{named_children, one_based};
 
+const METHOD_REFERENCE: &str = "method_reference";
 const BODY_FIELD: &str = "body";
 const VALUE_FIELD: &str = "value";
 const TYPE_FIELD: &str = "type";
@@ -258,6 +259,7 @@ pub struct CallArguments {
     pub null_arguments: Vec<NullArgument>,
     pub nested_nulls: Vec<NestedNull>,
     pub lambda_returns: Vec<LambdaReturn>,
+    pub references: Vec<ReferenceArgument>,
 }
 
 pub fn null_arguments_in(top_level: Node<'_>, nodes: &[Node<'_>], source: &[u8]) -> CallArguments {
@@ -271,7 +273,12 @@ pub fn null_arguments_in(top_level: Node<'_>, nodes: &[Node<'_>], source: &[u8])
     };
     let mut null_arguments = Vec::new();
     let mut nested_nulls = Vec::new();
+    let mut references = Vec::new();
     for call in nodes {
+        if call.kind() == METHOD_REFERENCE {
+            references.extend(reference_argument(*call, source, &context));
+            continue;
+        }
         let passed = nulls_passed_to(*call, source, &context);
         if passed.is_empty() {
             continue;
@@ -288,6 +295,7 @@ pub fn null_arguments_in(top_level: Node<'_>, nodes: &[Node<'_>], source: &[u8])
         null_arguments,
         nested_nulls,
         lambda_returns: lambda_returns_in(nodes, source, &context),
+        references,
     }
 }
 

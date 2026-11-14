@@ -335,3 +335,36 @@ fn a_called_receiver_is_resolved_by_what_it_returns() {
     found.sort();
     assert_eq!(found, ["30:32 text", "31:32 text", "32:18 pathname"]);
 }
+
+const REFERENCES: &str = r#"package app;
+
+import java.util.function.BiFunction;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+final class Ops {
+    static int sum(int left, int right) { return left + right; }
+    static String join(String left, String right) { return left + right; }
+}
+
+@NullMarked
+interface Ranges<V extends @Nullable Object> {
+    void merge(@Nullable V value, BiFunction<? super V, ? super @Nullable V, ? extends @Nullable V> function);
+}
+
+@NullMarked
+final class Caller {
+    void call(Ranges<Integer> ranges, Ranges<String> texts) {
+        ranges.merge(1, Ops::sum);
+        texts.merge("", Ops::join);
+    }
+}
+"#;
+
+// Una referencia a un método con parámetros primitivos pasada donde la interfaz funcional le da
+// algo `@Nullable` se desempaqueta: se marca la referencia.
+#[test]
+fn a_method_reference_that_unboxes_a_nullable_argument_is_reported() {
+    assert_eq!(findings_in(REFERENCES, "data-flow-issue"), ["21:25 sum()"]);
+}

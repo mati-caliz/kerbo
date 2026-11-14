@@ -1594,7 +1594,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 750 de los 972 (436 `data-flow-issue`, 268 `null-argument`, 25
+  de más en los dos. En guava, 759 de los 972 (445 `data-flow-issue`, 268 `null-argument`, 25
   `failing-call`, 21 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
@@ -1695,6 +1695,10 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   devuelven posiblemente null (anotación externa). Un receptor que es otra llamada sobre un tipo
   conocido se resuelve por lo que devuelve (`Splitter.on(...).split(X.value())`), y `new File(...)`
   y `Paths.get(...)` no admiten null (anotaciones externas).
+  "Passing an argument to the method reference requires unboxing": una referencia a un método
+  estático con parámetros primitivos (`Integer::sum`) pasada a un parámetro cuya interfaz funcional
+  del JDK le da algo `@Nullable` (`BiFunction<? super V, ? super @Nullable V, ...>` de
+  `RangeMap.merge`).
   Falta:
   - `assertNull` sobre lo que devuelve un método del proyecto (5 en commons-lang, sobre
     `getIfEmpty`, `getIfBlank` y `applyNonNull`): IntelliJ marca la de 3 argumentos y no la de 4
