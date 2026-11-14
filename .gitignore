@@ -5,3 +5,5 @@ scripts/parity/python/out/
 scripts/parity/django/out/
 scripts/parity/rails/out/
 .parity/
+
+**/reports/mutation/
