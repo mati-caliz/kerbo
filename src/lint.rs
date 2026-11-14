@@ -50,7 +50,7 @@ pub mod java_receiver_arguments;
 pub mod java_receivers;
 pub mod java_resources;
 mod java_results;
-mod java_returns;
+pub mod java_returns;
 mod java_same_value;
 mod java_shapes;
 mod java_spacing;

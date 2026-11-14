@@ -23,7 +23,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
                 argument_types: vec![Some("String".to_owned()), None],
                 passed_before: Vec::new(),
             }],
-            unboxed: Some((12, 16)),
+            dereferenced_at: Some((12, 16)),
             passed_as: None,
             returned: None,
         }),
@@ -61,7 +61,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
                     ..step.clone()
                 })
                 .collect(),
-            unboxed: None,
+            dereferenced_at: None,
             passed_as: flow.arguments.first().cloned().map(Box::new),
             returned: None,
         }),
@@ -96,7 +96,7 @@ fn null_returns_survive_the_round_trip() {
     let call = NullFlow::new(NullOrigin::Call(Chain {
         root: ChainRoot::Class("Converter".to_owned()),
         steps: Vec::new(),
-        unboxed: None,
+        dereferenced_at: None,
         passed_as: None,
         returned: Some(returned("convert(a)", NullMarking::Unspecified)),
     }));

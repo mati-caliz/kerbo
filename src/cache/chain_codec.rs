@@ -45,7 +45,7 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
         });
         writer.list(&step.passed_before, write_null_argument);
     });
-    match chain.unboxed {
+    match chain.dereferenced_at {
         Some((line, column)) => {
             writer.number(PRESENT);
             writer.size(line);
@@ -99,7 +99,7 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
                 passed_before: reader.list(read_null_argument)?,
             })
         })?,
-        unboxed: match reader.number()? {
+        dereferenced_at: match reader.number()? {
             ABSENT => None,
             PRESENT => Some((reader.size()?, reader.size()?)),
             _ => return Err(Corrupt),

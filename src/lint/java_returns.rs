@@ -1,5 +1,6 @@
 use tree_sitter::Node;
 
+use super::java::text;
 use super::java_constants::literal_value;
 use crate::syntax::named_children;
 
@@ -10,6 +11,11 @@ const RETURN: &str = "return_statement";
 const RETURN_BOUNDARIES: &[&str] = &["lambda_expression", "class_body"];
 const PRIMITIVE_TYPES: &[&str] = &["integral_type", "floating_point_type", "boolean_type"];
 const COMMENTS: &[&str] = &["line_comment", "block_comment"];
+const IDENTIFIER: &str = "identifier";
+const FIELD_ACCESS: &str = "field_access";
+const THIS: &str = "this";
+const OBJECT_FIELD: &str = "object";
+const FIELD_FIELD: &str = "field";
 
 // La forma del tipo que devuelve un método: sólo una referencia puede ser null.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,4 +77,34 @@ pub fn returned(method: Node<'_>, source: &[u8]) -> Returns {
         }
         _ => Returns::Varied,
     }
+}
+
+// El campo que devuelve un getter simple, cuyo cuerpo es sólo `return campo;` o `return this.campo;`:
+// IntelliJ lee la llamada como el campo.
+pub fn returned_field(declaration: Node<'_>, source: &[u8]) -> Option<String> {
+    let body = declaration.child_by_field_name(BODY_FIELD)?;
+    let mut statements = named_children(body)
+        .into_iter()
+        .filter(|statement| !COMMENTS.contains(&statement.kind()));
+    let (Some(statement), None) = (statements.next(), statements.next()) else {
+        return None;
+    };
+    if statement.kind() != RETURN {
+        return None;
+    }
+    let value = named_children(statement)
+        .into_iter()
+        .find(|child| !COMMENTS.contains(&child.kind()))?;
+    let field = match value.kind() {
+        IDENTIFIER => value,
+        FIELD_ACCESS
+            if value
+                .child_by_field_name(OBJECT_FIELD)
+                .is_some_and(|object| object.kind() == THIS) =>
+        {
+            value.child_by_field_name(FIELD_FIELD)?
+        }
+        _ => return None,
+    };
+    Some(text(field, source).to_owned())
 }

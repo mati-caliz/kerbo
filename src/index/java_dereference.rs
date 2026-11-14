@@ -28,8 +28,8 @@ pub fn nullable_dereferences(
         .iter()
         .flat_map(|chain| {
             let nullable = nullable_steps(types, library, summary, chain);
-            let unboxing = chain
-                .unboxed
+            let last_dereferenced = chain
+                .dereferenced_at
                 .zip(chain.steps.last())
                 .filter(|(_, last)| {
                     nullable.len() == chain.steps.len()
@@ -47,7 +47,7 @@ pub fn nullable_dereferences(
                     }
                     _ => None,
                 })
-                .chain(unboxing)
+                .chain(last_dereferenced)
                 .collect::<Vec<_>>()
         })
         .collect();
@@ -292,6 +292,7 @@ fn project_step(
         declaration.return_nullness == ReturnNullness::Nullable
             || (declaration.inference == NullInference::ClosedReturnsNull
                 && declaration.body == Body::Written)
+            || returns_nullable_field(types, library, declaration)
     });
     let mut returned = candidates.iter().map(|(declaring, declaration)| {
         (declaration.return_type == ReturnType::Reference)
@@ -300,6 +301,17 @@ fn project_step(
     let first = returned.next().flatten();
     let same = returned.all(|other| other == first);
     Some((is_nullable, first.filter(|_| same)))
+}
+
+// Un getter simple de un campo `@Nullable` de su clase (o de una de arriba): IntelliJ lee la llamada
+// como el campo, aunque el método se pueda redefinir.
+fn returns_nullable_field(types: &ProjectTypes<'_>, library: &Library, declaration: &Declaration) -> bool {
+    declaration.returned_field.as_ref().is_some_and(|field| {
+        project_lineage(types, library, &declaration.owner.name)
+            .iter()
+            .find_map(|class| types.field_of(class, field))
+            .is_some_and(|(_, declared)| declared.is_nullable)
+    })
 }
 
 fn declares_argument_types(declaration: &Declaration, argument_types: &[Option<String>]) -> bool {

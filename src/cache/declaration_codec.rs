@@ -94,6 +94,9 @@ pub(super) fn write_declaration(writer: &mut Writer, declaration: &Declaration) 
             write_constraint(writer, constraint.as_ref());
         });
     });
+    writer.list(declaration.returned_field.as_slice(), |writer, field| {
+        writer.text(field);
+    });
 }
 
 pub(super) fn write_owner(writer: &mut Writer, owner: &Owner) {
@@ -201,6 +204,7 @@ pub(super) fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, C
         annotations: reader.list(Reader::text)?,
         owner: read_owner(reader)?,
         fail_clauses: reader.list(|reader| reader.list(read_constraint))?,
+        returned_field: reader.list(Reader::text)?.into_iter().next(),
     })
 }
 

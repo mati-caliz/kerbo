@@ -27,6 +27,7 @@ use crate::lint::java_nullable_fields::{ReturnNullness, declares_nullable, retur
 use crate::lint::java_owner::Owner;
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
+use crate::lint::java_returns::returned_field;
 use crate::lint::java_throws::MethodThrows;
 use crate::lint::java_type_arguments::{TypeArgument, parameter_type_arguments};
 use crate::lint::java_type_variables::is_type_variable;
@@ -108,6 +109,7 @@ pub struct Declaration {
     pub owner: Owner,
     pub fail_clauses: Vec<Clause>,
     pub return_nullness: ReturnNullness,
+    pub returned_field: Option<String>,
 }
 
 // Un campo tal como lo necesita el índice para saber si alguien lo usa.
@@ -279,6 +281,7 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
     Declaration {
         fail_clauses,
         return_nullness: return_nullness(method, source),
+        returned_field: method.and_then(|declaration| returned_field(declaration, source)),
         name: callable.name,
         scope: scope.to_owned(),
         position: position_of(callable.name_node),

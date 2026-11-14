@@ -116,3 +116,45 @@ fn an_inherited_receiver_reaches_the_library_method() {
         ["5:30 c", "6:25 m", "7:36 remappingFunction", "8:29 value"]
     );
 }
+
+const GETTER: &str = r#"package app;
+
+import org.jspecify.annotations.Nullable;
+
+abstract class Base<H> {
+    private @Nullable H subscriber;
+
+    H getSubscriber() {
+        return subscriber;
+    }
+}
+
+final class Holder {
+    final String name = "";
+}
+
+final class Child extends Base<Holder> {
+    void call() {
+        Object first = getSubscriber().name;
+        Object second = getSubscriber().name;
+        getSubscriber().toString();
+    }
+}
+
+final class Other extends Base<String> {
+    void call() {
+        getSubscriber().length();
+        getSubscriber().length();
+    }
+}
+"#;
+
+// Un getter cuyo cuerpo sólo devuelve un campo `@Nullable` se lee como el campo, aunque se pueda
+// redefinir: la primera desreferencia (una llamada o la lectura de un campo, marcada en el
+// calificador) se marca y después ya se lo da por presente.
+#[test]
+fn a_simple_getter_of_a_nullable_field_may_return_null() {
+    let mut found = findings_in(GETTER, "data-flow-issue");
+    found.sort();
+    assert_eq!(found, ["19:24 getSubscriber()", "27:25 length()"]);
+}

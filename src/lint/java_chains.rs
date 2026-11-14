@@ -56,14 +56,15 @@ pub struct ChainStep {
 
 // `respuesta.getBody().error()`: la raíz y los pasos en orden. Interesan las de al menos dos pasos,
 // donde el resultado de una llamada se usa para llamar a otra, y las que terminan desempaquetadas
-// (`return jdbc.queryForObject(...)` en un método que devuelve `long`), con dónde empiezan, y las
+// (`return jdbc.queryForObject(...)` en un método que devuelve `long`) o leyendo un campo de su
+// resultado (`getSubscriber().eventos`), con dónde empiezan, y las
 // que se pasan directo como argumento de otra llamada (`Splitter.on(PATH_SEPARATOR.value())`) o
 // las devuelve un método no nulo (`return convert(a)`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chain {
     pub root: ChainRoot,
     pub steps: Vec<ChainStep>,
-    pub unboxed: Option<(usize, usize)>,
+    pub dereferenced_at: Option<(usize, usize)>,
     pub passed_as: Option<Box<NullArgument>>,
     pub returned: Option<NullReturn>,
 }
@@ -187,6 +188,18 @@ fn compact(written: &str) -> String {
     written.split_whitespace().collect()
 }
 
+// Dónde empieza la llamada si lo que devuelve se usa para leer un campo (`getSubscriber().eventos`):
+// Qodana marca ahí la desreferencia.
+fn field_read_at(invocation: Node<'_>) -> Option<(usize, usize)> {
+    let parent = invocation.parent()?;
+    let reads_field = parent.kind() == FIELD_ACCESS
+        && parent
+            .child_by_field_name(OBJECT_FIELD)
+            .is_some_and(|object| object.id() == invocation.id());
+    let start = invocation.start_position();
+    reads_field.then(|| (one_based(start.row), one_based(start.column)))
+}
+
 // La cadena que termina en esta llamada, si no es parte de otra más larga ya vista. Una variable
 // asignada desde una llamada no se sigue: el código real la chequea con `if (x == null) return;` y
 // eso pide flujo de datos, no texto.
@@ -201,14 +214,19 @@ pub fn chain_of(
     }
     let (root, steps) = walk(invocation, source, variables, facts)?;
     facts.remember_dereferenced(invocation, source);
-    let unboxed = unboxed_at(invocation, source);
+    let field_read = field_read_at(invocation);
+    if field_read.is_some() && is_stable_call(invocation) {
+        facts.checked.insert(compact(text(invocation, source)));
+    }
+    let dereferenced_at = unboxed_at(invocation, source).or(field_read);
     let passed_as = facts.passed_as(invocation, source);
     let returned = returned_by_method(invocation, source);
-    let interesting = steps.len() > 1 || unboxed.is_some() || passed_as.is_some() || returned.is_some();
+    let interesting =
+        steps.len() > 1 || dereferenced_at.is_some() || passed_as.is_some() || returned.is_some();
     interesting.then_some(Chain {
         root,
         steps,
-        unboxed,
+        dereferenced_at,
         passed_as,
         returned,
     })
@@ -220,7 +238,7 @@ pub fn origin_chain(invocation: Node<'_>, source: &[u8], variables: &Variables) 
     Some(Chain {
         root,
         steps,
-        unboxed: None,
+        dereferenced_at: None,
         passed_as: None,
         returned: None,
     })

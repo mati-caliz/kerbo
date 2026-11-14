@@ -1594,7 +1594,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 664 de los 972 (394 `data-flow-issue`, 224 `null-argument`, 25
+  de más en los dos. En guava, 701 de los 972 (428 `data-flow-issue`, 227 `null-argument`, 25
   `failing-call`, 21 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
@@ -1677,6 +1677,10 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   campo o getter heredado de una clase del proyecto (`collection`, `getList()`) lleva al tipo que
   declara para los parámetros del JDK que IntelliJ da por no nulos (también `ConcurrentMap.remove`,
   `Map.merge` y `List.addAll(int, Collection)`).
+  Un getter cuyo cuerpo sólo devuelve un campo `@Nullable` (`return subscriber;`) puede devolver
+  null aunque se pueda redefinir: IntelliJ lee la llamada como el campo. Leer un campo del resultado
+  de una llamada (`getSubscriber().eventos`) es una desreferencia, marcada donde empieza la llamada,
+  y después la misma llamada sin argumentos ya se da por presente.
   Falta:
   - `assertNull` sobre lo que devuelve un método del proyecto (5 en commons-lang, sobre
     `getIfEmpty`, `getIfBlank` y `applyNonNull`): IntelliJ marca la de 3 argumentos y no la de 4
@@ -1701,8 +1705,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     `immutableEntry(null, 1)` o `Collections.singletonMap(null, 1)` pasados a `builder.put`), el
     "Argument might be null" de `e0()`/`e1()` (variable de tipo con límite `@Nullable` devuelta
     dentro de una clase anónima), el de una llamada encadenada como receptor
-    (`Splitter.on(...).split(X.value())`), el de `parseInt`/`Ints.tryParse` y las desreferencias
-    de `getSubscriber()`.
+    (`Splitter.on(...).split(X.value())`) y el de `parseInt`/`Ints.tryParse`.
   - guava, 3 de más en LocalCacheTest (1062, 2408, 2449): el `entry` que devuelve `getEntry`.
     IntelliJ le infiere un contrato `null -> null` y no marca después el argumento; kerbo no
     infiere contratos sobre lo que devuelve un método.
