@@ -2,6 +2,7 @@ use super::java::{
     Declaration, Dereferenced, JavaSummary, NullInference, Parameter, ParameterNullness, Position, lint_at,
 };
 use super::java_dereference::{known_not_null, may_return_null};
+use super::java_inferred_arguments::context_inferred_non_null;
 use super::java_library_arguments::{inherited_library_class, library_substituted_non_null};
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::library::Library;
@@ -51,6 +52,13 @@ pub fn null_arguments(
         (may_return_null(types, library, summary, chain) && !known_not_null(types, library, summary, last))
             .then_some(argument)
     });
+    let inferred = summary.nested_nulls.iter().filter_map(|nested| {
+        if non_null_parameter(types, library, summary, &nested.inner).is_some() {
+            return None;
+        }
+        let parameter = context_inferred_non_null(types, library, summary, nested)?;
+        Some(report(&nested.inner, parameter))
+    });
     summary
         .null_arguments
         .iter()
@@ -58,16 +66,21 @@ pub fn null_arguments(
         .chain(nullable_calls)
         .filter_map(|argument| {
             let parameter = non_null_parameter(types, library, summary, argument)?;
-            Some(lint_at(
-                JavaRule::NullArgument,
-                &Position {
-                    line: argument.line,
-                    column: argument.column,
-                },
-                parameter,
-            ))
+            Some(report(argument, parameter))
         })
+        .chain(inferred)
         .collect()
+}
+
+const fn report(argument: &NullArgument, parameter: String) -> LintFinding {
+    lint_at(
+        JavaRule::NullArgument,
+        &Position {
+            line: argument.line,
+            column: argument.column,
+        },
+        parameter,
+    )
 }
 
 // Si la variable del flujo puede llegar null a sus usos: la llamada que le dio el valor puede
@@ -266,7 +279,11 @@ fn substituted_non_null(
         .is_some_and(|position| receiver.arguments.get(position) == Some(&ArgumentNullness::Concrete))
 }
 
-fn declares_method_variable(declaring: &JavaSummary, declaration: &Declaration, variable: &str) -> bool {
+pub(super) fn declares_method_variable(
+    declaring: &JavaSummary,
+    declaration: &Declaration,
+    variable: &str,
+) -> bool {
     declaring.generics.methods.iter().any(|method| {
         method.line == declaration.position.line
             && method.column == declaration.position.column

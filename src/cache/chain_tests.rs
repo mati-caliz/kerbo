@@ -255,7 +255,7 @@ fn lambdas_returning_null_survive_the_round_trip() {
                     TypeArgument::Concrete,
                     TypeArgument::Nullable,
                     TypeArgument::MethodVariable,
-                    TypeArgument::OtherVariable,
+                    TypeArgument::OtherVariable("K".to_owned()),
                     TypeArgument::Wildcard,
                 ],
             },

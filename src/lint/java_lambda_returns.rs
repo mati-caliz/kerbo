@@ -1,7 +1,8 @@
 use tree_sitter::Node;
 
 use super::java::text;
-use super::java_null_inference::{CallContext, NullArgument, argument_of_call};
+use super::java_nested_arguments::{enclosing_argument, outermost_parentheses};
+use super::java_null_inference::{CallContext, NullArgument};
 use super::java_null_origin::NullReturn;
 use super::java_owner::null_marking_of;
 use super::java_receivers::simple_type_name;
@@ -115,12 +116,8 @@ fn target_of(lambda: Node<'_>, source: &[u8], context: &CallContext<'_>) -> Opti
     let parent = written.parent()?;
     match parent.kind() {
         ARGUMENT_LIST => {
-            let index = named_children(parent)
-                .into_iter()
-                .filter(|argument| !COMMENTS.contains(&argument.kind()))
-                .position(|argument| argument.id() == written.id())?;
             let call = parent.parent()?;
-            let argument = argument_of_call(call, (index, lambda), source, context)?;
+            let argument = enclosing_argument(lambda, source, context)?;
             Some(LambdaTarget::Argument {
                 argument,
                 target_typed: has_target_type(call),
@@ -147,14 +144,6 @@ fn has_target_type(call: Node<'_>) -> bool {
     outermost_parentheses(call)
         .parent()
         .is_some_and(|parent| parent.kind() == VARIABLE_DECLARATOR || parent.kind() == ASSIGNMENT)
-}
-
-fn outermost_parentheses(node: Node<'_>) -> Node<'_> {
-    let mut current = node;
-    while let Some(parent) = current.parent().filter(|parent| parent.kind() == PARENTHESIZED) {
-        current = parent;
-    }
-    current
 }
 
 fn unparenthesized(node: Node<'_>) -> Node<'_> {

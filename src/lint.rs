@@ -31,6 +31,7 @@ mod java_javadoc_scope;
 mod java_javadoc_tags;
 pub mod java_lambda_returns;
 pub mod java_lambda_targets;
+pub mod java_nested_arguments;
 mod java_null_checks;
 mod java_null_conditions;
 pub mod java_null_flow;

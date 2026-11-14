@@ -158,3 +158,52 @@ fn a_simple_getter_of_a_nullable_field_may_return_null() {
     found.sort();
     assert_eq!(found, ["19:24 getSubscriber()", "27:25 length()"]);
 }
+
+const INFERRED: &str = r"package app;
+
+import java.util.Map;
+import java.util.function.Function;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+final class Entries {
+    static <K extends @Nullable Object, V extends @Nullable Object> Map.Entry<K, V> entry(K key, V value) {
+        throw new UnsupportedOperationException();
+    }
+
+    static <E extends @Nullable Object> Function<@Nullable Object, E> constant(E value) {
+        throw new UnsupportedOperationException();
+    }
+
+    static <K, V> void index(Iterable<K> keys, Function<? super K, V> function) {}
+}
+
+@NullMarked
+final class Builder<K, V> {
+    void put(Map.Entry<? extends K, ? extends V> entry) {}
+
+    void putLoose(Map.Entry<? extends @Nullable K, ? extends V> entry) {}
+}
+
+@NullMarked
+final class Caller {
+    void call(Builder<String, Integer> builder, Builder<@Nullable String, Integer> loose, Iterable<String> keys) {
+        builder.put(Entries.entry(null, 1));
+        builder.put(Entries.entry(1 > 0 ? null : null, null));
+        builder.putLoose(Entries.entry(null, 1));
+        loose.put(Entries.entry(null, 1));
+        Entries.index(keys, Entries.constant(null));
+    }
+}
+";
+
+// Un `null` pasado a una variable de tipo del método de adentro se marca si la llamada es
+// argumento de otra cuyo parámetro pone algo no nulo en ese lugar: un argumento de tipo del
+// receptor no nulo o una variable del método sin límite `@Nullable`.
+#[test]
+fn a_null_inferred_non_null_from_the_outer_call_is_reported() {
+    let mut found = findings_in(INFERRED, "null-argument");
+    found.sort();
+    assert_eq!(found, ["31:35 K", "32:56 V", "35:46 E"]);
+}

@@ -6,6 +6,7 @@ mod java_escapes;
 pub mod java_exposure;
 mod java_failing_calls;
 mod java_header;
+mod java_inferred_arguments;
 mod java_jdk;
 mod java_lambda_null_returns;
 mod java_library_arguments;

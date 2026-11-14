@@ -11,6 +11,7 @@ use super::null_codec::{read_contract_call, read_null_argument, write_contract_c
 use super::taint_codec::{read_taints, write_taints};
 use super::throws_codec::{read_method_throws, write_method_throws};
 use crate::index::java::{CallSite, Field, JavaSummary, Position};
+use crate::lint::java_nested_arguments::NestedNull;
 
 use crate::index::java_exposure::{DeclaredType, Exposure};
 use crate::lint::java_calls::{ResultUse, Visibility};
@@ -109,6 +110,10 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     write_generics(writer, &summary.generics);
     write_lambda_targets(writer, &summary.lambda_targets);
     writer.list(&summary.lambda_returns, write_lambda_return);
+    writer.list(&summary.nested_nulls, |writer, nested| {
+        write_null_argument(writer, &nested.inner);
+        write_null_argument(writer, &nested.outer);
+    });
 }
 
 pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corrupt> {
@@ -181,6 +186,12 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         generics: read_generics(reader)?,
         lambda_targets: read_lambda_targets(reader)?,
         lambda_returns: reader.list(read_lambda_return)?,
+        nested_nulls: reader.list(|reader| {
+            Ok(NestedNull {
+                inner: read_null_argument(reader)?,
+                outer: read_null_argument(reader)?,
+            })
+        })?,
     }))
 }
 

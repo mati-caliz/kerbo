@@ -17,13 +17,13 @@ const METHODS: &[&str] = &["method_declaration", "constructor_declaration"];
 
 // Lo que se sabe de nulos de un argumento de tipo escrito (`Function<? super T, ? extends R>`):
 // un tipo concreto, uno anotado `@Nullable` (o una variable con límite `@Nullable`), una variable
-// del método que lo declara, otra variable de tipo, o un comodín sin `extends`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// del método que lo declara, otra variable de tipo (con su nombre), o un comodín sin `extends`.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypeArgument {
     Concrete,
     Nullable,
     MethodVariable,
-    OtherVariable,
+    OtherVariable(String),
     Wildcard,
 }
 
@@ -96,7 +96,7 @@ fn variable_kind(argument: Node<'_>, written: &str, method: Option<Node<'_>>, so
     }
     match type_parameter_admits_null(argument, written, source) {
         Some(true) => TypeArgument::Nullable,
-        Some(false) => TypeArgument::OtherVariable,
+        Some(false) => TypeArgument::OtherVariable(written.to_owned()),
         None => TypeArgument::Concrete,
     }
 }

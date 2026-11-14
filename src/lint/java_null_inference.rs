@@ -4,6 +4,7 @@ use super::java::{CONSTRUCTOR, FINAL, PRIVATE, STATIC, has_modifier, is_type_dec
 use super::java_chains::argument_count;
 use super::java_exact_receivers::ExactReceivers;
 use super::java_lambda_returns::{LambdaReturn, lambda_returns_in};
+use super::java_nested_arguments::{NestedNull, enclosing_argument};
 use super::java_receiver_arguments::{ReceiverArguments, receiver_arguments};
 use super::java_receivers::{Receiver, StaticImports, Variables, simple_type_name, variable_types};
 use crate::syntax::{named_children, one_based};
@@ -251,11 +252,14 @@ fn enum_has_bodies(declaration: Node<'_>) -> bool {
 }
 
 // Los `null` que pasan como argumento las llamadas del archivo y las lambdas que devuelven `null`.
-pub fn null_arguments_in(
-    top_level: Node<'_>,
-    nodes: &[Node<'_>],
-    source: &[u8],
-) -> (Vec<NullArgument>, Vec<LambdaReturn>) {
+// Lo que se junta de los argumentos de las llamadas del archivo.
+pub struct CallArguments {
+    pub null_arguments: Vec<NullArgument>,
+    pub nested_nulls: Vec<NestedNull>,
+    pub lambda_returns: Vec<LambdaReturn>,
+}
+
+pub fn null_arguments_in(top_level: Node<'_>, nodes: &[Node<'_>], source: &[u8]) -> CallArguments {
     let variables = variable_types(nodes, source);
     let imported = StaticImports::of(top_level, source);
     let exact = ExactReceivers::of(nodes, source);
@@ -264,11 +268,26 @@ pub fn null_arguments_in(
         imported: &imported,
         exactly_constructed: &exact,
     };
-    let arguments = nodes
-        .iter()
-        .flat_map(|node| null_arguments(*node, source, &context))
-        .collect();
-    (arguments, lambda_returns_in(nodes, source, &context))
+    let mut null_arguments = Vec::new();
+    let mut nested_nulls = Vec::new();
+    for call in nodes {
+        let passed = nulls_passed_to(*call, source, &context);
+        if passed.is_empty() {
+            continue;
+        }
+        if let Some(outer) = enclosing_argument(*call, source, &context) {
+            nested_nulls.extend(passed.iter().map(|inner| NestedNull {
+                inner: inner.clone(),
+                outer: outer.clone(),
+            }));
+        }
+        null_arguments.extend(passed);
+    }
+    CallArguments {
+        null_arguments,
+        nested_nulls,
+        lambda_returns: lambda_returns_in(nodes, source, &context),
+    }
 }
 
 // Lo que hace falta del archivo para saber a quién llama una llamada.
@@ -315,7 +334,7 @@ pub(super) fn call_target(
 }
 
 // Los `null` que una llamada pasa como argumento.
-fn null_arguments(call: Node<'_>, source: &[u8], context: &CallContext<'_>) -> Vec<NullArgument> {
+fn nulls_passed_to(call: Node<'_>, source: &[u8], context: &CallContext<'_>) -> Vec<NullArgument> {
     call.child_by_field_name(ARGUMENTS_FIELD)
         .map(named_children)
         .unwrap_or_default()

@@ -81,9 +81,12 @@ pub fn write_type_arguments(writer: &mut Writer, arguments: &[TypeArgument]) {
             TypeArgument::Concrete => ARGUMENT_CONCRETE,
             TypeArgument::Nullable => ARGUMENT_NULLABLE,
             TypeArgument::MethodVariable => ARGUMENT_METHOD_VARIABLE,
-            TypeArgument::OtherVariable => ARGUMENT_OTHER_VARIABLE,
+            TypeArgument::OtherVariable(_) => ARGUMENT_OTHER_VARIABLE,
             TypeArgument::Wildcard => ARGUMENT_WILDCARD,
         });
+        if let TypeArgument::OtherVariable(name) = argument {
+            writer.text(name);
+        }
     });
 }
 
@@ -93,7 +96,7 @@ pub fn read_type_arguments(reader: &mut Reader<'_>) -> Result<Vec<TypeArgument>,
             ARGUMENT_CONCRETE => TypeArgument::Concrete,
             ARGUMENT_NULLABLE => TypeArgument::Nullable,
             ARGUMENT_METHOD_VARIABLE => TypeArgument::MethodVariable,
-            ARGUMENT_OTHER_VARIABLE => TypeArgument::OtherVariable,
+            ARGUMENT_OTHER_VARIABLE => TypeArgument::OtherVariable(reader.text()?),
             ARGUMENT_WILDCARD => TypeArgument::Wildcard,
             _ => return Err(Corrupt),
         })

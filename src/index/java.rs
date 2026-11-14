@@ -19,6 +19,7 @@ use crate::lint::java_generics::{Generics, generics_of};
 use crate::lint::java_inference::{dereferenced_first, unconditionally_dereferenced};
 use crate::lint::java_lambda_returns::LambdaReturn;
 use crate::lint::java_lambda_targets::{LambdaTargets, lambda_targets_of};
+use crate::lint::java_nested_arguments::NestedNull;
 use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_null_inference::{
     NullArgument, accepts_null, is_overridable, null_arguments_in, parameter_type_name, returns_null,
@@ -164,6 +165,7 @@ pub struct JavaSummary {
     pub generics: Generics,
     pub lambda_targets: LambdaTargets,
     pub lambda_returns: Vec<LambdaReturn>,
+    pub nested_nulls: Vec<NestedNull>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -206,9 +208,10 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.resources.extend(extracted.resources);
         summary.taints.extend(extracted.taints);
         summary.method_throws.extend(extracted.method_throws);
-        let (null_arguments, lambda_returns) = null_arguments_in(top_level, &nodes, source);
-        summary.null_arguments.extend(null_arguments);
-        summary.lambda_returns.extend(lambda_returns);
+        let arguments = null_arguments_in(top_level, &nodes, source);
+        summary.null_arguments.extend(arguments.null_arguments);
+        summary.nested_nulls.extend(arguments.nested_nulls);
+        summary.lambda_returns.extend(arguments.lambda_returns);
         summary
             .contract_calls
             .extend(contract_calls_in(top_level, &nodes, source));
