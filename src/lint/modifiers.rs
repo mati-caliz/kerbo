@@ -6,8 +6,9 @@ use super::java::{
     RECORD, STATIC, STRICTFP, UNNAMED, VARIABLE_DECLARATOR, children, enclosing_declaration, has_modifier,
     modifier_tokens, modifiers, parameters, text,
 };
-use super::{LintFinding, LintKind, finding};
+use super::{LintFinding, LintKind, finding, finding_at};
 use crate::fix::Fix;
+use crate::limits::JavaReference;
 use crate::syntax::{descendants, named_children};
 
 const FIELD: &str = "field_declaration";
@@ -42,7 +43,33 @@ const INTERFACE_BODIES: [&str; 2] = ["interface_body", "annotation_type_body"];
 const CATCH_PARAMETER: &str = "catch_formal_parameter";
 const SAFE_VARARGS: &str = "SafeVarargs";
 
-pub fn reported(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
+mod pmd;
+
+pub fn reported(root: Node<'_>, source: &[u8], reference: JavaReference) -> Vec<LintFinding> {
+    match reference {
+        JavaReference::Checkstyle => like_checkstyle(root, source),
+        JavaReference::Pmd => like_pmd(root, source),
+    }
+}
+
+fn like_pmd(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
+    let mut flagged = pmd::flagged(root, source);
+    flagged.sort_by_key(|flagged| flagged.modifier.start_byte());
+    flagged.dedup_by_key(|flagged| flagged.modifier.start_byte());
+    flagged
+        .into_iter()
+        .map(|flagged| {
+            finding_at(
+                LintKind::RedundantModifier,
+                flagged.location.start_position(),
+                text(flagged.modifier, source),
+                Some(Fix::remove(flagged.modifier, source)),
+            )
+        })
+        .collect()
+}
+
+fn like_checkstyle(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
     let mut flagged: Vec<Node<'_>> = descendants(root)
         .into_iter()
         .filter(|node| VISITED.contains(&node.kind()))

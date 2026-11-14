@@ -100,6 +100,7 @@ impl AnalysisCache {
         for rule in RuleId::ALL {
             limits.get(rule).hash(&mut builder);
         }
+        limits.java_reference().hash(&mut builder);
         builder.content(source);
         builder.key()
     }

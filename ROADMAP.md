@@ -1731,11 +1731,11 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
 
 Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_checks.xml`. Las seis de
 Javadoc ya están (en `docs/java.md`): commons-lang y junit4 coinciden con Checkstyle 14.4 en todo
-`sun_checks.xml`, y guava, sin `android/`, en 67.527 de 67.552.
+`sun_checks.xml`, y guava, sin `android/`, en 67.527 de 67.552. Contra PMD 7.29,
+`UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal` coinciden en los tres
+(`[java] reference`, en `docs/java.md`); `UnnecessaryImport` resuelve tipos con el classpath y no
+va a coincidir sin las firmas de la etapa 9.
 
-- La misma paridad contra PMD para quien usa el quickstart en vez de Checkstyle:
-  `UnnecessaryImport` resuelve tipos con el classpath y no va a coincidir sin las firmas de la
-  etapa 9; `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal`, sí.
 - Sumar Qodana al arnés de paridad para las reglas que coinciden con una inspección (imports sin
   usar y modificadores redundantes).
 - Por lo que más aparece en Qodana: la API nueva que reemplaza a la vieja (`getFirst()`,

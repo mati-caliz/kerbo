@@ -1,16 +1,19 @@
 mod anonymous;
+mod lombok;
 mod matching;
 
 use std::collections::HashMap;
+use std::ops::Range;
 
 use tree_sitter::Node;
 
 use super::java::{
     ABSTRACT, BODY_FIELD, CLASS, CLASS_BODY, CONSTRUCTOR, ENUM, FINAL, NAME_FIELD, OBJECT_CREATION, PRIVATE,
-    RECORD, children, has_modifier, is_type_declaration, qualified_name, text,
+    PROGRAM, RECORD, children, has_modifier, is_type_declaration, qualified_name, text,
 };
-use super::{LintFinding, LintKind, finding};
+use super::{LintFinding, LintKind, finding, finding_at};
 use crate::fix::Fix;
+use crate::limits::JavaReference;
 use crate::syntax::named_children;
 
 const PACKAGE: &str = "package_declaration";
@@ -18,6 +21,14 @@ const SUPERCLASS_FIELD: &str = "superclass";
 const CLASS_KEYWORD: &str = "class";
 const FINAL_PREFIX: &str = "final ";
 const NAME_SEPARATOR: &str = ".";
+const LOCAL_SEPARATOR: &str = ".#";
+const MEMBER_CONTAINERS: [&str; 5] = [
+    PROGRAM,
+    CLASS_BODY,
+    "interface_body",
+    "enum_body_declarations",
+    "annotation_type_body",
+];
 
 #[derive(Debug)]
 struct ClassDescription<'tree> {
@@ -26,6 +37,14 @@ struct ClassDescription<'tree> {
     depth: usize,
     constructors: Constructors,
     is_extended: bool,
+    visible_within: Option<Range<usize>>,
+}
+
+#[derive(Debug)]
+struct AnonymousClass {
+    super_name: String,
+    outer: String,
+    at: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,7 +66,7 @@ struct Collected<'tree> {
     classes: Vec<ClassDescription<'tree>>,
     by_name: HashMap<String, usize>,
     order: Vec<String>,
-    anonymous: Vec<(String, String)>,
+    anonymous: Vec<AnonymousClass>,
 }
 
 impl<'tree> Collected<'tree> {
@@ -73,53 +92,68 @@ enum Visit<'tree> {
     Leave,
 }
 
-pub fn reported(root: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
-    let mut collected = collect(root, source);
-    for (super_name, outer) in std::mem::take(&mut collected.anonymous) {
-        let target = matching::nearest(&collected, &super_name, |candidate| {
-            matching::anonymous_count(&outer, candidate)
-        });
+pub fn reported(root: Node<'_>, source: &[u8], reference: JavaReference) -> Vec<LintFinding> {
+    let mut collected = collect(root, source, reference);
+    for anonymous in std::mem::take(&mut collected.anonymous) {
+        let outer = anonymous.outer.as_str();
+        let target =
+            matching::nearest(
+                &collected,
+                &anonymous.super_name,
+                anonymous.at,
+                |candidate| match reference {
+                    JavaReference::Checkstyle => matching::anonymous_count(outer, candidate),
+                    JavaReference::Pmd => matching::declaration_count(outer, candidate),
+                },
+            );
         if let Some(class) = target.and_then(|index| collected.classes.get_mut(index)) {
             class.is_extended = true;
         }
     }
     for index in collected.current() {
-        mark_superclass(&mut collected, index, source);
+        mark_superclass(&mut collected, index, source, reference);
     }
     collected
         .current()
         .into_iter()
         .filter_map(|index| collected.classes.get(index))
-        .filter(|class| should_be_final(class))
+        .filter(|class| match reference {
+            JavaReference::Checkstyle => should_be_final(class),
+            JavaReference::Pmd => should_be_final_like_pmd(class, source),
+        })
         .map(|class| {
-            let name = class
-                .node
-                .child_by_field_name(NAME_FIELD)
-                .map_or("", |name| text(name, source));
+            let name_node = class.node.child_by_field_name(NAME_FIELD);
+            let name = name_node.map_or("", |name| text(name, source));
             let keyword = children(class.node)
                 .into_iter()
                 .find(|token| token.kind() == CLASS_KEYWORD);
             let fix = keyword.map(|keyword| Fix::insert_before(keyword, FINAL_PREFIX, source));
-            finding(LintKind::FinalClass, class.node, name, fix)
+            match (reference, name_node) {
+                (JavaReference::Pmd, Some(name_node)) => {
+                    finding_at(LintKind::FinalClass, name_node.start_position(), name, fix)
+                }
+                _ => finding(LintKind::FinalClass, class.node, name, fix),
+            }
         })
         .collect()
 }
 
-fn mark_superclass(collected: &mut Collected<'_>, index: usize, source: &[u8]) {
+fn mark_superclass(collected: &mut Collected<'_>, index: usize, source: &[u8], reference: JavaReference) {
     let Some(class) = collected.classes.get(index) else {
         return;
     };
     let Some(superclass) = class.node.child_by_field_name(SUPERCLASS_FIELD) else {
         return;
     };
-    let Some(super_name) = superclass
-        .named_child(0)
-        .and_then(|kind| anonymous::type_name(kind, source))
-    else {
+    let Some(super_name) = superclass.named_child(0).and_then(|kind| match reference {
+        JavaReference::Checkstyle => anonymous::type_name(kind, source),
+        JavaReference::Pmd => Some(qualified_name(kind, source)),
+    }) else {
         return;
     };
     let subclass = class.qualified.clone();
-    let target = matching::nearest(collected, &super_name, |candidate| {
+    let at = class.node.start_byte();
+    let target = matching::nearest(collected, &super_name, at, |candidate| {
         matching::declaration_count(&subclass, candidate)
     });
     if let Some(extended) = target.and_then(|target| collected.classes.get_mut(target)) {
@@ -139,8 +173,23 @@ fn should_be_final(class: &ClassDescription<'_>) -> bool {
     }
 }
 
-fn collect<'tree>(root: Node<'tree>, source: &[u8]) -> Collected<'tree> {
-    let mut walk = Walk::default();
+fn should_be_final_like_pmd(class: &ClassDescription<'_>, source: &[u8]) -> bool {
+    let node = class.node;
+    if has_modifier(node, FINAL) || class.is_extended || lombok::makes_constructors(node, source) {
+        return false;
+    }
+    match class.constructors {
+        Constructors::Absent => has_modifier(node, PRIVATE),
+        Constructors::OnlyPrivate => true,
+        Constructors::NonPrivate => false,
+    }
+}
+
+fn collect<'tree>(root: Node<'tree>, source: &[u8], reference: JavaReference) -> Collected<'tree> {
+    let mut walk = Walk {
+        reference,
+        ..Walk::default()
+    };
     let mut pending = vec![Visit::Enter(root)];
     while let Some(visit) = pending.pop() {
         let Visit::Enter(node) = visit else {
@@ -151,11 +200,18 @@ fn collect<'tree>(root: Node<'tree>, source: &[u8]) -> Collected<'tree> {
             PACKAGE => walk.package = qualified_name(node, source),
             CONSTRUCTOR => walk.register_constructor(node),
             OBJECT_CREATION if has_class_body(node) => {
-                let super_name = anonymous::super_name(node, source);
+                let super_name = match reference {
+                    JavaReference::Checkstyle => anonymous::super_name(node, source),
+                    JavaReference::Pmd => anonymous::resolved_super_name(node, source),
+                };
                 let outer = walk.outer().to_owned();
                 walk.collected
                     .anonymous
-                    .extend(super_name.map(|name| (name, outer)));
+                    .extend(super_name.map(|super_name| AnonymousClass {
+                        super_name,
+                        outer,
+                        at: node.start_byte(),
+                    }));
             }
             _ if is_type_declaration(node) => {
                 walk.enter_type(node, source);
@@ -173,6 +229,7 @@ struct Walk<'tree> {
     collected: Collected<'tree>,
     package: String,
     scopes: Vec<Scope>,
+    reference: JavaReference,
 }
 
 impl<'tree> Walk<'tree> {
@@ -186,7 +243,12 @@ impl<'tree> Walk<'tree> {
         let name = node
             .child_by_field_name(NAME_FIELD)
             .map_or("", |name| text(name, source));
-        let qualified = [self.outer(), name].join(NAME_SEPARATOR);
+        let block = local_block(node).filter(|_| self.reference == JavaReference::Pmd);
+        let outer = block.map_or_else(
+            || self.outer().to_owned(),
+            |block| [self.outer(), &block.start_byte().to_string()].join(LOCAL_SEPARATOR),
+        );
+        let qualified = [outer.as_str(), name].join(NAME_SEPARATOR);
         let constructors = if has_constructor(node) {
             Constructors::OnlyPrivate
         } else {
@@ -200,6 +262,7 @@ impl<'tree> Walk<'tree> {
                 depth,
                 constructors,
                 is_extended: false,
+                visible_within: block.map(|block| block.byte_range()),
             })
         });
         self.scopes.push(Scope {
@@ -223,6 +286,12 @@ impl<'tree> Walk<'tree> {
             class.constructors = Constructors::NonPrivate;
         }
     }
+}
+
+fn local_block(declaration: Node<'_>) -> Option<Node<'_>> {
+    declaration
+        .parent()
+        .filter(|parent| !MEMBER_CONTAINERS.contains(&parent.kind()))
 }
 
 fn has_class_body(creation: Node<'_>) -> bool {

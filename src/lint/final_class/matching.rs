@@ -5,13 +5,24 @@ use super::Collected;
 const SEPARATOR: u8 = b'.';
 const SEPARATOR_TEXT: &str = ".";
 
-pub fn nearest(collected: &Collected<'_>, name: &str, count: impl Fn(&str) -> usize) -> Option<usize> {
+pub fn nearest(
+    collected: &Collected<'_>,
+    name: &str,
+    at: usize,
+    count: impl Fn(&str) -> usize,
+) -> Option<usize> {
     let suffix = [SEPARATOR_TEXT, name].concat();
     let candidates = collected.current();
     let best = candidates
         .iter()
         .filter_map(|&index| Some((index, collected.classes.get(index)?)))
         .filter(|(_, class)| class.qualified.ends_with(&suffix))
+        .filter(|(_, class)| {
+            class
+                .visible_within
+                .as_ref()
+                .is_none_or(|block| block.contains(&at))
+        })
         .min_by_key(|(_, class)| (Reverse(count(&class.qualified)), class.depth))
         .map(|(index, _)| index);
     best.or_else(|| collected.by_name.get(name).copied())

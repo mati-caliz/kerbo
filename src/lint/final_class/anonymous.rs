@@ -41,6 +41,20 @@ pub fn super_name(creation: Node<'_>, source: &[u8]) -> Option<String> {
     }
 }
 
+pub fn resolved_super_name(creation: Node<'_>, source: &[u8]) -> Option<String> {
+    let created = qualified_name(creation.child_by_field_name(TYPE_FIELD)?, source);
+    match creation.child(0) {
+        Some(qualifier) if qualifier.kind() != NEW_KEYWORD => {
+            let outer = match qualifier.kind() {
+                OBJECT_CREATION => qualified_name(qualifier.child_by_field_name(TYPE_FIELD)?, source),
+                _ => qualifier_name(qualifier, source)?,
+            };
+            Some([outer.as_str(), created.as_str()].join(NAME_SEPARATOR))
+        }
+        _ => Some(created),
+    }
+}
+
 pub fn type_name(kind: Node<'_>, source: &[u8]) -> Option<String> {
     let breaks_name = descendants(kind).into_iter().any(|node| {
         node.kind() == SCOPED_TYPE_IDENTIFIER

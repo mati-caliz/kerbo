@@ -6,13 +6,15 @@ use serde::Deserialize;
 
 use crate::i18n::{Lang, Problem};
 use crate::language::{Language, Stack};
-use crate::limits::{Limits, Preset, REPORT_EVERY_OCCURRENCE};
+use crate::limits::{JavaReference, Limits, Preset, REPORT_EVERY_OCCURRENCE};
 use crate::rules::RuleId;
 
 mod go_target;
+mod java_reference;
 mod rust_target;
 
 pub use go_target::GoTarget;
+use java_reference::RawJava;
 pub use rust_target::RustTarget;
 
 pub const CONFIG_FILE: &str = "kerbo.toml";
@@ -35,6 +37,8 @@ struct RawConfig {
     rust: RustTarget,
     #[serde(default)]
     go: GoTarget,
+    #[serde(default)]
+    java: RawJava,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -94,6 +98,7 @@ pub struct Config {
     cache_max_megabytes: Option<usize>,
     rust: RustTarget,
     go: GoTarget,
+    java_reference: JavaReference,
 }
 
 impl Config {
@@ -116,6 +121,7 @@ impl Config {
     }
 
     fn defaults(root: PathBuf) -> Self {
+        let java_reference = java_reference::detected(&root);
         Self {
             root,
             preset: Preset::default(),
@@ -127,6 +133,7 @@ impl Config {
             cache_max_megabytes: None,
             rust: RustTarget::default(),
             go: GoTarget::default(),
+            java_reference,
         }
     }
 
@@ -167,6 +174,7 @@ impl Config {
             cache_max_megabytes: raw.cache.max_megabytes,
             rust: raw.rust,
             go: raw.go,
+            java_reference: raw.java.resolve(&root),
             root,
         })
     }
@@ -205,6 +213,7 @@ impl Config {
             Some(language.stack()),
             relative,
         )
+        .with_java_reference(self.java_reference)
     }
 
     pub fn reports(&self, relative: &Path, rule: RuleId) -> bool {

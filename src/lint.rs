@@ -45,6 +45,7 @@ mod java_optional;
 mod java_order;
 pub mod java_owner;
 mod java_padding;
+mod java_pmd_suppressions;
 pub mod java_receiver_arguments;
 pub mod java_receivers;
 pub mod java_resources;
@@ -77,7 +78,7 @@ use tree_sitter::{Node, Point};
 use crate::analysis::SourceUnit;
 use crate::fix::Fix;
 use crate::language::Language;
-use crate::limits::{Limits, Preset};
+use crate::limits::{JavaReference, Limits, Preset};
 use crate::profile::LintStyle;
 use crate::rules::{EslintRule, GoRule, JavaRule, PythonRule, RuleId, TaintRule};
 use crate::syntax::one_based;
@@ -208,9 +209,9 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
         return Vec::new();
     }
     let mut findings = imports::reported(root, source);
-    findings.extend(modifiers::reported(root, source));
+    findings.extend(modifiers::reported(root, source, limits.java_reference()));
     findings.extend(final_parameters::reported(root, source));
-    findings.extend(final_class::reported(root, source));
+    findings.extend(final_class::reported(root, source, limits.java_reference()));
     let nodes = crate::syntax::descendants(root);
     findings.extend(java_style::reported(&nodes, source));
     findings.extend(java_shapes::reported(&nodes, source));
@@ -231,6 +232,9 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     findings.extend(java_already_assigned::reported(&nodes, source));
     findings.extend(java_final_fields::reported(root, source));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
+    if limits.java_reference() == JavaReference::Pmd {
+        java_pmd_suppressions::drop_suppressed(&mut findings, root, source);
+    }
     findings.sort_by_key(|finding| (finding.line, finding.column));
     findings
 }
@@ -253,5 +257,7 @@ pub fn finding_at(kind: LintKind, start: Point, subject: &str, fix: Option<Fix>)
 mod java_inspection_tests;
 #[cfg(test)]
 mod java_javadoc_tests;
+#[cfg(test)]
+mod java_pmd_tests;
 #[cfg(test)]
 mod tests;

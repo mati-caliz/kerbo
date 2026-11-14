@@ -17,6 +17,15 @@ const FAMILY_WORDS: usize = (RuleId::ALL.len() - RuleId::CODE_RULES.len()).div_c
 pub struct Limits {
     values: [Option<u32>; RuleId::CODE_RULES.len()],
     silenced_families: [u64; FAMILY_WORDS],
+    java_reference: JavaReference,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum JavaReference {
+    #[default]
+    Checkstyle,
+    Pmd,
 }
 
 impl Default for Limits {
@@ -24,6 +33,7 @@ impl Default for Limits {
         Self {
             values: [None; RuleId::CODE_RULES.len()],
             silenced_families: [ALL_FAMILIES_SILENCED; FAMILY_WORDS],
+            java_reference: JavaReference::Checkstyle,
         }
     }
 }
@@ -137,6 +147,7 @@ impl Limits {
         let mut limits = Self {
             values: [ALWAYS_REPORTED; RuleId::CODE_RULES.len()],
             silenced_families: [NO_FAMILY_SILENCED; FAMILY_WORDS],
+            java_reference: JavaReference::Checkstyle,
         };
         let metrics = [
             (RuleId::FileLength, file),
@@ -184,6 +195,15 @@ impl Limits {
 
     pub fn with_override(self, limit_override: LimitOverride) -> Self {
         self.with_rule(limit_override.rule, Some(limit_override.value))
+    }
+
+    pub const fn java_reference(self) -> JavaReference {
+        self.java_reference
+    }
+
+    pub const fn with_java_reference(mut self, reference: JavaReference) -> Self {
+        self.java_reference = reference;
+        self
     }
 }
 

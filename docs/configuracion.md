@@ -41,6 +41,9 @@ build_tags = ["integration"]      # como run.build-tags de golangci-lint
 errcheck_exclude_functions = ["os.Remove"]  # como exclude-functions de errcheck
 errcheck_check_blank = true       # como check-blank: también `_ = f()`
 errcheck_check_type_assertions = true  # como check-type-assertions: también `x.(T)` sin `ok`
+
+[java]                            # opcional: a quién imitan redundant-modifier y final-class
+reference = "pmd"                 # checkstyle o pmd; si falta, se detecta (ver Java)
 ```
 
 | Preset | Archivo | Función | Ciclomática | Cognitiva | Parámetros |

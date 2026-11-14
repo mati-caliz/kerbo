@@ -3,6 +3,7 @@ use std::path::Path;
 use super::Config;
 use crate::i18n::Lang;
 use crate::language::Language;
+use crate::limits::JavaReference;
 use crate::rules::RuleId;
 use crate::test_support::TempTree;
 
@@ -132,4 +133,71 @@ fn reads_the_go_platform_and_build_tags() {
     assert_eq!(target.goarch.as_deref(), Some("arm64"));
     assert_eq!(target.build_tags, ["integration"]);
     assert!(load("[go]\ntags = []\n").is_err());
+}
+
+fn java_reference(files: &[(&str, &str)]) -> JavaReference {
+    let tree = TempTree::new(&format!("java-reference-{}", files.len()));
+    for (path, contents) in files {
+        tree.write(path, contents);
+    }
+    tree.write("src/A.java", "");
+    Config::load(None, tree.path())
+        .expect("la configuración es válida")
+        .limits_for(Path::new("src/A.java"), Language::Java, false)
+        .java_reference()
+}
+
+#[test]
+fn imitates_pmd_only_where_the_build_uses_pmd_without_checkstyle() {
+    const PMD_POM: &str = "<plugin><artifactId>maven-pmd-plugin</artifactId></plugin>";
+    const BOTH_POM: &str =
+        "<artifactId>maven-pmd-plugin</artifactId><artifactId>maven-checkstyle-plugin</artifactId>";
+    assert_eq!(java_reference(&[]), JavaReference::Checkstyle);
+    assert_eq!(java_reference(&[("pom.xml", PMD_POM)]), JavaReference::Pmd);
+    assert_eq!(
+        java_reference(&[("pom.xml", BOTH_POM)]),
+        JavaReference::Checkstyle
+    );
+    assert_eq!(
+        java_reference(&[
+            (
+                "build.gradle",
+                "plugins {
+    id 'pmd'
+}
+"
+            ),
+            ("config/pmd/rules.txt", "")
+        ]),
+        JavaReference::Pmd
+    );
+    assert_eq!(
+        java_reference(&[
+            ("pom.xml", PMD_POM),
+            (
+                "kerbo.toml",
+                "[java]
+reference = \"checkstyle\"
+"
+            )
+        ]),
+        JavaReference::Checkstyle
+    );
+    assert_eq!(
+        java_reference(&[(
+            "kerbo.toml",
+            "[java]
+reference = \"pmd\"
+"
+        )]),
+        JavaReference::Pmd
+    );
+    assert!(
+        load(
+            "[java]
+reference = \"sonar\"
+"
+        )
+        .is_err()
+    );
 }

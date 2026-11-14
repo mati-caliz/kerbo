@@ -153,3 +153,9 @@ latest = "crates:tree-sitter-go"
 version = "0.25.0"
 copied = "grammars/tree-sitter-python"
 latest = "crates:tree-sitter-python"
+
+[tools.pmd]
+family = "java"
+version = "7.29.0"
+latest = "github:pmd/pmd"
+cited_as = "PMD {major}"

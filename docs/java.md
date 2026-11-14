@@ -40,6 +40,28 @@ varargs con anotación antes de los puntos (`Object @Nullable ... args`) se lee 
 lo entienda. Lo único que no se imita son los Javadoc que Checkstyle no puede parsear (un `<N, E>`
 suelto que toma por HTML): Checkstyle avisa el error de parseo con el nombre de la regla y kerbo no.
 
+## PMD
+
+`RedundantModifier` y `FinalClass` tienen su par en el quickstart de PMD 7 (`UnnecessaryModifier` y
+`ClassWithOnlyPrivateConstructorsShouldBeFinal`), pero no avisan lo mismo, así que
+`redundant-modifier` y `final-class` imitan a uno o al otro según `[java] reference` de
+`kerbo.toml`. Si falta, kerbo imita a PMD cuando el build lo usa y no usa Checkstyle
+(`maven-pmd-plugin` en el `pom.xml`, el plugin `pmd` de Gradle, una carpeta `config/pmd` o un
+`pmd*.xml` en la raíz), y a Checkstyle en cualquier otro caso. Imitando a PMD:
+
+- No se marca el `public` del constructor de una clase que no es pública, ni `strictfp`, ni el
+  `final` de los parámetros de un método abstracto o de una variable `_`.
+- `final` sobra en un método de un enum sin constantes con cuerpo y en el de un record; el `public`
+  de un record adentro de una interfaz no se marca.
+- Una clase abstracta con sólo constructores privados también debería ser `final`. Las subclases se
+  buscan por tipo: cuenta una anónima en cualquier expresión y `Generic<String>.Inner`, y una
+  clase local tapa a la miembro del mismo nombre. `@Value` o un constructor de Lombok que no sea
+  privado la dejan afuera.
+- El aviso va en la línea del nombre de la declaración y no en la de su primera anotación, y
+  `@SuppressWarnings("all")`, `"PMD"` o `"PMD.<regla>"` y un `// NOPMD` lo callan.
+
+junit4, commons-lang y guava (sin `android/`) coinciden con PMD 7.29 en las dos reglas.
+
 ## Inspecciones de IntelliJ
 
 De las inspecciones de IntelliJ, kerbo hace:
