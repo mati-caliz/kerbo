@@ -207,3 +207,53 @@ fn a_null_inferred_non_null_from_the_outer_call_is_reported() {
     found.sort();
     assert_eq!(found, ["31:35 K", "32:56 V", "35:46 E"]);
 }
+
+const SHADOWED: &str = r"package app;
+
+import java.util.List;
+import java.util.Set;
+
+final class Holder {
+    private List<String> items;
+
+    void elsewhere(Set<Integer> items) {
+        items.size();
+    }
+
+    void call() {
+        items.addAll(null);
+    }
+}
+";
+
+// El receptor que el método no declara es el campo de la clase, aunque otro método tenga un
+// parámetro del mismo nombre con otro tipo.
+#[test]
+fn a_field_is_the_receiver_when_the_method_does_not_declare_it() {
+    assert_eq!(findings_in(SHADOWED, "null-argument"), ["14:22 c"]);
+}
+
+const PARAMETRIC: &str = r"package app;
+
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+interface Instances<B extends @Nullable Object> {
+    <T extends B> void putInstance(Class<T> type, @ParametricNullness T value);
+}
+
+@NullMarked
+final class Caller {
+    void call(Instances<Number> map) {
+        map.putInstance(Integer.class, null);
+        map.putInstance(null, 1);
+    }
+}
+";
+
+// Un parámetro `@ParametricNullness` admite null si su variable lo admite: no se marca.
+#[test]
+fn a_parametric_nullness_parameter_admits_null() {
+    assert_eq!(findings_in(PARAMETRIC, "null-argument"), ["15:25 type"]);
+}

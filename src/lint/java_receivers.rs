@@ -28,6 +28,8 @@ const METHODS: &[&str] = &[
     "lambda_expression",
 ];
 const CREATION: &str = "object_creation_expression";
+const MEMBER_BODIES: &[&str] = &["class_body", "interface_body", "enum_body_declarations"];
+const RECORD: &str = "record_declaration";
 const CLASS_BODY: &str = "class_body";
 const PROGRAM: &str = "program";
 const IDENTIFIER: &str = "identifier";
@@ -107,19 +109,13 @@ pub fn declared_arguments(usage: Node<'_>, name: &str, source: &[u8]) -> Option<
 }
 
 // El tipo escrito con que se declara una variable: en la lambda o el método que la usa más cercano
-// que la declare, si no en la clase de nivel superior. Si ahí se declara con tipos distintos o sin
-// tipo escrito, no se sabe.
+// que la declare, si no entre los campos de las clases que encierran el uso (de la más cercana a
+// la de nivel superior). Si ahí se declara con tipos distintos o sin tipo escrito, no se sabe.
 pub fn declared_type<'tree>(usage: Node<'tree>, name: &str, source: &[u8]) -> Option<Node<'tree>> {
-    let top_level = ancestors(usage)
-        .filter(|node| TYPE_DECLARATIONS.contains(&node.kind()))
-        .last();
     let declarations = ancestors(usage)
-        .filter(|node| METHODS.contains(&node.kind()))
-        .chain(top_level)
         .map(|scope| {
-            descendants(scope)
+            scope_declarations(scope)
                 .into_iter()
-                .flat_map(declared_by)
                 .filter(|(variable, _)| text(*variable, source) == name)
                 .map(|(_, written)| written)
                 .collect::<Vec<_>>()
@@ -130,6 +126,25 @@ pub fn declared_type<'tree>(usage: Node<'tree>, name: &str, source: &[u8]) -> Op
         .iter()
         .all(|written| written.is_some_and(|other| text(other, source) == text(first, source)))
         .then_some(first)
+}
+
+// Lo que declara un alcance: todo lo de adentro de un método o una lambda, sólo los campos del
+// cuerpo de una clase, y los componentes de un record.
+fn scope_declarations(scope: Node<'_>) -> Vec<(Node<'_>, Option<Node<'_>>)> {
+    match scope.kind() {
+        kind if METHODS.contains(&kind) => descendants(scope).into_iter().flat_map(declared_by).collect(),
+        kind if MEMBER_BODIES.contains(&kind) => {
+            named_children(scope).into_iter().flat_map(declared_by).collect()
+        }
+        RECORD => scope
+            .child_by_field_name(PARAMETERS_FIELD)
+            .map(named_children)
+            .unwrap_or_default()
+            .into_iter()
+            .flat_map(declared_by)
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 fn ancestors(node: Node<'_>) -> impl Iterator<Item = Node<'_>> {

@@ -6,9 +6,11 @@ use crate::lint::java_type_variables::{has_nullable_qualified_type, has_nullable
 
 const NULLABLE_ANNOTATIONS: &[&str] = &["Nullable", "CheckForNull"];
 const NON_NULL_ANNOTATIONS: &[&str] = &["NonNull", "NotNull", "Nonnull"];
+const PARAMETRIC_NULLNESS: &[&str] = &["ParametricNullness"];
 
 // Lo que el parámetro dice de su nulabilidad: una anotación (`@Nullable`, `@NonNull`...), nada, o
-// nada pero con un tipo que es una variable que admite null (`<T extends @Nullable Object>`).
+// nada pero con un tipo que es una variable que admite null (`<T extends @Nullable Object>`, o una
+// anotada `@ParametricNullness`, que admite null si su límite lo admite).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParameterNullness {
     Unannotated,
@@ -44,7 +46,8 @@ pub(super) fn parameter_nullness(name: Node<'_>, source: &[u8]) -> ParameterNull
         ParameterNullness::Nullable
     } else if declares_nullness(name, source, NON_NULL_ANNOTATIONS) {
         ParameterNullness::NonNull
-    } else if has_nullable_type_variable(name, source) {
+    } else if has_nullable_type_variable(name, source) || declares_nullness(name, source, PARAMETRIC_NULLNESS)
+    {
         ParameterNullness::NullableVariable
     } else {
         ParameterNullness::Unannotated
