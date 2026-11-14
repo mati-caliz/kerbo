@@ -34,6 +34,7 @@ mod java_javadoc_tags;
 pub mod java_lambda_returns;
 pub mod java_lambda_targets;
 mod java_list_sort;
+mod java_min_max;
 pub mod java_nested_arguments;
 mod java_null_checks;
 mod java_null_conditions;
@@ -243,6 +244,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
         limits.java_encoding(),
     ));
     findings.extend(java_list_sort::reported(root, source, limits.java_release()));
+    findings.extend(java_min_max::reported(root, source));
     findings.extend(java_size_is_empty::reported(root, source, limits.java_release()));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
     if limits.java_reference() == JavaReference::Pmd {
@@ -272,6 +274,8 @@ mod java_inspection_tests;
 mod java_javadoc_tests;
 #[cfg(test)]
 mod java_list_sort_tests;
+#[cfg(test)]
+mod java_min_max_tests;
 #[cfg(test)]
 mod java_pmd_tests;
 #[cfg(test)]

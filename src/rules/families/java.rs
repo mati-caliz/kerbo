@@ -63,6 +63,7 @@ rule_family!(JavaRule {
     UnnecessaryUnicodeEscape => "unnecessary-unicode-escape",
     Java8ListSort => "java8-list-sort",
     SizeReplaceableByIsEmpty => "size-replaceable-by-is-empty",
+    ManualMinMaxCalculation => "manual-min-max-calculation",
     JavadocVariable => "javadoc-variable",
     MissingJavadocMethod => "missing-javadoc-method",
     JavadocMethod => "javadoc-method",

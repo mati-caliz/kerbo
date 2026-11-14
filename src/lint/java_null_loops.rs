@@ -1,13 +1,12 @@
 use tree_sitter::Node;
 
-use super::java::text;
+use super::java::{text, unparenthesized};
 use crate::syntax::{descendants, named_children};
 
 const LOCAL: &str = "local_variable_declaration";
 const VARIABLE_DECLARATOR: &str = "variable_declarator";
 const ASSIGNMENT: &str = "assignment_expression";
 const BINARY: &str = "binary_expression";
-const PARENTHESIZED: &str = "parenthesized_expression";
 const FIELD_ACCESS: &str = "field_access";
 const IF: &str = "if_statement";
 const BLOCK: &str = "block";
@@ -203,15 +202,4 @@ fn length_of(node: Node<'_>, source: &[u8]) -> Option<String> {
     }
     node.child_by_field_name(OBJECT_FIELD)
         .map(|object| text(object, source).to_owned())
-}
-
-fn unparenthesized(node: Node<'_>) -> Node<'_> {
-    let mut current = node;
-    while current.kind() == PARENTHESIZED {
-        match current.named_child(0) {
-            Some(inner) => current = inner,
-            None => break,
-        }
-    }
-    current
 }

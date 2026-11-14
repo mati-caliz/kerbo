@@ -1,6 +1,6 @@
 use tree_sitter::Node;
 
-use super::java::text;
+use super::java::{text, unparenthesized};
 use super::java_calls::annotated_with;
 use super::java_null_flow::{Analysis, NULL, NullFlow, NullOrigin, PARENTHESIZED, State};
 use super::java_null_keys::tracked_key;
@@ -100,15 +100,4 @@ pub(super) fn note_return(analysis: &mut Analysis<'_, '_>, statement: Node<'_>, 
     if let Some(flow) = origin.and_then(|origin| analysis.flows.get_mut(origin)) {
         flow.returns.push(noted);
     }
-}
-
-fn unparenthesized(node: Node<'_>) -> Node<'_> {
-    let mut current = node;
-    while current.kind() == PARENTHESIZED {
-        match named_children(current).into_iter().next() {
-            Some(inner) => current = inner,
-            None => break,
-        }
-    }
-    current
 }

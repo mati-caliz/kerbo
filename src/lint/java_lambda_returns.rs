@@ -1,6 +1,6 @@
 use tree_sitter::Node;
 
-use super::java::text;
+use super::java::{text, unparenthesized};
 use super::java_nested_arguments::{enclosing_argument, outermost_parentheses};
 use super::java_null_inference::{CallContext, NullArgument};
 use super::java_null_origin::NullReturn;
@@ -14,7 +14,6 @@ const CLASS_BODY: &str = "class_body";
 const BLOCK: &str = "block";
 const RETURN: &str = "return_statement";
 const NULL: &str = "null_literal";
-const PARENTHESIZED: &str = "parenthesized_expression";
 const ARGUMENT_LIST: &str = "argument_list";
 const VARIABLE_DECLARATOR: &str = "variable_declarator";
 const ASSIGNMENT: &str = "assignment_expression";
@@ -144,15 +143,4 @@ fn has_target_type(call: Node<'_>) -> bool {
     outermost_parentheses(call)
         .parent()
         .is_some_and(|parent| parent.kind() == VARIABLE_DECLARATOR || parent.kind() == ASSIGNMENT)
-}
-
-fn unparenthesized(node: Node<'_>) -> Node<'_> {
-    let mut current = node;
-    while current.kind() == PARENTHESIZED {
-        match named_children(current).into_iter().next() {
-            Some(inner) => current = inner,
-            None => break,
-        }
-    }
-    current
 }

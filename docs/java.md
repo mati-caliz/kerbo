@@ -183,6 +183,13 @@ De las inspecciones de IntelliJ, kerbo hace:
   `StringBuilder` y `StringBuffer` desde 15), salvo adentro de la clase de ese mismo nombre.
   Coincide con Qodana en el corpus (30).
 
+- `ManualMinMaxCalculation` (`manual-min-max-calculation`): un mínimo o un máximo escrito a mano
+  con un ternario (`a < b ? a : b`), un `if`/`else` que asigna o devuelve uno de los dos lados, o
+  un `if` sin `else` que pisa lo que asignó, declaró o devuelve la sentencia de al lado. Se arregla
+  con `Math.min` o `Math.max`. Los dos lados tienen que ser del mismo tipo numérico (`int`, `long`,
+  `float` o `double`: variables con tipo declarado o literales) y no aplica dentro de la propia
+  `java.lang.Math`. Coincide con Qodana en el corpus (2).
+
 - `AutoCloseableResource` (`auto-closeable-resource`): una llamada que crea algo que se cierra
   (un `InputStream`, una `Connection`, un `ResultSet`, un `ExecutorService`, un `HttpClient`...)
   fuera de un `try` con recursos: en una variable que no se cierra, no se devuelve ni se pasa a

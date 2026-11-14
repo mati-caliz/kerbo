@@ -40,6 +40,7 @@ pub const BODY_FIELD: &str = "body";
 pub const TYPE_FIELD: &str = "type";
 pub const PARAMETERS_FIELD: &str = "parameters";
 const NAME_SEPARATOR: &str = ".";
+const PARENTHESIZED: &str = "parenthesized_expression";
 const ASTERISK: &str = "asterisk";
 const STAR: &str = "*";
 
@@ -123,4 +124,15 @@ pub fn parameter_type(parameter: Node<'_>) -> Option<Node<'_>> {
             .into_iter()
             .find(|child| child.kind() != MODIFIERS)
     })
+}
+
+pub fn unparenthesized(node: Node<'_>) -> Node<'_> {
+    let mut current = node;
+    while current.kind() == PARENTHESIZED {
+        match current.named_child(0) {
+            Some(inner) => current = inner,
+            None => break,
+        }
+    }
+    current
 }

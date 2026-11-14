@@ -381,6 +381,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT] = [
         "isEmpty() dice lo que se pregunta sin hacer la cuenta, y en algunas colecciones es más barato que contar. Como SizeReplaceableByIsEmpty de IntelliJ: sólo cuando el tipo declarado tiene isEmpty() (String, las colecciones y mapas de Java y de guava, CharSequence desde Java 15).",
         "if (pedidos.size() == 0) se vuelve if (pedidos.isEmpty()), y nombre.length() > 0, !nombre.isEmpty().",
     ),
+    RuleText::new(
+        "Mínimo o máximo calculado a mano con un ternario o un if",
+        "usá Math.min o Math.max",
+        "Math.min(a, b) dice qué se calcula; el ternario o el if obligan a leer la comparación y las dos ramas para darse cuenta, y es fácil dar vuelta el signo. Como ManualMinMaxCalculation de IntelliJ: sólo con los dos lados del mismo tipo numérico (int, long, float o double).",
+        "int tope = (pedidos < limite) ? pedidos : limite; se vuelve int tope = Math.min(pedidos, limite);.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {
