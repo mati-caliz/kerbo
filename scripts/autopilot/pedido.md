@@ -18,9 +18,9 @@ carril; esto dice cómo trabajar.
    actualizá la etapa en `ROADMAP.md` y, si cambió cuánto le queda, el orden de las etapas.
    Reescribí la nota de la etapa para la sesión que siga: corta, sólo lo que ahorra explorar.
 4. Después de pushear, **seguí con el próximo avance de la misma etapa**. Cortá sólo cuando la
-   etapa quede cerrada, cuando lo que sigue pida una decisión mía, o cuando la conversación ya se
-   haya compactado una vez (lo notás porque arranca con un resumen): ahí terminá el avance en curso,
-   pusheá y cortá. Al cortar, escribí un resumen corto: qué se hizo, la paridad y qué quedó.
+   etapa quede cerrada o cuando lo que sigue pida una decisión mía. Que la conversación se compacte
+   no es motivo para cortar: encadená tandas sin parar. Al cortar, escribí un resumen corto: qué se
+   hizo, la paridad y qué quedó.
 5. Sin intervención (`claude -p`) la sesión se termina en cuanto dejás de pedir herramientas. No
    cierres el turno esperando algo en segundo plano: corré lo pesado en primer plano (con el
    timeout máximo) o esperalo con `Monitor` hasta que termine.
