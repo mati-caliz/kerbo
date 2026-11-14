@@ -1,0 +1,118 @@
+use super::java_null_tests::{findings_in, findings_in_files};
+
+const LISTS: &str = r"package app;
+
+import java.util.List;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+abstract class Lists<E> {
+    abstract List<E> getList();
+
+    void call(List<String> names, List<@Nullable String> nullable, List<?> unknown) {
+        names.set(0, null);
+        nullable.set(0, null);
+        unknown.set(0, null);
+        getList().set(0, null);
+        names.add(null);
+    }
+}
+
+final class Unmarked {
+    void call(List<String> names) {
+        names.set(0, null);
+    }
+}
+";
+
+// Bajo `@NullMarked`, un parámetro de un método del JDK cuyo tipo es una variable de la clase no
+// admite null si el receptor (una variable o un getter del archivo) se declara con un tipo concreto
+// o una variable sin límite `@Nullable` en su lugar; no con `@Nullable`, un comodín, ni sin marca.
+#[test]
+fn a_null_passed_to_a_substituted_library_variable_is_reported() {
+    let mut found = findings_in(LISTS, "null-argument");
+    found.sort();
+    assert_eq!(found, ["12:22 E", "15:26 E", "16:19 E"]);
+}
+
+const LOOPS: &str = r"package app;
+
+import java.util.List;
+import java.util.Optional;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+final class Loops {
+    @Nullable String find() {
+        return null;
+    }
+
+    void call(List<String> names, Optional<String> maybe) {
+        int size = 3;
+        String next = find();
+        for (int i = 0; i <= size; i++) {
+            names.add(next);
+        }
+        names.add(next);
+        maybe.orElse(null);
+        int changing = 3;
+        changing++;
+        String other = find();
+        for (int i = 0; i < changing; i++) {
+            names.add(other);
+        }
+        names.add(other);
+    }
+}
+";
+
+// Un `for` desde cero hasta un número, o hasta una local inicializada con uno que no se reasigna,
+// da al menos una vuelta: lo que el cuerpo pasó a un parámetro no nulo queda no nulo después.
+// `Optional.orElse` admite null.
+#[test]
+fn a_loop_up_to_a_constant_runs_at_least_once() {
+    let mut found = findings_in(LOOPS, "null-argument");
+    found.sort();
+    assert_eq!(found, ["18:23 E", "26:23 E", "28:19 E"]);
+}
+
+const BASE_TESTER: &str = r"package app;
+
+import java.util.Collection;
+import java.util.Map;
+
+abstract class BaseTester<K, V> {
+    protected Collection<K> collection;
+
+    protected Map<K, V> getMap() {
+        return null;
+    }
+}
+";
+
+const CHILD_TESTER: &str = r"package app;
+
+final class ChildTester<K, V> extends BaseTester<K, V> {
+    void call(K key, V value) {
+        collection.removeAll(null);
+        getMap().putAll(null);
+        getMap().merge(key, value, null);
+        getMap().merge(key, null, (left, right) -> left);
+        getMap().put(key, null);
+    }
+}
+";
+
+// Un campo o un getter heredados de una clase del proyecto llevan al tipo que declaran: los
+// parámetros del JDK que IntelliJ da por no nulos se marcan también ahí.
+#[test]
+fn an_inherited_receiver_reaches_the_library_method() {
+    let mut found = findings_in_files(&[BASE_TESTER, CHILD_TESTER], "null-argument");
+    found.sort();
+    assert_eq!(
+        found,
+        ["5:30 c", "6:25 m", "7:36 remappingFunction", "8:29 value"]
+    );
+}

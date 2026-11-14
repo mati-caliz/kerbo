@@ -4,7 +4,7 @@ use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin, NullReturn};
 use crate::lint::java_null_inference::NullArgument;
 use crate::lint::java_owner::NullMarking;
-use crate::lint::java_receiver_arguments::{ArgumentNullness, ReceiverArguments};
+use crate::lint::java_receiver_arguments::{ArgumentNullness, InheritedMember, ReceiverArguments};
 use crate::lint::java_receivers::Receiver;
 
 #[test]
@@ -179,7 +179,13 @@ fn null_arguments_survive_the_round_trip() {
                 ArgumentNullness::Concrete,
                 ArgumentNullness::Nullable,
                 ArgumentNullness::Unknown,
+                ArgumentNullness::NonNullVariable,
             ],
+            inherited: Some(InheritedMember {
+                scope: vec!["ListTester".to_owned(), "Outer".to_owned()],
+                name: "getList".to_owned(),
+                getter: true,
+            }),
         },
     };
     let mut writer = Writer::default();

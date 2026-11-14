@@ -4,7 +4,7 @@ use super::summary_codec::{read_receiver, write_receiver};
 use crate::lint::java_contract_calls::{CallTarget, ContractCall};
 use crate::lint::java_contracts::Constraint;
 use crate::lint::java_null_inference::NullArgument;
-use crate::lint::java_receiver_arguments::{ArgumentNullness, ReceiverArguments};
+use crate::lint::java_receiver_arguments::{ArgumentNullness, InheritedMember, ReceiverArguments};
 
 const CONSTRAINT_ANY: u64 = 0;
 const CONSTRAINT_NULL: u64 = 1;
@@ -17,6 +17,7 @@ const TARGET_IMPORTED_METHOD: u64 = 2;
 const ARGUMENT_CONCRETE: u64 = 0;
 const ARGUMENT_NULLABLE: u64 = 1;
 const ARGUMENT_UNKNOWN: u64 = 2;
+const ARGUMENT_NON_NULL_VARIABLE: u64 = 3;
 
 pub fn write_null_argument(writer: &mut Writer, argument: &NullArgument) {
     writer.text(&argument.name);
@@ -34,8 +35,17 @@ pub fn write_null_argument(writer: &mut Writer, argument: &NullArgument) {
             ArgumentNullness::Concrete => ARGUMENT_CONCRETE,
             ArgumentNullness::Nullable => ARGUMENT_NULLABLE,
             ArgumentNullness::Unknown => ARGUMENT_UNKNOWN,
+            ArgumentNullness::NonNullVariable => ARGUMENT_NON_NULL_VARIABLE,
         });
     });
+    writer.list(
+        argument.receiver_arguments.inherited.as_slice(),
+        |writer, member| {
+            writer.list(&member.scope, |writer, name| writer.text(name));
+            writer.text(&member.name);
+            writer.number(u64::from(member.getter));
+        },
+    );
 }
 
 pub fn read_null_argument(reader: &mut Reader<'_>) -> Result<NullArgument, Corrupt> {
@@ -55,8 +65,19 @@ pub fn read_null_argument(reader: &mut Reader<'_>) -> Result<NullArgument, Corru
                 ARGUMENT_CONCRETE => Ok(ArgumentNullness::Concrete),
                 ARGUMENT_NULLABLE => Ok(ArgumentNullness::Nullable),
                 ARGUMENT_UNKNOWN => Ok(ArgumentNullness::Unknown),
+                ARGUMENT_NON_NULL_VARIABLE => Ok(ArgumentNullness::NonNullVariable),
                 _ => Err(Corrupt),
             })?,
+            inherited: reader
+                .list(|reader| {
+                    Ok(InheritedMember {
+                        scope: reader.list(Reader::text)?,
+                        name: reader.text()?,
+                        getter: reader.number()? != 0,
+                    })
+                })?
+                .into_iter()
+                .next(),
         },
     })
 }

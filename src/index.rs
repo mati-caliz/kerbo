@@ -8,6 +8,7 @@ mod java_failing_calls;
 mod java_header;
 mod java_jdk;
 mod java_lambda_null_returns;
+mod java_library_arguments;
 mod java_null_arguments;
 mod java_nullable_returns;
 mod java_nullness;
@@ -45,6 +46,8 @@ mod java_escapes_tests;
 mod java_failing_calls_tests;
 #[cfg(test)]
 mod java_null_lambda_return_tests;
+#[cfg(test)]
+mod java_null_library_argument_tests;
 #[cfg(test)]
 mod java_null_marked_tests;
 #[cfg(test)]

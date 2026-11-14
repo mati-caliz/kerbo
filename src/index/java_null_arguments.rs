@@ -2,6 +2,7 @@ use super::java::{
     Declaration, Dereferenced, JavaSummary, NullInference, Parameter, ParameterNullness, Position, lint_at,
 };
 use super::java_dereference::{known_not_null, may_return_null};
+use super::java_library_arguments::{inherited_library_class, library_substituted_non_null};
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
@@ -22,6 +23,10 @@ const LIBRARY_NON_NULL: &[(&str, &str, usize, usize, &str)] = &[
     ("java.util.Collection", "retainAll", 1, 0, "c"),
     ("java.util.Collection", "containsAll", 1, 0, "c"),
     ("java.util.Map", "putAll", 1, 0, "m"),
+    ("java.util.Map", "merge", 3, 1, "value"),
+    ("java.util.Map", "merge", 3, 2, "remappingFunction"),
+    ("java.util.List", "addAll", 2, 1, "c"),
+    ("java.util.concurrent.ConcurrentMap", "remove", 2, 0, "key"),
 ];
 
 // Calca el "Passing 'null' argument to parameter annotated as non-null" de DataFlowIssue con lo que
@@ -157,6 +162,19 @@ pub(super) fn non_null_parameter(
 ) -> Option<String> {
     if let Receiver::Type(written) = &argument.receiver
         && let Resolved::Library(class) = resolve(types, library, summary, written)
+    {
+        return library_non_null(library, &class, argument).or_else(|| {
+            library_substituted_non_null(
+                library,
+                &class,
+                argument,
+                types.is_marked(summary, argument.receiver_arguments.marking),
+            )
+        });
+    }
+    if argument.receiver == Receiver::Unknown
+        && let Some(member) = &argument.receiver_arguments.inherited
+        && let Some(class) = inherited_library_class(types, library, member)
     {
         return library_non_null(library, &class, argument);
     }

@@ -308,6 +308,9 @@ fn generic_signatures_keep_the_type_parameters_and_what_each_parent_receives() {
     assert_eq!(bounded.parameters, ["K", "V"]);
     let get = method_signature("(I)TE;").expect("la firma se lee");
     assert_eq!((get.parameters, get.returned), (Vec::new(), variable("E")));
+    assert_eq!(get.arguments, [Generic::Other]);
+    let put = method_signature("(TK;TV;)TV;").expect("la firma se lee");
+    assert_eq!(put.arguments, [variable("K"), variable("V")]);
     let to_array = method_signature("<T:Ljava/lang/Object;>([TT;)[TT;").expect("la firma se lee");
     assert_eq!(
         (to_array.parameters, to_array.returned),

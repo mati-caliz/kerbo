@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
 use super::java::text;
-use crate::syntax::named_children;
+use crate::syntax::{descendants, named_children};
 
 const LOCAL: &str = "local_variable_declaration";
 const VARIABLE_DECLARATOR: &str = "variable_declarator";
@@ -27,14 +27,28 @@ const FIELD_FIELD: &str = "field";
 const LENGTH: &str = "length";
 const ZERO: &str = "0";
 const LESS: &str = "<";
+const LESS_OR_EQUAL: &str = "<=";
+const IDENTIFIER: &str = "identifier";
+const DECIMAL: &str = "decimal_integer_literal";
+const UPDATE: &str = "update_expression";
+const METHODS: &[&str] = &[
+    "method_declaration",
+    "constructor_declaration",
+    "lambda_expression",
+];
 const EQUAL: &str = "==";
 
 // Si el `for (i = 0; i < arreglo.length; ...)` da al menos una vuelta porque antes, en el mismo
-// bloque, un `if (arreglo.length == 0)` sale del método: IntelliJ sigue el largo del arreglo.
+// bloque, un `if (arreglo.length == 0)` sale del método: IntelliJ sigue el largo del arreglo. O si
+// el límite es un número, o una local `int` inicializada con un número que no se reasigna
+// (`int size = 5; for (int i = 0; i <= size; i++)`): IntelliJ sigue su valor.
 pub(super) fn runs_at_least_once(for_statement: Node<'_>, source: &[u8]) -> bool {
     let Some(counter) = counter_from_zero(for_statement, source) else {
         return false;
     };
+    if bounded_by_a_positive_constant(for_statement, &counter, source) {
+        return true;
+    }
     let Some(array) = bounding_array(for_statement, &counter, source) else {
         return false;
     };
@@ -76,6 +90,67 @@ fn bounding_array(for_statement: Node<'_>, counter: &str, source: &[u8]) -> Opti
         return None;
     }
     length_of(right, source)
+}
+
+fn bounded_by_a_positive_constant(for_statement: Node<'_>, counter: &str, source: &[u8]) -> bool {
+    let Some((left, operator, right)) = for_statement
+        .child_by_field_name(CONDITION_FIELD)
+        .map(unparenthesized)
+        .and_then(|condition| binary_parts(condition, source))
+    else {
+        return false;
+    };
+    if text(left, source) != counter {
+        return false;
+    }
+    let Some(bound) = constant_value(for_statement, right, source) else {
+        return false;
+    };
+    match operator.as_str() {
+        LESS => bound > 0,
+        LESS_OR_EQUAL => bound >= 0,
+        _ => false,
+    }
+}
+
+// El valor de un número escrito, o de una local inicializada con uno que nadie reasigna.
+fn constant_value(context: Node<'_>, bound: Node<'_>, source: &[u8]) -> Option<i64> {
+    match bound.kind() {
+        DECIMAL => text(bound, source).parse().ok(),
+        IDENTIFIER => {
+            let name = text(bound, source);
+            let method = std::iter::successors(context.parent(), Node::parent)
+                .find(|node| METHODS.contains(&node.kind()))?;
+            let nodes = descendants(method);
+            let mut initializers = nodes.iter().filter(|node| {
+                node.kind() == VARIABLE_DECLARATOR
+                    && node
+                        .child_by_field_name(NAME_FIELD)
+                        .is_some_and(|declared| text(declared, source) == name)
+            });
+            let declarator = initializers.next()?;
+            if initializers.next().is_some() || nodes.iter().any(|node| reassigns(*node, name, source)) {
+                return None;
+            }
+            declarator
+                .child_by_field_name(VALUE_FIELD)
+                .filter(|value| value.kind() == DECIMAL)
+                .and_then(|value| text(value, source).parse().ok())
+        }
+        _ => None,
+    }
+}
+
+fn reassigns(node: Node<'_>, name: &str, source: &[u8]) -> bool {
+    match node.kind() {
+        ASSIGNMENT => node
+            .child_by_field_name(LEFT_FIELD)
+            .is_some_and(|target| text(target, source) == name),
+        UPDATE => named_children(node)
+            .into_iter()
+            .any(|operand| operand.kind() == IDENTIFIER && text(operand, source) == name),
+        _ => false,
+    }
 }
 
 fn exits_when_empty(statement: Node<'_>, array: &str, source: &[u8]) -> bool {

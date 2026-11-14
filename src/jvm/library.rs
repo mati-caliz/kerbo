@@ -130,6 +130,18 @@ impl Library {
     // Los métodos con ese nombre y cantidad de parámetros (estáticos también) de la primera clase
     // que los declara, subiendo por la clase padre y las interfaces.
     pub fn overloads(&self, class: &str, name: &str, arity: usize) -> Vec<Method> {
+        self.declared_overloads(class, name, arity)
+            .map(|(_, methods)| methods)
+            .unwrap_or_default()
+    }
+
+    // Lo mismo, con la clase que los declara.
+    pub fn declared_overloads(
+        &self,
+        class: &str,
+        name: &str,
+        arity: usize,
+    ) -> Option<(Rc<ClassFile>, Vec<Method>)> {
         let mut pending = vec![class.to_owned()];
         let mut seen = HashSet::new();
         while let Some(current) = pending.pop() {
@@ -146,12 +158,12 @@ impl Library {
                 .cloned()
                 .collect();
             if !matching.is_empty() {
-                return matching;
+                return Some((found, matching));
             }
             pending.extend(found.interfaces.iter().cloned());
             pending.extend(found.superclass.clone());
         }
-        Vec::new()
+        None
     }
 
     // La clase y todas las de arriba (padres e interfaces) que se pueden leer.

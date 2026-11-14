@@ -35,10 +35,12 @@ pub struct ClassSignature {
     pub parents: Vec<Generic>,
 }
 
-// Lo que devuelve un método, y sus propios parámetros de tipo, que tapan a los de la clase.
+// Lo que devuelve un método, los tipos de sus parámetros, y sus propios parámetros de tipo, que
+// tapan a los de la clase.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MethodSignature {
     pub parameters: Vec<String>,
+    pub arguments: Vec<Generic>,
     pub returned: Generic,
 }
 
@@ -56,12 +58,17 @@ pub fn method_signature(signature: &str) -> Option<MethodSignature> {
     let mut reader = Reader::new(signature);
     let parameters = reader.type_parameters()?;
     reader.expect(PARAMETERS_START)?;
+    let mut arguments = Vec::new();
     while reader.peek()? != PARAMETERS_END {
-        reader.java_type()?;
+        arguments.push(reader.java_type()?);
     }
     reader.expect(PARAMETERS_END)?;
     let returned = reader.java_type()?;
-    Some(MethodSignature { parameters, returned })
+    Some(MethodSignature {
+        parameters,
+        arguments,
+        returned,
+    })
 }
 
 // El tipo de un campo (`Ljava/util/List<Ljava/lang/String;>;`).

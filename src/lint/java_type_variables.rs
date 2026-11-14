@@ -63,12 +63,6 @@ fn closest_bound_is_nullable(name: Node<'_>, source: &[u8]) -> Option<bool> {
     None
 }
 
-// Si `written` es una variable de tipo declarada en el método o en las clases que encierran al nodo.
-pub fn is_type_parameter_in_scope(node: Node<'_>, written: &str, source: &[u8]) -> bool {
-    std::iter::successors(node.parent(), Node::parent)
-        .any(|scope| declared_bound_is_nullable(scope, written, source).is_some())
-}
-
 // Si `written` es una variable de tipo en el alcance del nodo, si la declarada más cerca tiene un
 // límite `@Nullable`.
 pub fn type_parameter_admits_null(node: Node<'_>, written: &str, source: &[u8]) -> Option<bool> {

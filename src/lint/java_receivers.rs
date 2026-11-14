@@ -4,6 +4,7 @@ use std::collections::hash_map::Entry;
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
+use super::java_receiver_arguments::getter_type;
 use crate::syntax::{descendants, named_children};
 
 pub use super::java_static_imports::StaticImports;
@@ -30,6 +31,7 @@ const CREATION: &str = "object_creation_expression";
 const CLASS_BODY: &str = "class_body";
 const PROGRAM: &str = "program";
 const IDENTIFIER: &str = "identifier";
+const INVOCATION: &str = "method_invocation";
 const FIELD_ACCESS: &str = "field_access";
 const THIS: &str = "this";
 const TYPE_FIELD: &str = "type";
@@ -224,6 +226,9 @@ pub fn receiver_of(invocation: Node<'_>, source: &[u8], variables: &Variables) -
                 .and_then(|field| variables.get(text(field, source)).cloned().flatten())
                 .map_or(Receiver::Unknown, Receiver::Type)
         }
+        INVOCATION => getter_type(object, source)
+            .map(|written| simple_type_name(text(written, source)))
+            .map_or(Receiver::Unknown, Receiver::Type),
         _ => Receiver::Unknown,
     }
 }

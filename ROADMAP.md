@@ -1594,7 +1594,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 633 de los 972 (394 `data-flow-issue`, 193 `null-argument`, 25
+  de más en los dos. En guava, 664 de los 972 (394 `data-flow-issue`, 224 `null-argument`, 25
   `failing-call`, 21 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
@@ -1609,7 +1609,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   que falta de guava, lo más grande: campos `@Nullable` calificados con un acceso a arreglo
   (`map.segments[0].table`), el estado que IntelliJ olvida en cada llamada (marca dos veces el
   mismo campo con un `segment.expand()` en el medio), campos
-  `volatile` que IntelliJ olvida en cada llamada, receptores heredados o getters para el JDK, `ConcurrentMap.putIfAbsent`/`replace`/`remove`. Bajo `@NullMarked`/`@NonNullApi` (del paquete, la clase o las que la encierran, cortado
+  `volatile` que IntelliJ olvida en cada llamada. Bajo `@NullMarked`/`@NonNullApi` (del paquete, la clase o las que la encierran, cortado
   por `@NullUnmarked`) un parámetro sin anotar es no nulo aunque el método se pueda redefinir; no
   si su tipo es una variable con límite `@Nullable` o el tipo calificado lleva `@Nullable` en su
   último tramo (`Spliterator.@Nullable OfInt`). Un método traído con `import static` explícito se
@@ -1667,7 +1667,16 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   aunque esté anotado (`PlainDescriptor.isPossiblyNonInitialized`: la deserialización no pasa por el
   constructor). Sólo se reconoce el `Serializable` escrito en la propia clase, no el heredado. Un
   `for (i = 0; i < a.length; ...)` precedido en el bloque por un `if (a.length == 0)` que sale da
-  al menos una vuelta.
+  al menos una vuelta, igual que uno hasta un número o hasta una local `int` inicializada con un
+  número que no se reasigna (`int size = 5; for (int i = 0; i <= size; i++)`).
+  Bajo `@NullMarked` del que llama, un parámetro de un método del JDK cuyo tipo es una variable de la
+  clase no admite null si el receptor se declara con un tipo concreto o con una variable sin límite
+  `@Nullable` en su lugar (`HashMap<Object, Object> map` en `map.put(i, null)`, `ConcurrentMap<K, V>`
+  de los testers); las sobrecargas tienen que coincidir, y `Optional.orElse` admite null (anotación
+  externa). El receptor puede ser un getter que declara el archivo (`getMap()` redefinido), y un
+  campo o getter heredado de una clase del proyecto (`collection`, `getList()`) lleva al tipo que
+  declara para los parámetros del JDK que IntelliJ da por no nulos (también `ConcurrentMap.remove`,
+  `Map.merge` y `List.addAll(int, Collection)`).
   Falta:
   - `assertNull` sobre lo que devuelve un método del proyecto (5 en commons-lang, sobre
     `getIfEmpty`, `getIfBlank` y `applyNonNull`): IntelliJ marca la de 3 argumentos y no la de 4
@@ -1686,11 +1695,10 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     `Map.get` de interfaces del proyecto que heredan de `Map` (`bimap.get(...)`), el de
     `expected.asLong` (campo `@Nullable` de otra clase sin variable de tipo conocido) y el de un
     `getInstance` cuyo receptor es un campo heredado.
-  - guava: los receptores que son campos heredados o getters (`collection`, `getMap()` en los
-    testers de testlib, `held.escape(null)`, `getEscaper().escape(null)`), la inferencia por
-    contexto (`Suppliers.ofInstance(null)`, `immutableEntry(null, 1)` pasado a `builder.put`), los
-    tipos genéricos `K`/`V` no nulos de `ConcurrentMap.putIfAbsent`/`replace`/`remove` y de las
-    interfaces del JDK (`Comparator<Integer>.compare`, `Map<Integer, Integer>.put`), el
+  - guava: los receptores que son campos heredados o getters hacia métodos del proyecto
+    (`held.escape(null)`, `getEscaper().escape(null)`) y la sustitución de variables con un receptor
+    heredado, la inferencia por contexto (`Suppliers.ofInstance(null)`, `Functions.constant(null)`,
+    `immutableEntry(null, 1)` o `Collections.singletonMap(null, 1)` pasados a `builder.put`), el
     "Argument might be null" de `e0()`/`e1()` (variable de tipo con límite `@Nullable` devuelta
     dentro de una clase anónima), el de una llamada encadenada como receptor
     (`Splitter.on(...).split(X.value())`), el de `parseInt`/`Ints.tryParse` y las desreferencias
