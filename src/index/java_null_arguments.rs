@@ -281,14 +281,14 @@ fn library_non_null(library: &Library, class: &str, argument: &NullArgument) -> 
 
 // Qué recibe el parámetro con el `null`: el valor entero, o uno de los elementos del varargs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Slot {
+pub(super) enum Slot {
     Whole,
     Element,
 }
 
 // Un `null` en el lugar del varargs es el arreglo entero sólo si es el único argumento de ahí;
 // si no, es uno de sus elementos.
-fn parameter_at<'declaration>(
+pub(super) fn parameter_at<'declaration>(
     declaration: &'declaration Declaration,
     argument: &NullArgument,
 ) -> Option<(&'declaration Parameter, Slot)> {

@@ -1594,8 +1594,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 621 de los 972 (394 `data-flow-issue`, 193 `null-argument`, 25
-  `failing-call`, 9 `nullable-return`), con 3
+  de más en los dos. En guava, 633 de los 972 (394 `data-flow-issue`, 193 `null-argument`, 25
+  `failing-call`, 21 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
   `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
@@ -1627,10 +1627,20 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   evaluate to null but is returned": un `null` escrito, una variable o campo `@Nullable` sin
   chequear o una llamada que puede devolver null, devueltos por un método cuyo retorno es no nulo
   por `@NullMarked` o `@NonNull` (no primitivo, `void`/`Void`, `@Nullable`, `@ParametricNullness`
-  ni variable de tipo con límite `@Nullable`). Falta en guava (16): las lambdas `t -> null` pasadas
-  a interfaces funcionales `@NullMarked` (TableCollectorsTest, FuturesTest, UnsignedBytes), los
-  campos `volatile` releídos (`return logger` en LazyLogger, `whenClosed` en ClosingFuture),
-  `convert(fromIterator.next())` dentro de una clase anónima y `uncheckedCastNullableTToT(...)`.
+  ni variable de tipo con límite `@Nullable`). También el `null` que devuelve una lambda (escrito
+  como cuerpo o en un `return`) en código `@NullMarked`, si su interfaz funcional ya sustituida
+  devuelve algo no nulo: una interfaz del proyecto `@NullMarked` con un solo método abstracto que
+  devuelve un tipo concreto (`AsyncFunction` devuelve `ListenableFuture<O>`), o una variable de la
+  interfaz (también las de `Function`, `BiFunction`, `Supplier`, `BinaryOperator`, `Callable` y
+  `PrivilegedAction` del JDK) en cuyo lugar se escribió un tipo concreto, o una variable del método
+  sin límite `@Nullable` si la llamada tiene un tipo destino (`Collector<...> c =
+  toImmutableTable(t -> null, ...)`; sin destino, IntelliJ la infiere de la lambda y no marca).
+  Falta en guava (9): los campos `volatile` releídos (`return logger` en LazyLogger, `whenClosed`
+  en ClosingFuture), `convert(fromIterator.next())` dentro de una clase anónima,
+  `uncheckedCastNullableTToT(...)` en StandardTable, y los 5 "type-variable return type may be
+  instantiated as non-null" (`return null` y `return t` con `@Nullable T t` en los dos
+  NullnessCasts, que piden sembrar los parámetros `@Nullable` en el flujo, y `return result` en
+  AbstractIterator, que pide inferir que `uncheckedCastNullableTToT` devuelve su argumento).
   Un método del proyecto que se declara `@Nullable` (también `@CheckForNull` y `char @Nullable []`)
   devuelve posiblemente null; la raíz de una cadena puede ser una constante traída con
   `import static` (un valor de enum o un campo estático); y una llamada que puede devolver null

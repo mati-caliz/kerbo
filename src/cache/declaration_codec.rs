@@ -1,4 +1,5 @@
 use super::codec::{Corrupt, Reader, Writer};
+use super::lambda_codec::{read_type_arguments, write_type_arguments};
 use super::null_codec::{read_constraint, write_constraint};
 use super::summary_codec::{
     read_flag, read_position, read_visibility, write_flag, write_position, write_visibility,
@@ -84,6 +85,7 @@ pub(super) fn write_declaration(writer: &mut Writer, declaration: &Declaration) 
         writer.text(&parameter.type_name);
         write_flag(writer, parameter.type_variable);
         write_flag(writer, parameter.accepts_null);
+        write_type_arguments(writer, &parameter.type_arguments);
     });
     writer.list(&declaration.annotations, |writer, name| writer.text(name));
     write_owner(writer, &declaration.owner);
@@ -193,6 +195,7 @@ pub(super) fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, C
                 type_name: reader.text()?,
                 type_variable: read_flag(reader)?,
                 accepts_null: read_flag(reader)?,
+                type_arguments: read_type_arguments(reader)?,
             })
         })?,
         annotations: reader.list(Reader::text)?,

@@ -76,6 +76,11 @@ pub fn type_parameter_admits_null(node: Node<'_>, written: &str, source: &[u8]) 
         .find_map(|scope| declared_bound_is_nullable(scope, written, source))
 }
 
+// Si `written` es una variable de tipo que declara el propio método, si tiene límite `@Nullable`.
+pub fn method_variable_admits_null(method: Node<'_>, written: &str, source: &[u8]) -> Option<bool> {
+    declared_bound_is_nullable(method, written, source)
+}
+
 fn declared_bound_is_nullable(declaration: Node<'_>, written: &str, source: &[u8]) -> Option<bool> {
     named_children(declaration)
         .into_iter()

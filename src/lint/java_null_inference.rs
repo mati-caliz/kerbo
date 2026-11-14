@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use super::java::{CONSTRUCTOR, FINAL, PRIVATE, STATIC, has_modifier, is_type_declaration, text};
 use super::java_chains::argument_count;
 use super::java_exact_receivers::ExactReceivers;
+use super::java_lambda_returns::{LambdaReturn, lambda_returns_in};
 use super::java_receiver_arguments::{ReceiverArguments, receiver_arguments};
 use super::java_receivers::{Receiver, StaticImports, Variables, simple_type_name, variable_types};
 use crate::syntax::{named_children, one_based};
@@ -177,7 +178,7 @@ pub(super) fn cast_type(argument: Node<'_>, source: &[u8]) -> Option<String> {
 
 // El tipo escrito de un parámetro a partir de su nombre; el de un varargs (`String... textos`) va
 // antes de su declarador.
-fn parameter_type(name: Node<'_>) -> Option<Node<'_>> {
+pub(super) fn parameter_type(name: Node<'_>) -> Option<Node<'_>> {
     let parameter = name.parent()?;
     if parameter.kind() != VARIABLE_DECLARATOR {
         return parameter.child_by_field_name(TYPE_FIELD);
@@ -249,8 +250,12 @@ fn enum_has_bodies(declaration: Node<'_>) -> bool {
         .any(|part| part.kind() == CLASS_BODY)
 }
 
-// Los `null` que pasan como argumento las llamadas del archivo.
-pub fn null_arguments_in(top_level: Node<'_>, nodes: &[Node<'_>], source: &[u8]) -> Vec<NullArgument> {
+// Los `null` que pasan como argumento las llamadas del archivo y las lambdas que devuelven `null`.
+pub fn null_arguments_in(
+    top_level: Node<'_>,
+    nodes: &[Node<'_>],
+    source: &[u8],
+) -> (Vec<NullArgument>, Vec<LambdaReturn>) {
     let variables = variable_types(nodes, source);
     let imported = StaticImports::of(top_level, source);
     let exact = ExactReceivers::of(nodes, source);
@@ -259,17 +264,18 @@ pub fn null_arguments_in(top_level: Node<'_>, nodes: &[Node<'_>], source: &[u8])
         imported: &imported,
         exactly_constructed: &exact,
     };
-    nodes
+    let arguments = nodes
         .iter()
         .flat_map(|node| null_arguments(*node, source, &context))
-        .collect()
+        .collect();
+    (arguments, lambda_returns_in(nodes, source, &context))
 }
 
 // Lo que hace falta del archivo para saber a quién llama una llamada.
-struct CallContext<'context> {
-    variables: &'context Variables,
-    imported: &'context StaticImports,
-    exactly_constructed: &'context ExactReceivers,
+pub(super) struct CallContext<'context> {
+    pub(super) variables: &'context Variables,
+    pub(super) imported: &'context StaticImports,
+    pub(super) exactly_constructed: &'context ExactReceivers,
 }
 
 // A quién llama una llamada: el nombre del método (o de la clase, si construye), si es un
@@ -310,48 +316,50 @@ pub(super) fn call_target(
 
 // Los `null` que una llamada pasa como argumento.
 fn null_arguments(call: Node<'_>, source: &[u8], context: &CallContext<'_>) -> Vec<NullArgument> {
-    let Some(CallTarget {
-        name,
-        is_constructor,
-        receiver,
-    }) = call_target(call, source, context.imported, context.variables)
-    else {
-        return Vec::new();
-    };
-    let exact = call.kind() == INVOCATION
-        && call
-            .child_by_field_name(OBJECT_FIELD)
-            .filter(|object| object.kind() == IDENTIFIER)
-            .is_some_and(|object| context.exactly_constructed.contains(object, source));
-    let arity = argument_count(call);
-    let mut found: Vec<NullArgument> = call
-        .child_by_field_name(ARGUMENTS_FIELD)
+    call.child_by_field_name(ARGUMENTS_FIELD)
         .map(named_children)
         .unwrap_or_default()
         .into_iter()
         .filter(|argument| !COMMENTS.contains(&argument.kind()))
         .enumerate()
         .filter_map(|(index, argument)| {
-            let literal = null_inside(argument)?.start_position();
-            Some(NullArgument {
-                name: name.clone(),
-                is_constructor,
-                arity,
-                receiver: receiver.clone(),
-                index,
-                line: one_based(literal.row),
-                column: one_based(literal.column),
-                cast: cast_type(argument, source),
-                exact,
-                receiver_arguments: ReceiverArguments::default(),
-            })
+            let literal = null_inside(argument)?;
+            let mut found = argument_of_call(call, (index, literal), source, context)?;
+            found.cast = cast_type(argument, source);
+            Some(found)
         })
-        .collect();
-    if !found.is_empty() {
-        let arguments = receiver_arguments(call, source);
-        for argument in &mut found {
-            argument.receiver_arguments = arguments.clone();
-        }
-    }
-    found
+        .collect()
+}
+
+// El argumento en la posición `index` de la llamada, ubicado en el nodo `at`: a quién llama y con qué
+// receptor.
+pub(super) fn argument_of_call(
+    call: Node<'_>,
+    (index, at): (usize, Node<'_>),
+    source: &[u8],
+    context: &CallContext<'_>,
+) -> Option<NullArgument> {
+    let CallTarget {
+        name,
+        is_constructor,
+        receiver,
+    } = call_target(call, source, context.imported, context.variables)?;
+    let exact = call.kind() == INVOCATION
+        && call
+            .child_by_field_name(OBJECT_FIELD)
+            .filter(|object| object.kind() == IDENTIFIER)
+            .is_some_and(|object| context.exactly_constructed.contains(object, source));
+    let start = at.start_position();
+    Some(NullArgument {
+        name,
+        is_constructor,
+        arity: argument_count(call),
+        receiver,
+        index,
+        line: one_based(start.row),
+        column: one_based(start.column),
+        cast: None,
+        exact,
+        receiver_arguments: receiver_arguments(call, source),
+    })
 }

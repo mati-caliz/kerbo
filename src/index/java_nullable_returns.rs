@@ -1,5 +1,6 @@
 use super::java::{JavaSummary, Position, lint_at};
 use super::java_dereference::{known_not_null, may_return_null};
+use super::java_lambda_null_returns::lambda_null_returns;
 use super::java_null_arguments::reaches;
 use super::java_nullness::ProjectTypes;
 use crate::jvm::library::Library;
@@ -29,6 +30,7 @@ pub fn nullable_returns(
     });
     from_flows
         .chain(from_calls)
+        .chain(lambda_null_returns(types, library, summary))
         .filter(|returned| types.is_marked(summary, returned.marking))
         .map(report)
         .collect()

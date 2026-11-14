@@ -63,14 +63,14 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
     writer.list(chain.returned.as_slice(), write_null_return);
 }
 
-fn write_null_return(writer: &mut Writer, returned: &NullReturn) {
+pub(super) fn write_null_return(writer: &mut Writer, returned: &NullReturn) {
     writer.text(&returned.name);
     writer.size(returned.line);
     writer.size(returned.column);
     write_marking(writer, returned.marking);
 }
 
-fn read_null_return(reader: &mut Reader<'_>) -> Result<NullReturn, Corrupt> {
+pub(super) fn read_null_return(reader: &mut Reader<'_>) -> Result<NullReturn, Corrupt> {
     Ok(NullReturn {
         name: reader.text()?,
         line: reader.size()?,

@@ -17,6 +17,7 @@ use crate::lint::java_fields::{
 };
 use crate::lint::java_generics::{Generics, generics_of};
 use crate::lint::java_inference::{dereferenced_first, unconditionally_dereferenced};
+use crate::lint::java_lambda_returns::LambdaReturn;
 use crate::lint::java_lambda_targets::{LambdaTargets, lambda_targets_of};
 use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_null_inference::{
@@ -27,6 +28,7 @@ use crate::lint::java_owner::Owner;
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
 use crate::lint::java_throws::MethodThrows;
+use crate::lint::java_type_arguments::{TypeArgument, parameter_type_arguments};
 use crate::lint::java_type_variables::is_type_variable;
 use crate::lint::taint::TaintMethod;
 use crate::lint::{LintFinding, LintKind};
@@ -57,6 +59,7 @@ pub struct Parameter {
     pub type_name: String,
     pub type_variable: bool,
     pub accepts_null: bool,
+    pub type_arguments: Vec<TypeArgument>,
 }
 
 // Si el cuerpo del método nombra al parámetro (un método sin cuerpo o un record, siempre).
@@ -158,6 +161,7 @@ pub struct JavaSummary {
     pub contract_calls: Vec<ContractCall>,
     pub generics: Generics,
     pub lambda_targets: LambdaTargets,
+    pub lambda_returns: Vec<LambdaReturn>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -200,9 +204,9 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         summary.resources.extend(extracted.resources);
         summary.taints.extend(extracted.taints);
         summary.method_throws.extend(extracted.method_throws);
-        summary
-            .null_arguments
-            .extend(null_arguments_in(top_level, &nodes, source));
+        let (null_arguments, lambda_returns) = null_arguments_in(top_level, &nodes, source);
+        summary.null_arguments.extend(null_arguments);
+        summary.lambda_returns.extend(lambda_returns);
         summary
             .contract_calls
             .extend(contract_calls_in(top_level, &nodes, source));
@@ -312,6 +316,7 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
                     type_name: parameter_type_name(*parameter, source),
                     type_variable: is_type_variable(*parameter, source),
                     accepts_null: accepts_null(*parameter),
+                    type_arguments: parameter_type_arguments(*parameter, source),
                 }
             })
             .collect(),

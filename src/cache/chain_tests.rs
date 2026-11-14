@@ -209,3 +209,56 @@ fn contract_calls_survive_the_round_trip() {
     let bytes = writer.into_bytes();
     assert_eq!(read_contract_call(&mut Reader::new(&bytes)), Ok(call));
 }
+
+#[test]
+fn lambdas_returning_null_survive_the_round_trip() {
+    use super::lambda_codec::{read_lambda_return, write_lambda_return};
+    use crate::lint::java_lambda_returns::{LambdaReturn, LambdaTarget};
+    use crate::lint::java_type_arguments::TypeArgument;
+
+    let returned = NullReturn {
+        name: "null".to_owned(),
+        line: 73,
+        column: 31,
+        marking: NullMarking::Marked,
+    };
+    let lambdas = [
+        LambdaReturn {
+            returns: vec![returned.clone()],
+            target: LambdaTarget::Argument {
+                argument: NullArgument {
+                    name: "toImmutableTable".to_owned(),
+                    is_constructor: false,
+                    arity: 3,
+                    receiver: Receiver::Type("TableCollectors".to_owned()),
+                    index: 0,
+                    line: 73,
+                    column: 26,
+                    cast: None,
+                    exact: false,
+                    receiver_arguments: ReceiverArguments::default(),
+                },
+                target_typed: true,
+            },
+        },
+        LambdaReturn {
+            returns: vec![returned],
+            target: LambdaTarget::Declared {
+                type_name: "BiFunction".to_owned(),
+                arguments: vec![
+                    TypeArgument::Concrete,
+                    TypeArgument::Nullable,
+                    TypeArgument::MethodVariable,
+                    TypeArgument::OtherVariable,
+                    TypeArgument::Wildcard,
+                ],
+            },
+        },
+    ];
+    for lambda in lambdas {
+        let mut writer = Writer::default();
+        write_lambda_return(&mut writer, &lambda);
+        let bytes = writer.into_bytes();
+        assert_eq!(read_lambda_return(&mut Reader::new(&bytes)), Ok(lambda));
+    }
+}
