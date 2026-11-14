@@ -170,6 +170,11 @@ De las inspecciones de IntelliJ, kerbo hace:
   ya traiga UTF-8 fuera de ASCII, que entonces se lee como UTF-8, igual que en IntelliJ.
   commons-lang (que declara ISO-8859-1) y guava coinciden con Qodana en los 23.120.
 
+- `Java8ListSort` (`java8-list-sort`): `Collections.sort(lista, comparador)` con `release` 8 o más,
+  y se arregla como `lista.sort(comparador)`. Cuenta el `sort` importado estático salvo que la clase
+  declare su propio `sort`, o que también se importe `Arrays.sort` y el primer argumento sea un
+  arreglo (declarado como `T[]`, un `new T[]` o un `toArray()`). Coincide con Qodana en guava (31).
+
 - `AutoCloseableResource` (`auto-closeable-resource`): una llamada que crea algo que se cierra
   (un `InputStream`, una `Connection`, un `ResultSet`, un `ExecutorService`, un `HttpClient`...)
   fuera de un `try` con recursos: en una variable que no se cierra, no se devuelve ni se pasa a

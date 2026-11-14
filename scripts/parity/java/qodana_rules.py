@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Compara las inspecciones de Qodana que tienen par en una regla de kerbo (imports sin usar,
-modificadores redundantes y escapes Unicode de más) con kerbo imitando a Checkstyle y a PMD, por
+modificadores redundantes, escapes Unicode de más y la API nueva) con kerbo imitando a Checkstyle y a PMD, por
 regla, archivo y línea. Las columnas no coinciden (Qodana cuenta caracteres, kerbo bytes): de los
 modificadores cuenta una vez cada línea, y de los escapes, cuántos hay en cada línea.
 
@@ -29,6 +29,7 @@ INSPECTIONS = {
     "FinalStaticMethod": "redundant-modifier",
     "FinalMethodInFinalClass": "redundant-modifier",
     "UnnecessaryUnicodeEscape": "unnecessary-unicode-escape",
+    "Java8ListSort": "java8-list-sort",
 }
 COUNTED_PER_LINE = {"unnecessary-unicode-escape"}
 RESULTS = "results-UNUSED_IMPORT"

@@ -369,6 +369,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT] = [
         "A \\u0041 makes the reader look up which letter it is; the file is UTF-8 and the character reads directly. Like IntelliJ's UnnecessaryUnicodeEscape: control characters, unusual spaces, invisible, unassigned and combining characters stay escaped, since they do not show well when written.",
         "String name = \"Jos\\u00e9\"; becomes String name = \"José\";.",
     ),
+    RuleText::new(
+        "Collections.sort(list, comparator) where list.sort(comparator) is enough",
+        "call sort on the list",
+        "Since Java 8 a list sorts itself with List.sort, which some implementations do faster than copying to an array. Like IntelliJ's Java8ListSort: only with release 8 or later.",
+        "Collections.sort(orders, byDate); becomes orders.sort(byDate);.",
+    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {

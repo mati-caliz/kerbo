@@ -1764,8 +1764,8 @@ ya está en el arnés (`scripts/parity/java/qodana_rules.py`).
   ni PMD (`FinalStaticMethod`, 23 en el corpus, y `transient` en un campo estático, 2), o si van
   como reglas aparte con la API nueva.
 - Por lo que más aparece en Qodana, ya sin los escapes Unicode de más (`unnecessary-unicode-escape`,
-  igual a Qodana en el corpus): `Collections.sort()` por `List.sort()` (31 en guava), `size() == 0`
-  por `isEmpty()` (30), el valor por defecto repetido en una anotación (7 en junit4), y min/max a
+  igual a Qodana en el corpus) y `Collections.sort()` por `List.sort()` (`java8-list-sort`, igual):
+  `size() == 0` por `isEmpty()` (30), el valor por defecto repetido en una anotación (7 en junit4), y min/max a
   mano y operaciones de `Map` simplificables (2 y 2). La API de Java 21 (`getFirst()`, `List.of`,
   `Math.clamp`, bloques de texto) no aparece en el corpus, que compila con Java 8: hace falta un
   repo con `release` 21 para medirla.

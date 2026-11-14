@@ -32,6 +32,7 @@ mod java_javadoc_scope;
 mod java_javadoc_tags;
 pub mod java_lambda_returns;
 pub mod java_lambda_targets;
+mod java_list_sort;
 pub mod java_nested_arguments;
 mod java_null_checks;
 mod java_null_conditions;
@@ -239,6 +240,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
         source,
         limits.java_encoding(),
     ));
+    findings.extend(java_list_sort::reported(root, source, limits.java_release()));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
     if limits.java_reference() == JavaReference::Pmd {
         java_pmd_suppressions::drop_suppressed(&mut findings, root, source);
@@ -265,6 +267,8 @@ pub fn finding_at(kind: LintKind, start: Point, subject: &str, fix: Option<Fix>)
 mod java_inspection_tests;
 #[cfg(test)]
 mod java_javadoc_tests;
+#[cfg(test)]
+mod java_list_sort_tests;
 #[cfg(test)]
 mod java_pmd_tests;
 #[cfg(test)]

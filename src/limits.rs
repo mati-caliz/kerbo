@@ -56,6 +56,7 @@ impl SourceEncoding {
 pub struct JavaSettings {
     pub reference: JavaReference,
     pub encoding: SourceEncoding,
+    pub release: Option<u32>,
 }
 
 impl Default for Limits {
@@ -233,6 +234,10 @@ impl Limits {
 
     pub const fn java_encoding(self) -> SourceEncoding {
         self.java.encoding
+    }
+
+    pub const fn java_release(self) -> Option<u32> {
+        self.java.release
     }
 
     pub const fn with_java(mut self, java: JavaSettings) -> Self {

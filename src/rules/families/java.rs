@@ -61,6 +61,7 @@ rule_family!(JavaRule {
     FieldMayBeFinal => "field-may-be-final",
     RedundantThrows => "redundant-throws",
     UnnecessaryUnicodeEscape => "unnecessary-unicode-escape",
+    Java8ListSort => "java8-list-sort",
     JavadocVariable => "javadoc-variable",
     MissingJavadocMethod => "missing-javadoc-method",
     JavadocMethod => "javadoc-method",

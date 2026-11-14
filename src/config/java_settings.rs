@@ -4,6 +4,7 @@ use std::path::Path;
 use serde::Deserialize;
 
 use super::java_encoding;
+use crate::jvm::release::project_release;
 use crate::limits::{JavaReference, JavaSettings, SourceEncoding};
 
 const BUILD_FILES: [&str; 3] = ["pom.xml", "build.gradle", "build.gradle.kts"];
@@ -44,6 +45,7 @@ impl RawJava {
             encoding: self
                 .encoding
                 .unwrap_or_else(|| java_encoding::detected(root, &BUILD_FILES)),
+            release: project_release(root),
         }
     }
 }

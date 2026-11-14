@@ -102,6 +102,7 @@ impl AnalysisCache {
         }
         limits.java_reference().hash(&mut builder);
         limits.java_encoding().hash(&mut builder);
+        limits.java_release().hash(&mut builder);
         builder.content(source);
         builder.key()
     }
