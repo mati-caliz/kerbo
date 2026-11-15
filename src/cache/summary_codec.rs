@@ -74,12 +74,7 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     writer.list(&summary.package_annotations, |writer, name| writer.text(name));
     writer.list(&summary.chains, write_chain);
     writer.list(&summary.null_flows, write_flow);
-    writer.list(&summary.resources, |writer, candidate| {
-        write_resource_origin(writer, &candidate.origin);
-        writer.list(&candidate.owners, write_resource_origin);
-        writer.size(candidate.line);
-        writer.size(candidate.column);
-    });
+    writer.list(&summary.resources, write_resource_candidate);
     writer.list(&summary.constants, |writer, constant| {
         writer.text(&constant.owner);
         writer.text(&constant.name);
@@ -154,14 +149,7 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         package_annotations: reader.list(Reader::text)?,
         chains: reader.list(read_chain)?,
         null_flows: reader.list(read_flow)?,
-        resources: reader.list(|reader| {
-            Ok(ResourceCandidate {
-                origin: read_resource_origin(reader)?,
-                owners: reader.list(read_resource_origin)?,
-                line: reader.size()?,
-                column: reader.size()?,
-            })
-        })?,
+        resources: reader.list(read_resource_candidate)?,
         constants: reader.list(|reader| {
             Ok(Constant {
                 owner: reader.text()?,
@@ -319,5 +307,30 @@ fn read_suppressed_span(reader: &mut Reader<'_>) -> Result<SuppressedSpan, Corru
         start: (reader.size()?, reader.size()?),
         end: (reader.size()?, reader.size()?),
         names: reader.list(Reader::text)?,
+    })
+}
+
+fn write_resource_candidate(writer: &mut Writer, candidate: &ResourceCandidate) {
+    write_resource_origin(writer, &candidate.origin);
+    writer.list(&candidate.owners, write_resource_origin);
+    writer.list(candidate.receiver.as_slice(), write_resource_origin);
+    writer.size(candidate.line);
+    writer.size(candidate.column);
+    writer.list(&candidate.consumers, |writer, (name, arity)| {
+        writer.text(name);
+        writer.size(*arity);
+    });
+    write_flag(writer, candidate.kept_at_end);
+}
+
+fn read_resource_candidate(reader: &mut Reader<'_>) -> Result<ResourceCandidate, Corrupt> {
+    Ok(ResourceCandidate {
+        origin: read_resource_origin(reader)?,
+        owners: reader.list(read_resource_origin)?,
+        receiver: reader.list(read_resource_origin)?.into_iter().next(),
+        line: reader.size()?,
+        column: reader.size()?,
+        consumers: reader.list(|reader| Ok((reader.text()?, reader.size()?)))?,
+        kept_at_end: read_flag(reader)?,
     })
 }

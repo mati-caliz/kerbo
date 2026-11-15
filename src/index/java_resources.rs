@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use super::java::{JavaSummary, Position, lint_at};
 use super::java_jdk::{CLOSEABLE, NOT_RESOURCES, STREAM_HOLDERS, returned_by};
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, resolve};
+use super::java_resource_owners::{creates_a_resource, keeps_its_type};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
@@ -25,7 +26,8 @@ const IGNORED_METHODS: &[(&str, &str)] = &[
 
 // Dónde se sabe qué tipo tiene un paso de la cadena: en el proyecto (por nombre simple), en los
 // jars, o en el JDK (que no viene en el classpath).
-enum Place {
+#[derive(PartialEq, Eq)]
+pub(super) enum Place {
     Project(String),
     Library(String),
 }
@@ -52,7 +54,12 @@ pub fn unclosed_resources(
                 .owners
                 .iter()
                 .any(|owner| is_closeable(types, library, summary, owner))
+                && !candidate
+                    .receiver
+                    .as_ref()
+                    .is_some_and(|receiver| creates_a_resource(types, library, summary, receiver))
         })
+        .filter(|candidate| !candidate.kept_at_end || !keeps_its_type(types, library, summary, candidate))
         .filter_map(|candidate| {
             let created = unclosed_class(types, library, summary, &candidate.origin)?;
             let simple = created.rsplit(QUALIFIER_SEPARATOR).next().unwrap_or(&created);
@@ -69,7 +76,7 @@ pub fn unclosed_resources(
 }
 
 // La clase de lo creado, si es algo que hay que cerrar.
-fn unclosed_class(
+pub(super) fn unclosed_class(
     types: &ProjectTypes<'_>,
     library: &Library,
     summary: &JavaSummary,
@@ -144,7 +151,7 @@ fn is_project_resource(library: &Library, inherited: &[String]) -> bool {
 
 // Lo que devuelve el último paso de la cadena, siguiendo cada paso por el proyecto, los jars o la
 // tabla del JDK. Una llamada sin receptor que la clase no declara puede venir de un `import static`.
-fn created_place(
+pub(super) fn created_place(
     types: &ProjectTypes<'_>,
     library: &Library,
     summary: &JavaSummary,

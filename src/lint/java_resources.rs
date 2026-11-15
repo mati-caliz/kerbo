@@ -1,11 +1,11 @@
-use std::collections::HashSet;
-
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_chains::{Chain, origin_chain};
 use super::java_receivers::Variables;
-use super::java_resource_escapes::{closed_in_block, discarded_by_assert_throws};
+use super::java_resource_escapes::{
+    Escaped, closed_in_block, consumed_by, discarded_by_assert_throws, innermost_lambda, keeps_the_value,
+};
 use crate::syntax::{descendants, named_children, one_based};
 
 const INVOCATION: &str = "method_invocation";
@@ -44,8 +44,11 @@ pub enum ResourceOrigin {
 pub struct ResourceCandidate {
     pub origin: ResourceOrigin,
     pub owners: Vec<ResourceOrigin>,
+    pub receiver: Option<ResourceOrigin>,
     pub line: usize,
     pub column: usize,
+    pub consumers: Vec<(String, usize)>,
+    pub kept_at_end: bool,
 }
 
 // Calca dónde mira AutoCloseableResource: una llamada o un `new` que inicializa una variable local
@@ -69,7 +72,15 @@ pub fn resource_candidates(body: Node<'_>, source: &[u8], variables: &Variables)
             ),
             INVOCATION if !is_close(node, source) => {
                 if let Some(created) = node.child_by_field_name(OBJECT_FIELD) {
-                    candidates.extend(candidate(created, source, variables));
+                    let (consumers, end) = consumed_by(node, source);
+                    let kept_at_end = keeps_the_value(end, source, &escaped);
+                    candidates.extend(
+                        candidate(created, source, variables).map(|found| ResourceCandidate {
+                            consumers,
+                            kept_at_end,
+                            ..found
+                        }),
+                    );
                 }
             }
             _ => {}
@@ -84,7 +95,7 @@ pub fn resource_candidates(body: Node<'_>, source: &[u8], variables: &Variables)
 fn kept_initializers<'tree>(
     declaration: Node<'tree>,
     source: &[u8],
-    escaped: &HashSet<&str>,
+    escaped: &Escaped<'_>,
 ) -> Vec<Node<'tree>> {
     named_children(declaration)
         .into_iter()
@@ -92,7 +103,7 @@ fn kept_initializers<'tree>(
         .filter(|declarator| {
             declarator
                 .child_by_field_name(NAME_FIELD)
-                .is_some_and(|name| !escaped.contains(text(name, source)))
+                .is_some_and(|name| !escaped.contains(&(text(name, source), innermost_lambda(name))))
         })
         .filter_map(|declarator| declarator.child_by_field_name(VALUE_FIELD))
         .collect()
@@ -114,8 +125,13 @@ fn call_candidate(invocation: Node<'_>, source: &[u8], variables: &Variables) ->
     Some(ResourceCandidate {
         origin: ResourceOrigin::Call(Box::new(origin_chain(invocation, source, variables)?)),
         owners: owners(invocation, source, variables),
+        receiver: invocation
+            .child_by_field_name(OBJECT_FIELD)
+            .and_then(|object| owner_origin(object, source, variables)),
         line: one_based(start.row),
         column: one_based(start.column),
+        consumers: Vec::new(),
+        kept_at_end: false,
     })
 }
 
@@ -130,8 +146,11 @@ fn construction_candidate(
     Some(ResourceCandidate {
         origin: ResourceOrigin::Construction(constructed_class(creation, source)?),
         owners: owners(creation, source, variables),
+        receiver: None,
         line: one_based(start.row),
         column: one_based(start.column),
+        consumers: Vec::new(),
+        kept_at_end: false,
     })
 }
 
@@ -145,32 +164,30 @@ fn constructed_class(creation: Node<'_>, source: &[u8]) -> Option<String> {
     Some(text(class, source).to_owned())
 }
 
-// Los argumentos de la llamada o el `new`, y el objeto sobre el que se llama, de los que se sabe
-// qué crean o con qué tipo se declaran.
+// Los argumentos de la llamada o el `new` de los que se sabe qué crean o con qué tipo se declaran.
 fn owners(created: Node<'_>, source: &[u8], variables: &Variables) -> Vec<ResourceOrigin> {
-    let arguments = created
+    created
         .child_by_field_name(ARGUMENTS_FIELD)
         .map(named_children)
-        .unwrap_or_default();
-    let receiver = created
-        .child_by_field_name(OBJECT_FIELD)
-        .filter(|object| object.kind() != IDENTIFIER);
-    arguments
+        .unwrap_or_default()
         .into_iter()
-        .chain(receiver)
-        .filter_map(|owner| match owner.kind() {
-            INVOCATION => {
-                origin_chain(owner, source, variables).map(|chain| ResourceOrigin::Call(Box::new(chain)))
-            }
-            CREATION => constructed_class(owner, source).map(ResourceOrigin::Construction),
-            IDENTIFIER => variables
-                .get(text(owner, source))
-                .cloned()
-                .flatten()
-                .map(ResourceOrigin::Construction),
-            _ => None,
-        })
+        .filter_map(|owner| owner_origin(owner, source, variables))
         .collect()
+}
+
+fn owner_origin(owner: Node<'_>, source: &[u8], variables: &Variables) -> Option<ResourceOrigin> {
+    match owner.kind() {
+        INVOCATION => {
+            origin_chain(owner, source, variables).map(|chain| ResourceOrigin::Call(Box::new(chain)))
+        }
+        CREATION => constructed_class(owner, source).map(ResourceOrigin::Construction),
+        IDENTIFIER => variables
+            .get(text(owner, source))
+            .cloned()
+            .flatten()
+            .map(ResourceOrigin::Construction),
+        _ => None,
+    }
 }
 
 fn is_close(invocation: Node<'_>, source: &[u8]) -> bool {
@@ -180,33 +197,24 @@ fn is_close(invocation: Node<'_>, source: &[u8]) -> bool {
 }
 
 // Las variables que se cierran o pasan a ser de otro: en un `try (variable)`, devueltas tal cual,
-// asignadas a otra cosa, con un `close()`, o pasadas como argumento (fuera de una lambda, que corre
-// después).
-fn escaped_names<'source>(nodes: &[Node<'_>], source: &'source [u8]) -> HashSet<&'source str> {
-    let mut escaped = HashSet::new();
-    let lambdas: Vec<(usize, usize)> = nodes
-        .iter()
-        .filter(|node| node.kind() == LAMBDA)
-        .map(|lambda| (lambda.start_byte(), lambda.end_byte()))
-        .collect();
-    let in_lambda = |node: Node<'_>| {
-        lambdas
-            .iter()
-            .any(|(start, end)| *start <= node.start_byte() && node.end_byte() <= *end)
-    };
+// asignadas a otra cosa, con un `close()`, o pasadas como argumento. Cada una con la lambda más
+// cercana donde pasa: como IntelliJ no entra en lambdas, sólo cuenta para una variable declarada en
+// esa misma lambda (o fuera de toda lambda).
+fn escaped_names<'source>(nodes: &[Node<'_>], source: &'source [u8]) -> Escaped<'source> {
+    let mut escaped = Escaped::new();
     for &node in nodes {
-        if node.kind() == ARGUMENTS && !in_lambda(node) {
+        let lambda = innermost_lambda(node);
+        if node.kind() == ARGUMENTS {
             escaped.extend(
                 named_children(node)
                     .into_iter()
                     .filter(|argument| argument.kind() == IDENTIFIER)
-                    .map(|argument| text(argument, source)),
+                    .map(|argument| (text(argument, source), lambda)),
             );
             continue;
         }
         let name = match node.kind() {
-            RESOURCE => single_child(node).filter(|child| child.kind() == IDENTIFIER),
-            RETURN if !in_lambda(node) => single_child(node).filter(|child| child.kind() == IDENTIFIER),
+            RESOURCE | RETURN => single_child(node).filter(|child| child.kind() == IDENTIFIER),
             ASSIGNMENT => node
                 .child_by_field_name(RIGHT_FIELD)
                 .filter(|right| right.kind() == IDENTIFIER),
@@ -215,7 +223,7 @@ fn escaped_names<'source>(nodes: &[Node<'_>], source: &'source [u8]) -> HashSet<
                 .filter(|object| object.kind() == IDENTIFIER),
             _ => None,
         };
-        escaped.extend(name.map(|name| text(name, source)));
+        escaped.extend(name.map(|name| (text(name, source), lambda)));
     }
     escaped
 }

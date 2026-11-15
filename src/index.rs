@@ -22,6 +22,7 @@ mod java_nullness;
 mod java_parameter_nullness;
 mod java_project;
 mod java_reference_unboxing;
+mod java_resource_owners;
 mod java_resources;
 mod java_rules;
 mod java_sequenced_types;

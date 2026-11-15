@@ -1590,8 +1590,15 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     sin resolver de una anónima anidada y de un overrider sin `throws` (sólo pesa con classpath
     incompleto); una interfaz del proyecto sin métodos no se reconoce en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
-  commons-lang 2 de 2 y guava 42 de 42, ninguno de más en los tres (2026-11-15). jenkins (primera
-  corrida): 607 de 750 con 108 de más, sobre todo `WebClient` y `LogRecorder` de los tests. Calca los `new`
+  commons-lang 2 de 2, guava 42 de 42 y jenkins 607 de 750, ninguno de más en los cuatro
+  (2026-11-15). En jenkins falta sobre todo el `JenkinsRule.WebClient` local que no se cierra, los
+  `listener.error(...)` (devuelven un `PrintWriter`) y los `ExecutorService` (con Java 21 se cierran).
+  Como `ResourceInspection.getParent`, las llamadas que devuelven el mismo tipo que lo creado (un
+  builder) llevan a la variable de la de más afuera: en un `try (...)` o en una local que escapa no
+  se marca, pero un `return` o un argumento al final de la cadena no lo salvan. Un receptor sólo
+  hace del recurso "creado de otro" si se cierra, no es de un tipo ignorado y no sale de un getter
+  (`isResourceCreation`), y vale también si es una variable o un campo (`logging.record(...)`). Una
+  local declarada en una lambda escapa por lo que pasa en esa lambda. Calca los `new`
   (clases del proyecto y anónimas) y descarta el recurso que recibe otro `AutoCloseable` como
   argumento o receptor. Como `ResourceInspection.EscapeVisitor`, una local escapa si en su bloque hay
   cualquier llamada con "close" o "cleanup" en el nombre (`isClosed()`, `onClose(...)`), fuera de
