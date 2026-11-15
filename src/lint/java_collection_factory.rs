@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::java::{IDENTIFIER, NAME_FIELD, TYPE_FIELD, text, unparenthesized};
+use super::java_collection_builders::built_elements;
 use super::java_sequenced_receivers::{receiver_type, simple_name};
 use super::{LintFinding, LintKind, finding};
 use crate::rules::JavaRule;
@@ -17,6 +18,9 @@ const STRING_LITERAL: &str = "string_literal";
 const BINARY: &str = "binary_expression";
 const UNARY: &str = "unary_expression";
 const OBJECT_FIELD: &str = "object";
+const FIELD_FIELD: &str = "field";
+const MAP_ENTRY_SIZE: usize = 2;
+const CONSTANT_SEPARATOR: char = '_';
 const ARGUMENTS_FIELD: &str = "arguments";
 const COMMENT_SUFFIX: &str = "comment";
 const COLLECTIONS: [&str; 2] = ["Collections", "java.util.Collections"];
@@ -111,12 +115,24 @@ fn arguments(call: Node<'_>) -> Vec<Node<'_>> {
 fn replacement(content: Node<'_>, kind: Kind, allows_copy_of: bool, source: &[u8]) -> Option<&'static str> {
     match content.kind() {
         INVOCATION if kind.factory != MAP => fixed_elements(content, kind, source),
+        IDENTIFIER => of_elements(
+            &built_elements(content, kind.created, kind.factory == MAP, source)?,
+            kind,
+            source,
+        ),
         OBJECT_CREATION => {
             let created = content.child_by_field_name(TYPE_FIELD)?;
             let anonymous = named_children(content)
                 .iter()
                 .any(|child| child.kind() == CLASS_BODY);
-            if anonymous || simple_name(text(created, source)) != kind.created {
+            if anonymous {
+                return of_elements(
+                    &built_elements(content, kind.created, kind.factory == MAP, source)?,
+                    kind,
+                    source,
+                );
+            }
+            if simple_name(text(created, source)) != kind.created {
                 return None;
             }
             let [copied] = arguments(content)[..] else {
@@ -146,24 +162,51 @@ fn fixed_elements(call: Node<'_>, kind: Kind, source: &[u8]) -> Option<&'static 
     if !is_as_list(call, source) || kind.factory == MAP {
         return None;
     }
-    let elements = arguments(call);
+    of_elements(&arguments(call), kind, source)
+}
+
+// `List.of` y compañía no aceptan null ni, en un `Set` o las claves de un `Map`, repetidos.
+fn of_elements(elements: &[Node<'_>], kind: Kind, source: &[u8]) -> Option<&'static str> {
     let all_present = elements.iter().all(|element| is_non_null(*element, source));
-    let mut constants: Vec<&str> = elements
+    let step = if kind.factory == MAP { MAP_ENTRY_SIZE } else { 1 };
+    let mut keys: Vec<&str> = elements
         .iter()
-        .filter(|element| CONSTANT_LITERALS.contains(&element.kind()))
+        .step_by(step)
+        .filter(|element| {
+            CONSTANT_LITERALS.contains(&element.kind()) || is_constant_reference(**element, source)
+        })
         .map(|element| text(*element, source))
         .collect();
-    let total = constants.len();
-    constants.sort_unstable();
-    constants.dedup();
-    let repeats = kind.factory != LIST && constants.len() != total;
+    let total = keys.len();
+    keys.sort_unstable();
+    keys.dedup();
+    let repeats = kind.factory != LIST && keys.len() != total;
     (all_present && !repeats).then_some("of")
+}
+
+// Una constante con nombre de constante (`KEY`, `Dia.LUNES`): un valor de enum o un campo static
+// final, que el flujo de IntelliJ da por no null.
+fn is_constant_reference(element: Node<'_>, source: &[u8]) -> bool {
+    let name = match element.kind() {
+        IDENTIFIER => element,
+        FIELD_ACCESS => match element.child_by_field_name(FIELD_FIELD) {
+            Some(field) => field,
+            None => return false,
+        },
+        _ => return false,
+    };
+    let written = text(name, source);
+    written.chars().any(|letter| letter.is_ascii_uppercase())
+        && written.chars().all(|letter| {
+            letter.is_ascii_uppercase() || letter.is_ascii_digit() || letter == CONSTANT_SEPARATOR
+        })
 }
 
 fn is_non_null(element: Node<'_>, source: &[u8]) -> bool {
     let element = unparenthesized(element);
     match element.kind() {
         kind if CONSTANT_LITERALS.contains(&kind) || kind == CLASS_LITERAL || kind == OBJECT_CREATION => true,
+        IDENTIFIER | FIELD_ACCESS => is_constant_reference(element, source),
         BINARY => descendants(element)
             .iter()
             .any(|part| part.kind() == STRING_LITERAL),

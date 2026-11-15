@@ -10,6 +10,7 @@ pub mod java_called_receivers;
 pub mod java_calls;
 mod java_chain_uses;
 pub mod java_chains;
+mod java_collection_builders;
 mod java_collection_factory;
 pub mod java_constants;
 mod java_constructor_throws;
@@ -87,6 +88,7 @@ pub mod java_static_imports;
 mod java_static_modifiers;
 mod java_style;
 mod java_switch;
+mod java_switch_assignment;
 pub mod java_taint;
 mod java_text;
 mod java_text_block;
@@ -327,6 +329,8 @@ pub fn finding_at(kind: LintKind, start: Point, subject: &str, fix: Option<Fix>)
     }
 }
 
+#[cfg(test)]
+mod java_api_fixture_tests;
 #[cfg(test)]
 mod java_collection_factory_tests;
 #[cfg(test)]

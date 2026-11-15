@@ -77,5 +77,5 @@ fn reports_a_counting_loop_that_only_appends_the_same_value() {
         .filter(|finding| finding.kind.rule() == RuleId::Java(JavaRule::StringRepeatCanBeUsed))
         .map(|finding| finding.line)
         .collect();
-    assert_eq!(found, [3, 6]);
+    assert_eq!(found, [3, 6, 10]);
 }

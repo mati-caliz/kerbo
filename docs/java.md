@@ -247,8 +247,9 @@ De las inspecciones de IntelliJ, kerbo hace:
 
 - `StringRepeatCanBeUsed` (`string-repeat-can-be-used`): desde Java 21,
   `builder.append(texto.repeat(n))` sobre un `StringBuilder` o `StringBuffer`; desde Java 11, un
-  `for` que cuenta con un `int` (`i < n`, `i++`) y en cada vuelta sólo agrega lo mismo al builder,
-  sin usar el contador ni llamar a nada. Coincide con Qodana en el corpus (3).
+  `for` que cuenta con un `int` (`i < n`, `<=` o `!=`, `i++`, o al revés bajando) y en cada vuelta
+  sólo agrega lo mismo al builder, sin usar el contador ni llamar a nada. Coincide con Qodana en el
+  corpus (3) y en el proyecto de prueba (6).
 
 - `PatternVariableCanBeUsed` (`pattern-variable-can-be-used`), desde Java 16: una variable local
   que se inicializa con un cast (`Foo foo = (Foo) valor;`) que un `valor instanceof Foo` anterior ya
@@ -259,16 +260,20 @@ De las inspecciones de IntelliJ, kerbo hace:
 
 - `EnhancedSwitchMigration` (`enhanced-switch-migration`), desde Java 14, en la forma que avisa por
   defecto: un switch viejo que devuelve o tira en todas sus ramas (de hasta dos sentencias), con
-  `default` o con un `return` o `throw` después, que se puede escribir como `return switch`. El que
-  asigna una variable en cada rama no está. Coincide con Qodana en el corpus (2).
+  `default` o con un `return` o `throw` después, que se puede escribir como `return switch`; o que
+  en cada rama asigna la misma variable local (o tira), con `default` o con la variable ya asignada
+  antes. Coincide con Qodana en el corpus (2) y en el proyecto de prueba
+  `scripts/parity/java/fixtures/api-nueva` (5 de 10 casos).
 
 - `Java9CollectionFactory` (`java9-collection-factory`): `Collections.unmodifiableList(new
   ArrayList<>(otra))` donde Java 10 tiene `List.copyOf(otra)` (igual con `Set` y `Map`), y
   `Collections.unmodifiableList(Arrays.asList(a, b))` donde alcanza `List.of(a, b)` si ningún
   elemento puede ser null. Un `ArrayList` copiado sólo compila con una colección o un int, así que
   basta con que lo copiado no sea un número; en un `Map`, el origen tiene que ser `Map`,
-  `AbstractMap` o `HashMap`. Las formas que arman la colección con `add` en una variable no están.
-  Coincide con Qodana en el corpus (19).
+  `AbstractMap` o `HashMap`. También la colección armada a mano: una variable local creada vacía (o
+  con capacidad) seguida sólo de `add` o `put` hasta el `unmodifiable...`, sin otros usos, y la
+  doble llave; los valores de enum y las constantes cuentan como no null. Coincide con Qodana en el
+  corpus (19) y en el proyecto de prueba (7 de 11 casos).
 
 - `ReadWriteStringCanBeUsed` (`read-write-string`): `new String(Files.readAllBytes(ruta), juego)`
   donde Java 11 tiene `Files.readString`, y `Files.write(ruta, texto.getBytes(juego))` donde Java 12

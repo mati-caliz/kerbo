@@ -1827,43 +1827,6 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   - Ver si conviene usar `tsrs_lint` para las reglas con tipos, en vez de portarlas, midiendo
     paridad contra typescript-eslint igual que las demás.
 
-### 15. Java: paridad con PMD y Qodana, y la API nueva
-
-Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_checks.xml`. Contra
-Checkstyle 14.4 coinciden commons-lang, junit4 y Jenkins en todo `sun_checks.xml`, guava, sin
-`android/`, en 67.550 de 67.552, y Maven salvo los errores del parser de Javadoc. Contra PMD 7.29 (con `[java] reference`, en `docs/java.md`)
-coinciden `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal` en los tres, y
-`UnnecessaryImport` salvo los que necesitan resolver tipos (2 en junit4, 11 en guava), que esperan
-las firmas de la etapa 9. Qodana está en el arnés (`scripts/parity/java/qodana_rules.py`), y
-`scripts/parity/java/measure_all.sh` mide todo el corpus Java de una vez.
-
-- El corpus suma Jenkins (`release` 21, Maven) para medir la API nueva. El `release` es por módulo,
-  como en IntelliJ (`war/` compila con 11). Jenkins destapó `FallThrough` y `SimplifyBooleanReturn`
-  de `sun_checks.xml` (ahora reglas), `HiddenField` con los componentes de un record, `LeftCurly`
-  con un miembro en la línea de la llave de una clase y `OperatorWrap` con `&& (`: quedó igual a
-  Checkstyle (42.410).
-- La API nueva, igual a Qodana en el corpus: bloques de texto (`text-block-migration`),
-  `Math.clamp` (`math-clamp-migration`), `StringBuilder.repeat` (`string-repeat-can-be-used`) y
-  `getFirst()`/`getLast()` (`sequenced-collection-method`, 10, con los tipos de las dependencias
-  resueltos en el índice). `DefaultAnnotationParam` lee el valor por defecto de las anotaciones de
-  las dependencias (`AnnotationDefault` del `.class`): Jenkins 10 de 10.
-- El corpus suma Maven (Java 17, con `<javaVersion>`) para las migraciones que Jenkins ya hizo:
-  `PatternVariableCanBeUsed` (5), `EnhancedSwitchMigration` en la forma de `return switch` (2),
-  `Java9CollectionFactory` (19), `ReadWriteStringCanBeUsed` (5) y el bucle de
-  `StringRepeatCanBeUsed` (1), iguales a Qodana. Contra Checkstyle, Maven destapó `ParenPad` (ahora
-  regla), `@TempDir` (que Checkstyle 14 ya no deja pasar en `VisibilityModifier`) y la clase local
-  de un método de interfaz en `DesignForExtension`. `kerbo.sh` fija la referencia: Maven usa
-  `maven-pmd-plugin` y kerbo lo medía contra PMD.
-- Las inspecciones de flujo (`DataFlowIssue`, `AutoCloseableResource`, `RedundantThrows`) no se
-  midieron contra Qodana en Jenkins ni en Maven: kerbo da 708 `auto-closeable-resource` en Jenkins,
-  casi todos por el `WebClient` de htmlunit en los tests.
-- Sin hacer: la forma de `EnhancedSwitchMigration` que asigna una variable en cada rama y las de
-  `Java9CollectionFactory` que arman la colección con `add`. `SizeReplaceableByIsEmpty` sobre una
-  cadena de llamadas (`a.getB().size() > 0`) pide los tipos de retorno (1 en Maven).
-- Contra Checkstyle quedan los errores del parser de Javadoc de Checkstyle, que avisa con el nombre
-  de la regla: 2 `javadoc-type` en guava (`<N, E>` en un comentario) y 4 `javadoc-method` en Maven
-  (`<p/>`); imitarlos pide calcar su gramática ANTLR.
-
 ### 13. Formateo propio (empezada: Go medido contra gofmt)
 
 - Lenguaje por lenguaje, y sólo cuando la salida sea idéntica a la de la herramienta actual.

@@ -32,8 +32,9 @@ const INT: &str = "int";
 const APPEND: &str = "append";
 const INCREMENTS: [&str; 2] = ["++", "+="];
 const DECREMENTS: [&str; 2] = ["--", "-="];
-const LESS: &str = "<";
-const GREATER: &str = ">";
+// `CountingLoop` de IntelliJ: el contador va hacia el límite con `<`, `<=` o `!=` (o al revés si baja).
+const UPWARD_BOUNDS: [&str; 3] = ["<", "<=", "!="];
+const DOWNWARD_BOUNDS: [&str; 3] = [">", ">=", "!="];
 const ONE: &str = "1";
 const EFFECTS: [&str; 4] = [INVOCATION, ASSIGNMENT, UPDATE, OBJECT_CREATION];
 
@@ -127,9 +128,15 @@ fn counts_up_or_down(loop_statement: Node<'_>, counter: &str, source: &[u8]) -> 
             .child_by_field_name(field)
             .is_some_and(|side| side.kind() == IDENTIFIER && text(side, source) == counter)
     };
-    let below = if ascending { LESS } else { GREATER };
-    let above = if ascending { GREATER } else { LESS };
-    is_counter(LEFT_FIELD) && operator == below || is_counter(RIGHT_FIELD) && operator == above
+    let (counter_side, toward) = if is_counter(LEFT_FIELD) {
+        (true, ascending)
+    } else if is_counter(RIGHT_FIELD) {
+        (true, !ascending)
+    } else {
+        (false, ascending)
+    };
+    let allowed = if toward { &UPWARD_BOUNDS } else { &DOWNWARD_BOUNDS };
+    counter_side && allowed.contains(&operator)
 }
 
 fn direction(loop_statement: Node<'_>, counter: &str, source: &[u8]) -> Option<bool> {

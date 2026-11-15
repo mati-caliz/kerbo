@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::java::text;
 use super::java_switch::yields_value;
+use super::java_switch_assignment::assigns_in_every_branch;
 use super::{LintFinding, LintKind, finding};
 use crate::rules::JavaRule;
 use crate::syntax::{descendants, named_children};
@@ -34,7 +35,9 @@ pub fn reported(nodes: &[Node<'_>], source: &[u8], release: Option<u32>) -> Vec<
     nodes
         .iter()
         .filter(|node| node.kind() == SWITCH && !yields_value(**node))
-        .filter(|switch| returns_in_every_branch(**switch, source))
+        .filter(|switch| {
+            returns_in_every_branch(**switch, source) || assigns_in_every_branch(**switch, source)
+        })
         .filter_map(|switch| {
             let keyword = switch
                 .child(0)
@@ -108,7 +111,7 @@ fn returns_in_every_branch(switch: Node<'_>, source: &[u8]) -> bool {
 
 // Las sentencias de una rama, hasta un `break` del propio switch (lo que sigue no se ejecuta); si la
 // rama es un único bloque, las de adentro.
-fn branch_statements(group: Node<'_>) -> Vec<Node<'_>> {
+pub(super) fn branch_statements(group: Node<'_>) -> Vec<Node<'_>> {
     let mut statements: Vec<Node<'_>> = named_children(group)
         .into_iter()
         .filter(|child| child.kind() != LABEL && !child.kind().ends_with(COMMENT_SUFFIX))
@@ -125,7 +128,7 @@ fn branch_statements(group: Node<'_>) -> Vec<Node<'_>> {
     statements
 }
 
-fn has_default(group: Node<'_>, source: &[u8]) -> bool {
+pub(super) fn has_default(group: Node<'_>, source: &[u8]) -> bool {
     named_children(group)
         .into_iter()
         .filter(|child| child.kind() == LABEL)
