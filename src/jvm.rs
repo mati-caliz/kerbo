@@ -13,4 +13,6 @@ pub mod release;
 pub mod zip;
 
 #[cfg(test)]
+mod jimage_tests;
+#[cfg(test)]
 mod tests;
