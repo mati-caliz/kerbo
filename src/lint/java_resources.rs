@@ -5,6 +5,7 @@ use tree_sitter::Node;
 use super::java::{NAME_FIELD, text};
 use super::java_chains::{Chain, origin_chain};
 use super::java_receivers::Variables;
+use super::java_resource_escapes::{closed_in_block, discarded_by_assert_throws};
 use crate::syntax::{descendants, named_children, one_based};
 
 const INVOCATION: &str = "method_invocation";
@@ -57,10 +58,14 @@ pub fn resource_candidates(body: Node<'_>, source: &[u8], variables: &Variables)
     let mut candidates = Vec::new();
     for &node in &nodes {
         match node.kind() {
-            LOCAL => candidates.extend(
+            LOCAL if !closed_in_block(node, source) => candidates.extend(
                 kept_initializers(node, source, &escaped)
                     .into_iter()
                     .filter_map(|value| candidate(value, source, variables)),
+            ),
+            LAMBDA => candidates.extend(
+                discarded_by_assert_throws(node, source)
+                    .and_then(|created| candidate(created, source, variables)),
             ),
             INVOCATION if !is_close(node, source) => {
                 if let Some(created) = node.child_by_field_name(OBJECT_FIELD) {

@@ -59,6 +59,7 @@ mod java_padding;
 mod java_pmd_suppressions;
 pub mod java_receiver_arguments;
 pub mod java_receivers;
+mod java_resource_escapes;
 pub mod java_resources;
 mod java_results;
 pub mod java_returns;

@@ -79,6 +79,8 @@ mod java_nullable_field_tests;
 #[cfg(test)]
 mod java_nullable_return_tests;
 #[cfg(test)]
+mod java_resource_tests;
+#[cfg(test)]
 mod java_sequenced_types_tests;
 #[cfg(test)]
 mod java_throw_abstract_tests;

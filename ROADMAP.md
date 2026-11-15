@@ -1589,8 +1589,15 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     sin resolver de una anónima anidada y de un overrider sin `throws` (sólo pesa con classpath
     incompleto); una interfaz del proyecto sin métodos no se reconoce en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
-  commons-lang 2 de 2, ninguno de más; guava 35 de 42 con 7 de más (primera corrida, 2026-11-15). Calca los `new` (clases del proyecto y anónimas) y descarta
-  el recurso que recibe otro `AutoCloseable` como argumento o receptor. Pendiente: medir spring-boot.
+  commons-lang 2 de 2 y guava 42 de 42, ninguno de más en los tres (2026-11-15). Calca los `new`
+  (clases del proyecto y anónimas) y descarta el recurso que recibe otro `AutoCloseable` como
+  argumento o receptor. Como `ResourceInspection.EscapeVisitor`, una local escapa si en su bloque hay
+  cualquier llamada con "close" o "cleanup" en el nombre (`isClosed()`, `onClose(...)`), fuera de
+  lambdas y anónimas; los métodos que IntelliJ ignora (`Writer.append`, `Formatter.format`,
+  `printf`, `checkNotNull`) no crean recursos; `BaseStream` devuelve su propio tipo
+  (`stream.parallel()` sigue siendo un `Stream` ignorado); una llamada por `import static` y una que
+  devuelve una clase del proyecto que se cierra crean recursos; y la lambda de `assertThrows` que sólo
+  crea uno lo pierde. Pendiente: medir spring-boot.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
   de más en los dos. En guava, 842 de los 972 (485 `data-flow-issue`, 308 `null-argument`, 25

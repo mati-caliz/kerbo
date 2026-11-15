@@ -12,6 +12,16 @@ use crate::rules::JavaRule;
 const QUALIFIER_SEPARATOR: char = '.';
 const AUTO_CLOSEABLE: &str = "java.lang.AutoCloseable";
 const TRY_WITH_RESOURCES_RELEASE: u32 = 7;
+const BASE_STREAM: &str = "java.util.stream.BaseStream";
+const IGNORED_METHODS: &[(&str, &str)] = &[
+    ("java.util.Formatter", "format"),
+    ("java.io.Writer", "append"),
+    ("com.google.common.base.Preconditions", "checkNotNull"),
+    ("org.hibernate.Session", "close"),
+    ("java.io.PrintWriter", "printf"),
+    ("java.io.PrintStream", "printf"),
+    ("java.lang.foreign.Arena", "ofAuto"),
+];
 
 // Dónde se sabe qué tipo tiene un paso de la cadena: en el proyecto (por nombre simple), en los
 // jars, o en el JDK (que no viene en el classpath).
@@ -67,9 +77,18 @@ fn unclosed_class(
 ) -> Option<String> {
     match origin {
         ResourceOrigin::Call(chain) => {
-            let created = created_class(types, library, summary, chain)?;
-            (is_resource(library, &created) || holds_a_file(types, library, summary, chain))
-                .then_some(created)
+            if is_ignored_call(types, library, summary, chain) {
+                return None;
+            }
+            match created_place(types, library, summary, chain)? {
+                Place::Library(created) => (is_resource(library, &created)
+                    || holds_a_file(types, library, summary, chain))
+                .then_some(created),
+                Place::Project(created) => {
+                    is_project_resource(library, &library_ancestors(types, library, &created))
+                        .then_some(created)
+                }
+            }
         }
         ResourceOrigin::Construction(class) => match resolve(types, library, summary, class) {
             Resolved::Library(created) => is_resource(library, &created).then_some(created),
@@ -89,9 +108,14 @@ fn is_closeable(
     owner: &ResourceOrigin,
 ) -> bool {
     let inherited = match owner {
-        ResourceOrigin::Call(chain) => created_class(types, library, summary, chain)
-            .map(|created| ancestors(library, &created))
-            .unwrap_or_default(),
+        ResourceOrigin::Call(chain) => match created_place(types, library, summary, chain) {
+            Some(Place::Library(created)) => ancestors(library, &created),
+            Some(Place::Project(created)) => library_ancestors(types, library, &created)
+                .iter()
+                .flat_map(|ancestor| ancestors(library, ancestor))
+                .collect(),
+            None => Vec::new(),
+        },
         ResourceOrigin::Construction(class) => match resolve(types, library, summary, class) {
             Resolved::Library(created) => ancestors(library, &created),
             Resolved::Project(created) => library_ancestors(types, library, &created)
@@ -118,45 +142,108 @@ fn is_project_resource(library: &Library, inherited: &[String]) -> bool {
         })
 }
 
-// La clase que devuelve el último paso de la cadena, siguiendo cada paso por el proyecto, los jars
-// o la tabla del JDK.
-fn created_class(
+// Lo que devuelve el último paso de la cadena, siguiendo cada paso por el proyecto, los jars o la
+// tabla del JDK. Una llamada sin receptor que la clase no declara puede venir de un `import static`.
+fn created_place(
     types: &ProjectTypes<'_>,
     library: &Library,
     summary: &JavaSummary,
     chain: &Chain,
-) -> Option<String> {
+) -> Option<Place> {
     let (ChainRoot::Instance(root) | ChainRoot::Class(root)) = &chain.root;
-    let mut place = match resolve(types, library, summary, root) {
+    let mut place = place_of(resolve(types, library, summary, root));
+    for (index, step) in chain.steps.iter().enumerate() {
+        let next = next_place(types, library, place, step).or_else(|| {
+            let imported = (index == 0)
+                .then(|| imported_owner(types, library, summary, &step.name))
+                .flatten()?;
+            next_place(types, library, Place::Project(imported), step)
+        });
+        place = next?;
+    }
+    Some(place)
+}
+
+fn next_place(types: &ProjectTypes<'_>, library: &Library, place: Place, step: &ChainStep) -> Option<Place> {
+    match place {
+        Place::Project(owner) => declared_return(types, library, &owner, step).or_else(|| {
+            inherited_return(
+                library,
+                &library_ancestors(types, library, &owner),
+                &step.name,
+                step.arity,
+            )
+            .map(Place::Library)
+        }),
+        Place::Library(class) => {
+            let returned = if library.has_class(&class) {
+                inherited_return(library, std::slice::from_ref(&class), &step.name, step.arity)?
+            } else {
+                returned_by(&class, &step.name)?.to_owned()
+            };
+            Some(Place::Library(if returned == BASE_STREAM {
+                class
+            } else {
+                returned
+            }))
+        }
+    }
+}
+
+fn place_of(resolved: Resolved) -> Place {
+    match resolved {
         Resolved::Project(name) => Place::Project(name),
         Resolved::Library(name) => Place::Library(name),
-    };
-    for step in &chain.steps {
-        place = match place {
-            Place::Project(owner) => {
-                if let Some(next) = declared_return(types, library, &owner, step) {
-                    next
-                } else {
-                    Place::Library(inherited_return(
-                        library,
-                        &library_ancestors(types, library, &owner),
-                        &step.name,
-                        step.arity,
-                    )?)
-                }
-            }
-            Place::Library(class) => {
-                if library.has_class(&class) {
-                    Place::Library(inherited_return(library, &[class], &step.name, step.arity)?)
-                } else {
-                    Place::Library(returned_by(&class, &step.name)?.to_owned())
-                }
-            }
-        };
     }
-    match place {
-        Place::Library(class) => Some(class),
-        Place::Project(_) => None,
+}
+
+// Los métodos que IntelliJ no cuenta como creación de un recurso (`MethodMatcher` por defecto):
+// devuelven el mismo objeto que reciben (`writer.append(...)`) o lo chequean.
+fn is_ignored_call(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    chain: &Chain,
+) -> bool {
+    let Some((last, before)) = chain.steps.split_last() else {
+        return false;
+    };
+    let receiver = Chain {
+        steps: before.to_vec(),
+        ..chain.clone()
+    };
+    let Some(place) = created_place(types, library, summary, &receiver) else {
+        return false;
+    };
+    let lineage = match place {
+        Place::Library(class) => ancestors(library, &class),
+        Place::Project(class) => library_ancestors(types, library, &class)
+            .iter()
+            .flat_map(|ancestor| ancestors(library, ancestor))
+            .chain(std::iter::once(class))
+            .collect(),
+    };
+    IGNORED_METHODS.iter().any(|(owner, method)| {
+        *method == last.name
+            && lineage.iter().any(|class| {
+                class == owner || owner.rsplit(QUALIFIER_SEPARATOR).next() == Some(class.as_str())
+            })
+    })
+}
+
+fn imported_owner(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    method: &str,
+) -> Option<String> {
+    let owner = summary.static_imports.iter().find_map(|path| {
+        let (owner, member) = path.rsplit_once(QUALIFIER_SEPARATOR)?;
+        (member == method).then_some(owner)
+    })?;
+    match resolve(types, library, summary, owner) {
+        Resolved::Project(name) => Some(name),
+        Resolved::Library(_) => None,
     }
 }
 
