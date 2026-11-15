@@ -110,3 +110,13 @@ pub(super) fn text_arguments(invocation: Node<'_>, source: &[u8]) -> Vec<String>
         .map(|literal| text(literal, source).trim_matches(QUOTE).to_owned())
         .collect()
 }
+
+pub(super) fn argument_count(invocation: Node<'_>) -> usize {
+    invocation
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .iter()
+        .filter(|argument| !COMMENTS.contains(&argument.kind()))
+        .count()
+}

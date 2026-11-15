@@ -4,7 +4,9 @@ use super::null_codec::{read_constraint, write_constraint};
 use super::summary_codec::{
     read_flag, read_position, read_visibility, write_flag, write_position, write_visibility,
 };
-use crate::index::java::{Declaration, Dereferenced, NullInference, Parameter, ParameterNullness, Reading};
+use crate::index::java::{
+    Declaration, Dereferenced, NullInference, Parameter, ParameterNullness, Purity, Reading,
+};
 use crate::lint::java_calls::{Arity, Body, ReturnType, Returns};
 use crate::lint::java_nullable_fields::ReturnNullness;
 use crate::lint::java_owner::{NullMarking, Owner, OwnerKind};
@@ -97,6 +99,7 @@ pub(super) fn write_declaration(writer: &mut Writer, declaration: &Declaration) 
     writer.list(declaration.returned_field.as_slice(), |writer, field| {
         writer.text(field);
     });
+    write_flag(writer, declaration.purity == Purity::Pure);
 }
 
 pub(super) fn write_owner(writer: &mut Writer, owner: &Owner) {
@@ -205,6 +208,11 @@ pub(super) fn read_declaration(reader: &mut Reader<'_>) -> Result<Declaration, C
         owner: read_owner(reader)?,
         fail_clauses: reader.list(|reader| reader.list(read_constraint))?,
         returned_field: reader.list(Reader::text)?.into_iter().next(),
+        purity: if read_flag(reader)? {
+            Purity::Pure
+        } else {
+            Purity::Impure
+        },
     })
 }
 

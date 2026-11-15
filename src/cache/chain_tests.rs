@@ -23,6 +23,7 @@ fn sample_flow() -> NullFlow {
                 text_arguments: vec!["java.version".to_owned()],
                 argument_types: vec![Some("String".to_owned()), None],
                 passed_before: Vec::new(),
+                dereferenced: true,
             }],
             dereferenced_at: Some((12, 16)),
             passed_as: None,

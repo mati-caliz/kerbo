@@ -33,7 +33,8 @@ use crate::lint::java_owner::Owner;
 use crate::lint::java_pmd_suppressions::{SuppressedSpan, suppressed_spans};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
-use crate::lint::java_returns::returned_field;
+pub use crate::lint::java_returns::Purity;
+use crate::lint::java_returns::{purity_of, returned_field};
 use crate::lint::java_sequenced_collection::SequencedCandidate;
 use crate::lint::java_size_is_empty::{SizeCandidate, array_methods, chained_candidates};
 use crate::lint::java_throws::MethodThrows;
@@ -118,6 +119,7 @@ pub struct Declaration {
     pub fail_clauses: Vec<Clause>,
     pub return_nullness: ReturnNullness,
     pub returned_field: Option<String>,
+    pub purity: Purity,
 }
 
 // Un campo tal como lo necesita el índice para saber si alguien lo usa.
@@ -269,6 +271,16 @@ fn read_names(callable: &Callable<'_>, source: &[u8]) -> HashSet<String> {
         .collect()
 }
 
+fn inference_of(method: Option<Node<'_>>, source: &[u8]) -> NullInference {
+    if method.is_none_or(is_overridable) {
+        NullInference::Overridable
+    } else if method.is_some_and(|declaration| returns_null(declaration, source)) {
+        NullInference::ClosedReturnsNull
+    } else {
+        NullInference::Closed
+    }
+}
+
 fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declaration {
     let read = read_names(&callable, source);
     let record = callable
@@ -283,13 +295,7 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
     let used_first: HashSet<String> = body
         .map(|body| dereferenced_first(body, source))
         .unwrap_or_default();
-    let inference = if method.is_none_or(is_overridable) {
-        NullInference::Overridable
-    } else if method.is_some_and(|declaration| returns_null(declaration, source)) {
-        NullInference::ClosedReturnsNull
-    } else {
-        NullInference::Closed
-    };
+    let inference = inference_of(method, source);
     let fail_clauses = match method {
         Some(declaration) if inference != NullInference::Overridable && callable.body == Body::Written => {
             let not_null: Vec<bool> = callable
@@ -308,6 +314,7 @@ fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declara
         fail_clauses,
         return_nullness: return_nullness(method, source),
         returned_field: method.and_then(|declaration| returned_field(declaration, source)),
+        purity: purity_of(method),
         name: callable.name,
         scope: scope.to_owned(),
         position: position_of(callable.name_node),

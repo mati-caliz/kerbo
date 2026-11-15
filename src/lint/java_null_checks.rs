@@ -88,6 +88,14 @@ pub(super) fn is_getter_name(name: &str) -> bool {
 }
 
 // `T local = receptor.getX();`, con una llamada sin argumentos: la local y el texto de la llamada.
+// Una llamada sin argumentos que IntelliJ recuerda: un getter por el nombre.
+pub(super) fn is_stable_getter(call: Node<'_>, source: &[u8]) -> bool {
+    is_stable_call(call)
+        && call
+            .child_by_field_name(NAME_FIELD)
+            .is_some_and(|name| is_getter_name(text(name, source)))
+}
+
 pub(super) fn getter_local(node: Node<'_>, source: &[u8]) -> Option<(String, String)> {
     let value = node.child_by_field_name(VALUE_FIELD).filter(|value| {
         node.kind() == VARIABLE_DECLARATOR

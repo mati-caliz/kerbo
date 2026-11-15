@@ -4,11 +4,14 @@ use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_called_receivers::receiver_facts;
+pub(super) use super::java_chain_uses::argument_count;
 use super::java_chain_uses::{
     class_arguments, field_read_at, guarded_by_non_empty, nullable_root_arguments, text_arguments, thrown_at,
 };
 use super::java_exact_roots::{ExactRoot, exact_root};
-use super::java_null_checks::{checked_expression, dereferenced_local, getter_local, is_stable_call};
+use super::java_null_checks::{
+    checked_expression, dereferenced_local, getter_local, is_stable_call, is_stable_getter,
+};
 use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
 use super::java_null_origin::{ArgumentShape, NullOrigin, NullReturn};
 use super::java_null_returns::returned_by_method;
@@ -54,6 +57,7 @@ pub struct ChainStep {
     pub text_arguments: Vec<String>,
     pub argument_types: Vec<Option<String>>,
     pub passed_before: Vec<NullArgument>,
+    pub dereferenced: bool,
 }
 
 // `respuesta.getBody().error()`: la raíz y los pasos en orden. Interesan las de al menos dos pasos,
@@ -88,6 +92,7 @@ pub struct NullFacts {
     passed: HashMap<String, Vec<(usize, NullArgument)>>,
     seen: HashSet<usize>,
     getter_locals: HashMap<String, String>,
+    dereferenced: HashSet<String>,
 }
 
 impl NullFacts {
@@ -96,6 +101,7 @@ impl NullFacts {
         self.checked.clear();
         self.passed.clear();
         self.getter_locals.clear();
+        self.dereferenced.clear();
     }
 
     // Se llama en orden de recorrido: un chequeo cuenta para lo que viene después.
@@ -157,8 +163,10 @@ impl NullFacts {
         while let Some(object) = current.child_by_field_name(OBJECT_FIELD)
             && object.kind() == INVOCATION
         {
-            if is_stable_call(object) {
+            if is_stable_getter(object, source) {
                 self.checked.insert(compact(text(object, source)));
+            } else if is_stable_call(object) {
+                self.dereferenced.insert(compact(text(object, source)));
             }
             current = object;
         }
@@ -175,8 +183,15 @@ impl NullFacts {
         let name = text(variable, source);
         self.getter_locals.remove(name);
         let member_prefix = format!("{name}{QUALIFIER_SEPARATOR}");
-        self.checked
-            .retain(|known| known != name && !known.starts_with(&member_prefix));
+        let unrelated = |known: &String| known != name && !known.starts_with(&member_prefix);
+        self.checked.retain(unrelated);
+        self.dereferenced.retain(unrelated);
+    }
+
+    // Una llamada sin argumentos que no es un getter, ya desreferenciada: el índice decide si el método
+    // es puro (entonces IntelliJ también la recuerda: `domain.publicSuffix()`).
+    fn was_dereferenced(&self, expression: Node<'_>, source: &[u8]) -> bool {
+        self.dereferenced.contains(&compact(text(expression, source)))
     }
 
     fn is_checked(&self, expression: Node<'_>, source: &[u8]) -> bool {
@@ -224,7 +239,7 @@ pub fn chain_of(
     let (root, steps, enclosing) = walk(invocation, source, variables, facts)?;
     facts.remember_dereferenced(invocation, source);
     let field_read = field_read_at(invocation);
-    if field_read.is_some() && is_stable_call(invocation) {
+    if field_read.is_some() && is_stable_getter(invocation, source) {
         facts.checked.insert(compact(text(invocation, source)));
     }
     let dereferenced_at = unboxed_at(invocation, source)
@@ -285,6 +300,7 @@ fn walk(
             text_arguments: text_arguments(current, source),
             argument_types: argument_types(current, source, variables),
             passed_before: facts.passed_before(current, source),
+            dereferenced: facts.was_dereferenced(current, source),
         });
         let Some(object) = current.child_by_field_name(OBJECT_FIELD) else {
             steps.reverse();
@@ -377,14 +393,4 @@ fn is_charset_factory(invocation: Node<'_>, source: &[u8]) -> bool {
         && invocation
             .child_by_field_name(OBJECT_FIELD)
             .is_some_and(|object| text(object, source) == CHARSET_TYPE)
-}
-
-pub(super) fn argument_count(invocation: Node<'_>) -> usize {
-    invocation
-        .child_by_field_name(ARGUMENTS_FIELD)
-        .map(named_children)
-        .unwrap_or_default()
-        .iter()
-        .filter(|argument| !COMMENTS.contains(&argument.kind()))
-        .count()
 }

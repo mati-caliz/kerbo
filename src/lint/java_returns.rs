@@ -2,11 +2,19 @@ use tree_sitter::Node;
 
 use super::java::text;
 use super::java_constants::literal_value;
-use crate::syntax::named_children;
+use crate::syntax::{descendants, named_children};
 
 const BODY_FIELD: &str = "body";
 const TYPE_FIELD: &str = "type";
 const VOID: &str = "void_type";
+const PURE_INVOCATION: &str = "method_invocation";
+const IMPURE_KINDS: &[&str] = &[
+    "object_creation_expression",
+    "assignment_expression",
+    "update_expression",
+    "lambda_expression",
+    "array_creation_expression",
+];
 const RETURN: &str = "return_statement";
 const RETURN_BOUNDARIES: &[&str] = &["lambda_expression", "class_body"];
 const PRIMITIVE_TYPES: &[&str] = &["integral_type", "floating_point_type", "boolean_type"];
@@ -107,4 +115,34 @@ pub fn returned_field(declaration: Node<'_>, source: &[u8]) -> Option<String> {
         _ => return None,
     };
     Some(text(field, source).to_owned())
+}
+
+// Si IntelliJ infiere puro el método (aproximado por el cuerpo): su resultado se recuerda como el de
+// un getter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Purity {
+    Pure,
+    Impure,
+}
+
+pub fn purity_of(method: Option<Node<'_>>) -> Purity {
+    if method.is_some_and(has_pure_body) {
+        Purity::Pure
+    } else {
+        Purity::Impure
+    }
+}
+
+// Un cuerpo puro, aproximado: sólo llama métodos propios (sin receptor o sobre `this`), no crea
+// objetos ni asigna.
+fn has_pure_body(declaration: Node<'_>) -> bool {
+    let Some(body) = declaration.child_by_field_name(BODY_FIELD) else {
+        return false;
+    };
+    descendants(body).into_iter().all(|node| match node.kind() {
+        PURE_INVOCATION => node
+            .child_by_field_name(OBJECT_FIELD)
+            .is_none_or(|object| object.kind() == THIS),
+        kind => !IMPURE_KINDS.contains(&kind),
+    })
 }

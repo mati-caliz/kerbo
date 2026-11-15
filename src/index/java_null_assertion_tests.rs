@@ -243,3 +243,49 @@ fn only_known_nullness_annotations_count() {
         ["14:41 value()"]
     );
 }
+
+const REMEMBERED_CALLS: &str = r"package app;
+
+final class Registry {
+    static Registry instance;
+
+    static Registry find() {
+        return instance;
+    }
+
+    Registry lookup() {
+        return null;
+    }
+}
+
+final class Agent {
+    Registry registry;
+
+    Registry toRegistry() {
+        Registry found = Registry.find();
+        return found == null ? null : found.lookup();
+    }
+
+    Registry suffix() {
+        return registry == null ? null : registry;
+    }
+
+    static void uses(Agent agent) {
+        agent.toRegistry().lookup();
+        agent.toRegistry().lookup();
+        agent.suffix().lookup();
+        agent.suffix().lookup();
+    }
+}
+";
+
+// Una llamada sin argumentos ya desreferenciada se recuerda si el método es puro (sólo llama métodos
+// propios, no crea ni asigna: `domain.publicSuffix()` en guava); una impura se vuelve a marcar
+// (`slave.toComputer()` en jenkins).
+#[test]
+fn only_pure_calls_are_remembered_after_a_dereference() {
+    assert_eq!(
+        findings_in(REMEMBERED_CALLS, "data-flow-issue"),
+        ["28:28 lookup()", "29:28 lookup()", "30:24 lookup()"]
+    );
+}

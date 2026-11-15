@@ -44,6 +44,7 @@ pub(super) fn keeps_its_type(
             text_arguments: Vec::new(),
             argument_types: Vec::new(),
             passed_before: Vec::new(),
+            dereferenced: false,
         });
         created_place(types, library, summary, &extended).is_some_and(|place| place == created)
     })

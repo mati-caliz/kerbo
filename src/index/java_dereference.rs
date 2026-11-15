@@ -1,4 +1,4 @@
-use super::java::{Declaration, JavaSummary, NullInference, Position, lint_at};
+use super::java::{Declaration, JavaSummary, NullInference, Position, Purity, lint_at};
 use super::java_exact_classes::exact_class;
 use super::java_forwarded_returns::forwards_null;
 use super::java_jdk::{is_always_defined, jdk_method};
@@ -288,12 +288,17 @@ fn project_step(
     step: &ChainStep,
 ) -> Option<(bool, Option<Resolved>)> {
     let candidates = project_candidates(types, library, owner, step)?;
-    let is_nullable = candidates.iter().all(|(_, declaration)| {
-        declaration.return_nullness == ReturnNullness::Nullable
-            || (declaration.inference == NullInference::ClosedReturnsNull
-                && declaration.body == Body::Written)
-            || returns_nullable_field(types, library, declaration)
-    });
+    let remembered = step.dereferenced
+        && candidates
+            .iter()
+            .all(|(_, declaration)| declaration.purity == Purity::Pure);
+    let is_nullable = !remembered
+        && candidates.iter().all(|(_, declaration)| {
+            declaration.return_nullness == ReturnNullness::Nullable
+                || (declaration.inference == NullInference::ClosedReturnsNull
+                    && declaration.body == Body::Written)
+                || returns_nullable_field(types, library, declaration)
+        });
     let mut returned = candidates.iter().map(|(declaring, declaration)| {
         (declaration.return_type == ReturnType::Reference)
             .then(|| resolve(types, library, declaring, &declaration.returned))
