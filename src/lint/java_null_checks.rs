@@ -17,6 +17,11 @@ const COMMENTS: &[&str] = &["line_comment", "block_comment"];
 const ARGUMENTS_FIELD: &str = "arguments";
 const INVOCATION: &str = "method_invocation";
 const OBJECT_FIELD: &str = "object";
+const VALUE_FIELD: &str = "value";
+const VARIABLE_DECLARATOR: &str = "variable_declarator";
+const FIELD_ACCESS: &str = "field_access";
+const IDENTIFIER: &str = "identifier";
+const GETTER_PREFIXES: &[&str] = &["get", "is"];
 
 // Una llamada sin argumentos sobre una cadena que tampoco los tiene: con argumentos en el medio,
 // cada vez puede ser otro objeto.
@@ -71,4 +76,37 @@ fn first_argument(invocation: Node<'_>) -> Option<Node<'_>> {
         .unwrap_or_default()
         .into_iter()
         .find(|argument| !COMMENTS.contains(&argument.kind()))
+}
+
+// IntelliJ recuerda el valor de un getter (`getX()`, `isX()`), no el de cualquier llamada sin
+// argumentos: `slave.toComputer()` se vuelve a marcar aunque antes se haya desreferenciado.
+pub(super) fn is_getter_name(name: &str) -> bool {
+    GETTER_PREFIXES.iter().any(|prefix| {
+        name.strip_prefix(prefix)
+            .is_some_and(|rest| rest.starts_with(|first: char| first.is_ascii_uppercase()))
+    })
+}
+
+// `T local = receptor.getX();`, con una llamada sin argumentos: la local y el texto de la llamada.
+pub(super) fn getter_local(node: Node<'_>, source: &[u8]) -> Option<(String, String)> {
+    let value = node.child_by_field_name(VALUE_FIELD).filter(|value| {
+        node.kind() == VARIABLE_DECLARATOR
+            && value.kind() == INVOCATION
+            && is_stable_call(*value)
+            && value
+                .child_by_field_name(NAME_FIELD)
+                .is_some_and(|name| is_getter_name(text(name, source)))
+    })?;
+    let name = node.child_by_field_name(NAME_FIELD)?;
+    Some((text(name, source).to_owned(), text(value, source).to_owned()))
+}
+
+// La local que se desreferencia en `local.metodo()` o `local.campo`: si salió de un getter, IntelliJ
+// da por no nula la misma llamada después.
+pub(super) fn dereferenced_local<'source>(node: Node<'_>, source: &'source [u8]) -> Option<&'source str> {
+    if node.kind() != INVOCATION && node.kind() != FIELD_ACCESS {
+        return None;
+    }
+    let object = node.child_by_field_name(OBJECT_FIELD)?;
+    (object.kind() == IDENTIFIER).then(|| text(object, source))
 }

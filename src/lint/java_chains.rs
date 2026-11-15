@@ -8,7 +8,7 @@ use super::java_chain_uses::{
     class_arguments, field_read_at, guarded_by_non_empty, nullable_root_arguments, text_arguments, thrown_at,
 };
 use super::java_exact_roots::{ExactRoot, exact_root};
-use super::java_null_checks::{checked_expression, is_stable_call};
+use super::java_null_checks::{checked_expression, dereferenced_local, getter_local, is_stable_call};
 use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
 use super::java_null_origin::{ArgumentShape, NullOrigin, NullReturn};
 use super::java_null_returns::returned_by_method;
@@ -87,6 +87,7 @@ pub struct NullFacts {
     checked: HashSet<String>,
     passed: HashMap<String, Vec<(usize, NullArgument)>>,
     seen: HashSet<usize>,
+    getter_locals: HashMap<String, String>,
 }
 
 impl NullFacts {
@@ -94,6 +95,7 @@ impl NullFacts {
     pub fn enter_method(&mut self) {
         self.checked.clear();
         self.passed.clear();
+        self.getter_locals.clear();
     }
 
     // Se llama en orden de recorrido: un chequeo cuenta para lo que viene después.
@@ -102,6 +104,13 @@ impl NullFacts {
         self.forget_reassigned(node, source);
         if let Some(checked) = checked_expression(node, source) {
             self.checked.insert(compact(text(checked, source)));
+        }
+        if let Some((local, getter)) = getter_local(node, source) {
+            self.getter_locals.insert(local, compact(&getter));
+        }
+        if let Some(getter) = dereferenced_local(node, source).and_then(|local| self.getter_locals.get(local))
+        {
+            self.checked.insert(getter.clone());
         }
         let arguments = call_arguments(node);
         if !arguments.iter().any(|argument| argument.kind() == INVOCATION) {
@@ -164,6 +173,7 @@ impl NullFacts {
             return;
         };
         let name = text(variable, source);
+        self.getter_locals.remove(name);
         let member_prefix = format!("{name}{QUALIFIER_SEPARATOR}");
         self.checked
             .retain(|known| known != name && !known.starts_with(&member_prefix));

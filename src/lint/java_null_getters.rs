@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use tree_sitter::Node;
 
 use super::java_chains::Chain;
+use super::java_null_checks::is_getter_name;
 use super::java_null_flow::Analysis;
 
 const QUALIFIER_SEPARATOR: char = '.';
@@ -17,7 +18,8 @@ pub(super) struct Getters {
 }
 
 pub(super) fn remember_getter(analysis: &mut Analysis<'_, '_>, flow: usize, chain: &Chain, value: Node<'_>) {
-    if chain.steps.iter().all(|step| step.arity == 0) {
+    let is_getter = chain.steps.last().is_some_and(|step| is_getter_name(&step.name));
+    if is_getter && chain.steps.iter().all(|step| step.arity == 0) {
         let written = compact(analysis.text(value));
         analysis.getters.texts.insert(flow, written);
     }

@@ -43,6 +43,12 @@ final class Uses {
         second.getNumber();
     }
 
+    static int chained(Job job) {
+        Build last = job.getLastBuild();
+        last.getNumber();
+        return job.getLastBuild().getNumber();
+    }
+
     static void reference(String id) {
         Build build = Job.find(id);
         await(build::isDone);
@@ -79,12 +85,12 @@ final class Uses {
 "#;
 
 // `assertThat(x, notNullValue())` de Hamcrest deja a `x` presente; un getter sin argumentos ya
-// desreferenciado por una variable da lo mismo más adelante; `x::m` desreferencia a `x` (y se marca
+// desreferenciado por una variable da lo mismo más adelante, también en una cadena; `x::m` desreferencia a `x` (y se marca
 // ahí, no después); y `@SuppressWarnings("ConstantConditions")` apaga DataFlowIssue.
 #[test]
 fn assertions_cached_getters_references_and_suppressions_follow_intellij() {
     assert_eq!(
         findings_in(SOURCE, "data-flow-issue"),
-        ["39:15 getNumber()", "46:15 build()"]
+        ["39:15 getNumber()", "46:14 getNumber()", "52:15 build()"]
     );
 }

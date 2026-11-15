@@ -1566,7 +1566,9 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
 
 - `RedundantThrows` (`redundant-throws`): Guava 28 de 28, commons-lang 124 de 125, junit4 218 de
   219, **ninguno de más en los tres** (2026-11-10). jenkins (primera corrida, 2026-11-15): 379 de
-  504 con 52 de más, casi todos `ServletException` en filtros y acciones. Guava se mide sin `android/` ni los
+  504 con 52 de más, 49 de ellos `jakarta.servlet.ServletException`: Qodana no marca ninguno de esos
+  (sí 6 `javax.servlet.ServletException`) aunque la librería está en su proyecto y el cuerpo no lo
+  tira; sin explicación todavía, no se calca a mano. Guava se mide sin `android/` ni los
   `src-super`/`test-super` de GWT (`scripts/parity/java/configs/guava.kerbo.toml`, que `kerbo.sh`
   copia al repo): Qodana sólo analiza los módulos del pom raíz. Falta medir spring-boot.
   - Ya se calca el análisis global de IntelliJ (`RefMethodImpl.updateThrowsList`): lo que tiran los
@@ -1613,11 +1615,12 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
   (primera corrida, 2026-11-15) 472 de 1258 (448 `data-flow-issue`, 15 `null-argument`, 9
-  `nullable-return`) con 18 de más: correlaciones con booleanos y ternarios, contratos inferidos
+  `nullable-return`) con 16 de más: correlaciones con booleanos y ternarios, contratos inferidos
   (`if (!isValidData(data)) return null;`) y el `(fp = fp.getParent()).getRemote()` de FilePathTest.
   Para jenkins sumaron: Hamcrest `assertThat(x, notNullValue())` deja presente a `x`; un getter sin
   argumentos ya desreferenciado por una variable (`b1 = p.getLastBuild(); b1.getNumber()`) da lo
-  mismo después (`b2 = p.getLastBuild()`); `x::m` desreferencia a `x`; los parámetros que un jar
+  mismo después (`b2 = p.getLastBuild()`, también `p.getLastBuild().getNumber()`), sólo si es un
+  getter por el nombre (`getX`, `isX`: `slave.toComputer()` se vuelve a marcar); `x::m` desreferencia a `x`; los parámetros que un jar
   anota `@NonNull`/`@Nonnull`/`@NotNull` no admiten null; y `@SuppressWarnings("ConstantConditions")`
   (o `"DataFlowIssue"`) apaga las cinco subreglas en la declaración. Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
