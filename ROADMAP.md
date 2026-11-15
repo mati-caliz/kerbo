@@ -1615,14 +1615,17 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
   (primera corrida, 2026-11-15) 472 de 1258 (448 `data-flow-issue`, 15 `null-argument`, 9
-  `nullable-return`) con 16 de más: correlaciones con booleanos y ternarios, contratos inferidos
+  `nullable-return`) con 14 de más: correlaciones que IntelliJ sigue partiendo estados, contratos inferidos
   (`if (!isValidData(data)) return null;`) y el `(fp = fp.getParent()).getRemote()` de FilePathTest.
   Para jenkins sumaron: Hamcrest `assertThat(x, notNullValue())` deja presente a `x`; un getter sin
   argumentos ya desreferenciado por una variable (`b1 = p.getLastBuild(); b1.getNumber()`) da lo
   mismo después (`b2 = p.getLastBuild()`, también `p.getLastBuild().getNumber()`), sólo si es un
   getter por el nombre (`getX`, `isX`: `slave.toComputer()` se vuelve a marcar); `x::m` desreferencia a `x`; los parámetros que un jar
   anota `@NonNull`/`@Nonnull`/`@NotNull` no admiten null; y `@SuppressWarnings("ConstantConditions")`
-  (o `"DataFlowIssue"`) apaga las cinco subreglas en la declaración. Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
+  (o `"DataFlowIssue"`) apaga las cinco subreglas en la declaración. Dos correlaciones: una local
+  `boolean` que no se reasigna guarda su chequeo (`boolean colapsado = ... && padre != null; if
+  (colapsado) padre.x`), y `ws = b != null ? b.getWorkspace() : null` hace que `ws` no nulo deje
+  presente a `b`. Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
   `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
   calificador. El campo de una variable de tipo conocido (`segment.table`) entra al flujo con su

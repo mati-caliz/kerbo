@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
+use super::java_null_correlations::{implied_by, stored_condition};
 use super::java_null_flow::{
     AND, ARGUMENTS_FIELD, Analysis, BINARY, COMMENTS, EQUAL, INSTANCEOF, INVOCATION, LEFT_FIELD, NOT,
     NOT_EQUAL, NULL, OBJECT_FIELD, OPERAND_FIELD, OPERATOR_FIELD, OR, PARENTHESIZED, RIGHT_FIELD, State,
@@ -44,6 +45,9 @@ const LITERAL_SUFFIX: &str = "_literal";
 
 // Los estados si la condición da verdadero y si da falso.
 pub(super) fn branch_states(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) -> (State, State) {
+    if let Some(condition) = stored_condition(analysis, node) {
+        return branch_states(analysis, condition, state);
+    }
     match node.kind() {
         PARENTHESIZED => match named_children(node)
             .into_iter()
@@ -150,6 +154,9 @@ fn compared_with_null(analysis: &Analysis<'_, '_>, compared: Node<'_>, after: St
     let mut present = after.clone();
     if let Some(tested) = compared_key(analysis, compared) {
         forget(&mut present, &tested);
+        if let Some(implied) = implied_by(analysis, &tested) {
+            forget(&mut present, implied);
+        }
     }
     (after, present)
 }

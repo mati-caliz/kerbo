@@ -7,6 +7,7 @@ use super::java_null_conditions::{
     always_fails, asserted_condition, asserted_present, branch_states, condition_asserted, is_logical,
     without_cast,
 };
+use super::java_null_correlations::{Correlations, note_assignment, note_condition};
 use super::java_null_forwarding::forwarding_chain;
 use super::java_null_getters::{Getters, forget_getters_of, is_known_getter, remember_getter};
 use super::java_null_keys::{
@@ -91,6 +92,7 @@ pub(super) struct Analysis<'source, 'context> {
     pub(super) nullable_elements: Vec<String>,
     pub(super) only_dereferences: bool,
     pub(super) getters: Getters,
+    pub(super) correlations: Correlations,
     pub(super) return_marking: Option<NullMarking>,
 }
 
@@ -117,6 +119,7 @@ pub fn null_flows(
         nullable_elements: Vec::new(),
         only_dereferences: false,
         getters: Getters::default(),
+        correlations: Correlations::default(),
         return_marking: method_marking(method, source),
     };
     let entry = seed_nullable_variables(&mut analysis, method);
@@ -271,6 +274,7 @@ impl Analysis<'_, '_> {
             match declarator.child_by_field_name(VALUE_FIELD) {
                 Some(value) => {
                     state = self.expression(value, state);
+                    note_condition(self, node, declarator);
                     state = self.assign(variable, value, state);
                 }
                 None => {
@@ -295,6 +299,7 @@ impl Analysis<'_, '_> {
         for key in &keys {
             state.remove(key);
             forget_getters_of(self, key);
+            note_assignment(self, key, value);
         }
         let origin = copied.or_else(|| {
             let chain = chain?;

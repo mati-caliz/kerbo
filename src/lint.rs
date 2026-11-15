@@ -44,6 +44,7 @@ mod java_min_max;
 pub mod java_nested_arguments;
 mod java_null_checks;
 mod java_null_conditions;
+mod java_null_correlations;
 pub mod java_null_flow;
 mod java_null_forwarding;
 mod java_null_getters;

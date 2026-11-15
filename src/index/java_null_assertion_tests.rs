@@ -24,6 +24,10 @@ final class Build {
     boolean isDone() {
         return true;
     }
+
+    Object workspace() {
+        return this;
+    }
 }
 
 final class Uses {
@@ -47,6 +51,19 @@ final class Uses {
         Build last = job.getLastBuild();
         last.getNumber();
         return job.getLastBuild().getNumber();
+    }
+
+    static void correlated(Job job, int size) {
+        Build parent = job.getLastBuild();
+        boolean collapsed = size == 1 && parent != null;
+        if (collapsed) {
+            parent.getNumber();
+        }
+        Build build = Job.find("a");
+        Object workspace = build != null ? build.workspace() : null;
+        if (workspace != null) {
+            build.getNumber();
+        }
     }
 
     static void reference(String id) {
@@ -86,11 +103,12 @@ final class Uses {
 
 // `assertThat(x, notNullValue())` de Hamcrest deja a `x` presente; un getter sin argumentos ya
 // desreferenciado por una variable da lo mismo más adelante, también en una cadena; `x::m` desreferencia a `x` (y se marca
-// ahí, no después); y `@SuppressWarnings("ConstantConditions")` apaga DataFlowIssue.
+// ahí, no después); y `@SuppressWarnings("ConstantConditions")` apaga DataFlowIssue. Una `boolean`
+// local guarda su chequeo, y `ws = b != null ? b.x() : null` hace que `ws` no nulo deje presente a `b`.
 #[test]
 fn assertions_cached_getters_references_and_suppressions_follow_intellij() {
     assert_eq!(
         findings_in(SOURCE, "data-flow-issue"),
-        ["39:15 getNumber()", "46:14 getNumber()", "52:15 build()"]
+        ["43:15 getNumber()", "50:14 getNumber()", "69:15 build()"]
     );
 }
