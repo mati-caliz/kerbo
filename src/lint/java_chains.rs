@@ -5,7 +5,7 @@ use tree_sitter::Node;
 use super::java::{NAME_FIELD, text};
 use super::java_called_receivers::receiver_facts;
 use super::java_chain_uses::{
-    class_arguments, field_read_at, guarded_by_non_empty, nullable_root_arguments, text_arguments,
+    class_arguments, field_read_at, guarded_by_non_empty, nullable_root_arguments, text_arguments, thrown_at,
 };
 use super::java_exact_roots::{ExactRoot, exact_root};
 use super::java_null_checks::{checked_expression, is_stable_call};
@@ -217,7 +217,9 @@ pub fn chain_of(
     if field_read.is_some() && is_stable_call(invocation) {
         facts.checked.insert(compact(text(invocation, source)));
     }
-    let dereferenced_at = unboxed_at(invocation, source).or(field_read);
+    let dereferenced_at = unboxed_at(invocation, source)
+        .or(field_read)
+        .or_else(|| thrown_at(invocation));
     let passed_as = facts.passed_as(invocation, source);
     let returned = returned_by_method(invocation, source);
     let interesting =

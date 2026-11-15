@@ -1599,7 +1599,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   devuelve una clase del proyecto que se cierra crean recursos; y la lambda de `assertThrows` que sólo
   crea uno lo pierde. Pendiente: medir spring-boot.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
-  `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
+  `nullable-return`): commons-lang 131 de 141 y junit4 17 de 19 (`failing-call` 15 de 15), ninguno
   de más en los dos. En guava, 842 de los 972 (485 `data-flow-issue`, 308 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
@@ -1661,7 +1661,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `@Nullable` (propio o de otra variable, como `segment.table`) puede ser null aunque se acabe de
   chequear, desreferenciar o asignar (`whenClosed = new CountDownLatch(1); return whenClosed;`). Los
   que no son `volatile` se siguen como una variable (Qodana no los vuelve a marcar en TreeMultiset
-  ni en LinkedHashMultimapTest). `throw x` desreferencia a `x`, y asignar `x.campo = ...` también.
+  ni en LinkedHashMultimapTest). `throw x` desreferencia a `x` (también `throw llamada()`, con una
+  llamada que puede devolver null), y asignar `x.campo = ...` también.
   Un `while` o un `for` se recorre una segunda vez con lo que dejó la primera (el avance y el
   cuerpo), anotando sólo desreferencias: `for (n = primero; ; n = n.siguiente)` con un `siguiente`
   `@Nullable` marca el avance. En esa vuelta un argumento ni se marca ni deja presente la variable
@@ -1736,8 +1737,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     parámetros del JDK (`DfaUtil.addRangeContracts`) y pide un modelo de enteros.
   - El `@NotNull` de las anotaciones externas del JDK (`Iterable.iterator()` devolviendo null en
     TypeUtilsTest): una sola vez en commons-lang.
-  - "may produce NPE" entre métodos (2): `Method.invoke` y
-    `throw Throwables.rethrowAsException(...)` en junit4; y "Immutable object is modified"
+  - "may produce NPE" de `addSuppressed.invoke(...)` en junit4: un campo `static final` inicializado
+    con un método que devuelve null (IntelliJ toma la nulidad del inicializador); y "Immutable object is modified"
     (`List.set` sobre `Collections.unmodifiableList`) en TestWithParametersTest.
   - El flujo de nulos sigue un solo flujo por variable: al juntar ramas queda el más viejo. Dos
     asignaciones distintas en ramas distintas no se siguen a la vez.

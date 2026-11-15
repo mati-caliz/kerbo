@@ -6,6 +6,7 @@ use crate::syntax::{named_children, one_based};
 
 const INVOCATION: &str = "method_invocation";
 const FIELD_ACCESS: &str = "field_access";
+const THROW: &str = "throw_statement";
 const OBJECT_FIELD: &str = "object";
 const NAME_FIELD: &str = "name";
 const CONDITION_FIELD: &str = "condition";
@@ -30,6 +31,16 @@ pub(super) fn field_read_at(invocation: Node<'_>) -> Option<(usize, usize)> {
             .is_some_and(|object| object.id() == invocation.id());
     let start = invocation.start_position();
     reads_field.then(|| (one_based(start.row), one_based(start.column)))
+}
+
+// Dónde empieza la llamada si se tira lo que devuelve (`throw Throwables.rethrowAsException(e)`):
+// tirar null es una desreferencia.
+pub(super) fn thrown_at(invocation: Node<'_>) -> Option<(usize, usize)> {
+    let start = invocation.start_position();
+    invocation
+        .parent()
+        .is_some_and(|parent| parent.kind() == THROW)
+        .then(|| (one_based(start.row), one_based(start.column)))
 }
 
 // En qué lugares de sus argumentos de tipo se declara `@Nullable` la variable donde empieza la

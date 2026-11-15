@@ -66,6 +66,14 @@ final class Closeables {
         return whenClosed;
     }
 
+    static @Nullable Exception rethrowAsException(Exception cause) throws Exception {
+        throw cause;
+    }
+
+    void rethrowCall(Exception cause) throws Exception {
+        throw rethrowAsException(cause);
+    }
+
     void rethrow() throws Exception {
         if (failure != null) {
             throw failure;
@@ -78,14 +86,17 @@ final class Closeables {
 }
 ";
 
-// Asignar un campo `volatile` no lo deja presente: lo que se devuelve es otra lectura. `throw x`
-// desreferencia a `x`.
+// Asignar un campo `volatile` no lo deja presente: lo que se devuelve es otra lectura. `throw x`, y
+// `throw` de una llamada que puede devolver null, desreferencian lo que tiran.
 #[test]
 fn a_reassigned_volatile_field_is_still_possibly_null() {
     assert_eq!(findings_in(REASSIGNED, "nullable-return"), ["15:16 whenClosed"]);
     let mut thrown = findings_in(REASSIGNED, "data-flow-issue");
     thrown.sort();
-    assert_eq!(thrown, ["20:19 failure()", "25:15 plain()"]);
+    assert_eq!(
+        thrown,
+        ["23:15 rethrowAsException()", "28:19 failure()", "33:15 plain()"]
+    );
 }
 
 const THROUGH_ARRAYS: &str = r"package app;
