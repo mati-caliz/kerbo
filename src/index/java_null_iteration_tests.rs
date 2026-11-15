@@ -123,3 +123,47 @@ final class Locals {
 fn a_local_assigned_null_is_possibly_null_where_no_branch_reassigned_it() {
     assert_eq!(findings_in(NULL_LOCALS, "data-flow-issue"), ["19:15 run()"]);
 }
+
+const EXACT_ROOTS: &str = r"package app;
+
+import java.util.Map;
+import org.jspecify.annotations.Nullable;
+
+interface Bimap<K, V> extends Map<K, V> {
+    Bimap<V, K> inverse();
+}
+
+abstract class HashBimap<K, V> implements Bimap<K, V> {
+    static <K, V> HashBimap<K, V> create(int size) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public @Nullable V get(@Nullable Object key) {
+        return null;
+    }
+}
+
+final class Uses {
+    static int lookups() {
+        Bimap<Integer, Integer> bimap = HashBimap.create(4);
+        Bimap<Integer, Integer> inverse = bimap.inverse();
+        int value = bimap.get(1);
+        return value + (int) inverse.get(2);
+    }
+
+    static int reassigned(Bimap<Integer, Integer> other) {
+        Bimap<Integer, Integer> bimap = HashBimap.create(4);
+        bimap = other;
+        return (int) bimap.get(1);
+    }
+}
+";
+
+// Una local creada con una fábrica estática del proyecto (o un `new`) y que no se reasigna lleva
+// los métodos de la clase que devuelve la fábrica, no los del tipo declarado: el `get` `@Nullable`
+// de `HashBimap` desempaqueta null; el de `Map` que llega por `inverse()`, no.
+#[test]
+fn a_local_created_by_a_factory_uses_the_methods_of_the_created_class() {
+    assert_eq!(findings_in(EXACT_ROOTS, "data-flow-issue"), ["25:21 get()"]);
+}

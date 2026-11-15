@@ -2,7 +2,7 @@ use tree_sitter::Node;
 
 use super::java::text;
 use super::java_receiver_arguments::{ArgumentNullness, receiver_arguments};
-use crate::syntax::one_based;
+use crate::syntax::{named_children, one_based};
 
 const INVOCATION: &str = "method_invocation";
 const FIELD_ACCESS: &str = "field_access";
@@ -14,6 +14,11 @@ const GUARDING_STATEMENTS: &[&str] = &["while_statement", "if_statement"];
 const EMPTY_SENSITIVE: &[&str] = &["poll", "peek"];
 const NOT_EMPTY_SUFFIX: &str = ".isEmpty()";
 const NEGATION: &str = "!";
+const ARGUMENTS_FIELD: &str = "arguments";
+const COMMENTS: &[&str] = &["line_comment", "block_comment"];
+const CLASS_LITERAL: &str = "class_literal";
+const STRING_LITERAL: &str = "string_literal";
+const QUOTE: char = '"';
 
 // Dónde empieza la llamada si lo que devuelve se usa para leer un campo (`getSubscriber().eventos`):
 // Qodana marca ahí la desreferencia.
@@ -67,4 +72,30 @@ pub(super) fn guarded_by_non_empty(invocation: Node<'_>, source: &[u8]) -> bool 
             let written: String = text(condition, source).split_whitespace().collect();
             written.contains(&guard)
         })
+}
+
+// Las posiciones de los argumentos que son un literal de clase (`Long.class`).
+pub(super) fn class_arguments(invocation: Node<'_>) -> Vec<usize> {
+    invocation
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .iter()
+        .filter(|argument| !COMMENTS.contains(&argument.kind()))
+        .enumerate()
+        .filter(|(_, argument)| argument.kind() == CLASS_LITERAL)
+        .map(|(position, _)| position)
+        .collect()
+}
+
+// Lo que dicen los argumentos que son un texto literal (`System.getProperty("java.version")`).
+pub(super) fn text_arguments(invocation: Node<'_>, source: &[u8]) -> Vec<String> {
+    invocation
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|argument| argument.kind() == STRING_LITERAL)
+        .map(|literal| text(literal, source).trim_matches(QUOTE).to_owned())
+        .collect()
 }

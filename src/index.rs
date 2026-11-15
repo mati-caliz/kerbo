@@ -5,6 +5,7 @@ pub mod java_annotation_values;
 mod java_default_annotation_params;
 mod java_dereference;
 mod java_escapes;
+mod java_exact_classes;
 pub mod java_exposure;
 mod java_failing_calls;
 mod java_forwarded_returns;

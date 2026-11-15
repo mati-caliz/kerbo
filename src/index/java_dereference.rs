@@ -1,4 +1,5 @@
 use super::java::{Declaration, JavaSummary, NullInference, Position, lint_at};
+use super::java_exact_classes::exact_class;
 use super::java_forwarded_returns::forwards_null;
 use super::java_jdk::{is_always_defined, jdk_method};
 use super::java_null_arguments::{accepts, non_null_parameter, project_owners, reaches};
@@ -158,10 +159,10 @@ fn nullable_steps(
     summary: &JavaSummary,
     chain: &Chain,
 ) -> Vec<bool> {
-    let mut current = enclosing_owner(types, library, chain).map_or_else(
-        || resolve_root(types, library, summary, &chain.root),
-        Resolved::Project,
-    );
+    let mut current = enclosing_owner(types, library, chain)
+        .map(Resolved::Project)
+        .or_else(|| exact_class(types, library, summary, chain.exact_root.as_ref()?))
+        .unwrap_or_else(|| resolve_root(types, library, summary, &chain.root));
     let mut nullable = Vec::new();
     for (index, step) in chain.steps.iter().enumerate() {
         let substituted: &[usize] = if index == 0 {

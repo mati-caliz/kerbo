@@ -3,9 +3,12 @@ use super::declaration_codec::{read_marking, write_marking};
 use super::null_codec::{read_null_argument, write_null_argument};
 use super::summary_codec::{read_flag, write_flag};
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
+use crate::lint::java_exact_roots::ExactRoot;
 use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin, NullReturn};
 use crate::lint::java_resources::ResourceOrigin;
 
+const EXACT_CONSTRUCTION: u64 = 0;
+const EXACT_FACTORY: u64 = 1;
 const ABSENT: u64 = 0;
 const PRESENT: u64 = 1;
 const ROOT_INSTANCE: u64 = 0;
@@ -69,6 +72,18 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
         writer.size(*position);
         write_origin(writer, origin);
     });
+    writer.list(chain.exact_root.as_slice(), |writer, exact| match exact {
+        ExactRoot::Construction(class) => {
+            writer.number(EXACT_CONSTRUCTION);
+            writer.text(class);
+        }
+        ExactRoot::Factory { class, method, arity } => {
+            writer.number(EXACT_FACTORY);
+            writer.text(class);
+            writer.text(method);
+            writer.size(*arity);
+        }
+    });
 }
 
 pub(super) fn write_null_return(writer: &mut Writer, returned: &NullReturn) {
@@ -121,6 +136,7 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
         nullable_root_arguments: reader.list(Reader::size)?,
         enclosing: reader.list(Reader::text)?,
         forwarded: reader.list(|reader| Ok((reader.size()?, read_origin(reader)?)))?,
+        exact_root: reader.list(read_exact_root)?.into_iter().next(),
     })
 }
 
@@ -198,7 +214,7 @@ pub(super) fn write_resource_origin(writer: &mut Writer, origin: &ResourceOrigin
 
 pub(super) fn read_resource_origin(reader: &mut Reader<'_>) -> Result<ResourceOrigin, Corrupt> {
     match reader.number()? {
-        ORIGIN_CALL => Ok(ResourceOrigin::Call(read_chain(reader)?)),
+        ORIGIN_CALL => Ok(ResourceOrigin::Call(Box::new(read_chain(reader)?))),
         ORIGIN_CONSTRUCTION => Ok(ResourceOrigin::Construction(reader.text()?)),
         _ => Err(Corrupt),
     }
@@ -214,6 +230,18 @@ fn read_origin(reader: &mut Reader<'_>) -> Result<NullOrigin, Corrupt> {
             via: reader.list(Reader::text)?.into_iter().next(),
             field: reader.text()?,
             after_call: reader.number()? != 0,
+        },
+        _ => return Err(Corrupt),
+    })
+}
+
+fn read_exact_root(reader: &mut Reader<'_>) -> Result<ExactRoot, Corrupt> {
+    Ok(match reader.number()? {
+        EXACT_CONSTRUCTION => ExactRoot::Construction(reader.text()?),
+        EXACT_FACTORY => ExactRoot::Factory {
+            class: reader.text()?,
+            method: reader.text()?,
+            arity: reader.size()?,
         },
         _ => return Err(Corrupt),
     })

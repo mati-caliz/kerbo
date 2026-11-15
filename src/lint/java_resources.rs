@@ -31,7 +31,7 @@ const COMMENTS: &[&str] = &["line_comment", "block_comment"];
 // que se nombra, como está escrita.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResourceOrigin {
-    Call(Chain),
+    Call(Box<Chain>),
     Construction(String),
 }
 
@@ -107,7 +107,7 @@ fn call_candidate(invocation: Node<'_>, source: &[u8], variables: &Variables) ->
         .filter(|name| !text(*name, source).starts_with(GETTER_PREFIX))?;
     let start = name.start_position();
     Some(ResourceCandidate {
-        origin: ResourceOrigin::Call(origin_chain(invocation, source, variables)?),
+        origin: ResourceOrigin::Call(Box::new(origin_chain(invocation, source, variables)?)),
         owners: owners(invocation, source, variables),
         line: one_based(start.row),
         column: one_based(start.column),
@@ -154,7 +154,9 @@ fn owners(created: Node<'_>, source: &[u8], variables: &Variables) -> Vec<Resour
         .into_iter()
         .chain(receiver)
         .filter_map(|owner| match owner.kind() {
-            INVOCATION => origin_chain(owner, source, variables).map(ResourceOrigin::Call),
+            INVOCATION => {
+                origin_chain(owner, source, variables).map(|chain| ResourceOrigin::Call(Box::new(chain)))
+            }
             CREATION => constructed_class(owner, source).map(ResourceOrigin::Construction),
             IDENTIFIER => variables
                 .get(text(owner, source))

@@ -4,7 +4,10 @@ use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_called_receivers::receiver_facts;
-use super::java_chain_uses::{field_read_at, guarded_by_non_empty, nullable_root_arguments};
+use super::java_chain_uses::{
+    class_arguments, field_read_at, guarded_by_non_empty, nullable_root_arguments, text_arguments,
+};
+use super::java_exact_roots::{ExactRoot, exact_root};
 use super::java_null_checks::{checked_expression, is_stable_call};
 use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
 use super::java_null_origin::{ArgumentShape, NullOrigin, NullReturn};
@@ -24,12 +27,10 @@ const OBJECT_FIELD: &str = "object";
 const ARGUMENTS_FIELD: &str = "arguments";
 const LEFT_FIELD: &str = "left";
 const COMMENTS: &[&str] = &["line_comment", "block_comment"];
-const CLASS_LITERAL: &str = "class_literal";
 const STRING_LITERAL: &str = "string_literal";
 const STANDARD_CHARSETS: &str = "StandardCharsets";
 const CHARSET_TYPE: &str = "Charset";
 const CHARSET_FACTORIES: &[&str] = &["defaultCharset", "forName"];
-const QUOTE: char = '"';
 
 // De dónde sale el primer objeto de una cadena: una variable con su tipo declarado, o una clase
 // cuyo método estático se llama.
@@ -75,6 +76,7 @@ pub struct Chain {
     pub nullable_root_arguments: Vec<usize>,
     pub enclosing: Vec<String>,
     pub forwarded: Vec<(usize, NullOrigin)>,
+    pub exact_root: Option<ExactRoot>,
 }
 
 // Lo que se sabe del archivo hasta el punto que se recorre: lo que ya se chequeó contra null (por
@@ -229,6 +231,7 @@ pub fn chain_of(
         nullable_root_arguments: nullable_root_arguments(invocation, source),
         enclosing,
         forwarded: Vec::new(),
+        exact_root: exact_root(invocation, source),
     })
 }
 
@@ -244,6 +247,7 @@ pub fn origin_chain(invocation: Node<'_>, source: &[u8], variables: &Variables) 
         nullable_root_arguments: nullable_root_arguments(invocation, source),
         enclosing,
         forwarded: Vec::new(),
+        exact_root: exact_root(invocation, source),
     })
 }
 
@@ -307,32 +311,6 @@ fn walk(
         };
         return Some((root, steps, Vec::new()));
     }
-}
-
-// Las posiciones de los argumentos que son un literal de clase (`Long.class`).
-fn class_arguments(invocation: Node<'_>) -> Vec<usize> {
-    invocation
-        .child_by_field_name(ARGUMENTS_FIELD)
-        .map(named_children)
-        .unwrap_or_default()
-        .iter()
-        .filter(|argument| !COMMENTS.contains(&argument.kind()))
-        .enumerate()
-        .filter(|(_, argument)| argument.kind() == CLASS_LITERAL)
-        .map(|(position, _)| position)
-        .collect()
-}
-
-// Lo que dicen los argumentos que son un texto literal (`System.getProperty("java.version")`).
-fn text_arguments(invocation: Node<'_>, source: &[u8]) -> Vec<String> {
-    invocation
-        .child_by_field_name(ARGUMENTS_FIELD)
-        .map(named_children)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|argument| argument.kind() == STRING_LITERAL)
-        .map(|literal| text(literal, source).trim_matches(QUOTE).to_owned())
-        .collect()
 }
 
 // El tipo de cada argumento cuando se sabe: una variable con su tipo declarado o un casteo.

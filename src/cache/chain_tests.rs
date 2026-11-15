@@ -2,15 +2,15 @@ use super::chain_codec::{read_flow, write_flow};
 use super::codec::{Reader, Writer};
 use crate::lint::java_called_receivers::CalledReceiver;
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
+use crate::lint::java_exact_roots::ExactRoot;
 use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin, NullReturn};
 use crate::lint::java_null_inference::{ArgumentShape, NullArgument};
 use crate::lint::java_owner::NullMarking;
 use crate::lint::java_receiver_arguments::{ArgumentNullness, InheritedMember, ReceiverArguments};
 use crate::lint::java_receivers::Receiver;
 
-#[test]
-fn chains_and_null_flows_survive_the_round_trip() {
-    let flow = NullFlow {
+fn sample_flow() -> NullFlow {
+    NullFlow {
         origin: NullOrigin::Call(Chain {
             root: ChainRoot::Instance("JdbcTemplate".to_owned()),
             steps: vec![ChainStep {
@@ -30,6 +30,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
             nullable_root_arguments: vec![1],
             enclosing: vec!["Inner".to_owned(), "Outer".to_owned()],
             forwarded: Vec::new(),
+            exact_root: Some(ExactRoot::Construction("HashBiMap".to_owned())),
         }),
         dereferences: vec![Dereference {
             name: "intValue".to_owned(),
@@ -51,7 +52,12 @@ fn chains_and_null_flows_survive_the_round_trip() {
         }],
         passed_before: Vec::new(),
         returns: Vec::new(),
-    };
+    }
+}
+
+#[test]
+fn chains_and_null_flows_survive_the_round_trip() {
+    let flow = sample_flow();
     let NullOrigin::Call(called) = &flow.origin else {
         unreachable!("el flujo de arriba sale de una llamada");
     };
@@ -72,6 +78,11 @@ fn chains_and_null_flows_survive_the_round_trip() {
             nullable_root_arguments: vec![1],
             enclosing: Vec::new(),
             forwarded: vec![(0, NullOrigin::Annotated), (1, NullOrigin::Literal)],
+            exact_root: Some(ExactRoot::Factory {
+                class: "HashBiMap".to_owned(),
+                method: "create".to_owned(),
+                arity: 1,
+            }),
         }),
         passed_before: flow.arguments.clone(),
         ..NullFlow::new(NullOrigin::Literal)
@@ -110,6 +121,7 @@ fn null_returns_survive_the_round_trip() {
         nullable_root_arguments: Vec::new(),
         enclosing: Vec::new(),
         forwarded: Vec::new(),
+        exact_root: None,
     }));
     let mut writer = Writer::default();
     write_flow(&mut writer, &literal);

@@ -1589,12 +1589,11 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     sin resolver de una anónima anidada y de un overrider sin `throws` (sólo pesa con classpath
     incompleto); una interfaz del proyecto sin métodos no se reconoce en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
-  commons-lang 2 de 2, ninguno de más. Calca los `new` (clases del proyecto y anónimas) y descarta
-  el recurso que recibe otro `AutoCloseable` como argumento o receptor. Pendiente: medir con Qodana
-  en guava y spring-boot, que no tienen corrida de esta regla.
+  commons-lang 2 de 2, ninguno de más; guava 35 de 42 con 7 de más (primera corrida, 2026-11-15). Calca los `new` (clases del proyecto y anónimas) y descarta
+  el recurso que recibe otro `AutoCloseable` como argumento o receptor. Pendiente: medir spring-boot.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 838 de los 972 (481 `data-flow-issue`, 308 `null-argument`, 25
+  de más en los dos. En guava, 842 de los 972 (485 `data-flow-issue`, 308 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
@@ -1666,7 +1665,9 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   fuera de ese camino el `null` inicial no se sigue, porque IntelliJ separa estados por condiciones
   que lo correlacionan con otra variable (`hp2` sólo si `!badDefaultPort` en HostAndPortTest,
   `calendarUtils` sólo si `monthOnly` en FastDatePrinter) y kerbo no: probado, daba 14 de más. Una
-  sentencia `fail(...)` corta el camino. Un campo `@Nullable` puede alcanzarse por un elemento de un arreglo que es
+  sentencia `fail(...)` corta el camino. Una cadena que empieza en una local creada con un `new` o
+  una fábrica estática del proyecto (y no reasignada) busca sus métodos en la clase creada:
+  `bimap.get(...)` con `BiMap bimap = HashBiMap.create(n)` usa el `@Nullable V get` de `HashBiMap`. Un campo `@Nullable` puede alcanzarse por un elemento de un arreglo que es
   campo de una variable (`map.segments[0].table`). Desempaquetan lo que puede ser null un casteo a
   primitivo (`(int) mmHeap.peek()`, también de una variable), una cuenta (`queue.poll() ^ x`; no
   `+` ni `==`) y pasarlo a un parámetro primitivo de un método del proyecto. El `@Nullable` de un
