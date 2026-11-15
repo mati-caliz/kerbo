@@ -226,6 +226,13 @@ fn the_release_comes_from_the_build_and_skips_what_is_not_a_number() {
     );
     assert_eq!(project_release(apache.path()), Some(17));
     assert_eq!(project_release(TempTree::new("jvm-release-none").path()), None);
+    let module_only = TempTree::new("jvm-release-module-only");
+    module_only.write(
+        "pom.xml",
+        "<project><modules><module>war</module></modules></project>",
+    );
+    module_only.write("war/pom.xml", "<project><release>11</release></project>");
+    assert_eq!(project_release(module_only.path()), None);
 }
 
 fn class_type(name: &str, arguments: Vec<Generic>) -> Generic {

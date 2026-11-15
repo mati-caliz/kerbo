@@ -1565,7 +1565,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
 (`qodana.sh <repo> <inspección>`, `kerbo.sh`, `compare_all.py`), 2026-11-07.
 
 - `RedundantThrows` (`redundant-throws`): Guava 28 de 28, commons-lang 124 de 125, junit4 218 de
-  219, **ninguno de más en los tres** (2026-11-10). jenkins (2026-11-15): 381 de 504 con 3 de más.
+  219, **ninguno de más en los tres** (2026-11-10). jenkins (2026-11-15): 382 de 504 con 3 de más.
   Qodana no marca una excepción cuya clase traen dos jars (`jakarta.servlet.ServletException` está
   en `jakarta.servlet-api` y en `winstone`; IntelliJ compara el `PsiClass` que resuelve contra el
   de `findClass`, y con dos copias no coinciden): kerbo tampoco (`Library::is_duplicated`), y el
@@ -1597,12 +1597,13 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     sin resolver de una anónima anidada y de un overrider sin `throws` (sólo pesa con classpath
     incompleto); una interfaz del proyecto sin métodos no se reconoce en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
-  commons-lang 2 de 2, guava 42 de 42 y jenkins 633 de 750, ninguno de más en los cuatro
+  commons-lang 2 de 2, guava 42 de 42 y jenkins 674 de 750, ninguno de más en los cuatro
   (2026-11-15); maven 67 de 89 con 2 de más. Una local también escapa al iniciar el recurso de un
   `try` (`try (InputStream in = is)`), y un `new` que recibe un campo que se cierra (`this.world`) es
   de otro. En jenkins faltan sobre todo los
-  `listener.error(...)` (devuelven un `PrintWriter`) y los `ExecutorService` (con Java 21 se
-  cierran). Un nombre simple que no se importa puede ser una clase anidada de una importada
+  `listener.error(...)` (devuelven un `PrintWriter`). La API del JDK sale del `release` del pom raíz
+  (si no lo dice, el JDK instalado), como el SDK del proyecto en IntelliJ: antes tomaba el `<release>11`
+  de `war/` para todo jenkins y ahí `ExecutorService` todavía no se cierra. Un nombre simple que no se importa puede ser una clase anidada de una importada
   (`JenkinsRule.WebClient` llega como `WebClient`).
   Como `ResourceInspection.getParent`, las llamadas que devuelven el mismo tipo que lo creado (un
   builder) llevan a la variable de la de más afuera: en un `try (...)` o en una local que escapa no

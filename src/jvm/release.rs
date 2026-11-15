@@ -15,6 +15,7 @@ const POM_PROPERTIES: [&str; 8] = [
     "<source>",
 ];
 const PROPERTY_START: &str = "${";
+const ROOT_POM: &str = "pom.xml";
 const PROPERTY_END: char = '}';
 const TAG_OPEN: char = '<';
 const TAG_CLOSE: char = '>';
@@ -27,14 +28,24 @@ const GRADLE_SETTINGS: [&str; 4] = [
 const LEGACY_VERSION_PREFIX: &str = "1.";
 const VERSION_DECORATION: [char; 3] = ['\'', '"', '_'];
 
-// El `release` de Java que dice el build del proyecto. Si no lo dice, o lo hereda de un padre que no
-// está en el repo, vale la versión del JDK instalado.
+// El `release` de Java que dice el build raíz del proyecto, para leer la API del JDK como el SDK del
+// proyecto en IntelliJ. Si la raíz no lo dice (o lo hereda de un padre que no está en el repo), vale la
+// versión del JDK instalado, aunque un módulo declare otro: en jenkins `war/` dice 11 y Qodana usa el
+// SDK 21 para todo.
 pub fn project_release(root: &Path) -> Option<u32> {
     let poms = pom_files(root);
     if poms.is_empty() {
         return first_setting(&files_named(root, BUILD_FILES), &GRADLE_SETTINGS);
     }
-    first_setting(&poms, &POM_PROPERTIES)
+    let root_pom = root.join(ROOT_POM);
+    let contents: Vec<String> = poms
+        .iter()
+        .filter_map(|file| fs::read_to_string(file).ok())
+        .collect();
+    let declared = fs::read_to_string(root_pom).ok()?;
+    POM_PROPERTIES.iter().find_map(|setting| {
+        version_after(&declared, setting).or_else(|| property_after(&contents, &declared, setting))
+    })
 }
 
 // El `release` de cada módulo: el que dice su build o, si no lo dice, el del módulo que lo contiene,
