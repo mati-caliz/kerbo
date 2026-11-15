@@ -1787,7 +1787,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     (`tsrs --api`, la API de TypeScript 7 por MessagePack sobre stdio), sin Node.
   - Ver si conviene usar `tsrs_lint` para las reglas con tipos, en vez de portarlas, midiendo
     paridad contra typescript-eslint igual que las demás.
-- Un JDK de `jlink --compress` no se lee.
+- Un JDK de `jlink --compress=1` (`compact-cp`, deprecado desde Java 21) no se lee: sus clases
+  reparten los textos del constant pool en la tabla de la imagen. `zip` (`--compress=2`, `zip-N`) sí.
 
 ### 15. Java: paridad con PMD y Qodana, y la API nueva
 

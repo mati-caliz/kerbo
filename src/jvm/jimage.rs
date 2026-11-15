@@ -21,21 +21,30 @@ const KIND_SHIFT: u8 = 3;
 const LENGTH_MASK: u8 = 0b111;
 const CLASS_EXTENSION: &str = "class";
 const STRING_END: u8 = 0;
+const COMPRESSED_MAGIC: u32 = 0xCAFE_FAFA;
+const COMPRESSED_HEADER_SIZE: usize = 29;
+const UNCOMPRESSED_SIZE_AT: usize = 12;
+const DECOMPRESSOR_NAME_AT: usize = 20;
+const ZIP_DECOMPRESSOR: &str = "zip";
 
 #[derive(Debug, Clone, Copy)]
 struct Resource {
     offset: usize,
-    size: usize,
+    stored: usize,
+    compressed: bool,
 }
 
 // `lib/modules` del JDK: el formato jimage, con el índice en memoria y cada clase leída del disco a
-// pedido (el archivo pesa más de 100 MB). Una clase comprimida (un runtime de `jlink --compress`) no
-// se puede leer sin los descompresores del JDK: queda afuera, y sus llamadas no se resuelven.
+// pedido (el archivo pesa más de 100 MB). Una clase de un runtime de `jlink --compress` trae una o
+// más cabeceras (`CompressedResourceHeader`) con el descompresor que la abre: `zip` (zlib, el de
+// `--compress=2` y `zip-N`) se lee; `compact-cp` (el viejo `--compress=1`, que reparte los textos
+// del constant pool en la tabla de la imagen) no, y esa clase no se resuelve.
 #[derive(Debug)]
 pub struct ModulesImage {
     path: PathBuf,
     data_start: usize,
     resources: HashMap<String, Resource>,
+    strings: Vec<u8>,
 }
 
 impl ModulesImage {
@@ -71,6 +80,7 @@ impl ModulesImage {
             path: path.to_path_buf(),
             data_start: header_size.checked_add(index_size)?,
             resources,
+            strings: strings.to_vec(),
         })
     }
 
@@ -80,29 +90,56 @@ impl ModulesImage {
 
     pub fn read(&self, entry: &str) -> Option<Vec<u8>> {
         let resource = self.resources.get(entry)?;
-        read_range(
+        let stored = read_range(
             &self.path,
             self.data_start.checked_add(resource.offset)?,
-            resource.size,
-        )
+            resource.stored,
+        )?;
+        if resource.compressed {
+            decompress(stored, &self.strings)
+        } else {
+            Some(stored)
+        }
     }
+}
+
+// Saca las cabeceras de compresión de a una, aplicando el descompresor que nombra cada una.
+fn decompress(mut bytes: Vec<u8>, strings: &[u8]) -> Option<Vec<u8>> {
+    while read_u32(&bytes, 0) == Some(COMPRESSED_MAGIC) {
+        let uncompressed = usize::try_from(read_u64(&bytes, UNCOMPRESSED_SIZE_AT)?).ok()?;
+        let name = text_at(strings, u64::from(read_u32(&bytes, DECOMPRESSOR_NAME_AT)?))?;
+        if name != ZIP_DECOMPRESSOR {
+            return None;
+        }
+        let payload = bytes.get(COMPRESSED_HEADER_SIZE..)?;
+        bytes = miniz_oxide::inflate::decompress_to_vec_zlib(payload).ok()?;
+        if bytes.len() != uncompressed {
+            return None;
+        }
+    }
+    Some(bytes)
 }
 
 fn resource_at(location: &[u8], strings: &[u8]) -> Option<(String, Resource)> {
     let attributes = attributes_of(location)?;
     let attribute = |kind: u8| attributes.get(usize::from(kind)).copied();
-    if text_at(strings, attribute(ATTRIBUTE_EXTENSION)?)? != CLASS_EXTENSION
-        || attribute(ATTRIBUTE_COMPRESSED)? != 0
-    {
+    if text_at(strings, attribute(ATTRIBUTE_EXTENSION)?)? != CLASS_EXTENSION {
         return None;
     }
+    let compressed = attribute(ATTRIBUTE_COMPRESSED)?;
     let parent = text_at(strings, attribute(ATTRIBUTE_PARENT)?)?;
     let base = text_at(strings, attribute(ATTRIBUTE_BASE)?)?;
     Some((
         format!("{parent}/{base}.{CLASS_EXTENSION}"),
         Resource {
             offset: usize::try_from(attribute(ATTRIBUTE_OFFSET)?).ok()?,
-            size: usize::try_from(attribute(ATTRIBUTE_UNCOMPRESSED)?).ok()?,
+            stored: usize::try_from(if compressed == 0 {
+                attribute(ATTRIBUTE_UNCOMPRESSED)?
+            } else {
+                compressed
+            })
+            .ok()?,
+            compressed: compressed != 0,
         },
     ))
 }
@@ -137,4 +174,9 @@ fn text_at(strings: &[u8], offset: u64) -> Option<&str> {
 fn read_u32(bytes: &[u8], offset: usize) -> Option<u32> {
     let slice = bytes.get(offset..offset.checked_add(size_of::<u32>())?)?;
     Some(u32::from_le_bytes(slice.try_into().ok()?))
+}
+
+fn read_u64(bytes: &[u8], offset: usize) -> Option<u64> {
+    let slice = bytes.get(offset..offset.checked_add(size_of::<u64>())?)?;
+    Some(u64::from_le_bytes(slice.try_into().ok()?))
 }

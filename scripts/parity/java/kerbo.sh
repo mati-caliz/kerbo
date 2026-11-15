@@ -10,13 +10,14 @@
 # kerbo.toml del repo, para dejar afuera lo que Qodana no analiza, con `[java] reference =
 # "checkstyle"`. Con JAVA_REFERENCE=pmd la misma
 # configuración más `[java] reference = "pmd"` va a kerbo-pmd.toml (aparte, para que otra corrida
-# sobre el mismo repo no la pise) y la salida queda en kerbo-pmd.json.
+# sobre el mismo repo no la pise) y la salida queda en kerbo-pmd.json. KERBO_JDK cambia el volumen o la
+# carpeta del JDK (un runtime de jlink, por ejemplo).
 set -euo pipefail
 
 readonly CPUS=4
 readonly BUILD_JOBS=4
 readonly MEMORY_LIMIT="8g"
-readonly JDK_VOLUME="jdk21"
+readonly JDK_VOLUME="${KERBO_JDK:-jdk21}"
 repo_name="$1"
 shift
 jars="$*"
