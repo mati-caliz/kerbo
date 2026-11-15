@@ -10,6 +10,7 @@ mod jimage;
 pub mod library;
 pub mod method;
 pub mod release;
+mod string_sharing;
 pub mod zip;
 
 #[cfg(test)]

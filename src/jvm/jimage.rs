@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::mem::size_of;
 use std::path::{Path, PathBuf};
 
+use super::string_sharing::restore_shared_strings;
 use super::zip::read_range;
 
 const MAGIC: u32 = 0xCAFE_DADA;
@@ -26,6 +27,7 @@ const COMPRESSED_HEADER_SIZE: usize = 29;
 const UNCOMPRESSED_SIZE_AT: usize = 12;
 const DECOMPRESSOR_NAME_AT: usize = 20;
 const ZIP_DECOMPRESSOR: &str = "zip";
+const STRING_SHARING_DECOMPRESSOR: &str = "compact-cp";
 
 #[derive(Debug, Clone, Copy)]
 struct Resource {
@@ -37,8 +39,8 @@ struct Resource {
 // `lib/modules` del JDK: el formato jimage, con el índice en memoria y cada clase leída del disco a
 // pedido (el archivo pesa más de 100 MB). Una clase de un runtime de `jlink --compress` trae una o
 // más cabeceras (`CompressedResourceHeader`) con el descompresor que la abre: `zip` (zlib, el de
-// `--compress=2` y `zip-N`) se lee; `compact-cp` (el viejo `--compress=1`, que reparte los textos
-// del constant pool en la tabla de la imagen) no, y esa clase no se resuelve.
+// `--compress=2` y `zip-N`) o `compact-cp` (el viejo `--compress=1`, que reparte los textos del
+// constant pool en la tabla de la imagen).
 #[derive(Debug)]
 pub struct ModulesImage {
     path: PathBuf,
@@ -108,11 +110,12 @@ fn decompress(mut bytes: Vec<u8>, strings: &[u8]) -> Option<Vec<u8>> {
     while read_u32(&bytes, 0) == Some(COMPRESSED_MAGIC) {
         let uncompressed = usize::try_from(read_u64(&bytes, UNCOMPRESSED_SIZE_AT)?).ok()?;
         let name = text_at(strings, u64::from(read_u32(&bytes, DECOMPRESSOR_NAME_AT)?))?;
-        if name != ZIP_DECOMPRESSOR {
-            return None;
-        }
         let payload = bytes.get(COMPRESSED_HEADER_SIZE..)?;
-        bytes = miniz_oxide::inflate::decompress_to_vec_zlib(payload).ok()?;
+        bytes = match name {
+            ZIP_DECOMPRESSOR => miniz_oxide::inflate::decompress_to_vec_zlib(payload).ok()?,
+            STRING_SHARING_DECOMPRESSOR => restore_shared_strings(payload, strings)?,
+            _ => return None,
+        };
         if bytes.len() != uncompressed {
             return None;
         }

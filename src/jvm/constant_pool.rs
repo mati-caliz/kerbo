@@ -3,8 +3,8 @@ use super::class_file::{Cursor, FOUR_BYTES, Malformed, THREE_BYTES, TWO_BYTES, b
 const UTF8: u8 = 1;
 const INTEGER: u8 = 3;
 const FLOAT: u8 = 4;
-const LONG: u8 = 5;
-const DOUBLE: u8 = 6;
+pub(super) const LONG: u8 = 5;
+pub(super) const DOUBLE: u8 = 6;
 const CLASS: u8 = 7;
 const STRING: u8 = 8;
 const FIELD_REFERENCE: u8 = 9;
@@ -109,4 +109,22 @@ pub(super) fn constant_pool(cursor: &mut Cursor<'_>) -> Result<Pool, Malformed> 
         index = index.saturating_add(slots);
     }
     Ok(pool)
+}
+
+// Lo que ocupa una constante después de su etiqueta, salvo un texto (`Utf8`), que lleva su largo.
+pub(super) const fn constant_size(tag: u8) -> Option<usize> {
+    match tag {
+        CLASS | STRING | METHOD_TYPE | MODULE | PACKAGE => Some(TWO_BYTES),
+        METHOD_HANDLE => Some(THREE_BYTES),
+        INTEGER
+        | FLOAT
+        | FIELD_REFERENCE
+        | METHOD_REFERENCE
+        | INTERFACE_METHOD_REFERENCE
+        | NAME_AND_TYPE
+        | DYNAMIC
+        | INVOKE_DYNAMIC => Some(FOUR_BYTES),
+        LONG | DOUBLE => Some(EIGHT_BYTES),
+        _ => None,
+    }
 }
