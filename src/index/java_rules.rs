@@ -1,4 +1,5 @@
 use super::java::{CallSite, Declaration, JavaSummary, lint_at};
+use super::java_default_annotation_params::{AnnotationDefaults, redundant_annotation_params};
 use super::java_dereference::nullable_dereferences;
 use super::java_escapes::{PackageTypes, escaped_types};
 use super::java_failing_calls::failing_calls;
@@ -27,6 +28,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
     let types = ProjectTypes::new(files);
     let usage = Usage::new(files);
     let package_types = PackageTypes::new(files);
+    let annotation_defaults = AnnotationDefaults::new(files);
     let throw_lookup = ThrowLookup::new(&types, library);
     let throws_facts = ThrowsFacts::new(files);
     let mut tainted = tainted_sinks(files, &project).into_iter();
@@ -41,6 +43,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
             in_file.extend(failing_calls(&types, library, summary, file.in_tests));
             in_file.extend(unclosed_resources(&types, library, summary));
             in_file.extend(escaped_types(&package_types, summary));
+            in_file.extend(redundant_annotation_params(&annotation_defaults, summary));
             in_file.extend(redundant_throws(&throw_lookup, &throws_facts, summary));
             in_file.extend(
                 summary

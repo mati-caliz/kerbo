@@ -1,4 +1,5 @@
 mod analysis_codec;
+mod annotation_codec;
 mod budget;
 mod chain_codec;
 mod codec;
@@ -36,7 +37,7 @@ use crate::rules::RuleId;
 use crate::secrets::{PathProfile, SecretFinding};
 
 const FORMAT_DIRECTORY: &str = "analysis-v2";
-const FORMAT_VERSION: u64 = 86;
+const FORMAT_VERSION: u64 = 87;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisSubject<'subject> {

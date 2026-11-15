@@ -1,4 +1,4 @@
-use super::javadoc;
+use super::{java_inspections, javadoc};
 use crate::i18n::catalog::RuleText;
 use crate::rules::JavaRule;
 
@@ -8,7 +8,7 @@ const UNKNOWN: RuleText = RuleText::new(
     "Checkstyle la marca con sun_checks.xml.",
     "Ver la documentación de Checkstyle.",
 );
-const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT] = [
+const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT - java_inspections::RULE_COUNT] = [
     RuleText::new(
         "Tipo con un nombre que no es PascalCase",
         "nombralo con mayúscula inicial, letras y números",
@@ -363,34 +363,11 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT] = [
         "Quien llama tiene que atrapar o declarar una excepción que nunca llega, y el código de manejo que escribe no corre nunca. Como RedundantThrows de IntelliJ: si kerbo no puede resolver alguna llamada del método, no opina.",
         "void cargar() throws IOException { lista.clear(); } se vuelve void cargar() { lista.clear(); }.",
     ),
-    RuleText::new(
-        "Escape Unicode de un carácter que se puede escribir tal cual",
-        "escribí el carácter en vez del escape",
-        "Un \\u0041 obliga a buscar qué letra es; el archivo está en UTF-8 y el carácter se lee directo. Como UnnecessaryUnicodeEscape de IntelliJ: quedan los controles, los espacios raros, los invisibles, los sin asignar y las marcas combinantes, que no se ven bien escritos.",
-        "String nombre = \"Jos\\u00e9\"; se vuelve String nombre = \"José\";.",
-    ),
-    RuleText::new(
-        "Collections.sort(lista, comparador) donde alcanza con lista.sort(comparador)",
-        "llamá a sort sobre la lista",
-        "Desde Java 8 la lista se ordena sola con List.sort, que algunas implementaciones hacen más rápido que copiar a un arreglo. Como Java8ListSort de IntelliJ: sólo con release 8 o más.",
-        "Collections.sort(pedidos, porFecha); se vuelve pedidos.sort(porFecha);.",
-    ),
-    RuleText::new(
-        "size() o length() comparado con 0 o 1 donde alcanza con isEmpty()",
-        "usá isEmpty(), negado si la comparación pregunta si hay algo",
-        "isEmpty() dice lo que se pregunta sin hacer la cuenta, y en algunas colecciones es más barato que contar. Como SizeReplaceableByIsEmpty de IntelliJ: sólo cuando el tipo declarado tiene isEmpty() (String, las colecciones y mapas de Java y de guava, CharSequence desde Java 15).",
-        "if (pedidos.size() == 0) se vuelve if (pedidos.isEmpty()), y nombre.length() > 0, !nombre.isEmpty().",
-    ),
-    RuleText::new(
-        "Mínimo o máximo calculado a mano con un ternario o un if",
-        "usá Math.min o Math.max",
-        "Math.min(a, b) dice qué se calcula; el ternario o el if obligan a leer la comparación y las dos ramas para darse cuenta, y es fácil dar vuelta el signo. Como ManualMinMaxCalculation de IntelliJ: sólo con los dos lados del mismo tipo numérico (int, long, float o double).",
-        "int tope = (pedidos < limite) ? pedidos : limite; se vuelve int tope = Math.min(pedidos, limite);.",
-    ),
 ];
 
 pub fn java(rule: JavaRule) -> RuleText {
     javadoc::rule_text(rule)
+        .or_else(|| java_inspections::rule_text(rule))
         .or_else(|| TEXTS.get(rule.position()).copied())
         .unwrap_or(UNKNOWN)
 }

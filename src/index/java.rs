@@ -2,6 +2,9 @@ use std::collections::HashSet;
 
 use tree_sitter::Node;
 
+use super::java_annotation_values::{
+    AnnotationDefault, AnnotationValue, annotation_defaults, annotation_values,
+};
 use super::java_exposure::{DeclaredType, Exposure, exposures};
 use super::java_header::{imported_paths, package_annotations, package_of};
 use super::java_parameter_nullness::parameter_nullness;
@@ -167,6 +170,8 @@ pub struct JavaSummary {
     pub lambda_returns: Vec<LambdaReturn>,
     pub nested_nulls: Vec<NestedNull>,
     pub references: Vec<ReferenceArgument>,
+    pub annotation_defaults: Vec<AnnotationDefault>,
+    pub annotation_values: Vec<AnnotationValue>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -180,8 +185,10 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         imports: imported_paths(root, source, false),
         static_imports: imported_paths(root, source, true),
         package_annotations: package_annotations(root, source),
+        annotation_values: annotation_values(root, source),
         ..JavaSummary::default()
     };
+    summary.annotation_defaults = annotation_defaults(root, source, &summary.package);
     for top_level in named_children(root)
         .into_iter()
         .filter(|node| TYPE_DECLARATIONS.contains(&node.kind()))

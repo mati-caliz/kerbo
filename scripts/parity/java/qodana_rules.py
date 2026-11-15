@@ -32,6 +32,8 @@ INSPECTIONS = {
     "Java8ListSort": "java8-list-sort",
     "SizeReplaceableByIsEmpty": "size-replaceable-by-is-empty",
     "ManualMinMaxCalculation": "manual-min-max-calculation",
+    "DefaultAnnotationParam": "default-annotation-param",
+    "Java8MapApi": "java8-map-api",
 }
 COUNTED_PER_LINE = {"unnecessary-unicode-escape"}
 RESULTS = "results-UNUSED_IMPORT"
@@ -44,14 +46,21 @@ def qodana_findings(repo, results_folder):
     results = json.loads((PARITY / repo / results_folder / "qodana.sarif.json").read_text(encoding="utf-8"))
     found = collections.defaultdict(collections.Counter)
     messages = {}
-    for result in results["runs"][0].get("results", []):
+    run = results["runs"][0]
+    enabled = {
+        INSPECTIONS[inspection["id"]]
+        for extension in run["tool"].get("extensions", [])
+        for inspection in extension.get("rules", [])
+        if inspection["id"] in INSPECTIONS and inspection.get("defaultConfiguration", {}).get("enabled")
+    }
+    for result in run.get("results", []):
         rule = INSPECTIONS.get(result["ruleId"])
         if rule:
             location = result["locations"][0]["physicalLocation"]
             key = (location["artifactLocation"]["uri"], location["region"]["startLine"])
             found[rule][key] = found[rule][key] + 1 if rule in COUNTED_PER_LINE else 1
             messages[key] = f"{result['ruleId']}: {result['message']['text']}"
-    return found, messages
+    return found, messages, enabled
 
 
 def kerbo_findings(repo, report):
@@ -68,12 +77,10 @@ def kerbo_findings(repo, report):
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     repo = sys.argv[1]
-    reference, messages = qodana_findings(repo, sys.argv[2] if len(sys.argv) > 2 else RESULTS)
+    reference, messages, enabled = qodana_findings(repo, sys.argv[2] if len(sys.argv) > 2 else RESULTS)
     for imitated, report in REPORTS.items():
         kerbo = kerbo_findings(repo, report)
-        for rule in sorted(set(INSPECTIONS.values())):
-            if not reference[rule]:
-                continue
+        for rule in sorted(enabled):
             missing = reference[rule] - kerbo[rule]
             extra = kerbo[rule] - reference[rule]
             total = sum(reference[rule].values())

@@ -190,6 +190,17 @@ De las inspecciones de IntelliJ, kerbo hace:
   `float` o `double`: variables con tipo declarado o literales) y no aplica dentro de la propia
   `java.lang.Math`. Coincide con Qodana en el corpus (2).
 
+- `DefaultAnnotationParam` (`default-annotation-param`): un elemento de una anotación escrito con
+  el mismo valor que ya tiene por defecto (`@Reintento(intentos = 3)` con `intentos() default 3`).
+  Sólo con las anotaciones que declara el proyecto, que es donde se ve el valor por defecto; si el
+  nombre de la anotación puede ser de más de una, no se reporta. Coincide con Qodana en el corpus
+  (7, todos en junit4).
+
+- `Java8MapApi` (`java8-map-api`), en la forma de `computeIfAbsent`: un valor que se lee con `get`,
+  se calcula si es `null` y se guarda con `put`. Desde Java 8, cuando el tipo declarado es un `Map`
+  y lo calculado no puede tener efectos (un arreglo o un literal, sin llamadas): con efectos,
+  IntelliJ lo deja como información. Coincide con Qodana en el corpus (2, en commons-lang).
+
 - `AutoCloseableResource` (`auto-closeable-resource`): una llamada que crea algo que se cierra
   (un `InputStream`, una `Connection`, un `ResultSet`, un `ExecutorService`, un `HttpClient`...)
   fuera de un `try` con recursos: en una variable que no se cierra, no se devuelve ni se pasa a

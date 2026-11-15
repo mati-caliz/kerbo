@@ -1,3 +1,6 @@
+use super::annotation_codec::{
+    read_annotation_default, read_annotation_value, write_annotation_default, write_annotation_value,
+};
 use super::chain_codec::{
     read_chain, read_flow, read_resource_origin, write_chain, write_flow, write_resource_origin,
 };
@@ -114,6 +117,8 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     writer.list(&summary.lambda_returns, write_lambda_return);
     write_nested_nulls(writer, &summary.nested_nulls);
     write_references(writer, &summary.references);
+    writer.list(&summary.annotation_defaults, write_annotation_default);
+    writer.list(&summary.annotation_values, write_annotation_value);
 }
 
 pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corrupt> {
@@ -188,6 +193,8 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         lambda_returns: reader.list(read_lambda_return)?,
         nested_nulls: read_nested_nulls(reader)?,
         references: read_references(reader)?,
+        annotation_defaults: reader.list(read_annotation_default)?,
+        annotation_values: reader.list(read_annotation_value)?,
     }))
 }
 

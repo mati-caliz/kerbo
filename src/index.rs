@@ -1,6 +1,8 @@
 pub mod ecmascript_taint;
 pub mod go_taint;
 pub mod java;
+pub mod java_annotation_values;
+mod java_default_annotation_params;
 mod java_dereference;
 mod java_escapes;
 pub mod java_exposure;
@@ -41,6 +43,8 @@ pub use java_rules::project_lints;
 mod ecmascript_taint_tests;
 #[cfg(test)]
 mod go_taint_tests;
+#[cfg(test)]
+mod java_default_annotation_param_tests;
 #[cfg(test)]
 mod java_deserialization_tests;
 #[cfg(test)]

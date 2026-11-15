@@ -11,6 +11,7 @@ mod explanations;
 mod fixes;
 mod go;
 mod java;
+mod java_inspections;
 mod javadoc;
 mod shell;
 

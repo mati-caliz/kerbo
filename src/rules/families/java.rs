@@ -64,6 +64,8 @@ rule_family!(JavaRule {
     Java8ListSort => "java8-list-sort",
     SizeReplaceableByIsEmpty => "size-replaceable-by-is-empty",
     ManualMinMaxCalculation => "manual-min-max-calculation",
+    DefaultAnnotationParam => "default-annotation-param",
+    Java8MapApi => "java8-map-api",
     JavadocVariable => "javadoc-variable",
     MissingJavadocMethod => "missing-javadoc-method",
     JavadocMethod => "javadoc-method",
