@@ -7,12 +7,14 @@ mod java_dereference;
 mod java_escapes;
 pub mod java_exposure;
 mod java_failing_calls;
+mod java_forwarded_returns;
 mod java_header;
 mod java_inferred_arguments;
 mod java_jdk;
 mod java_lambda_null_returns;
 mod java_library_arguments;
 mod java_null_arguments;
+mod java_null_origins;
 mod java_nullable_returns;
 mod java_nullness;
 mod java_parameter_nullness;
@@ -58,6 +60,8 @@ mod java_null_lambda_return_tests;
 mod java_null_library_argument_tests;
 #[cfg(test)]
 mod java_null_marked_tests;
+#[cfg(test)]
+mod java_null_parameter_tests;
 #[cfg(test)]
 mod java_null_reference_tests;
 #[cfg(test)]

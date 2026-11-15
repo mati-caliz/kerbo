@@ -2,7 +2,7 @@ use tree_sitter::Node;
 
 use super::java_fields::Volatility;
 use super::java_null_flow::{Analysis, IDENTIFIER, NullFlow, NullOrigin, OBJECT_FIELD, State};
-use super::java_nullable_fields::nullable_field_keys;
+use super::java_nullable_fields::{nullable_element_parameters, nullable_field_keys, nullable_parameters};
 use crate::syntax::descendants;
 
 const FIELD_ACCESS: &str = "field_access";
@@ -113,16 +113,21 @@ fn qualified_owner<'context>(
     analysis.variables.get(analysis.text(object))?.as_ref()
 }
 
-// Al entrar al método, cada campo `@Nullable` que ve puede ser null. Los campos de otras variables
-// (`segmento.tabla`) también: si su clase los declara `@Nullable` se sabe recién en el índice.
-pub(super) fn seed_nullable_fields(analysis: &mut Analysis<'_, '_>, method: Node<'_>) -> State {
+// Al entrar al método, cada campo y cada parámetro `@Nullable` que ve puede ser null. Los campos de
+// otras variables (`segmento.tabla`) también: si su clase los declara `@Nullable` se sabe recién en
+// el índice. Los elementos de un parámetro arreglo `@Nullable` no se siguen: cada lectura puede ser
+// null.
+pub(super) fn seed_nullable_variables(analysis: &mut Analysis<'_, '_>, method: Node<'_>) -> State {
     let mut state = State::new();
     seed_qualified_fields(analysis, method, &mut state);
+    analysis.nullable_elements = nullable_element_parameters(method, analysis.source);
+    for parameter in nullable_parameters(method, analysis.source) {
+        state.insert(parameter, analysis.flows.len());
+        analysis.flows.push(NullFlow::new(NullOrigin::Annotated));
+    }
     for (keys, volatility) in nullable_field_keys(method, analysis.source) {
         if volatility == Volatility::Volatile {
-            analysis
-                .forgettable
-                .push((keys.clone(), NullOrigin::NullableField));
+            analysis.forgettable.push((keys.clone(), NullOrigin::Annotated));
         }
         if let [qualified, bare] = keys.as_slice() {
             analysis.partners.insert(qualified.clone(), bare.clone());
@@ -131,7 +136,7 @@ pub(super) fn seed_nullable_fields(analysis: &mut Analysis<'_, '_>, method: Node
         for key in keys {
             state.insert(key, analysis.flows.len());
         }
-        analysis.flows.push(NullFlow::new(NullOrigin::NullableField));
+        analysis.flows.push(NullFlow::new(NullOrigin::Annotated));
     }
     state
 }

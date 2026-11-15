@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
-use super::java_chains::origin_chain;
 use super::java_null_conditions::{
     asserted_condition, asserted_present, branch_states, condition_asserted, is_logical, without_cast,
 };
-use super::java_null_keys::{forget, forget_fields, join, seed_nullable_fields, spellings, tracked_key};
+use super::java_null_forwarding::forwarding_chain;
+use super::java_null_keys::{forget, forget_fields, join, seed_nullable_variables, spellings, tracked_key};
 use super::java_null_loops::runs_at_least_once;
 use super::java_null_returns::{method_marking, note_return};
 use super::java_null_uses::{dereference, passed};
@@ -83,6 +83,7 @@ pub(super) struct Analysis<'source, 'context> {
     pub(super) flows: Vec<NullFlow>,
     pub(super) partners: HashMap<String, String>,
     pub(super) forgettable: Vec<(Vec<String>, NullOrigin)>,
+    pub(super) nullable_elements: Vec<String>,
     pub(super) return_marking: Option<NullMarking>,
 }
 
@@ -106,9 +107,10 @@ pub fn null_flows(
         flows: Vec::new(),
         partners: HashMap::new(),
         forgettable: Vec::new(),
+        nullable_elements: Vec::new(),
         return_marking: method_marking(method, source),
     };
-    let entry = seed_nullable_fields(&mut analysis, method);
+    let entry = seed_nullable_variables(&mut analysis, method);
     analysis.statement(body, entry);
     analysis
         .flows
@@ -278,14 +280,14 @@ impl Analysis<'_, '_> {
         let keys = spellings(self, variable);
         let value = without_cast(written);
         let copied = tracked_key(self, value).and_then(|source_key| state.get(&source_key).copied());
+        let chain = (copied.is_none() && value.kind() == INVOCATION)
+            .then(|| forwarding_chain(self, value, &state))
+            .flatten();
         for key in &keys {
             state.remove(key);
         }
         let origin = copied.or_else(|| {
-            let chain = (value.kind() == INVOCATION)
-                .then(|| origin_chain(value, self.source, self.variables))
-                .flatten()?;
-            self.flows.push(NullFlow::new(NullOrigin::Call(chain)));
+            self.flows.push(NullFlow::new(NullOrigin::Call(chain?)));
             Some(self.flows.len() - 1)
         });
         if let Some(origin) = origin {

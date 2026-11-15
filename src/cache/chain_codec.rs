@@ -13,7 +13,7 @@ const ROOT_CLASS: u64 = 1;
 const ORIGIN_CALL: u64 = 0;
 const ORIGIN_CONSTRUCTION: u64 = 1;
 const NULL_FROM_CALL: u64 = 0;
-const NULL_FROM_FIELD: u64 = 1;
+const NULL_FROM_ANNOTATED: u64 = 1;
 const NULL_FROM_QUALIFIED_FIELD: u64 = 2;
 const NULL_FROM_LITERAL: u64 = 3;
 
@@ -65,6 +65,10 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
         writer.size(*position);
     });
     writer.list(&chain.enclosing, |writer, name| writer.text(name));
+    writer.list(&chain.forwarded, |writer, (position, origin)| {
+        writer.size(*position);
+        write_origin(writer, origin);
+    });
 }
 
 pub(super) fn write_null_return(writer: &mut Writer, returned: &NullReturn) {
@@ -116,6 +120,7 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
         returned: reader.list(read_null_return)?.into_iter().next(),
         nullable_root_arguments: reader.list(Reader::size)?,
         enclosing: reader.list(Reader::text)?,
+        forwarded: reader.list(|reader| Ok((reader.size()?, read_origin(reader)?)))?,
     })
 }
 
@@ -128,13 +133,25 @@ fn read_optional_text(reader: &mut Reader<'_>) -> Result<Option<String>, Corrupt
 }
 
 pub(super) fn write_flow(writer: &mut Writer, flow: &NullFlow) {
-    match &flow.origin {
+    write_origin(writer, &flow.origin);
+    writer.list(&flow.dereferences, |writer, used| {
+        writer.text(&used.name);
+        writer.size(used.line);
+        writer.size(used.column);
+    });
+    writer.list(&flow.arguments, write_null_argument);
+    writer.list(&flow.passed_before, write_null_argument);
+    writer.list(&flow.returns, write_null_return);
+}
+
+fn write_origin(writer: &mut Writer, origin: &NullOrigin) {
+    match origin {
         NullOrigin::Literal => writer.number(NULL_FROM_LITERAL),
         NullOrigin::Call(chain) => {
             writer.number(NULL_FROM_CALL);
             write_chain(writer, chain);
         }
-        NullOrigin::NullableField => writer.number(NULL_FROM_FIELD),
+        NullOrigin::Annotated => writer.number(NULL_FROM_ANNOTATED),
         NullOrigin::QualifiedField {
             owner,
             via,
@@ -148,30 +165,11 @@ pub(super) fn write_flow(writer: &mut Writer, flow: &NullFlow) {
             writer.number(u64::from(*after_call));
         }
     }
-    writer.list(&flow.dereferences, |writer, used| {
-        writer.text(&used.name);
-        writer.size(used.line);
-        writer.size(used.column);
-    });
-    writer.list(&flow.arguments, write_null_argument);
-    writer.list(&flow.passed_before, write_null_argument);
-    writer.list(&flow.returns, write_null_return);
 }
 
 pub(super) fn read_flow(reader: &mut Reader<'_>) -> Result<NullFlow, Corrupt> {
     Ok(NullFlow {
-        origin: match reader.number()? {
-            NULL_FROM_LITERAL => NullOrigin::Literal,
-            NULL_FROM_CALL => NullOrigin::Call(read_chain(reader)?),
-            NULL_FROM_FIELD => NullOrigin::NullableField,
-            NULL_FROM_QUALIFIED_FIELD => NullOrigin::QualifiedField {
-                owner: reader.text()?,
-                via: reader.list(Reader::text)?.into_iter().next(),
-                field: reader.text()?,
-                after_call: reader.number()? != 0,
-            },
-            _ => return Err(Corrupt),
-        },
+        origin: read_origin(reader)?,
         dereferences: reader.list(|reader| {
             Ok(Dereference {
                 name: reader.text()?,
@@ -204,4 +202,19 @@ pub(super) fn read_resource_origin(reader: &mut Reader<'_>) -> Result<ResourceOr
         ORIGIN_CONSTRUCTION => Ok(ResourceOrigin::Construction(reader.text()?)),
         _ => Err(Corrupt),
     }
+}
+
+fn read_origin(reader: &mut Reader<'_>) -> Result<NullOrigin, Corrupt> {
+    Ok(match reader.number()? {
+        NULL_FROM_LITERAL => NullOrigin::Literal,
+        NULL_FROM_CALL => NullOrigin::Call(read_chain(reader)?),
+        NULL_FROM_ANNOTATED => NullOrigin::Annotated,
+        NULL_FROM_QUALIFIED_FIELD => NullOrigin::QualifiedField {
+            owner: reader.text()?,
+            via: reader.list(Reader::text)?.into_iter().next(),
+            field: reader.text()?,
+            after_call: reader.number()? != 0,
+        },
+        _ => return Err(Corrupt),
+    })
 }

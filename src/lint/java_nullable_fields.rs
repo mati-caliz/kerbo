@@ -26,6 +26,8 @@ const LAMBDA: &str = "lambda_expression";
 const PARAMETERS_FIELD: &str = "parameters";
 const IDENTIFIER: &str = "identifier";
 const INFERRED_PARAMETERS: &str = "inferred_parameters";
+const FORMAL_PARAMETER: &str = "formal_parameter";
+const SPREAD_PARAMETER: &str = "spread_parameter";
 const OPEN_BRACKET: char = '[';
 const QUALIFIER_SEPARATOR: char = '.';
 const ANNOTATION_KINDS: &[&str] = &["marker_annotation", "annotation"];
@@ -71,6 +73,51 @@ pub(super) fn nullable_field_keys(method: Node<'_>, source: &[u8]) -> Vec<(Vec<S
             (keys, volatility)
         })
         .collect()
+}
+
+// Los parámetros que el método declara `@Nullable` (o `@CheckForNull`): pueden llegar null.
+pub(super) fn nullable_parameters(method: Node<'_>, source: &[u8]) -> Vec<String> {
+    parameters_of(method)
+        .into_iter()
+        .filter(|parameter| {
+            parameter.kind() == FORMAL_PARAMETER
+                && parameter.child_by_field_name(DIMENSIONS_FIELD).is_none()
+                && declares_nullable_type(*parameter, source)
+        })
+        .filter_map(|parameter| parameter.child_by_field_name(NAME_FIELD))
+        .map(|name| text(name, source).to_owned())
+        .collect()
+}
+
+// Los parámetros arreglo o varargs cuyos elementos son `@Nullable` (`@Nullable Object... datos`,
+// `@Nullable Entry<K, V>[] entradas`): cada elemento que se lee puede ser null.
+pub(super) fn nullable_element_parameters(method: Node<'_>, source: &[u8]) -> Vec<String> {
+    parameters_of(method)
+        .into_iter()
+        .filter_map(|parameter| {
+            match parameter.kind() {
+                FORMAL_PARAMETER => parameter
+                    .child_by_field_name(TYPE_FIELD)
+                    .filter(|written| written.kind() == ARRAY_TYPE)
+                    .filter(|_| parameter.child_by_field_name(DIMENSIONS_FIELD).is_none())
+                    .and_then(|_| parameter.child_by_field_name(NAME_FIELD)),
+                SPREAD_PARAMETER => named_children(parameter)
+                    .into_iter()
+                    .find(|child| child.kind() == VARIABLE_DECLARATOR)
+                    .and_then(|declarator| declarator.child_by_field_name(NAME_FIELD)),
+                _ => None,
+            }
+            .filter(|_| annotated_with(parameter, NULLABLE, source))
+        })
+        .map(|name| text(name, source).to_owned())
+        .collect()
+}
+
+fn parameters_of(method: Node<'_>) -> Vec<Node<'_>> {
+    method
+        .child_by_field_name(PARAMETERS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
 }
 
 // Los campos `@Nullable` de las clases que encierran al método, de adentro hacia afuera: un campo

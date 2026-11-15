@@ -7,7 +7,7 @@ use super::java_called_receivers::receiver_facts;
 use super::java_chain_uses::{field_read_at, guarded_by_non_empty, nullable_root_arguments};
 use super::java_null_checks::{checked_expression, is_stable_call};
 use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
-use super::java_null_origin::{ArgumentShape, NullReturn};
+use super::java_null_origin::{ArgumentShape, NullOrigin, NullReturn};
 use super::java_null_returns::returned_by_method;
 use super::java_receivers::{StaticImports, Variables, declared_simple_type, enclosing_types};
 use super::java_throws::ArgumentKind;
@@ -62,7 +62,9 @@ pub struct ChainStep {
 // que se pasan directo como argumento de otra llamada (`Splitter.on(PATH_SEPARATOR.value())`) o
 // las devuelve un método no nulo (`return convert(a)`). Una llamada sin receptor dentro de una clase
 // anidada o anónima lleva las clases que la encierran, de la más cercana a la más lejana: el método
-// puede ser de una de afuera.
+// puede ser de una de afuera. Si la cadena es una llamada sin receptor, de dónde puede venir el
+// null de cada argumento (`uncheckedCastNullableTToT(valor)`): si el método sólo devuelve ese
+// parámetro, la llamada es tan nula como el argumento.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chain {
     pub root: ChainRoot,
@@ -72,6 +74,7 @@ pub struct Chain {
     pub returned: Option<NullReturn>,
     pub nullable_root_arguments: Vec<usize>,
     pub enclosing: Vec<String>,
+    pub forwarded: Vec<(usize, NullOrigin)>,
 }
 
 // Lo que se sabe del archivo hasta el punto que se recorre: lo que ya se chequeó contra null (por
@@ -225,6 +228,7 @@ pub fn chain_of(
         returned,
         nullable_root_arguments: nullable_root_arguments(invocation, source),
         enclosing,
+        forwarded: Vec::new(),
     })
 }
 
@@ -239,6 +243,7 @@ pub fn origin_chain(invocation: Node<'_>, source: &[u8], variables: &Variables) 
         returned: None,
         nullable_root_arguments: nullable_root_arguments(invocation, source),
         enclosing,
+        forwarded: Vec::new(),
     })
 }
 

@@ -1,4 +1,5 @@
 use super::java::{Declaration, JavaSummary, NullInference, Position, lint_at};
+use super::java_forwarded_returns::forwards_null;
 use super::java_jdk::{is_always_defined, jdk_method};
 use super::java_null_arguments::{accepts, non_null_parameter, project_owners, reaches};
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
@@ -76,7 +77,8 @@ pub(super) fn may_return_null(
     chain: &Chain,
 ) -> bool {
     let nullable = nullable_steps(types, library, summary, chain);
-    nullable.len() == chain.steps.len() && nullable.last() == Some(&true)
+    (nullable.len() == chain.steps.len() && nullable.last() == Some(&true))
+        || forwards_null(types, library, summary, chain)
 }
 
 // Si antes se chequeó contra null o se pasó a un parámetro que no puede ser null.
@@ -282,7 +284,31 @@ fn project_step(
     owner: &str,
     step: &ChainStep,
 ) -> Option<(bool, Option<Resolved>)> {
-    let candidates: Vec<_> = project_lineage(types, library, owner).iter().find_map(|class| {
+    let candidates = project_candidates(types, library, owner, step)?;
+    let is_nullable = candidates.iter().all(|(_, declaration)| {
+        declaration.return_nullness == ReturnNullness::Nullable
+            || (declaration.inference == NullInference::ClosedReturnsNull
+                && declaration.body == Body::Written)
+            || returns_nullable_field(types, library, declaration)
+    });
+    let mut returned = candidates.iter().map(|(declaring, declaration)| {
+        (declaration.return_type == ReturnType::Reference)
+            .then(|| resolve(types, library, declaring, &declaration.returned))
+    });
+    let first = returned.next().flatten();
+    let same = returned.all(|other| other == first);
+    Some((is_nullable, first.filter(|_| same)))
+}
+
+// Las sobrecargas del método del proyecto que el paso puede llamar, en la clase más cercana de las
+// de arriba que lo declara.
+pub(super) fn project_candidates<'summary>(
+    types: &ProjectTypes<'summary>,
+    library: &Library,
+    owner: &str,
+    step: &ChainStep,
+) -> Option<Vec<(&'summary JavaSummary, &'summary Declaration)>> {
+    project_lineage(types, library, owner).iter().find_map(|class| {
         let found: Vec<_> = types
             .declarations_of(class)
             .filter(|(_, declaration)| {
@@ -304,20 +330,7 @@ fn project_step(
             .collect();
         let chosen = if exact.is_empty() { preferred } else { exact };
         (!chosen.is_empty()).then_some(chosen)
-    })?;
-    let is_nullable = candidates.iter().all(|(_, declaration)| {
-        declaration.return_nullness == ReturnNullness::Nullable
-            || (declaration.inference == NullInference::ClosedReturnsNull
-                && declaration.body == Body::Written)
-            || returns_nullable_field(types, library, declaration)
-    });
-    let mut returned = candidates.iter().map(|(declaring, declaration)| {
-        (declaration.return_type == ReturnType::Reference)
-            .then(|| resolve(types, library, declaring, &declaration.returned))
-    });
-    let first = returned.next().flatten();
-    let same = returned.all(|other| other == first);
-    Some((is_nullable, first.filter(|_| same)))
+    })
 }
 
 // Un getter simple de un campo `@Nullable` de su clase (o de una de arriba): IntelliJ lee la llamada

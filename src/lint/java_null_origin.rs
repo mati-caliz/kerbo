@@ -47,15 +47,15 @@ impl NullFlow {
     }
 }
 
-// De dónde puede venir el null: un `null` escrito, una llamada que puede devolverlo, un campo anotado `@Nullable` o el
-// campo de otro objeto, con el tipo de ese objeto como está escrito, el campo arreglo por el que se
+// De dónde puede venir el null: un `null` escrito, una llamada que puede devolverlo, un campo o
+// parámetro anotado `@Nullable` (o el elemento de un arreglo anotado así) o el campo de otro objeto, con el tipo de ese objeto como está escrito, el campo arreglo por el que se
 // llega a él si lo hay (`mapa.segmentos[0].tabla`) y si se volvió a leer después de una llamada
 // (entonces cuenta sólo si el campo es `volatile`, y eso se sabe en el índice).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NullOrigin {
     Literal,
     Call(Chain),
-    NullableField,
+    Annotated,
     QualifiedField {
         owner: String,
         via: Option<String>,
@@ -64,9 +64,12 @@ pub enum NullOrigin {
     },
 }
 
-// En el lugar de un varargs, si el valor puede ser el arreglo entero o es siempre un elemento.
+// En el lugar de un varargs, si el valor puede ser el arreglo entero o es siempre un elemento: el
+// valor de una variable de tipo (que además sólo entra en un parámetro de otra variable o de
+// `Object`) o una variable declarada con un tipo que no es arreglo.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArgumentShape {
     MaybeArray,
     Element,
+    Single,
 }

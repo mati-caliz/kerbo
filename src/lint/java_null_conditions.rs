@@ -17,8 +17,15 @@ const ASSERTS_PRESENT: &[&str] = &["requireNonNull", "assertNotNull", "notNull",
 const ASSERT_THAT: &str = "assertThat";
 const IS_NOT_NULL: &str = "isNotNull";
 const VALUE_FIELD: &str = "value";
-const TRUE_MEANS_PRESENT: &[&str] = &["nonNull", "hasText", "hasLength", "isNotEmpty", "isNotBlank"];
-const FALSE_MEANS_PRESENT: &[&str] = &["isNull", "isEmpty", "isBlank"];
+const TRUE_MEANS_PRESENT: &[&str] = &[
+    "nonNull",
+    "hasText",
+    "hasLength",
+    "isNotEmpty",
+    "isNotBlank",
+    "isInstance",
+];
+const FALSE_MEANS_PRESENT: &[&str] = &["isNull", "isEmpty", "isBlank", "isNullOrEmpty"];
 const FAILS_WHEN_FALSE: &[&str] = &[
     "checkState",
     "checkArgument",

@@ -4,13 +4,13 @@ use super::java::{
 use super::java_dereference::{known_not_null, may_return_null};
 use super::java_inferred_arguments::context_inferred_non_null;
 use super::java_library_arguments::{called_type, inherited_library_class, library_substituted_non_null};
+use super::java_null_origins::may_be_null;
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use super::java_variable_returns::{inherited_project_class, returns_nullable_variable};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body};
-use crate::lint::java_fields::Volatility;
-use crate::lint::java_null_flow::{NullFlow, NullOrigin};
+use crate::lint::java_null_flow::NullFlow;
 use crate::lint::java_null_inference::{ARRAY_SUFFIX, ArgumentShape, NullArgument};
 use crate::lint::java_receiver_arguments::ArgumentNullness;
 use crate::lint::java_receivers::{Receiver, simple_type_name};
@@ -77,7 +77,7 @@ pub fn null_arguments(
         let parameter = context_inferred_non_null(types, library, summary, nested)?;
         Some(report(&nested.inner, parameter))
     });
-    summary
+    let mut findings: Vec<LintFinding> = summary
         .null_arguments
         .iter()
         .chain(possibly_null)
@@ -88,7 +88,10 @@ pub fn null_arguments(
         })
         .chain(inferred)
         .chain(nullable_variables)
-        .collect()
+        .collect();
+    findings.sort_by_key(|finding| (finding.line, finding.column));
+    findings.dedup_by_key(|finding| (finding.line, finding.column));
+    findings
 }
 
 const fn report(argument: &NullArgument, parameter: String) -> LintFinding {
@@ -110,58 +113,11 @@ pub(super) fn reaches(
     summary: &JavaSummary,
     flow: &NullFlow,
 ) -> bool {
-    let origin_may_be_null = match &flow.origin {
-        NullOrigin::Call(chain) => may_return_null(types, library, summary, chain),
-        NullOrigin::NullableField | NullOrigin::Literal => true,
-        NullOrigin::QualifiedField {
-            owner,
-            via,
-            field,
-            after_call,
-        } => is_nullable_field(
-            types,
-            library,
-            summary,
-            (owner, via.as_deref(), field, *after_call),
-        ),
-    };
-    origin_may_be_null
+    may_be_null(types, library, summary, &flow.origin)
         && flow
             .passed_before
             .iter()
             .all(|argument| non_null_parameter(types, library, summary, argument).is_none())
-}
-
-// Si el campo que declara la clase del proyecto (o una de arriba en el proyecto) es `@Nullable` y,
-// leído de nuevo después de una llamada, si es `volatile`. Con un campo arreglo en el medio, el
-// campo es del tipo de sus elementos.
-fn is_nullable_field(
-    types: &ProjectTypes<'_>,
-    library: &Library,
-    summary: &JavaSummary,
-    (owner, via, field, after_call): (&str, Option<&str>, &str, bool),
-) -> bool {
-    let Resolved::Project(mut owner) = resolve(types, library, summary, owner) else {
-        return false;
-    };
-    if let Some(via) = via {
-        let Some((declaring, array)) = project_lineage(types, library, &owner)
-            .iter()
-            .find_map(|class| types.field_of(class, via))
-        else {
-            return false;
-        };
-        let Resolved::Project(element) = resolve(types, library, declaring, &array.type_name) else {
-            return false;
-        };
-        owner = element;
-    }
-    project_lineage(types, library, &owner)
-        .iter()
-        .find_map(|class| types.field_of(class, field))
-        .is_some_and(|(_, declared)| {
-            declared.is_nullable && (!after_call || declared.volatility == Volatility::Volatile)
-        })
 }
 
 // Las clases del proyecto donde buscar el método que recibe el argumento, de la más cercana a la
@@ -337,7 +293,7 @@ fn receives(parameter: &Parameter, argument: &NullArgument) -> bool {
     let holds_type_variable_value = parameter.type_variable || parameter.type_name == OBJECT;
     parameter.accepts_null
         && argument.cast.as_deref().is_none_or(written_as_cast)
-        && (argument.shape == ArgumentShape::MaybeArray || holds_type_variable_value)
+        && (argument.shape != ArgumentShape::Element || holds_type_variable_value)
 }
 
 fn library_non_null(library: &Library, class: &str, argument: &NullArgument) -> Option<String> {

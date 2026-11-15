@@ -22,6 +22,7 @@ const ARGUMENT_UNKNOWN: u64 = 2;
 const ARGUMENT_NON_NULL_VARIABLE: u64 = 3;
 const SHAPE_MAYBE_ARRAY: u64 = 0;
 const SHAPE_ELEMENT: u64 = 1;
+const SHAPE_SINGLE: u64 = 2;
 
 pub fn write_null_argument(writer: &mut Writer, argument: &NullArgument) {
     writer.text(&argument.name);
@@ -36,6 +37,7 @@ pub fn write_null_argument(writer: &mut Writer, argument: &NullArgument) {
     writer.number(match argument.shape {
         ArgumentShape::MaybeArray => SHAPE_MAYBE_ARRAY,
         ArgumentShape::Element => SHAPE_ELEMENT,
+        ArgumentShape::Single => SHAPE_SINGLE,
     });
     write_marking(writer, argument.receiver_arguments.marking);
     writer.list(&argument.receiver_arguments.arguments, |writer, nullness| {
@@ -75,6 +77,7 @@ pub fn read_null_argument(reader: &mut Reader<'_>) -> Result<NullArgument, Corru
         shape: match reader.number()? {
             SHAPE_MAYBE_ARRAY => ArgumentShape::MaybeArray,
             SHAPE_ELEMENT => ArgumentShape::Element,
+            SHAPE_SINGLE => ArgumentShape::Single,
             _ => return Err(Corrupt),
         },
         receiver_arguments: ReceiverArguments {

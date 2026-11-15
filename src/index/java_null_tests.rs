@@ -269,8 +269,8 @@ fn null_passed_to_a_parameter_the_method_dereferences_is_reported() {
             "74:23 text",
             "75:32 text",
             "76:35 texts",
-            "97:25 text",
-            "92:21 field"
+            "92:21 field",
+            "97:25 text"
         ]
     );
 }

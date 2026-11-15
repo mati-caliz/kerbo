@@ -1594,7 +1594,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 790 de los 972 (459 `data-flow-issue`, 284 `null-argument`, 25
+  de más en los dos. En guava, 814 de los 972 (466 `data-flow-issue`, 301 `null-argument`, 25
   `failing-call`, 22 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
@@ -1695,6 +1695,15 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   devuelven posiblemente null (anotación externa). Un receptor que es otra llamada sobre un tipo
   conocido se resuelve por lo que devuelve (`Splitter.on(...).split(X.value())`), y `new File(...)`
   y `Paths.get(...)` no admiten null (anotaciones externas).
+  Un parámetro `@Nullable` (o `@CheckForNull`) entra al flujo como posiblemente null, igual que un
+  campo: pasarlo sin chequear a un parámetro no nulo o desreferenciarlo se marca, también a través
+  de un casteo (`(K) key`, marcado en la variable). El elemento de un parámetro arreglo o varargs
+  con elementos `@Nullable` (`@Nullable Object... data`, `@Nullable Entry<K, V>[] entries`) leído
+  con un índice que no es constante siempre puede ser null: IntelliJ no lo sigue, aunque se acabe
+  de asignar. Un método del proyecto que nadie redefine y cuyo cuerpo es sólo `return parametro;`
+  (`uncheckedCastNullableTToT`) devuelve lo que recibe: llamado sin receptor, es tan nulo como ese
+  argumento (contrato inferido). `isNullOrEmpty(x)` falso e `isInstance(x)` verdadero dan `x` por
+  presente, y una variable declarada con un tipo que no es arreglo va a un varargs como elemento.
   "Passing an argument to the method reference requires unboxing": una referencia a un método
   estático con parámetros primitivos (`Integer::sum`) pasada a un parámetro cuya interfaz funcional
   del JDK le da algo `@Nullable` (`BiFunction<? super V, ? super @Nullable V, ...>` de
@@ -1722,6 +1731,12 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     heredado, la inferencia por contexto más honda (`CacheLoader.from(Suppliers.ofInstance(null))`)
     o con un receptor que es una llamada (`fluent(1, 2, 3).toMap(Functions.constant(null))`) y el
     de `parseInt`/`Ints.tryParse`.
+  - guava, el contrato que devuelve el argumento cuando la llamada de afuera tiene un receptor con
+    comodines (`transformer.transformEntry((K) key, ...)`, `function.apply(uncheckedCastNullableTToT(...))`
+    en Maps, Tables y Streams), los `super(referent, ...)` de las Finalizable*Reference (sustitución
+    de la variable de la clase en el constructor del JDK), `Comparable.compareTo` sobre un casteo
+    (anotación externa) y los campos de `readResolve` pasados a una llamada (`asSet(domain)`,
+    `Charset.forName(charsetCanonicalName)`).
   - guava, 3 de más en LocalCacheTest (1062, 2408, 2449): el `entry` que devuelve `getEntry`.
     IntelliJ le infiere un contrato `null -> null` y no marca después el argumento; kerbo no
     infiere contratos sobre lo que devuelve un método.

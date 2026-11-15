@@ -40,6 +40,7 @@ pub mod java_nested_arguments;
 mod java_null_checks;
 mod java_null_conditions;
 pub mod java_null_flow;
+mod java_null_forwarding;
 pub mod java_null_inference;
 mod java_null_keys;
 mod java_null_loops;
