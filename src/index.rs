@@ -89,6 +89,8 @@ mod java_sequenced_types_tests;
 #[cfg(test)]
 mod java_throw_abstract_tests;
 #[cfg(test)]
+mod java_throw_ambiguous_tests;
+#[cfg(test)]
 mod java_throw_functional_tests;
 #[cfg(test)]
 mod java_throw_reach_tests;

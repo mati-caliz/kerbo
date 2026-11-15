@@ -1569,8 +1569,11 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   Qodana no marca una excepción cuya clase traen dos jars (`jakarta.servlet.ServletException` está
   en `jakarta.servlet-api` y en `winstone`; IntelliJ compara el `PsiClass` que resuelve contra el
   de `findClass`, y con dos copias no coinciden): kerbo tampoco (`Library::is_duplicated`), y el
-  classpath de jenkins suma `winstone` como el proyecto de Qodana. maven (primera corrida): 492 de
-  588 con 10 de más. Guava se mide sin `android/` ni los
+  classpath de jenkins suma `winstone` como el proyecto de Qodana. maven: 492 de 588 con 6 de más.
+  Un nombre simple que declaran varios tipos del proyecto con padres distintos (cuatro
+  `CycleDetectedException` en maven, una no chequeada) responde `is_subclass` sólo si todas las
+  declaraciones dan lo mismo; si no, no se sabe (el arreglo de fondo sigue siendo indexar por nombre
+  calificado). Guava se mide sin `android/` ni los
   `src-super`/`test-super` de GWT (`scripts/parity/java/configs/guava.kerbo.toml`, que `kerbo.sh`
   copia al repo): Qodana sólo analiza los módulos del pom raíz. Falta medir spring-boot.
   - Ya se calca el análisis global de IntelliJ (`RefMethodImpl.updateThrowsList`): lo que tiran los
@@ -1595,7 +1598,9 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     incompleto); una interfaz del proyecto sin métodos no se reconoce en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
   commons-lang 2 de 2, guava 42 de 42 y jenkins 633 de 750, ninguno de más en los cuatro
-  (2026-11-15); maven 67 de 89 con 4 de más (primera corrida). En jenkins faltan sobre todo los
+  (2026-11-15); maven 67 de 89 con 2 de más. Una local también escapa al iniciar el recurso de un
+  `try` (`try (InputStream in = is)`), y un `new` que recibe un campo que se cierra (`this.world`) es
+  de otro. En jenkins faltan sobre todo los
   `listener.error(...)` (devuelven un `PrintWriter`) y los `ExecutorService` (con Java 21 se
   cierran). Un nombre simple que no se importa puede ser una clase anidada de una importada
   (`JenkinsRule.WebClient` llega como `WebClient`).

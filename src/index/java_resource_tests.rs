@@ -114,6 +114,11 @@ final class Recorder implements Closeable {
     }
 }
 
+final class Wrapper extends Client {
+    Wrapper(Client inner) {
+    }
+}
+
 final class Uses {
     private final Rule rule = new Rule();
     private final Recorder logging = new Recorder();
@@ -145,6 +150,16 @@ final class Uses {
         task.run();
     }
 
+    private final Client shared = new Client();
+
+    void handedOver() throws java.io.IOException {
+        Client held = rule.createClient();
+        try (Client inTry = held) {
+            inTry.read();
+        }
+        new Wrapper(this.shared).read();
+    }
+
     Client returned() {
         return rule.createClient().login("dave");
     }
@@ -154,7 +169,8 @@ final class Uses {
 // Las llamadas que devuelven el mismo tipo (un builder) llevan lo creado a la variable de la de más
 // afuera: en un `try (...)` no se marca; en una local que no se cierra, sí, en la creación. Un
 // `return` al final de la cadena no la salva. Una local declarada en una lambda escapa por lo que
-// pasa en esa lambda. Un receptor
+// pasa en esa lambda; una local escapa al iniciar el recurso de un `try`, y un `new` que recibe un
+// campo que se cierra (`this.campo`) es de otro. Un receptor
 // que se cierra, aunque sea un campo, es de otro.
 #[test]
 fn builder_chains_follow_the_outermost_call_and_closeable_receivers_own_the_result() {
@@ -170,5 +186,5 @@ fn builder_chains_follow_the_outermost_call_and_closeable_receivers_own_the_resu
         .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
         .collect();
     found.sort();
-    assert_eq!(found, ["48:14 Client", "52:30 Client", "69:21 Client"]);
+    assert_eq!(found, ["53:14 Client", "57:30 Client", "84:21 Client"]);
 }

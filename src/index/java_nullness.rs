@@ -119,6 +119,16 @@ impl<'summary> ProjectTypes<'summary> {
         self.declared.get(owner).into_iter().flatten().copied()
     }
 
+    // Si el nombre simple lo declaran varios tipos con padres distintos (cuatro `CycleDetectedException`
+    // en maven, unas chequeadas y otra no): sin indexar por nombre calificado, hay que mirar cada una.
+    pub fn is_ambiguous(&self, owner: &str) -> bool {
+        self.declared.get(owner).is_some_and(|declarations| {
+            declarations
+                .iter()
+                .any(|(_, parents)| declarations.first().is_some_and(|(_, first)| first != parents))
+        })
+    }
+
     // El archivo que declara un tipo visto desde otro: si hay varios tipos con ese nombre simple, el
     // único del mismo paquete.
     pub fn declaring_file(&self, owner: &str, from: &JavaSummary) -> Option<&'summary JavaSummary> {

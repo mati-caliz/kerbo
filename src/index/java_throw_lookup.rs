@@ -259,8 +259,28 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
     }
 
     // Si `class` es `ancestor` o hereda de él. Sin leer toda la jerarquía, sólo un sí es seguro.
+    // Con un nombre del proyecto que declaran varios tipos con padres distintos, la respuesta vale
+    // si todos dan la misma; si no, no se sabe.
     pub fn is_subclass(&self, class: &Resolved, ancestor: &Resolved) -> Option<bool> {
-        let mut pending = vec![class.clone()];
+        if let Resolved::Project(owner) = class
+            && class != ancestor
+            && self.types.is_ambiguous(owner)
+        {
+            let mut answers = self.types.declared_in(owner).map(|(summary, parents)| {
+                let starts = parents
+                    .iter()
+                    .map(|parent| self.parent_named(summary, parent))
+                    .collect();
+                self.is_subclass_from(starts, ancestor)
+            });
+            let first = answers.next()?;
+            return answers.all(|other| other == first).then_some(first).flatten();
+        }
+        self.is_subclass_from(vec![class.clone()], ancestor)
+    }
+
+    fn is_subclass_from(&self, starts: Vec<Resolved>, ancestor: &Resolved) -> Option<bool> {
+        let mut pending = starts;
         let mut seen = HashSet::new();
         let mut complete = true;
         while let Some(current) = pending.pop() {

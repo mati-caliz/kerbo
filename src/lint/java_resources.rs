@@ -14,6 +14,9 @@ const GENERIC_TYPE: &str = "generic_type";
 const TYPE_FIELD: &str = "type";
 const ARGUMENTS_FIELD: &str = "arguments";
 const IDENTIFIER: &str = "identifier";
+const FIELD_ACCESS: &str = "field_access";
+const THIS: &str = "this";
+const FIELD_FIELD: &str = "field";
 const LOCAL: &str = "local_variable_declaration";
 const VARIABLE_DECLARATOR: &str = "variable_declarator";
 const RESOURCE: &str = "resource";
@@ -186,6 +189,12 @@ fn owner_origin(owner: Node<'_>, source: &[u8], variables: &Variables) -> Option
             .cloned()
             .flatten()
             .map(ResourceOrigin::Construction),
+        FIELD_ACCESS => owner
+            .child_by_field_name(OBJECT_FIELD)
+            .filter(|object| object.kind() == THIS)
+            .and_then(|_| owner.child_by_field_name(FIELD_FIELD))
+            .and_then(|field| variables.get(text(field, source)).cloned().flatten())
+            .map(ResourceOrigin::Construction),
         _ => None,
     }
 }
@@ -214,7 +223,11 @@ fn escaped_names<'source>(nodes: &[Node<'_>], source: &'source [u8]) -> Escaped<
             continue;
         }
         let name = match node.kind() {
-            RESOURCE | RETURN => single_child(node).filter(|child| child.kind() == IDENTIFIER),
+            RESOURCE => node
+                .child_by_field_name(VALUE_FIELD)
+                .or_else(|| single_child(node))
+                .filter(|child| child.kind() == IDENTIFIER),
+            RETURN => single_child(node).filter(|child| child.kind() == IDENTIFIER),
             ASSIGNMENT => node
                 .child_by_field_name(RIGHT_FIELD)
                 .filter(|right| right.kind() == IDENTIFIER),
