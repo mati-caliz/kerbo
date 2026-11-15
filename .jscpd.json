@@ -50,6 +50,8 @@
     "**/scripts/verify-secrets.sh",
     "**/scripts/verify-sql.sh",
     "**/internal/tenantdb/**",
+    "**/internal/service/**",
+    "**/internal/apicontract/**",
     "**/src/lib/assume-json-shape.ts",
     "**/src/lib/tenant-db.ts",
     "**/src/lib/tenant-leak.ts",

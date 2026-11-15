@@ -30,6 +30,7 @@ EXAMPLES_PER_WORD = 3
 TYPESCRIPT_SUFFIXES = {".ts", ".tsx", ".mts", ".cts"}
 CODE_SUFFIXES = TYPESCRIPT_SUFFIXES | {".py", ".go", ".rs"}
 SKIPPED_PARTS = {
+    "generated",
     "node_modules",
     "dist",
     "build",
