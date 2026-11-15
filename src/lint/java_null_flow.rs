@@ -7,7 +7,9 @@ use super::java_null_conditions::{
     asserted_condition, asserted_present, branch_states, condition_asserted, is_logical, without_cast,
 };
 use super::java_null_forwarding::forwarding_chain;
-use super::java_null_keys::{forget, forget_fields, join, seed_nullable_variables, spellings, tracked_key};
+use super::java_null_keys::{
+    VolatileField, forget, join, reread, seed_nullable_variables, spellings, tracked_key,
+};
 use super::java_null_loops::runs_at_least_once;
 use super::java_null_returns::{method_marking, note_return};
 use super::java_null_uses::{dereference, passed};
@@ -46,6 +48,7 @@ const SWITCH: &str = "switch_expression";
 const SYNCHRONIZED: &str = "synchronized_statement";
 const LABELED: &str = "labeled_statement";
 const ASSERT: &str = "assert_statement";
+const THROW: &str = "throw_statement";
 const EXITS: &[&str] = &[
     "return_statement",
     "throw_statement",
@@ -82,7 +85,7 @@ pub(super) struct Analysis<'source, 'context> {
     pub(super) imported: &'context StaticImports,
     pub(super) flows: Vec<NullFlow>,
     pub(super) partners: HashMap<String, String>,
-    pub(super) forgettable: Vec<(Vec<String>, NullOrigin)>,
+    pub(super) volatile_fields: Vec<VolatileField>,
     pub(super) nullable_elements: Vec<String>,
     pub(super) return_marking: Option<NullMarking>,
 }
@@ -106,7 +109,7 @@ pub fn null_flows(
         imported,
         flows: Vec::new(),
         partners: HashMap::new(),
-        forgettable: Vec::new(),
+        volatile_fields: Vec::new(),
         nullable_elements: Vec::new(),
         return_marking: method_marking(method, source),
     };
@@ -197,13 +200,21 @@ impl Analysis<'_, '_> {
             SWITCH => Some(self.expression(node, state)),
             kind if TRY_STATEMENTS.contains(&kind) => self.try_statement(node, state),
             kind if EXITS.contains(&kind) => {
-                note_return(self, node, &state);
-                for child in named_children(node) {
-                    self.expression(child, state.clone());
-                }
+                self.exit(node, &state);
                 None
             }
             _ => Some(state),
+        }
+    }
+
+    // Un `return`, `throw`, `break`, `continue` o `yield`: lo que devuelve o tira se usa ahí.
+    fn exit(&mut self, node: Node<'_>, state: &State) {
+        note_return(self, node, state.clone());
+        if node.kind() == THROW {
+            dereference(self, node, state.clone());
+        }
+        for child in named_children(node) {
+            self.expression(child, state.clone());
         }
     }
 
@@ -279,7 +290,11 @@ impl Analysis<'_, '_> {
     fn assign(&mut self, variable: String, written: Node<'_>, mut state: State) -> State {
         let keys = spellings(self, variable);
         let value = without_cast(written);
-        let copied = tracked_key(self, value).and_then(|source_key| state.get(&source_key).copied());
+        let source_key = tracked_key(self, value);
+        if let Some(source_key) = &source_key {
+            state = reread(self, state, source_key);
+        }
+        let copied = source_key.and_then(|source_key| state.get(&source_key).copied());
         let chain = (copied.is_none() && value.kind() == INVOCATION)
             .then(|| forwarding_chain(self, value, &state))
             .flatten();
@@ -365,9 +380,6 @@ impl Analysis<'_, '_> {
             current = passed(self, node, current);
         }
         let asserted = asserted_present(node, self.source);
-        if kind == INVOCATION && asserted.is_none() {
-            current = forget_fields(self, node, current);
-        }
         if let Some(asserted) = asserted.and_then(|argument| tracked_key(self, argument)) {
             forget(&mut current, &asserted);
         }

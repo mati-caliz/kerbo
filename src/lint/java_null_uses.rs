@@ -10,7 +10,7 @@ use super::java_null_flow::{
 };
 use super::java_null_forwarding::forwarding_chain;
 use super::java_null_inference::{CallTarget, NullArgument, call_target};
-use super::java_null_keys::{forget, spellings, tracked_key};
+use super::java_null_keys::{forget, reread, spellings, tracked_key};
 use super::java_null_origin::ArgumentShape;
 use super::java_receiver_arguments::ReceiverArguments;
 use super::java_receivers::declared_type;
@@ -24,6 +24,7 @@ const CAST: &str = "cast_expression";
 const TYPE_FIELD: &str = "type";
 const VALUE_FIELD: &str = "value";
 const INDEX_FIELD: &str = "index";
+const THROW: &str = "throw_statement";
 const INTEGER_LITERAL: &str = "decimal_integer_literal";
 const ARRAY_TYPE: &str = "array_type";
 const DIMENSIONS_FIELD: &str = "dimensions";
@@ -42,6 +43,11 @@ pub(super) fn passed(analysis: &mut Analysis<'_, '_>, call: Node<'_>, mut state:
         .filter(|argument| !COMMENTS.contains(&argument.kind()))
         .map(without_cast)
         .collect();
+    for argument in &arguments {
+        if let Some(key) = tracked_key(analysis, *argument) {
+            state = reread(analysis, state, &key);
+        }
+    }
     let untracked = untracked_arguments(analysis, &arguments, &state);
     let passed: Vec<(usize, Node<'_>, String, usize)> = arguments
         .iter()
@@ -163,6 +169,12 @@ pub(super) fn dereference(analysis: &mut Analysis<'_, '_>, node: Node<'_>, mut s
             node.child_by_field_name(ARRAY_FIELD),
             node.child_by_field_name(ARRAY_FIELD),
         ),
+        THROW => {
+            let thrown = named_children(node)
+                .into_iter()
+                .find(|child| !COMMENTS.contains(&child.kind()));
+            (thrown, thrown)
+        }
         CAST if casts_to_primitive(node) => (
             node.child_by_field_name(VALUE_FIELD),
             node.child_by_field_name(VALUE_FIELD),
@@ -184,6 +196,7 @@ pub(super) fn dereference(analysis: &mut Analysis<'_, '_>, node: Node<'_>, mut s
     ) else {
         return state;
     };
+    state = reread(analysis, state, &receiver);
     if let Some(origin) = forget(&mut state, &receiver) {
         let used = dereference_at(analysis, used);
         if let Some(flow) = analysis.flows.get_mut(origin) {

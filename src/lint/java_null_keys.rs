@@ -10,18 +10,6 @@ const THIS: &str = "this";
 const FIELD_FIELD: &str = "field";
 const ARRAY_ACCESS: &str = "array_access";
 const ARRAY_FIELD: &str = "array";
-const NAME_FIELD: &str = "name";
-const PURE_METHODS: &[&str] = &[
-    "hashCode",
-    "equals",
-    "toString",
-    "getClass",
-    "length",
-    "size",
-    "isEmpty",
-    "charAt",
-    "compareTo",
-];
 
 // Saca la variable del estado junto con las que tienen su mismo valor: una copia `y = x` o el
 // campo escrito como `x` y como `this.x`.
@@ -99,6 +87,14 @@ fn qualified_access(analysis: &Analysis<'_, '_>, access: Node<'_>) -> Option<Qua
     })
 }
 
+// Un campo `@Nullable` que puede ser `volatile`: las claves con que se lo lee, de dónde sale el null
+// al releerlo y si ya se sabe que es `volatile` (los de otras variables se saben en el índice).
+pub(super) struct VolatileField {
+    keys: Vec<String>,
+    origin: NullOrigin,
+    known_volatile: bool,
+}
+
 // La clave y, si es un campo, la otra forma de escribirlo.
 pub(super) fn spellings(analysis: &Analysis<'_, '_>, key: String) -> Vec<String> {
     let partner = analysis.partners.get(&key).cloned();
@@ -127,7 +123,11 @@ pub(super) fn seed_nullable_variables(analysis: &mut Analysis<'_, '_>, method: N
     }
     for (keys, volatility) in nullable_field_keys(method, analysis.source) {
         if volatility == Volatility::Volatile {
-            analysis.forgettable.push((keys.clone(), NullOrigin::Annotated));
+            analysis.volatile_fields.push(VolatileField {
+                keys: keys.clone(),
+                origin: NullOrigin::Annotated,
+                known_volatile: true,
+            });
         }
         if let [qualified, bare] = keys.as_slice() {
             analysis.partners.insert(qualified.clone(), bare.clone());
@@ -158,15 +158,16 @@ fn seed_qualified_fields(analysis: &mut Analysis<'_, '_>, method: Node<'_>, stat
         if state.contains_key(&key) {
             continue;
         }
-        analysis.forgettable.push((
-            vec![key.clone()],
-            NullOrigin::QualifiedField {
+        analysis.volatile_fields.push(VolatileField {
+            keys: vec![key.clone()],
+            origin: NullOrigin::QualifiedField {
                 owner: owner.clone(),
                 via: via.clone(),
                 field: field.clone(),
                 after_call: true,
             },
-        ));
+            known_volatile: false,
+        });
         state.insert(key, analysis.flows.len());
         analysis.flows.push(NullFlow::new(NullOrigin::QualifiedField {
             owner,
@@ -177,36 +178,26 @@ fn seed_qualified_fields(analysis: &mut Analysis<'_, '_>, method: Node<'_>, stat
     }
 }
 
-// Después de una llamada IntelliJ olvida lo que sabía de los campos `volatile`: uno `@Nullable` ya
-// chequeado o desreferenciado vuelve a poder ser null, en un flujo nuevo. No si la llamada es sobre
-// el valor del propio campo (`segmento.tabla.length()`) o es de las que IntelliJ sabe puras.
-pub(super) fn forget_fields(
-    analysis: &mut Analysis<'_, '_>,
-    invocation: Node<'_>,
-    mut state: State,
-) -> State {
-    let is_pure = invocation
-        .child_by_field_name(NAME_FIELD)
-        .is_some_and(|name| PURE_METHODS.contains(&analysis.text(name)));
-    if is_pure {
+// IntelliJ no sigue los campos `volatile`: cada lectura es un valor nuevo que puede ser null aunque
+// se haya chequeado, desreferenciado o asignado. Un campo propio `volatile` se relee siempre; el de
+// otra variable (`segmento.tabla`), si el flujo ya no lo sigue, en un flujo que cuenta sólo si su
+// clase lo declara `volatile` (eso se sabe en el índice).
+pub(super) fn reread(analysis: &mut Analysis<'_, '_>, mut state: State, key: &str) -> State {
+    let Some(field) = analysis
+        .volatile_fields
+        .iter()
+        .find(|field| field.keys.iter().any(|known| known == key))
+    else {
+        return state;
+    };
+    let still_followed = field.keys.iter().any(|known| state.contains_key(known));
+    if !field.known_volatile && still_followed {
         return state;
     }
-    let called_on = invocation
-        .child_by_field_name(OBJECT_FIELD)
-        .and_then(|object| tracked_key(analysis, object));
-    for index in 0..analysis.forgettable.len() {
-        let Some((keys, origin)) = analysis.forgettable.get(index) else {
-            continue;
-        };
-        let known = keys.iter().all(|key| !state.contains_key(key));
-        if !known || called_on.as_ref().is_some_and(|called| keys.contains(called)) {
-            continue;
-        }
-        let (keys, origin) = (keys.clone(), origin.clone());
-        for key in keys {
-            state.insert(key, analysis.flows.len());
-        }
-        analysis.flows.push(NullFlow::new(origin));
+    let (keys, origin) = (field.keys.clone(), field.origin.clone());
+    for spelling in keys {
+        state.insert(spelling, analysis.flows.len());
     }
+    analysis.flows.push(NullFlow::new(origin));
     state
 }

@@ -144,12 +144,18 @@ final class Reader {
 ";
 
 // El campo `@Nullable` de otra clase del proyecto, leído desde una variable de ese tipo, se marca en
-// su primer uso sin chequeo, también copiado a una local; no si se chequea al asignarlo.
+// su uso sin chequeo, también copiado a una local; no si se chequea la local al asignarla. Como es
+// `volatile`, cada lectura del campo puede ser null aunque se haya chequeado.
 #[test]
 fn a_nullable_field_of_another_object_is_reported() {
     assert_eq!(
         findings_in(QUALIFIED_FIELDS, "data-flow-issue"),
-        ["15:30 length()", "20:22 length()"]
+        [
+            "15:30 length()",
+            "15:55 length()",
+            "20:22 length()",
+            "27:30 length()"
+        ]
     );
 }
 

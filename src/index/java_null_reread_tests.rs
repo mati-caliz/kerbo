@@ -30,20 +30,62 @@ final class Forgetful {
 }
 ";
 
-// Después de una llamada, un campo `@Nullable` y `volatile` vuelve a poder ser null aunque ya se
-// haya chequeado o desreferenciado; uno que no es `volatile` no, ni una llamada sobre el valor del
-// campo.
+// IntelliJ no sigue un campo `@Nullable` y `volatile`: cada lectura puede ser null aunque ya se
+// haya chequeado o desreferenciado. Uno que no es `volatile` se sigue como una variable.
 #[test]
-fn a_volatile_nullable_field_is_forgotten_after_each_call() {
+fn a_volatile_nullable_field_is_possibly_null_on_every_read() {
+    let mut found = findings_in(FORGOTTEN, "data-flow-issue");
+    found.sort();
     assert_eq!(
-        findings_in(FORGOTTEN, "data-flow-issue"),
+        found,
         [
             "15:23 length()",
-            "19:23 length()",
+            "16:23 length()",
             "18:23 length()",
+            "19:23 length()",
+            "23:17 length()",
             "25:17 length()"
         ]
     );
+}
+
+const REASSIGNED: &str = r"package app;
+
+import java.util.concurrent.CountDownLatch;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+final class Closeables {
+    private volatile @Nullable CountDownLatch whenClosed;
+    private volatile @Nullable Exception failure;
+    private @Nullable Exception plain;
+
+    CountDownLatch whenClosedCountDown() {
+        whenClosed = new CountDownLatch(1);
+        return whenClosed;
+    }
+
+    void rethrow() throws Exception {
+        if (failure != null) {
+            throw failure;
+        }
+        if (plain != null) {
+            throw plain;
+        }
+        throw plain;
+    }
+}
+";
+
+// Asignar un campo `volatile` no lo deja presente: lo que se devuelve es otra lectura. `throw x`
+// desreferencia a `x`.
+#[test]
+fn a_reassigned_volatile_field_is_still_possibly_null() {
+    assert_eq!(findings_in(REASSIGNED, "nullable-return"), ["15:16 whenClosed"]);
+    let mut thrown = findings_in(REASSIGNED, "data-flow-issue");
+    thrown.sort();
+    assert_eq!(thrown, ["20:19 failure()", "25:15 plain()"]);
 }
 
 const THROUGH_ARRAYS: &str = r"package app;

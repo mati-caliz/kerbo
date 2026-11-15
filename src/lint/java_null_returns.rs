@@ -3,7 +3,7 @@ use tree_sitter::Node;
 use super::java::{text, unparenthesized};
 use super::java_calls::annotated_with;
 use super::java_null_flow::{Analysis, NULL, NullFlow, NullOrigin, PARENTHESIZED, State};
-use super::java_null_keys::tracked_key;
+use super::java_null_keys::{reread, tracked_key};
 use super::java_null_origin::NullReturn;
 use super::java_nullable_fields::declares_nullable_type;
 use super::java_owner::{NullMarking, null_marking_of};
@@ -78,7 +78,7 @@ fn returned(expression: Node<'_>, source: &[u8], marking: NullMarking) -> NullRe
 
 // Anota lo que sale por el `return`: un `null` escrito es un flujo propio, y una variable que el
 // flujo sigue suma la devolución a su flujo.
-pub(super) fn note_return(analysis: &mut Analysis<'_, '_>, statement: Node<'_>, state: &State) {
+pub(super) fn note_return(analysis: &mut Analysis<'_, '_>, statement: Node<'_>, state: State) {
     let Some(marking) = analysis.return_marking.filter(|_| statement.kind() == RETURN) else {
         return;
     };
@@ -96,7 +96,11 @@ pub(super) fn note_return(analysis: &mut Analysis<'_, '_>, statement: Node<'_>, 
         analysis.flows.push(flow);
         return;
     }
-    let origin = tracked_key(analysis, value).and_then(|key| state.get(&key).copied());
+    let Some(key) = tracked_key(analysis, value) else {
+        return;
+    };
+    let state = reread(analysis, state, &key);
+    let origin = state.get(&key).copied();
     if let Some(flow) = origin.and_then(|origin| analysis.flows.get_mut(origin)) {
         flow.returns.push(noted);
     }

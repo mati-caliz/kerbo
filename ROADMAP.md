@@ -1594,8 +1594,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 814 de los 972 (466 `data-flow-issue`, 301 `null-argument`, 25
-  `failing-call`, 22 `nullable-return`), con 3
+  de más en los dos. En guava, 824 de los 972 (474 `data-flow-issue`, 301 `null-argument`, 25
+  `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
   `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
@@ -1607,9 +1607,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   y en un varargs cuenta como elemento salvo que se pase el arreglo entero (sin casteo o casteado a
   arreglo): el elemento sólo es no nulo por `@NullMarked`, no por desreferencias del cuerpo. Lo
   que falta de guava, lo más grande: campos `@Nullable` calificados con un acceso a arreglo
-  (`map.segments[0].table`), el estado que IntelliJ olvida en cada llamada (marca dos veces el
-  mismo campo con un `segment.expand()` en el medio), campos
-  `volatile` que IntelliJ olvida en cada llamada. Bajo `@NullMarked`/`@NonNullApi` (del paquete, la clase o las que la encierran, cortado
+  (`map.segments[0].table`). Bajo `@NullMarked`/`@NonNullApi` (del paquete, la clase o las que la encierran, cortado
   por `@NullUnmarked`) un parámetro sin anotar es no nulo aunque el método se pueda redefinir; no
   si su tipo es una variable con límite `@Nullable` o el tipo calificado lleva `@Nullable` en su
   último tramo (`Spliterator.@Nullable OfInt`). Un método traído con `import static` explícito se
@@ -1635,12 +1633,11 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `PrivilegedAction` del JDK) en cuyo lugar se escribió un tipo concreto, o una variable del método
   sin límite `@Nullable` si la llamada tiene un tipo destino (`Collector<...> c =
   toImmutableTable(t -> null, ...)`; sin destino, IntelliJ la infiere de la lambda y no marca).
-  Falta en guava (9): los campos `volatile` releídos (`return logger` en LazyLogger, `whenClosed`
-  en ClosingFuture), `convert(fromIterator.next())` dentro de una clase anónima,
+  Falta en guava (7): `convert(fromIterator.next())` dentro de una clase anónima,
   `uncheckedCastNullableTToT(...)` en StandardTable, y los 5 "type-variable return type may be
   instantiated as non-null" (`return null` y `return t` con `@Nullable T t` en los dos
-  NullnessCasts, que piden sembrar los parámetros `@Nullable` en el flujo, y `return result` en
-  AbstractIterator, que pide inferir que `uncheckedCastNullableTToT` devuelve su argumento).
+  NullnessCasts, y `return result` en AbstractIterator): kerbo no calca ese mensaje para un
+  retorno que es una variable de tipo con límite `@Nullable`.
   Un método del proyecto que se declara `@Nullable` (también `@CheckForNull` y `char @Nullable []`)
   devuelve posiblemente null; la raíz de una cadena puede ser una constante traída con
   `import static` (un valor de enum o un campo estático); y una llamada que puede devolver null
@@ -1652,10 +1649,11 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   String`, un comodín u otra variable de tipo, ni si el método declara su propia variable. Una
   variable que el archivo declara con tipos distintos toma el tipo de la lambda o el método más
   cercano que la declara.
-  Después de cada llamada que no es pura, un campo `@Nullable` y `volatile` (propio o de otra
-  variable, como `segment.table`) vuelve a poder ser null: IntelliJ olvida lo que sabía de él. Los
-  que no son `volatile` no se olvidan (Qodana no los vuelve a marcar en TreeMultiset ni en
-  LinkedHashMultimapTest). Un campo `@Nullable` puede alcanzarse por un elemento de un arreglo que es
+  IntelliJ no sigue los campos `volatile` (`PlainDescriptor.createValue`): cada lectura de uno
+  `@Nullable` (propio o de otra variable, como `segment.table`) puede ser null aunque se acabe de
+  chequear, desreferenciar o asignar (`whenClosed = new CountDownLatch(1); return whenClosed;`). Los
+  que no son `volatile` se siguen como una variable (Qodana no los vuelve a marcar en TreeMultiset
+  ni en LinkedHashMultimapTest). `throw x` desreferencia a `x`. Un campo `@Nullable` puede alcanzarse por un elemento de un arreglo que es
   campo de una variable (`map.segments[0].table`). Desempaquetan lo que puede ser null un casteo a
   primitivo (`(int) mmHeap.peek()`, también de una variable), una cuenta (`queue.poll() ^ x`; no
   `+` ni `==`) y pasarlo a un parámetro primitivo de un método del proyecto. El `@Nullable` de un
