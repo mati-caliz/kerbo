@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use crate::lint::java::VARIABLE_DECLARATOR;
+use crate::lint::java_null_inference::{is_overridable, returns_null};
 use crate::lint::java_owner::annotation_names;
 use crate::lint::java_type_variables::{has_nullable_qualified_type, has_nullable_type_variable};
 
@@ -67,5 +68,24 @@ pub(super) fn parameter_nullness(name: Node<'_>, source: &[u8]) -> ParameterNull
         ParameterNullness::NullableVariable
     } else {
         ParameterNullness::Unannotated
+    }
+}
+
+// Lo que IntelliJ infiere de nulos en un método: nada si se puede redefinir, y si no, si devuelve
+// `null` sin un contrato que lo explique.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NullInference {
+    Overridable,
+    Closed,
+    ClosedReturnsNull,
+}
+
+pub(super) fn inference_of(method: Option<Node<'_>>, source: &[u8]) -> NullInference {
+    if method.is_none_or(is_overridable) {
+        NullInference::Overridable
+    } else if method.is_some_and(|declaration| returns_null(declaration, source)) {
+        NullInference::ClosedReturnsNull
+    } else {
+        NullInference::Closed
     }
 }

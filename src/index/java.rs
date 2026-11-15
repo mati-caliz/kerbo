@@ -7,6 +7,8 @@ use super::java_annotation_values::{
 };
 use super::java_exposure::{DeclaredType, Exposure, exposures};
 use super::java_header::{imported_paths, package_annotations, package_of};
+pub use super::java_parameter_nullness::NullInference;
+use super::java_parameter_nullness::inference_of;
 use super::java_parameter_nullness::parameter_nullness;
 use crate::lint::java_calls::{
     Arity, Body, Call, Callable, ResultUse, ReturnType, Returns, TYPE_DECLARATIONS, Visibility, extract,
@@ -25,9 +27,7 @@ use crate::lint::java_lambda_returns::LambdaReturn;
 use crate::lint::java_lambda_targets::{LambdaTargets, lambda_targets_of};
 use crate::lint::java_nested_arguments::{NestedNull, ReferenceArgument};
 use crate::lint::java_null_flow::NullFlow;
-use crate::lint::java_null_inference::{
-    NullArgument, accepts_null, is_overridable, null_arguments_in, parameter_type_name, returns_null,
-};
+use crate::lint::java_null_inference::{NullArgument, accepts_null, null_arguments_in, parameter_type_name};
 use crate::lint::java_nullable_fields::{ReturnNullness, declares_nullable, return_nullness};
 use crate::lint::java_owner::Owner;
 use crate::lint::java_pmd_suppressions::{SuppressedSpan, suppressed_spans};
@@ -86,15 +86,6 @@ pub enum Dereferenced {
     No,
     Always,
     AlwaysFirst,
-}
-
-// Lo que IntelliJ infiere de nulos en un método: nada si se puede redefinir, y si no, si devuelve
-// `null` sin un contrato que lo explique.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NullInference {
-    Overridable,
-    Closed,
-    ClosedReturnsNull,
 }
 
 // Un método o constructor tal como lo necesita el índice: sin nodos, para guardarlo en la caché.
@@ -269,16 +260,6 @@ fn read_names(callable: &Callable<'_>, source: &[u8]) -> HashSet<String> {
         .filter_map(|node| node.utf8_text(source).ok())
         .map(str::to_owned)
         .collect()
-}
-
-fn inference_of(method: Option<Node<'_>>, source: &[u8]) -> NullInference {
-    if method.is_none_or(is_overridable) {
-        NullInference::Overridable
-    } else if method.is_some_and(|declaration| returns_null(declaration, source)) {
-        NullInference::ClosedReturnsNull
-    } else {
-        NullInference::Closed
-    }
 }
 
 fn declaration_of(callable: Callable<'_>, scope: &str, source: &[u8]) -> Declaration {
