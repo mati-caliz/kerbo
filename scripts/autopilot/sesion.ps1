@@ -92,6 +92,22 @@ function Proxima-Etapa([string]$Carpeta) {
         Select-Object -First 1
 }
 
+# Los carriles arrancan juntos: elegir y tomar la etapa va bajo un mutex del sistema, o dos carriles
+# eligen la misma y chocan al escribir la toma.
+function Tomar-Proxima-Etapa([string]$Carpeta) {
+    $Candado = [System.Threading.Mutex]::new($false, 'Global\kerbo-autopilot-tomas')
+    try {
+        try { $Candado.WaitOne() | Out-Null } catch [System.Threading.AbandonedMutexException] {}
+        $Elegida = Proxima-Etapa $Carpeta
+        if ($Elegida) {
+            $Toma = Join-Path $Tomas "etapa-$($Elegida.Numero).carril"
+            [System.IO.File]::WriteAllText($Toma, "$Carril $PID", [System.Text.Encoding]::ASCII)
+        }
+        return $Elegida
+    }
+    finally { $Candado.ReleaseMutex(); $Candado.Dispose() }
+}
+
 function Mantener-Despierta {
     Add-Type -Namespace Kerbo -Name Energia -MemberDefinition @'
 [DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint estado);
@@ -166,10 +182,9 @@ $ErroresSeguidos = 0
 $Carpeta = Carpeta-Del-Carril
 while (-not (Test-Path $Parada)) {
     Al-Dia $Carpeta
-    $Elegida = Proxima-Etapa $Carpeta
+    $Elegida = Tomar-Proxima-Etapa $Carpeta
     if (-not $Elegida) { Write-Host 'No queda ninguna etapa libre.' -ForegroundColor Yellow; break }
     $Toma = Join-Path $Tomas "etapa-$($Elegida.Numero).carril"
-    Set-Content -Path $Toma -Value "$Carril $PID" -Encoding ASCII
     $ElModelo = $Modelo
     if (-not $ElModelo) { $ElModelo = $ModelosPorEtapa[$Elegida.Numero] }
     if (-not $ElModelo) { $ElModelo = $ModeloPorDefecto }
