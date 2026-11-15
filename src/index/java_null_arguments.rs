@@ -32,6 +32,10 @@ const LIBRARY_NON_NULL: &[(&str, &str, usize, usize, &str)] = &[
     ("java.io.File", "File", 1, 0, "pathname"),
     ("java.nio.file.Paths", "get", 1, 0, "first"),
     ("java.util.concurrent.ConcurrentMap", "remove", 2, 0, "key"),
+    ("java.util.Collection", "toArray", 1, 0, "a"),
+    ("java.io.OutputStream", "write", 1, 0, "b"),
+    ("java.io.OutputStream", "write", 3, 0, "b"),
+    ("java.lang.Comparable", "compareTo", 1, 0, "o"),
 ];
 
 // Calca el "Passing 'null' argument to parameter annotated as non-null" de DataFlowIssue con lo que

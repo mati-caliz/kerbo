@@ -335,3 +335,41 @@ fn a_called_receiver_is_resolved_by_what_it_returns() {
     found.sort();
     assert_eq!(found, ["30:32 text", "31:32 text", "32:18 pathname"]);
 }
+
+const EXTERNAL: &str = r"package app;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Collection;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+final class External {
+    static <E extends @Nullable Object> int wrap(E[] array) {
+        return array.length;
+    }
+
+    static <E extends @Nullable Object> int spread(E... elements) {
+        return elements.length;
+    }
+
+    void call(Collection<Object> keys, OutputStream stream) throws IOException {
+        keys.toArray((Object[]) null);
+        stream.write(null);
+        stream.write(null, 0, 1);
+        wrap((String[]) null);
+        spread((String) null);
+    }
+}
+";
+
+// `Collection.toArray(T[])` y `OutputStream.write(byte[]...)` no admiten null por las anotaciones
+// externas de IntelliJ. Un arreglo `E[]` no admite null aunque `E` sí; sí lo admite un elemento de
+// un varargs `E...`.
+#[test]
+fn external_annotations_and_arrays_of_nullable_variables_reject_null() {
+    let mut found = findings_in(EXTERNAL, "null-argument");
+    found.sort();
+    assert_eq!(found, ["20:33 a", "21:22 b", "22:22 b", "23:25 array"]);
+}

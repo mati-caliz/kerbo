@@ -1594,7 +1594,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 829 de los 972 (479 `data-flow-issue`, 301 `null-argument`, 25
+  de más en los dos. En guava, 836 de los 972 (479 `data-flow-issue`, 308 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
@@ -1617,7 +1617,9 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   mientras la cadena no tenga argumentos y no se reasigne la variable. Un `poll()` o `peek()` dentro de un `while`/`if` que chequea `!cola.isEmpty()` no avisa (IntelliJ sigue el tamaño), y la raíz de una cadena declarada con tipos distintos en el archivo toma el tipo del alcance del uso. `File.getParent` y
   `getParentFile` no cuentan como nulos: Qodana no los marca nunca. Del JDK, los parámetros que
   sus anotaciones externas dan por no nulos (`Future.get`, `Collection.addAll`/`removeAll`/...,
-  `Map.putAll`), también en las clases que los heredan. `failing-call` calca "The call to X
+  `Map.putAll`, `Collection.toArray(T[])`, `OutputStream.write(byte[]...)`, `Comparable.compareTo`),
+  también en las clases que los heredan. Un parámetro `E[]` (no varargs) no admite un arreglo null
+  aunque `E` tenga límite `@Nullable`. `failing-call` calca "The call to X
   always fails, according to its method contracts" con las cláusulas `fail` que IntelliJ infiere
   del cuerpo y las escritas a mano de Validate, Spring Assert, JUnit y TestNG, con receptores
   calificados con el paquete y variables que un `if` chequeó no nulas.

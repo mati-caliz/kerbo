@@ -7,6 +7,10 @@ use crate::lint::java_type_variables::{has_nullable_qualified_type, has_nullable
 const NULLABLE_ANNOTATIONS: &[&str] = &["Nullable", "CheckForNull"];
 const NON_NULL_ANNOTATIONS: &[&str] = &["NonNull", "NotNull", "Nonnull"];
 const PARAMETRIC_NULLNESS: &[&str] = &["ParametricNullness"];
+const FORMAL_PARAMETER: &str = "formal_parameter";
+const DIMENSIONS_FIELD: &str = "dimensions";
+const TYPE_FIELD: &str = "type";
+const ARRAY_TYPE: &str = "array_type";
 
 // Lo que el parámetro dice de su nulabilidad: una anotación (`@Nullable`, `@NonNull`...), nada, o
 // nada pero con un tipo que es una variable que admite null (`<T extends @Nullable Object>`, o una
@@ -41,12 +45,24 @@ fn declares_nullness(name: Node<'_>, source: &[u8], annotations: &[&str]) -> boo
         .any(|annotation| annotations.contains(&annotation.as_str()))
 }
 
+// `E[] arreglo` (no un varargs): aunque `E` admita null, el arreglo no.
+fn is_plain_array(name: Node<'_>) -> bool {
+    name.parent().is_some_and(|parameter| {
+        parameter.kind() == FORMAL_PARAMETER
+            && (parameter.child_by_field_name(DIMENSIONS_FIELD).is_some()
+                || parameter
+                    .child_by_field_name(TYPE_FIELD)
+                    .is_some_and(|written| written.kind() == ARRAY_TYPE))
+    })
+}
+
 pub(super) fn parameter_nullness(name: Node<'_>, source: &[u8]) -> ParameterNullness {
     if declares_nullness(name, source, NULLABLE_ANNOTATIONS) || has_nullable_qualified_type(name, source) {
         ParameterNullness::Nullable
     } else if declares_nullness(name, source, NON_NULL_ANNOTATIONS) {
         ParameterNullness::NonNull
-    } else if has_nullable_type_variable(name, source) || declares_nullness(name, source, PARAMETRIC_NULLNESS)
+    } else if !is_plain_array(name)
+        && (has_nullable_type_variable(name, source) || declares_nullness(name, source, PARAMETRIC_NULLNESS))
     {
         ParameterNullness::NullableVariable
     } else {
