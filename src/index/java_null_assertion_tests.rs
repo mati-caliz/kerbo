@@ -193,3 +193,53 @@ final class Queue {
 fn a_value_already_passed_to_a_non_null_parameter_is_not_reported_again() {
     assert_eq!(findings_in(PASSED_TWICE, "null-argument"), ["29:26 user"]);
 }
+
+const OWN_ANNOTATION: &str = r"package app;
+
+import org.example.annotations.Nullable;
+
+interface Node {
+    @Nullable
+    Node child(String name);
+
+    String value();
+}
+
+final class Reader {
+    static String read(Node node) {
+        return node.child(node.value()).value();
+    }
+}
+";
+
+const KNOWN_ANNOTATION: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+
+interface Node {
+    @Nullable
+    Node child(String name);
+
+    String value();
+}
+
+final class Reader {
+    static String read(Node node) {
+        return node.child(node.value()).value();
+    }
+}
+";
+
+// IntelliJ sólo reconoce las anotaciones de nulidad de paquetes conocidos: una propia que se llama
+// `Nullable` (la de maven, `org.apache.maven.api.annotations`) no dice nada.
+#[test]
+fn only_known_nullness_annotations_count() {
+    assert_eq!(
+        findings_in(OWN_ANNOTATION, "data-flow-issue"),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        findings_in(KNOWN_ANNOTATION, "data-flow-issue"),
+        ["14:41 value()"]
+    );
+}

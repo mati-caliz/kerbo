@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, modifiers, text};
+use super::java_nullness_annotations::is_recognized;
 use super::java_receivers::simple_type_name;
 use crate::syntax::named_children;
 
@@ -152,6 +153,7 @@ pub fn annotation_names(declaration: Node<'_>, source: &[u8]) -> Vec<String> {
         .into_iter()
         .filter(|child| ANNOTATIONS.contains(&child.kind()))
         .filter_map(|annotation| annotation.child_by_field_name(NAME_FIELD))
+        .filter(|name| is_recognized(*name, source))
         .map(|name| {
             let written = text(name, source);
             written

@@ -7,6 +7,7 @@ use super::java::{NAME_FIELD, text};
 use super::java_calls::annotated_with;
 use super::java_deserialization::resolved_without_construction;
 use super::java_fields::{Volatility, volatility_of};
+use super::java_nullness_annotations::is_recognized;
 use crate::syntax::{descendants, named_children};
 
 const NULLABLE: &str = "Nullable";
@@ -231,6 +232,7 @@ fn annotated_after_type_parameters(declaration: Node<'_>, simple_name: &str, sou
         .into_iter()
         .filter(|child| ANNOTATION_KINDS.contains(&child.kind()))
         .filter_map(|annotation| annotation.child_by_field_name(NAME_FIELD))
+        .filter(|name| is_recognized(*name, source))
         .any(|name| text(name, source).rsplit(QUALIFIER_SEPARATOR).next() == Some(simple_name))
 }
 

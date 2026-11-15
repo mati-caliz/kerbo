@@ -10,6 +10,7 @@ use super::java_chains::{Chain, NullFacts, chain_of};
 use super::java_constants::{Constants, constant_value, constants_in};
 use super::java_implicit_constructor::implicit_enum_constructor;
 use super::java_null_flow::{NullFlow, null_flows};
+use super::java_nullness_annotations::is_recognized;
 use super::java_owner::{Owner, annotation_names, mentioned_name, owner_of};
 use super::java_receivers::{
     Receiver, StaticImports, Variables, simple_type_name, supertypes, type_arguments, variable_types,
@@ -326,6 +327,7 @@ pub(super) fn annotated_with(node: Node<'_>, simple_name: &str, source: &[u8]) -
             .into_iter()
             .filter(|child| ANNOTATIONS.contains(&child.kind()))
             .filter_map(|annotation| annotation.child_by_field_name(NAME_FIELD))
+            .filter(|name| is_recognized(*name, source))
             .any(|name| {
                 let written = text(name, source);
                 written.rsplit(QUALIFIER_SEPARATOR).next() == Some(simple_name)

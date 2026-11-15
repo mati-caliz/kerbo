@@ -1630,8 +1630,10 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `boolean` que no se reasigna guarda su chequeo (`boolean colapsado = ... && padre != null; if
   (colapsado) padre.x`), y `ws = b != null ? b.getWorkspace() : null` hace que `ws` no nulo deje
   presente a `b`. Pasar un valor a un método del proyecto que siempre falla con null en ese lugar
-  (cláusula `fail` inferida: `checkGoodName(name)`) lo deja presente después. maven (primera
-  corrida, 2026-11-15): 40 de 140 con 98 de más, sin mirar todavía. Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
+  (cláusula `fail` inferida: `checkGoodName(name)`) lo deja presente después. maven (2026-11-15):
+  40 de 140, ninguno de más. Una anotación de nulidad sólo cuenta si es de un paquete que IntelliJ
+  conoce sin configurar (JetBrains, JSR-305, JSpecify, Checker, Android, Spring, ...): el
+  `org.apache.maven.api.annotations.Nullable` propio de maven no dice nada (daba 98 de más). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
   `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
   calificador. El campo de una variable de tipo conocido (`segment.table`) entra al flujo con su

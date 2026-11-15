@@ -56,6 +56,7 @@ mod java_null_origin;
 mod java_null_returns;
 mod java_null_uses;
 pub mod java_nullable_fields;
+pub mod java_nullness_annotations;
 mod java_numeric_types;
 mod java_optional;
 mod java_order;
