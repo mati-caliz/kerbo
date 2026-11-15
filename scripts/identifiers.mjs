@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
+import process from "node:process";
 
 const [packageDir] = process.argv.slice(2);
 const ts = createRequire(path.join(packageDir, "package.json"))("typescript");
