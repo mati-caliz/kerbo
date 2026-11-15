@@ -10,6 +10,7 @@ pub mod java_exposure;
 mod java_failing_calls;
 mod java_forwarded_returns;
 mod java_header;
+mod java_import_shadow_rule;
 mod java_inferred_arguments;
 mod java_inspection_suppressions;
 mod java_jdk;
@@ -26,6 +27,7 @@ mod java_resource_owners;
 mod java_resources;
 mod java_rules;
 mod java_sequenced_types;
+mod java_size_chain_rule;
 mod java_substituted_returns;
 mod java_taint;
 mod java_throw_functional;
@@ -59,6 +61,8 @@ mod java_escapes_tests;
 #[cfg(test)]
 mod java_failing_calls_tests;
 #[cfg(test)]
+mod java_import_shadow_tests;
+#[cfg(test)]
 mod java_null_assertion_tests;
 #[cfg(test)]
 mod java_null_iteration_tests;
@@ -86,6 +90,8 @@ mod java_nullable_return_tests;
 mod java_resource_tests;
 #[cfg(test)]
 mod java_sequenced_types_tests;
+#[cfg(test)]
+mod java_size_chain_tests;
 #[cfg(test)]
 mod java_throw_abstract_tests;
 #[cfg(test)]

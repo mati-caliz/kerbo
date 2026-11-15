@@ -7,12 +7,13 @@ use crate::deploy::{self, Violation};
 use crate::duplicates::{DuplicateUnits, duplicate_units};
 use crate::index::java::{JavaSummary, summarize};
 use crate::language::Language;
-use crate::limits::Limits;
+use crate::limits::{JavaReference, Limits};
 use crate::lines::LineMap;
 use crate::lint::ecmascript::taint::ecmascript_taints;
 use crate::lint::go::platform::GoPlatform;
 use crate::lint::go::taint::go_taints;
 use crate::lint::go::{GoPackageFacts, package_facts};
+use crate::lint::java_import_shadows::import_shadows;
 use crate::lint::java_sequenced_collection::library_candidates;
 use crate::lint::python::taint::python_taints;
 use crate::lint::taint::{TaintFamily, TaintMethod};
@@ -184,6 +185,9 @@ pub fn analyze_unit(
         .then(|| {
             let mut summary = summarize(root, source);
             summary.sequenced_candidates = library_candidates(root, source, limits.java_release());
+            if limits.java_reference() == JavaReference::Pmd {
+                summary.import_shadows = import_shadows(root, source);
+            }
             summary
         }),
         taints: TaintRule::ALL

@@ -19,6 +19,7 @@ use crate::lint::java_fields::{
     DeclaredField, Volatility, declared_fields, used_identifiers, written_only_identifiers,
 };
 use crate::lint::java_generics::{Generics, generics_of};
+use crate::lint::java_import_shadows::{ImportShadow, nested_types};
 use crate::lint::java_inference::{dereferenced_first, unconditionally_dereferenced};
 use crate::lint::java_lambda_returns::LambdaReturn;
 use crate::lint::java_lambda_targets::{LambdaTargets, lambda_targets_of};
@@ -34,6 +35,7 @@ use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
 use crate::lint::java_returns::returned_field;
 use crate::lint::java_sequenced_collection::SequencedCandidate;
+use crate::lint::java_size_is_empty::{SizeCandidate, array_methods, chained_candidates};
 use crate::lint::java_throws::MethodThrows;
 use crate::lint::java_type_arguments::{TypeArgument, parameter_type_arguments};
 use crate::lint::java_type_variables::is_type_variable;
@@ -176,6 +178,10 @@ pub struct JavaSummary {
     pub annotation_values: Vec<AnnotationValue>,
     pub sequenced_candidates: Vec<SequencedCandidate>,
     pub suppressed_spans: Vec<SuppressedSpan>,
+    pub nested_types: Vec<(String, String)>,
+    pub import_shadows: Vec<ImportShadow>,
+    pub size_candidates: Vec<SizeCandidate>,
+    pub array_methods: Vec<String>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -194,6 +200,9 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         ..JavaSummary::default()
     };
     summary.annotation_defaults = annotation_defaults(root, source, &summary.package);
+    summary.nested_types = nested_types(root, source);
+    summary.size_candidates = chained_candidates(root, source);
+    summary.array_methods = array_methods(root, source);
     for top_level in named_children(root)
         .into_iter()
         .filter(|node| TYPE_DECLARATIONS.contains(&node.kind()))

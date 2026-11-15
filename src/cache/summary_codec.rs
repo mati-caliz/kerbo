@@ -1,6 +1,6 @@
 use super::annotation_codec::{
-    read_annotation_default, read_annotation_value, read_sequenced_candidate, write_annotation_default,
-    write_annotation_value, write_sequenced_candidate,
+    read_annotation_default, read_annotation_value, read_resolution_candidates, write_annotation_default,
+    write_annotation_value, write_resolution_candidates,
 };
 use super::chain_codec::{
     read_chain, read_flow, read_resource_origin, write_chain, write_flow, write_resource_origin,
@@ -116,15 +116,15 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     write_references(writer, &summary.references);
     writer.list(&summary.annotation_defaults, write_annotation_default);
     writer.list(&summary.annotation_values, write_annotation_value);
-    writer.list(&summary.sequenced_candidates, write_sequenced_candidate);
     writer.list(&summary.suppressed_spans, write_suppressed_span);
+    write_resolution_candidates(writer, summary);
 }
 
 pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corrupt> {
     if reader.number()? == ABSENT {
         return Ok(None);
     }
-    Ok(Some(JavaSummary {
+    let mut summary = JavaSummary {
         declarations: reader.list(read_declaration)?,
         calls: reader.list(|reader| {
             Ok(CallSite {
@@ -187,9 +187,11 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         references: read_references(reader)?,
         annotation_defaults: reader.list(read_annotation_default)?,
         annotation_values: reader.list(read_annotation_value)?,
-        sequenced_candidates: reader.list(read_sequenced_candidate)?,
         suppressed_spans: reader.list(read_suppressed_span)?,
-    }))
+        ..JavaSummary::default()
+    };
+    read_resolution_candidates(reader, &mut summary)?;
+    Ok(Some(summary))
 }
 
 pub(super) fn write_visibility(writer: &mut Writer, visibility: Visibility) {

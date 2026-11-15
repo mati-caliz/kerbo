@@ -13,6 +13,9 @@ pub fn tag_problem(problem: JavadocTagProblem, subject: &str) -> String {
         JavadocTagProblem::InvalidInheritDoc => {
             format!("`{subject}` no hereda nada en un constructor, un método static o uno privado")
         }
+        JavadocTagProblem::ParseError => {
+            format!("El HTML del Javadoc no se puede leer y sus etiquetas no se revisan: `{subject}`")
+        }
     }
 }
 

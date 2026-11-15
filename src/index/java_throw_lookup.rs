@@ -101,6 +101,20 @@ impl<'query, 'summary> ThrowLookup<'query, 'summary> {
         }
     }
 
+    // Los tipos a los que llega una cadena de llamadas, o nada si algún paso no se resuelve.
+    pub fn returned_types(&self, summary: &JavaSummary, origin: &ThrowOrigin) -> Option<Vec<Typed>> {
+        let ThrowOrigin::Call(root, steps) = origin else {
+            return None;
+        };
+        let (first, rest) = steps.split_first()?;
+        let mut signatures = self.on_root(summary, root, Wanted::of_step(first))?;
+        for step in rest {
+            let receivers = returned_by(&signatures)?;
+            signatures = self.on_receivers(&receivers, Wanted::of_step(step))?;
+        }
+        returned_by(&signatures)
+    }
+
     fn call_thrown(
         &self,
         summary: &JavaSummary,

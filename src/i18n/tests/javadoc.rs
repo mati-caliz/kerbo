@@ -5,12 +5,13 @@ use crate::rules::JavaRule;
 
 #[test]
 fn every_javadoc_tag_problem_names_the_tag_in_both_languages() {
-    const PROBLEMS: [JavadocTagProblem; 5] = [
+    const PROBLEMS: [JavadocTagProblem; 6] = [
         JavadocTagProblem::Missing,
         JavadocTagProblem::Unused,
         JavadocTagProblem::Duplicate,
         JavadocTagProblem::Unknown,
         JavadocTagProblem::InvalidInheritDoc,
+        JavadocTagProblem::ParseError,
     ];
     const TAG: &str = "@param <T>";
     for lang in LANGS {

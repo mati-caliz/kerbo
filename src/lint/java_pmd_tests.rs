@@ -79,3 +79,14 @@ fn every_pmd_fix_removes_its_own_problem() {
         );
     }
 }
+
+#[test]
+fn pmd_takes_a_static_import_of_a_type_and_a_wildcard_over_a_class_as_unused() {
+    let source = "package p;\n\nimport static q.Outer.Inner;\nimport static q.Outer.CONSTANT;\nimport q.Outer.*;\nimport java.util.*;\n\nclass F {\n    Inner first() {\n        return null;\n    }\n\n    Object second() {\n        return CONSTANT;\n    }\n\n    List<String> third() {\n        return null;\n    }\n}\n";
+    let found: Vec<usize> = lints(source, &like_pmd())
+        .into_iter()
+        .filter(|finding| finding.kind.rule() == RuleId::UnusedImport)
+        .map(|finding| finding.line)
+        .collect();
+    assert_eq!(found, [3, 5]);
+}

@@ -47,8 +47,11 @@ una arroba al principio de la línea y fuera de un tag inline, así que un `@Ove
 `{@snippet : ...}` no es una etiqueta. `JavadocPackage` se avisa una vez por carpeta sin
 `package-info.java`, en el primer archivo por orden alfabético, y `module-info.java` no cuenta. Un
 varargs con anotación antes de los puntos (`Object @Nullable ... args`) se lee aunque tree-sitter no
-lo entienda. Lo único que no se imita son los Javadoc que Checkstyle no puede parsear (un `<N, E>`
-suelto que toma por HTML): Checkstyle avisa el error de parseo con el nombre de la regla y kerbo no.
+lo entienda. Cuando el HTML de un Javadoc no entra en la gramática de Checkstyle (un `<N, E>` que
+toma por etiqueta, un `</p>` que no cierra nada, una etiqueta que se cierra con otro nombre),
+`JavadocMethod` y `JavadocType` avisan el error en su línea y no revisan las etiquetas de ese
+Javadoc, como Checkstyle: kerbo calca su lexer y su parser de HTML (la etiqueta sin cierre no puede
+tener elementos adentro; gana el primer error del parser y, si no hay, el último del lexer).
 
 ## PMD
 
@@ -63,6 +66,12 @@ imitan a uno o al otro según `[java] reference` de `kerbo.toml`. Si falta, kerb
   `@exception`, los tipos de los parámetros de `#metodo(...)`, el `target` de un `@link` en un
   snippet y los links de un comentario `///`) está usado, y uno de `java.lang` que se usa no se
   marca como sin usar (sí como redundante).
+- También sobran, como para PMD: un `import static a.B.C;` de un tipo que sólo se usa como tipo, un
+  `import a.b.Clase.*;` (comodín sobre una clase y no un paquete) y el import de un tipo anidado
+  (`java.util.Map.Entry`) cuando en cada uso el nombre ya llega como tipo miembro de una clase que
+  lo encierra o de sus padres (del proyecto, de las dependencias o del JDK). Si en el camino hay un
+  supertipo que PMD no puede resolver como está escrito, o el Javadoc nombra el tipo, cuenta como
+  usado.
 - No se marca el `public` del constructor de una clase que no es pública, ni `strictfp`, ni el
   `final` de los parámetros de un método abstracto o de una variable `_`.
 - `final` sobra en un método de un enum sin constantes con cuerpo y en el de un record; el `public`
@@ -195,8 +204,10 @@ De las inspecciones de IntelliJ, kerbo hace:
   orden), y se arregla con `isEmpty()` o `!isEmpty()`. El número puede ser una constante `final` del
   alcance. Sin resolver tipos: el receptor es una variable cuyo tipo declarado tiene `isEmpty()`
   (las colecciones y mapas de `java.util` y de guava; `String` desde `release` 6 y `CharSequence`,
-  `StringBuilder` y `StringBuffer` desde 15), salvo adentro de la clase de ese mismo nombre.
-  Coincide con Qodana en el corpus (30).
+  `StringBuilder` y `StringBuffer` desde 15), salvo adentro de la clase de ese mismo nombre. Si el
+  receptor es lo que devuelve una cadena de llamadas (`pex.getResults().get(0).getProblems().size() >
+  0`), el índice la sigue con los tipos genéricos del proyecto y de las dependencias, como hace con
+  los `throws`. Coincide con Qodana en el corpus (34).
 
 - `ManualMinMaxCalculation` (`manual-min-max-calculation`): un mínimo o un máximo escrito a mano
   con un ternario (`a < b ? a : b`), un `if`/`else` que asigna o devuelve uno de los dos lados, o

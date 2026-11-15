@@ -9,7 +9,7 @@ use crate::fix::Fix;
 use crate::limits::JavaReference;
 use crate::syntax::{named_children, one_based};
 
-mod javadoc;
+pub(super) mod javadoc;
 
 const IMPORT: &str = "import_declaration";
 const PACKAGE: &str = "package_declaration";
@@ -19,6 +19,9 @@ const NAME_KINDS: [&str; 2] = ["scoped_identifier", "identifier"];
 const JAVA_LANG: &str = "java.lang";
 const JAVA_LANG_PREFIX: &str = "java.lang.";
 const SEPARATOR: char = '.';
+const IDENTIFIER: &str = "identifier";
+const STAR_SUFFIX: &str = ".*";
+const IMPORT_PARTS: [&str; 2] = [IMPORT, "scoped_identifier"];
 
 #[derive(Debug)]
 struct Import<'tree> {
@@ -42,6 +45,20 @@ impl Import<'_> {
         self.text
             .rsplit_once(SEPARATOR)
             .map_or(self.text.as_str(), |(_, last)| last)
+    }
+
+    // `import a.b.Clase.*;`: el comodín sobre una clase (sus tipos anidados) y no sobre un paquete. PMD
+    // lo da por no usado.
+    fn is_class_star(&self) -> bool {
+        if self.is_static {
+            return false;
+        }
+        let owner = self.text.strip_suffix(STAR_SUFFIX).unwrap_or(&self.text);
+        self.is_star
+            && owner
+                .rsplit(SEPARATOR)
+                .next()
+                .is_some_and(|last| last.starts_with(|first: char| first.is_ascii_uppercase()))
     }
 
     fn removal(&self, source: &[u8]) -> Fix {
@@ -144,17 +161,21 @@ fn unused_imports(
         JavaReference::Checkstyle => HashSet::new(),
         JavaReference::Pmd => javadoc::referenced_names(root, source),
     };
+    let expression_names = match reference {
+        JavaReference::Checkstyle => HashSet::new(),
+        JavaReference::Pmd => identifier_names(root, source),
+    };
     let is_unused = |import: &Import<'_>| {
         let name = import.simple_name();
         let used = referenced.contains(name) || documented.contains(name);
         match reference {
             JavaReference::Checkstyle => !used || is_java_lang_class(&import.text),
-            JavaReference::Pmd => !used,
+            JavaReference::Pmd => !used || import.is_star || is_static_type_import(import, &expression_names),
         }
     };
     imports
         .iter()
-        .filter(|import| !import.is_star)
+        .filter(|import| !import.is_star || (reference == JavaReference::Pmd && import.is_class_star()))
         .filter(|import| is_unused(import))
         .map(|import| {
             finding(
@@ -164,6 +185,29 @@ fn unused_imports(
                 Some(import.removal(source)),
             )
         })
+        .collect()
+}
+
+// PMD toma un `import static a.B.C;` de un tipo anidado que sólo se usa como tipo (nunca como valor
+// ni como llamada) por no usado: lo que importa un import estático son miembros, no tipos.
+fn is_static_type_import(import: &Import<'_>, expression_names: &HashSet<&str>) -> bool {
+    let name = import.simple_name();
+    import.is_static
+        && !import.is_star
+        && name.starts_with(|first: char| first.is_ascii_uppercase())
+        && !expression_names.contains(name)
+}
+
+fn identifier_names<'source>(root: Node<'_>, source: &'source [u8]) -> HashSet<&'source str> {
+    crate::syntax::descendants(root)
+        .into_iter()
+        .filter(|node| {
+            node.kind() == IDENTIFIER
+                && node
+                    .parent()
+                    .is_none_or(|parent| !IMPORT_PARTS.contains(&parent.kind()))
+        })
+        .filter_map(|node| node.utf8_text(source).ok())
         .collect()
 }
 

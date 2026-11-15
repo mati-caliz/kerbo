@@ -3,6 +3,7 @@ use super::java_default_annotation_params::{AnnotationDefaults, redundant_annota
 use super::java_dereference::nullable_dereferences;
 use super::java_escapes::{PackageTypes, escaped_types};
 use super::java_failing_calls::failing_calls;
+use super::java_import_shadow_rule::shadowed_imports;
 use super::java_inspection_suppressions::drop_inspection_suppressed;
 use super::java_null_arguments::null_arguments;
 use super::java_nullable_returns::nullable_returns;
@@ -10,6 +11,7 @@ use super::java_nullness::{ProjectTypes, unannotated_overrides};
 use super::java_project::{IndexedSummary, Project, key_of};
 use super::java_resources::unclosed_resources;
 use super::java_sequenced_types::sequenced_on_library_types;
+use super::java_size_chain_rule::chained_sizes;
 use super::java_taint::tainted_sinks;
 use super::java_throw_lookup::ThrowLookup;
 use super::java_throws::{ThrowsFacts, redundant_throws};
@@ -51,6 +53,8 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
                 summary,
             ));
             in_file.extend(sequenced_on_library_types(library, summary));
+            in_file.extend(shadowed_imports(&types, library, summary));
+            in_file.extend(chained_sizes(&throw_lookup, library, files, summary));
             in_file.extend(redundant_throws(&throw_lookup, &throws_facts, summary));
             drop_inspection_suppressed(&mut in_file, summary);
             in_file.extend(

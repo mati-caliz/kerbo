@@ -3,13 +3,17 @@ use tree_sitter::Node;
 use super::java::{
     FINAL, IDENTIFIER, NAME_FIELD, VARIABLE_DECLARATOR, has_modifier, is_type_declaration, text,
 };
-use super::java_receivers::declared_type;
+use super::java_receivers::{declared_type, variable_types};
+use super::java_throws::{ThrowOrigin, call_origin};
 use super::{LintFinding, LintKind, finding};
 use crate::fix::Fix;
 use crate::rules::JavaRule;
-use crate::syntax::{descendants, named_children};
+use crate::syntax::{descendants, named_children, one_based};
 
 const BINARY: &str = "binary_expression";
+const METHOD_DECLARATION: &str = "method_declaration";
+const ARRAY_TYPE: &str = "array_type";
+const TYPE_FIELD: &str = "type";
 const INVOCATION: &str = "method_invocation";
 const PARENTHESIZED: &str = "parenthesized_expression";
 const DECIMAL_LITERAL: &str = "decimal_integer_literal";
@@ -182,7 +186,78 @@ pub fn reported(root: Node<'_>, source: &[u8], release: Option<u32>) -> Vec<Lint
         .collect()
 }
 
+// El caso en que el receptor es lo que devuelve una llamada (`a.getItems().size() > 0`): el índice
+// sigue la cadena con los tipos del proyecto y de las dependencias.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SizeCandidate {
+    pub origin: ThrowOrigin,
+    pub replacement: String,
+    pub line: usize,
+    pub column: usize,
+}
+
+pub fn chained_candidates(root: Node<'_>, source: &[u8]) -> Vec<SizeCandidate> {
+    let nodes = descendants(root);
+    let variables = variable_types(&nodes, source);
+    nodes
+        .into_iter()
+        .filter(|node| node.kind() == BINARY)
+        .filter_map(|comparison| {
+            let (receiver, empty) = compared_size(comparison, source)?;
+            let is_getter = receiver.kind() == INVOCATION
+                && receiver
+                    .child_by_field_name(ARGUMENTS_FIELD)
+                    .is_some_and(|arguments| named_children(arguments).is_empty());
+            if !is_getter {
+                return None;
+            }
+            let origin = call_origin(receiver, source, &variables);
+            let prefix = if empty { "" } else { NEGATION };
+            let start = comparison.start_position();
+            Some(SizeCandidate {
+                origin,
+                replacement: format!("{prefix}{}{IS_EMPTY_CALL}", text(receiver, source)),
+                line: one_based(start.row),
+                column: one_based(start.column),
+            })
+        })
+        .collect()
+}
+
+// Los métodos del archivo que devuelven un arreglo: el índice guarda el tipo devuelto sin los `[]`,
+// y `nombres().length` no tiene isEmpty().
+pub fn array_methods(root: Node<'_>, source: &[u8]) -> Vec<String> {
+    descendants(root)
+        .into_iter()
+        .filter(|node| node.kind() == METHOD_DECLARATION)
+        .filter(|method| {
+            method
+                .child_by_field_name(TYPE_FIELD)
+                .is_some_and(|written| written.kind() == ARRAY_TYPE)
+        })
+        .filter_map(|method| Some(text(method.child_by_field_name(NAME_FIELD)?, source).to_owned()))
+        .collect()
+}
+
+pub fn has_is_empty_type(simple: &str) -> bool {
+    WITH_IS_EMPTY.contains(&simple)
+        || LATER_IS_EMPTY
+            .first()
+            .is_some_and(|(string, _)| *string == simple)
+}
+
 fn replacement(comparison: Node<'_>, source: &[u8], release: Option<u32>) -> Option<String> {
+    let (receiver, empty) = compared_size(comparison, source)?;
+    if receiver.kind() != IDENTIFIER || !has_is_empty(receiver, source, release) {
+        return None;
+    }
+    let prefix = if empty { "" } else { NEGATION };
+    Some(format!("{prefix}{}{IS_EMPTY_CALL}", text(receiver, source)))
+}
+
+// El receptor de `size()` o `length()` comparado con 0 o 1, y si la comparación pregunta si está
+// vacío.
+fn compared_size<'tree>(comparison: Node<'tree>, source: &[u8]) -> Option<(Node<'tree>, bool)> {
     let operator = Comparison::parse(text(comparison.child_by_field_name(OPERATOR_FIELD)?, source))?;
     let left = comparison.child_by_field_name(LEFT_FIELD)?;
     let right = comparison.child_by_field_name(RIGHT_FIELD)?;
@@ -195,12 +270,8 @@ fn replacement(comparison: Node<'_>, source: &[u8], release: Option<u32>) -> Opt
         return None;
     }
     let receiver = call.child_by_field_name(OBJECT_FIELD)?;
-    if receiver.kind() != IDENTIFIER || !has_is_empty(receiver, source, release) {
-        return None;
-    }
     let empty = operator.emptiness(integer_constant(other, source)?)?;
-    let prefix = if empty { "" } else { NEGATION };
-    Some(format!("{prefix}{}{IS_EMPTY_CALL}", text(receiver, source)))
+    Some((receiver, empty))
 }
 
 fn is_size_call(node: Node<'_>, source: &[u8]) -> bool {

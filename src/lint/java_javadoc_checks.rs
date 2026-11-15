@@ -7,6 +7,7 @@ use super::java::{
 use super::java_javadoc::{
     ANNOTATION_ELEMENT, COMPACT_CONSTRUCTOR, attached_javadoc, overrides, written_annotations,
 };
+use super::java_javadoc_parse::parse_error;
 use super::java_javadoc_scope::{Scope, declared_scope, has_javadoc_method_owner, surrounding_scope};
 use super::java_javadoc_tags::{MethodTag, MethodTagKind, block_tags, method_tags};
 use super::{JavadocTagProblem, LintFinding, LintKind, finding, finding_at};
@@ -253,6 +254,14 @@ pub fn method_tag_findings(declaration: Node<'_>, source: &[u8]) -> Vec<LintFind
     else {
         return Vec::new();
     };
+    if let Some(error) = parse_error(text(comment, source), comment.start_position().row) {
+        return vec![tag_finding(
+            JavaRule::JavadocMethod,
+            JavadocTagProblem::ParseError,
+            error.row,
+            &error.detail,
+        )];
+    }
     let mut javadoc = MethodJavadoc {
         declaration,
         first_row: comment.start_position().row,
@@ -308,6 +317,14 @@ pub fn type_tag_findings(declaration: Node<'_>, source: &[u8]) -> Vec<LintFindin
         return Vec::new();
     };
     let first_row = comment.start_position().row;
+    if let Some(error) = parse_error(text(comment, source), first_row) {
+        return vec![tag_finding(
+            JavaRule::JavadocType,
+            JavadocTagProblem::ParseError,
+            error.row,
+            &error.detail,
+        )];
+    }
     let tags = block_tags(text(comment, source));
     let mut findings: Vec<LintFinding> = tags
         .iter()

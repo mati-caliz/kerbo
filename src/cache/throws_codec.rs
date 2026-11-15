@@ -62,7 +62,7 @@ pub fn read_method_throws(reader: &mut Reader<'_>) -> Result<MethodThrows, Corru
     })
 }
 
-fn write_origin(writer: &mut Writer, origin: &ThrowOrigin) {
+pub(super) fn write_origin(writer: &mut Writer, origin: &ThrowOrigin) {
     match origin {
         ThrowOrigin::Unknown => writer.number(ORIGIN_UNKNOWN),
         ThrowOrigin::Thrown(name) => {
@@ -98,7 +98,7 @@ fn write_origin(writer: &mut Writer, origin: &ThrowOrigin) {
     }
 }
 
-fn read_origin(reader: &mut Reader<'_>) -> Result<ThrowOrigin, Corrupt> {
+pub(super) fn read_origin(reader: &mut Reader<'_>) -> Result<ThrowOrigin, Corrupt> {
     match reader.number()? {
         ORIGIN_UNKNOWN => Ok(ThrowOrigin::Unknown),
         ORIGIN_THROWN => Ok(ThrowOrigin::Thrown(reader.text()?)),

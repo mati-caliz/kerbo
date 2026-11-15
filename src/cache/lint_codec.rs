@@ -18,12 +18,13 @@ const GO: u64 = 10;
 const JAVA: u64 = 11;
 const TAINT: u64 = 12;
 const JAVADOC: u64 = 13;
-const JAVADOC_PROBLEMS: [JavadocTagProblem; 5] = [
+const JAVADOC_PROBLEMS: [JavadocTagProblem; 6] = [
     JavadocTagProblem::Missing,
     JavadocTagProblem::Unused,
     JavadocTagProblem::Duplicate,
     JavadocTagProblem::Unknown,
     JavadocTagProblem::InvalidInheritDoc,
+    JavadocTagProblem::ParseError,
 ];
 const NO_FIX: u64 = 0;
 const WITH_FIX: u64 = 1;

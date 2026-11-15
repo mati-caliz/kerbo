@@ -30,9 +30,12 @@ mod java_functional_arguments;
 pub mod java_generics;
 mod java_hidden;
 mod java_implicit_constructor;
+pub mod java_import_shadows;
 pub mod java_inference;
 mod java_javadoc;
 mod java_javadoc_checks;
+mod java_javadoc_lexer;
+mod java_javadoc_parse;
 mod java_javadoc_scope;
 mod java_javadoc_tags;
 pub mod java_lambda_returns;
@@ -78,7 +81,7 @@ mod java_same_value;
 pub mod java_sequenced_collection;
 mod java_sequenced_receivers;
 mod java_shapes;
-mod java_size_is_empty;
+pub mod java_size_is_empty;
 mod java_spacing;
 pub mod java_static_imports;
 mod java_static_modifiers;
@@ -128,6 +131,7 @@ pub enum JavadocTagProblem {
     Duplicate,
     Unknown,
     InvalidInheritDoc,
+    ParseError,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -337,6 +341,8 @@ mod java_fall_through_tests;
 mod java_hidden_tests;
 #[cfg(test)]
 mod java_inspection_tests;
+#[cfg(test)]
+mod java_javadoc_parse_tests;
 #[cfg(test)]
 mod java_javadoc_tests;
 #[cfg(test)]

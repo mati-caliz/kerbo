@@ -11,6 +11,9 @@ pub fn tag_problem(problem: JavadocTagProblem, subject: &str) -> String {
         JavadocTagProblem::InvalidInheritDoc => {
             format!("`{subject}` inherits nothing on a constructor, a static method or a private one")
         }
+        JavadocTagProblem::ParseError => {
+            format!("The Javadoc HTML cannot be parsed, so its tags are not checked: `{subject}`")
+        }
     }
 }
 
