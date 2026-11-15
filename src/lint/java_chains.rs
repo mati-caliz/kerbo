@@ -7,7 +7,7 @@ use super::java_called_receivers::receiver_facts;
 use super::java_chain_uses::{field_read_at, guarded_by_non_empty, nullable_root_arguments};
 use super::java_null_checks::{checked_expression, is_stable_call};
 use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
-use super::java_null_origin::NullReturn;
+use super::java_null_origin::{ArgumentShape, NullReturn};
 use super::java_null_returns::returned_by_method;
 use super::java_receivers::{StaticImports, Variables, declared_simple_type, enclosing_types};
 use super::java_throws::ArgumentKind;
@@ -60,7 +60,9 @@ pub struct ChainStep {
 // (`return jdbc.queryForObject(...)` en un método que devuelve `long`) o leyendo un campo de su
 // resultado (`getSubscriber().eventos`), con dónde empiezan, y las
 // que se pasan directo como argumento de otra llamada (`Splitter.on(PATH_SEPARATOR.value())`) o
-// las devuelve un método no nulo (`return convert(a)`).
+// las devuelve un método no nulo (`return convert(a)`). Una llamada sin receptor dentro de una clase
+// anidada o anónima lleva las clases que la encierran, de la más cercana a la más lejana: el método
+// puede ser de una de afuera.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chain {
     pub root: ChainRoot,
@@ -69,6 +71,7 @@ pub struct Chain {
     pub passed_as: Option<Box<NullArgument>>,
     pub returned: Option<NullReturn>,
     pub nullable_root_arguments: Vec<usize>,
+    pub enclosing: Vec<String>,
 }
 
 // Lo que se sabe del archivo hasta el punto que se recorre: lo que ya se chequeó contra null (por
@@ -123,6 +126,7 @@ impl NullFacts {
                 column: one_based(start.column),
                 cast: None,
                 exact: false,
+                shape: ArgumentShape::MaybeArray,
                 receiver_arguments: receiver_arguments.clone(),
             };
             self.passed
@@ -202,7 +206,7 @@ pub fn chain_of(
     if facts.seen.contains(&invocation.id()) {
         return None;
     }
-    let (root, steps) = walk(invocation, source, variables, facts)?;
+    let (root, steps, enclosing) = walk(invocation, source, variables, facts)?;
     facts.remember_dereferenced(invocation, source);
     let field_read = field_read_at(invocation);
     if field_read.is_some() && is_stable_call(invocation) {
@@ -220,12 +224,13 @@ pub fn chain_of(
         passed_as,
         returned,
         nullable_root_arguments: nullable_root_arguments(invocation, source),
+        enclosing,
     })
 }
 
 // La cadena que da valor a una variable, de un paso o más (`manager.getCache(nombre)`).
 pub fn origin_chain(invocation: Node<'_>, source: &[u8], variables: &Variables) -> Option<Chain> {
-    let (root, steps) = walk(invocation, source, variables, &mut NullFacts::default())?;
+    let (root, steps, enclosing) = walk(invocation, source, variables, &mut NullFacts::default())?;
     Some(Chain {
         root,
         steps,
@@ -233,6 +238,7 @@ pub fn origin_chain(invocation: Node<'_>, source: &[u8], variables: &Variables) 
         passed_as: None,
         returned: None,
         nullable_root_arguments: nullable_root_arguments(invocation, source),
+        enclosing,
     })
 }
 
@@ -241,7 +247,7 @@ fn walk(
     source: &[u8],
     variables: &Variables,
     facts: &mut NullFacts,
-) -> Option<(ChainRoot, Vec<ChainStep>)> {
+) -> Option<(ChainRoot, Vec<ChainStep>, Vec<String>)> {
     let mut steps = Vec::new();
     let mut current = invocation;
     loop {
@@ -261,8 +267,12 @@ fn walk(
         });
         let Some(object) = current.child_by_field_name(OBJECT_FIELD) else {
             steps.reverse();
-            let enclosing = enclosing_types(current, source).into_iter().next()?;
-            return Some((ChainRoot::Class(enclosing), steps));
+            let mut enclosing = enclosing_types(current, source);
+            let innermost = enclosing.first()?.clone();
+            if enclosing.len() == 1 {
+                enclosing.clear();
+            }
+            return Some((ChainRoot::Class(innermost), steps, enclosing));
         };
         if object.kind() == INVOCATION {
             current = object;
@@ -276,7 +286,7 @@ fn walk(
                 .next()
                 .is_some_and(|last| last.starts_with(|first: char| first.is_ascii_uppercase()))
                 && written.starts_with(|first: char| first.is_ascii_lowercase());
-            return qualified_class.then(|| (ChainRoot::Class(written.to_owned()), steps));
+            return qualified_class.then(|| (ChainRoot::Class(written.to_owned()), steps, Vec::new()));
         }
         if object.kind() != IDENTIFIER {
             return None;
@@ -290,7 +300,7 @@ fn walk(
             Some(None) => ChainRoot::Instance(declared_simple_type(object, written, source)?),
             None => return None,
         };
-        return Some((root, steps));
+        return Some((root, steps, Vec::new()));
     }
 }
 

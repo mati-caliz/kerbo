@@ -9,6 +9,7 @@ pub fn write_generics(writer: &mut Writer, generics: &Generics) {
             writer.text(&parent.written);
             writer.list(&parent.arguments, |writer, argument| writer.text(argument));
         });
+        writer.list(&declared.nullable_parameters, |writer, name| writer.text(name));
     });
     writer.list(&generics.methods, |writer, method| {
         writer.size(method.line);
@@ -35,6 +36,7 @@ pub fn read_generics(reader: &mut Reader<'_>) -> Result<Generics, Corrupt> {
                         arguments: reader.list(Reader::text)?,
                     })
                 })?,
+                nullable_parameters: reader.list(Reader::text)?,
             })
         })?,
         methods: reader.list(|reader| {

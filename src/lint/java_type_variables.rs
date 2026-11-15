@@ -75,7 +75,7 @@ pub fn method_variable_admits_null(method: Node<'_>, written: &str, source: &[u8
     declared_bound_is_nullable(method, written, source)
 }
 
-fn declared_bound_is_nullable(declaration: Node<'_>, written: &str, source: &[u8]) -> Option<bool> {
+pub fn declared_bound_is_nullable(declaration: Node<'_>, written: &str, source: &[u8]) -> Option<bool> {
     named_children(declaration)
         .into_iter()
         .filter(|child| child.kind() == TYPE_PARAMETERS)

@@ -5,18 +5,20 @@ use super::java_dereference::{known_not_null, may_return_null};
 use super::java_inferred_arguments::context_inferred_non_null;
 use super::java_library_arguments::{called_type, inherited_library_class, library_substituted_non_null};
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
+use super::java_variable_returns::{inherited_project_class, returns_nullable_variable};
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body};
 use crate::lint::java_fields::Volatility;
 use crate::lint::java_null_flow::{NullFlow, NullOrigin};
-use crate::lint::java_null_inference::{ARRAY_SUFFIX, NullArgument};
+use crate::lint::java_null_inference::{ARRAY_SUFFIX, ArgumentShape, NullArgument};
 use crate::lint::java_receiver_arguments::ArgumentNullness;
 use crate::lint::java_receivers::{Receiver, simple_type_name};
 use crate::rules::JavaRule;
 
 // Los parámetros del JDK que las anotaciones externas de IntelliJ marcan `@NotNull`: clase (vale
 // también para las que la heredan), método, cantidad de argumentos, posición y nombre.
+const OBJECT: &str = "Object";
 const LIBRARY_NON_NULL: &[(&str, &str, usize, usize, &str)] = &[
     ("java.util.concurrent.Future", "get", 2, 1, "unit"),
     ("java.util.Collection", "addAll", 1, 0, "c"),
@@ -54,6 +56,20 @@ pub fn null_arguments(
         (may_return_null(types, library, summary, chain) && !known_not_null(types, library, summary, last))
             .then_some(argument)
     });
+    let nullable_variables = summary.chains.iter().filter_map(|chain| {
+        let argument = chain.passed_as.as_deref()?;
+        let last = chain.steps.last()?;
+        if !returns_nullable_variable(types, library, chain)
+            || may_return_null(types, library, summary, chain)
+            || known_not_null(types, library, summary, last)
+        {
+            return None;
+        }
+        let mut element = argument.clone();
+        element.shape = ArgumentShape::Element;
+        let parameter = non_null_parameter(types, library, summary, &element)?;
+        Some(report(argument, parameter))
+    });
     let inferred = summary.nested_nulls.iter().filter_map(|nested| {
         if non_null_parameter(types, library, summary, &nested.inner).is_some() {
             return None;
@@ -71,6 +87,7 @@ pub fn null_arguments(
             Some(report(argument, parameter))
         })
         .chain(inferred)
+        .chain(nullable_variables)
         .collect()
 }
 
@@ -198,6 +215,15 @@ pub(super) fn non_null_parameter(
     }
     if argument.receiver == Receiver::Unknown
         && let Some(member) = &argument.receiver_arguments.inherited
+        && let Some(class) = inherited_project_class(types, library, member)
+    {
+        let mut through_member = argument.clone();
+        through_member.receiver = Receiver::Type(class);
+        through_member.receiver_arguments.inherited = None;
+        return non_null_parameter(types, library, summary, &through_member);
+    }
+    if argument.receiver == Receiver::Unknown
+        && let Some(member) = &argument.receiver_arguments.inherited
         && let Some(class) = inherited_library_class(types, library, member)
     {
         return library_non_null(library, &class, argument);
@@ -304,12 +330,14 @@ pub(super) fn declares_method_variable(
 
 // Si la sobrecarga puede recibir este `null`: un primitivo no, y con un casteo sólo la del tipo
 // casteado o una cuyo tipo es una variable de tipo.
+// Un valor de una variable de tipo sólo entra en un parámetro de otra variable o de `Object`.
 fn receives(parameter: &Parameter, argument: &NullArgument) -> bool {
+    let written_as_cast =
+        |cast: &str| parameter.type_variable || simple_type_name(cast) == parameter.type_name;
+    let holds_type_variable_value = parameter.type_variable || parameter.type_name == OBJECT;
     parameter.accepts_null
-        && argument
-            .cast
-            .as_deref()
-            .is_none_or(|cast| parameter.type_variable || simple_type_name(cast) == parameter.type_name)
+        && argument.cast.as_deref().is_none_or(written_as_cast)
+        && (argument.shape == ArgumentShape::MaybeArray || holds_type_variable_value)
 }
 
 fn library_non_null(library: &Library, class: &str, argument: &NullArgument) -> Option<String> {
@@ -344,7 +372,10 @@ pub(super) fn parameter_at<'declaration>(
             .cast
             .as_deref()
             .is_some_and(|cast| !cast.ends_with(ARRAY_SUFFIX));
-        let slot = if argument.arity == declaration.parameters.len() && !cast_to_element {
+        let slot = if argument.arity == declaration.parameters.len()
+            && !cast_to_element
+            && argument.shape == ArgumentShape::MaybeArray
+        {
             Slot::Whole
         } else {
             Slot::Element

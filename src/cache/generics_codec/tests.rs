@@ -12,6 +12,7 @@ fn the_generics_of_a_file_survive_the_round_trip() {
                 written: "Source".to_owned(),
                 arguments: vec!["T".to_owned(), "IOException".to_owned()],
             }],
+            nullable_parameters: vec!["T".to_owned()],
         }],
         methods: vec![MethodGenerics {
             line: 4,

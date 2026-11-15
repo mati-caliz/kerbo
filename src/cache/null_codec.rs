@@ -5,7 +5,7 @@ use crate::lint::java_called_receivers::CalledReceiver;
 use crate::lint::java_contract_calls::{CallTarget, ContractCall};
 use crate::lint::java_contracts::Constraint;
 use crate::lint::java_nested_arguments::{NestedNull, ReferenceArgument};
-use crate::lint::java_null_inference::NullArgument;
+use crate::lint::java_null_inference::{ArgumentShape, NullArgument};
 use crate::lint::java_receiver_arguments::{ArgumentNullness, InheritedMember, ReceiverArguments};
 
 const CONSTRAINT_ANY: u64 = 0;
@@ -20,6 +20,8 @@ const ARGUMENT_CONCRETE: u64 = 0;
 const ARGUMENT_NULLABLE: u64 = 1;
 const ARGUMENT_UNKNOWN: u64 = 2;
 const ARGUMENT_NON_NULL_VARIABLE: u64 = 3;
+const SHAPE_MAYBE_ARRAY: u64 = 0;
+const SHAPE_ELEMENT: u64 = 1;
 
 pub fn write_null_argument(writer: &mut Writer, argument: &NullArgument) {
     writer.text(&argument.name);
@@ -31,6 +33,10 @@ pub fn write_null_argument(writer: &mut Writer, argument: &NullArgument) {
     writer.size(argument.column);
     writer.list(argument.cast.as_slice(), |writer, cast| writer.text(cast));
     writer.number(u64::from(argument.exact));
+    writer.number(match argument.shape {
+        ArgumentShape::MaybeArray => SHAPE_MAYBE_ARRAY,
+        ArgumentShape::Element => SHAPE_ELEMENT,
+    });
     write_marking(writer, argument.receiver_arguments.marking);
     writer.list(&argument.receiver_arguments.arguments, |writer, nullness| {
         writer.number(match nullness {
@@ -66,6 +72,11 @@ pub fn read_null_argument(reader: &mut Reader<'_>) -> Result<NullArgument, Corru
         column: reader.size()?,
         cast: reader.list(Reader::text)?.into_iter().next(),
         exact: reader.number()? != 0,
+        shape: match reader.number()? {
+            SHAPE_MAYBE_ARRAY => ArgumentShape::MaybeArray,
+            SHAPE_ELEMENT => ArgumentShape::Element,
+            _ => return Err(Corrupt),
+        },
         receiver_arguments: ReceiverArguments {
             marking: read_marking(reader)?,
             arguments: reader.list(|reader| match reader.number()? {

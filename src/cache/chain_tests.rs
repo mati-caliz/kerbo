@@ -3,7 +3,7 @@ use super::codec::{Reader, Writer};
 use crate::lint::java_called_receivers::CalledReceiver;
 use crate::lint::java_chains::{Chain, ChainRoot, ChainStep};
 use crate::lint::java_null_flow::{Dereference, NullFlow, NullOrigin, NullReturn};
-use crate::lint::java_null_inference::NullArgument;
+use crate::lint::java_null_inference::{ArgumentShape, NullArgument};
 use crate::lint::java_owner::NullMarking;
 use crate::lint::java_receiver_arguments::{ArgumentNullness, InheritedMember, ReceiverArguments};
 use crate::lint::java_receivers::Receiver;
@@ -28,6 +28,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
             passed_as: None,
             returned: None,
             nullable_root_arguments: vec![1],
+            enclosing: vec!["Inner".to_owned(), "Outer".to_owned()],
         }),
         dereferences: vec![Dereference {
             name: "intValue".to_owned(),
@@ -44,6 +45,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
             column: 30,
             cast: None,
             exact: false,
+            shape: ArgumentShape::MaybeArray,
             receiver_arguments: ReceiverArguments::default(),
         }],
         passed_before: Vec::new(),
@@ -67,6 +69,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
             passed_as: flow.arguments.first().cloned().map(Box::new),
             returned: None,
             nullable_root_arguments: vec![1],
+            enclosing: Vec::new(),
         }),
         passed_before: flow.arguments.clone(),
         ..NullFlow::new(NullOrigin::Literal)
@@ -103,6 +106,7 @@ fn null_returns_survive_the_round_trip() {
         passed_as: None,
         returned: Some(returned("convert(a)", NullMarking::Unspecified)),
         nullable_root_arguments: Vec::new(),
+        enclosing: Vec::new(),
     }));
     let mut writer = Writer::default();
     write_flow(&mut writer, &literal);
@@ -177,6 +181,7 @@ fn null_arguments_survive_the_round_trip() {
         column: 88,
         cast: Some("boolean[][]".to_owned()),
         exact: false,
+        shape: ArgumentShape::MaybeArray,
         receiver_arguments: ReceiverArguments {
             marking: NullMarking::Marked,
             arguments: vec![
@@ -251,6 +256,7 @@ fn lambdas_returning_null_survive_the_round_trip() {
                     column: 26,
                     cast: None,
                     exact: false,
+                    shape: ArgumentShape::MaybeArray,
                     receiver_arguments: ReceiverArguments::default(),
                 },
                 target_typed: true,

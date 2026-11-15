@@ -6,6 +6,7 @@ use super::java_chains::argument_count;
 use super::java_exact_receivers::ExactReceivers;
 use super::java_lambda_returns::{LambdaReturn, lambda_returns_in};
 use super::java_nested_arguments::{NestedNull, ReferenceArgument, enclosing_argument, reference_argument};
+pub use super::java_null_origin::ArgumentShape;
 use super::java_receiver_arguments::ReceiverArguments;
 use super::java_receivers::{Receiver, StaticImports, Variables, simple_type_name, variable_types};
 use crate::syntax::{named_children, one_based};
@@ -61,6 +62,7 @@ pub struct NullArgument {
     pub column: usize,
     pub cast: Option<String>,
     pub exact: bool,
+    pub shape: ArgumentShape,
     pub receiver_arguments: ReceiverArguments,
 }
 
@@ -388,6 +390,7 @@ pub(super) fn argument_of_call(
         column: one_based(start.column),
         cast: None,
         exact,
+        shape: ArgumentShape::MaybeArray,
         receiver_arguments: receiver_facts(call, source, context.imported, context.variables),
     })
 }

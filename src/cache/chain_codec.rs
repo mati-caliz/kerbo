@@ -64,6 +64,7 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
     writer.list(&chain.nullable_root_arguments, |writer, position| {
         writer.size(*position);
     });
+    writer.list(&chain.enclosing, |writer, name| writer.text(name));
 }
 
 pub(super) fn write_null_return(writer: &mut Writer, returned: &NullReturn) {
@@ -114,6 +115,7 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
         },
         returned: reader.list(read_null_return)?.into_iter().next(),
         nullable_root_arguments: reader.list(Reader::size)?,
+        enclosing: reader.list(Reader::text)?,
     })
 }
 

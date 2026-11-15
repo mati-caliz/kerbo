@@ -8,6 +8,7 @@ use super::java_null_flow::{
 };
 use super::java_null_inference::{CallTarget, NullArgument, call_target};
 use super::java_null_keys::{forget, spellings, tracked_key};
+use super::java_null_origin::ArgumentShape;
 use crate::syntax::{named_children, one_based};
 
 const FIELD_ACCESS: &str = "field_access";
@@ -64,6 +65,7 @@ pub(super) fn passed(analysis: &mut Analysis<'_, '_>, call: Node<'_>, mut state:
             column: one_based(start.column),
             cast: None,
             exact: false,
+            shape: ArgumentShape::MaybeArray,
             receiver_arguments: receiver_arguments.clone(),
         };
         let Some(flow) = analysis.flows.get_mut(origin) else {

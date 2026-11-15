@@ -3,6 +3,7 @@ use tree_sitter::Node;
 use super::java::{NAME_FIELD, text};
 use super::java_calls::TYPE_DECLARATIONS;
 use super::java_receivers::{simple_type_name, supertype_nodes, type_arguments};
+use super::java_type_variables::declared_bound_is_nullable;
 use crate::syntax::{descendants, named_children, one_based};
 
 const METHODS: &[&str] = &["method_declaration", "constructor_declaration"];
@@ -28,6 +29,7 @@ pub struct TypeGenerics {
     pub name: String,
     pub parameters: Vec<String>,
     pub parents: Vec<GenericParent>,
+    pub nullable_parameters: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,10 +94,16 @@ fn type_generics(declaration: Node<'_>, name: &str, source: &[u8]) -> Option<Typ
         })
         .collect();
     let generic = !parameters.is_empty() || parents.iter().any(|parent| !parent.arguments.is_empty());
+    let nullable_parameters = parameters
+        .iter()
+        .filter(|parameter| declared_bound_is_nullable(declaration, parameter, source) == Some(true))
+        .cloned()
+        .collect();
     generic.then(|| TypeGenerics {
         name: name.to_owned(),
         parameters,
         parents,
+        nullable_parameters,
     })
 }
 

@@ -31,6 +31,7 @@ mod java_throw_wanted;
 mod java_throws;
 mod java_typed;
 mod java_unused;
+mod java_variable_returns;
 pub mod python_taint;
 mod taint_engine;
 mod taint_reach;
@@ -63,6 +64,8 @@ mod java_null_reference_tests;
 mod java_null_reread_tests;
 #[cfg(test)]
 mod java_null_tests;
+#[cfg(test)]
+mod java_null_variable_return_tests;
 #[cfg(test)]
 mod java_nullable_field_tests;
 #[cfg(test)]

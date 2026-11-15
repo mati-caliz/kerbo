@@ -85,7 +85,7 @@ pub(super) fn inherited_library_class(
     }
 }
 
-fn declared_member_type<'summary>(
+pub(super) fn declared_member_type<'summary>(
     types: &ProjectTypes<'summary>,
     class: &str,
     member: &InheritedMember,

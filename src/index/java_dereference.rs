@@ -4,6 +4,7 @@ use super::java_null_arguments::{accepts, non_null_parameter, project_owners, re
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
 use super::java_reference_unboxing::unboxed_references;
 use super::java_substituted_returns::returns_nullable_argument;
+use super::java_variable_returns::enclosing_owner;
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body, ReturnType};
@@ -153,7 +154,10 @@ fn nullable_steps(
     summary: &JavaSummary,
     chain: &Chain,
 ) -> Vec<bool> {
-    let mut current = resolve_root(types, library, summary, &chain.root);
+    let mut current = enclosing_owner(types, library, chain).map_or_else(
+        || resolve_root(types, library, summary, &chain.root),
+        Resolved::Project,
+    );
     let mut nullable = Vec::new();
     for (index, step) in chain.steps.iter().enumerate() {
         let substituted: &[usize] = if index == 0 {

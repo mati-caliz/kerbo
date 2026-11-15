@@ -1594,8 +1594,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 773 de los 972 (459 `data-flow-issue`, 268 `null-argument`, 25
-  `failing-call`, 21 `nullable-return`), con 3
+  de más en los dos. En guava, 790 de los 972 (459 `data-flow-issue`, 284 `null-argument`, 25
+  `failing-call`, 22 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
   `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
@@ -1720,9 +1720,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   - guava: los receptores que son campos heredados o getters hacia métodos del proyecto
     (`held.escape(null)`, `getEscaper().escape(null)`) y la sustitución de variables con un receptor
     heredado, la inferencia por contexto más honda (`CacheLoader.from(Suppliers.ofInstance(null))`)
-    o con un receptor que es una llamada (`fluent(1, 2, 3).toMap(Functions.constant(null))`), el
-    "Argument might be null" de `e0()`/`e1()` (variable de tipo con límite `@Nullable` devuelta
-    dentro de una clase anónima) y el de `parseInt`/`Ints.tryParse`.
+    o con un receptor que es una llamada (`fluent(1, 2, 3).toMap(Functions.constant(null))`) y el
+    de `parseInt`/`Ints.tryParse`.
   - guava, 3 de más en LocalCacheTest (1062, 2408, 2449): el `entry` que devuelve `getEntry`.
     IntelliJ le infiere un contrato `null -> null` y no marca después el argumento; kerbo no
     infiere contratos sobre lo que devuelve un método.

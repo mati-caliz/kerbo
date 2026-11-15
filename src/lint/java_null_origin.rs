@@ -63,3 +63,10 @@ pub enum NullOrigin {
         after_call: bool,
     },
 }
+
+// En el lugar de un varargs, si el valor puede ser el arreglo entero o es siempre un elemento.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArgumentShape {
+    MaybeArray,
+    Element,
+}

@@ -224,7 +224,10 @@ pub(super) fn is_type_parameter(summary: &JavaSummary, written: &str) -> bool {
         .any(|parameter| parameter == written)
 }
 
-fn generics_in<'summary>(summary: &'summary JavaSummary, owner: &str) -> Option<&'summary TypeGenerics> {
+pub(super) fn generics_in<'summary>(
+    summary: &'summary JavaSummary,
+    owner: &str,
+) -> Option<&'summary TypeGenerics> {
     let declared_once = summary.hierarchy.iter().filter(|(name, _)| name == owner).count() == 1;
     let mut matching = summary
         .generics
