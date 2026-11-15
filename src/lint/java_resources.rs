@@ -28,6 +28,7 @@ const RIGHT_FIELD: &str = "right";
 const CLOSE: &str = "close";
 const GETTER_PREFIX: &str = "get";
 const LAMBDA: &str = "lambda_expression";
+const EXPRESSION_STATEMENT: &str = "expression_statement";
 const ARGUMENTS: &str = "argument_list";
 const COMMENTS: &[&str] = &["line_comment", "block_comment"];
 
@@ -56,8 +57,9 @@ pub struct ResourceCandidate {
 
 // Calca dónde mira AutoCloseableResource: una llamada o un `new` que inicializa una variable local
 // que nunca va a un `try (variable)`, nunca se devuelve tal cual, no se guarda en otro lado y nunca
-// recibe `close()`; y una llamada o un `new` sobre cuyo resultado se llama a otro método
-// (`fabrica().getValidator()`), que pierde lo que creó.
+// recibe `close()`; una llamada o un `new` sobre cuyo resultado se llama a otro método
+// (`fabrica().getValidator()`), que pierde lo que creó; y una sentencia que lo descarta
+// (`listener.error(...)` devuelve un `PrintWriter`).
 pub fn resource_candidates(body: Node<'_>, source: &[u8], variables: &Variables) -> Vec<ResourceCandidate> {
     let nodes = descendants(body);
     let escaped = escaped_names(&nodes, source);
@@ -68,6 +70,13 @@ pub fn resource_candidates(body: Node<'_>, source: &[u8], variables: &Variables)
                 kept_initializers(node, source, &escaped)
                     .into_iter()
                     .filter_map(|value| candidate(value, source, variables)),
+            ),
+            EXPRESSION_STATEMENT => candidates.extend(
+                named_children(node)
+                    .into_iter()
+                    .find(|child| !COMMENTS.contains(&child.kind()))
+                    .filter(|created| created.kind() != INVOCATION || !is_close(*created, source))
+                    .and_then(|created| candidate(created, source, variables)),
             ),
             LAMBDA => candidates.extend(
                 discarded_by_assert_throws(node, source)

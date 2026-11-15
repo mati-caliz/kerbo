@@ -1597,11 +1597,11 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     sin resolver de una anónima anidada y de un overrider sin `throws` (sólo pesa con classpath
     incompleto); una interfaz del proyecto sin métodos no se reconoce en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
-  commons-lang 2 de 2, guava 42 de 42 y jenkins 674 de 750, ninguno de más en los cuatro
-  (2026-11-15); maven 67 de 89 con 2 de más. Una local también escapa al iniciar el recurso de un
+  commons-lang 2 de 2, guava 42 de 42 y jenkins 693 de 750, ninguno de más en los cuatro
+  (2026-11-15); maven 75 de 89 con 2 de más. Una sentencia que descarta lo que crea también se
+  marca (`listener.error(...)` devuelve un `PrintWriter`). Una local también escapa al iniciar el recurso de un
   `try` (`try (InputStream in = is)`), y un `new` que recibe un campo que se cierra (`this.world`) es
-  de otro. En jenkins faltan sobre todo los
-  `listener.error(...)` (devuelven un `PrintWriter`). La API del JDK sale del `release` del pom raíz
+  de otro. La API del JDK sale del `release` del pom raíz
   (si no lo dice, el JDK instalado), como el SDK del proyecto en IntelliJ: antes tomaba el `<release>11`
   de `war/` para todo jenkins y ahí `ExecutorService` todavía no se cierra. Un nombre simple que no se importa puede ser una clase anidada de una importada
   (`JenkinsRule.WebClient` llega como `WebClient`).

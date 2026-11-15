@@ -52,6 +52,11 @@ final class Uses {
         tracked.isClosed();
     }
 
+    void discarded() {
+        Streams.track();
+        Streams.track().close();
+    }
+
     void inLambda() {
         Streams.assertThrows(RuntimeException.class, () -> Streams.track());
     }
@@ -60,7 +65,8 @@ final class Uses {
 
 // Una llamada traída con `import static` y una que devuelve una clase del proyecto que se cierra
 // crean recursos; una llamada con "close" en el nombre en el mismo bloque da la local por escapada;
-// la lambda de `assertThrows` que sólo crea un recurso lo pierde.
+// la lambda de `assertThrows` que sólo crea un recurso lo pierde, igual que una sentencia que descarta
+// lo que crea (no si lo cierra en la misma sentencia).
 #[test]
 fn imported_calls_project_resources_and_closing_names_follow_intellij() {
     let summary = summary_of(SOURCES);
@@ -75,7 +81,15 @@ fn imported_calls_project_resources_and_closing_names_follow_intellij() {
         .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
         .collect();
     found.sort();
-    assert_eq!(found, ["38:30 InputStream", "43:17 Tracked", "52:68 Tracked"]);
+    assert_eq!(
+        found,
+        [
+            "38:30 InputStream",
+            "43:17 Tracked",
+            "52:17 Tracked",
+            "57:68 Tracked"
+        ]
+    );
 }
 
 const BUILDERS: &str = r#"package app;
