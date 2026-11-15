@@ -10,7 +10,12 @@ import process from "node:process";
 
 const [packageDir] = process.argv.slice(2);
 const ts = createRequire(path.join(packageDir, "package.json"))("typescript");
-const files = readFileSync(0, "utf8").split("\n").filter(Boolean);
+// readFileSync(0) falla con EAGAIN cuando la entrada es un pipe largo (la lista de archivos de gastronova).
+const chunks = [];
+for await (const chunk of process.stdin) {
+  chunks.push(chunk);
+}
+const files = Buffer.concat(chunks).toString("utf8").split("\n").filter(Boolean);
 const lines = [];
 
 function identifiersOf(file) {
