@@ -1565,7 +1565,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
 (`qodana.sh <repo> <inspección>`, `kerbo.sh`, `compare_all.py`), 2026-11-07.
 
 - `RedundantThrows` (`redundant-throws`): Guava 28 de 28, commons-lang 124 de 125, junit4 218 de
-  219, **ninguno de más en los tres** (2026-11-10). Guava se mide sin `android/` ni los
+  219, **ninguno de más en los tres** (2026-11-10). jenkins (primera corrida, 2026-11-15): 379 de
+  504 con 52 de más, casi todos `ServletException` en filtros y acciones. Guava se mide sin `android/` ni los
   `src-super`/`test-super` de GWT (`scripts/parity/java/configs/guava.kerbo.toml`, que `kerbo.sh`
   copia al repo): Qodana sólo analiza los módulos del pom raíz. Falta medir spring-boot.
   - Ya se calca el análisis global de IntelliJ (`RefMethodImpl.updateThrowsList`): lo que tiran los
@@ -1589,7 +1590,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     sin resolver de una anónima anidada y de un overrider sin `throws` (sólo pesa con classpath
     incompleto); una interfaz del proyecto sin métodos no se reconoce en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
-  commons-lang 2 de 2 y guava 42 de 42, ninguno de más en los tres (2026-11-15). Calca los `new`
+  commons-lang 2 de 2 y guava 42 de 42, ninguno de más en los tres (2026-11-15). jenkins (primera
+  corrida): 607 de 750 con 108 de más, sobre todo `WebClient` y `LogRecorder` de los tests. Calca los `new`
   (clases del proyecto y anónimas) y descarta el recurso que recibe otro `AutoCloseable` como
   argumento o receptor. Como `ResourceInspection.EscapeVisitor`, una local escapa si en su bloque hay
   cualquier llamada con "close" o "cleanup" en el nombre (`isClosed()`, `onClose(...)`), fuera de
@@ -1602,7 +1604,15 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `nullable-return`): commons-lang 131 de 141 y junit4 17 de 19 (`failing-call` 15 de 15), ninguno
   de más en los dos. En guava, 842 de los 972 (485 `data-flow-issue`, 308 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
-  `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
+  `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
+  (primera corrida, 2026-11-15) 472 de 1258 (448 `data-flow-issue`, 15 `null-argument`, 9
+  `nullable-return`) con 18 de más: correlaciones con booleanos y ternarios, contratos inferidos
+  (`if (!isValidData(data)) return null;`) y el `(fp = fp.getParent()).getRemote()` de FilePathTest.
+  Para jenkins sumaron: Hamcrest `assertThat(x, notNullValue())` deja presente a `x`; un getter sin
+  argumentos ya desreferenciado por una variable (`b1 = p.getLastBuild(); b1.getNumber()`) da lo
+  mismo después (`b2 = p.getLastBuild()`); `x::m` desreferencia a `x`; los parámetros que un jar
+  anota `@NonNull`/`@Nonnull`/`@NotNull` no admiten null; y `@SuppressWarnings("ConstantConditions")`
+  (o `"DataFlowIssue"`) apaga las cinco subreglas en la declaración. Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
   `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
   calificador. El campo de una variable de tipo conocido (`segment.table`) entra al flujo con su

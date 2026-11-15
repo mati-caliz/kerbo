@@ -1,5 +1,6 @@
 use super::class_file::binary_to_source;
 
+const PACKAGE_SEPARATOR: char = '.';
 const ACCESS_PRIVATE: u16 = 0x0002;
 const ACCESS_STATIC: u16 = 0x0008;
 const ACCESS_VARARGS: u16 = 0x0080;
@@ -60,6 +61,18 @@ impl Method {
         self.parameter_descriptors()
             .get(position)
             .is_some_and(|parameter| !accepted.contains(parameter))
+    }
+
+    // El nombre simple de la clase del parámetro, si es un objeto (`Ljava/lang/String;` da `String`).
+    pub fn parameter_class(&self, position: usize) -> Option<String> {
+        let descriptor = self.parameter_descriptors().into_iter().nth(position)?;
+        let binary = descriptor
+            .strip_prefix(char::from(OBJECT_START))?
+            .strip_suffix(char::from(OBJECT_END))?;
+        binary_to_source(binary)
+            .rsplit(PACKAGE_SEPARATOR)
+            .next()
+            .map(str::to_owned)
     }
 
     fn parameter_descriptors(&self) -> Vec<&str> {

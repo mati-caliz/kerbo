@@ -29,6 +29,7 @@ use crate::lint::java_null_inference::{
 };
 use crate::lint::java_nullable_fields::{ReturnNullness, declares_nullable, return_nullness};
 use crate::lint::java_owner::Owner;
+use crate::lint::java_pmd_suppressions::{SuppressedSpan, suppressed_spans};
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
 use crate::lint::java_returns::returned_field;
@@ -174,6 +175,7 @@ pub struct JavaSummary {
     pub annotation_defaults: Vec<AnnotationDefault>,
     pub annotation_values: Vec<AnnotationValue>,
     pub sequenced_candidates: Vec<SequencedCandidate>,
+    pub suppressed_spans: Vec<SuppressedSpan>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
@@ -188,6 +190,7 @@ pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {
         static_imports: imported_paths(root, source, true),
         package_annotations: package_annotations(root, source),
         annotation_values: annotation_values(root, source),
+        suppressed_spans: suppressed_spans(root, source),
         ..JavaSummary::default()
     };
     summary.annotation_defaults = annotation_defaults(root, source, &summary.package);

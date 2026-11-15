@@ -2,7 +2,7 @@ use tree_sitter::{Node, Point};
 
 use super::java::{ANNOTATION, NAME_FIELD, modifiers, qualified_name, text};
 use super::{LintFinding, LintKind};
-use crate::syntax::{descendants, named_children};
+use crate::syntax::{descendants, named_children, one_based};
 
 const SUPPRESS_WARNINGS: &str = "SuppressWarnings";
 const ARGUMENTS_FIELD: &str = "arguments";
@@ -66,6 +66,29 @@ fn has_nopmd_comment(line: &[u8]) -> bool {
     line.find(LINE_COMMENT)
         .and_then(|start| line.get(start..))
         .is_some_and(|comment| comment.contains(NOPMD))
+}
+
+// Los tramos del archivo que un `@SuppressWarnings` cubre, con los nombres que silencia: el índice los
+// usa para las inspecciones de IntelliJ que se calculan con el proyecto entero.
+pub fn suppressed_spans(root: Node<'_>, source: &[u8]) -> Vec<SuppressedSpan> {
+    suppressing_declarations(root, source)
+        .into_iter()
+        .map(|(declaration, names)| {
+            let (start, end) = (declaration.start_position(), declaration.end_position());
+            SuppressedSpan {
+                start: (one_based(start.row), one_based(start.column)),
+                end: (one_based(end.row), one_based(end.column)),
+                names,
+            }
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SuppressedSpan {
+    pub start: (usize, usize),
+    pub end: (usize, usize),
+    pub names: Vec<String>,
 }
 
 fn suppressing_declarations<'tree>(root: Node<'tree>, source: &[u8]) -> Vec<(Node<'tree>, Vec<String>)> {

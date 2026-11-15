@@ -9,6 +9,7 @@ use super::java_null_flow::{
     OBJECT_FIELD, State,
 };
 use super::java_null_forwarding::forwarding_chain;
+use super::java_null_getters::note_dereferenced;
 use super::java_null_inference::{CallTarget, NullArgument, call_target};
 use super::java_null_keys::{forget, reread, spellings, tracked_key};
 use super::java_null_origin::ArgumentShape;
@@ -25,6 +26,7 @@ const TYPE_FIELD: &str = "type";
 const VALUE_FIELD: &str = "value";
 const INDEX_FIELD: &str = "index";
 const THROW: &str = "throw_statement";
+const METHOD_REFERENCE: &str = "method_reference";
 const INTEGER_LITERAL: &str = "decimal_integer_literal";
 const ARRAY_TYPE: &str = "array_type";
 const DIMENSIONS_FIELD: &str = "dimensions";
@@ -172,11 +174,11 @@ pub(super) fn dereference(analysis: &mut Analysis<'_, '_>, node: Node<'_>, mut s
             node.child_by_field_name(ARRAY_FIELD),
             node.child_by_field_name(ARRAY_FIELD),
         ),
-        THROW => {
-            let thrown = named_children(node)
+        THROW | METHOD_REFERENCE => {
+            let used = named_children(node)
                 .into_iter()
                 .find(|child| !COMMENTS.contains(&child.kind()));
-            (thrown, thrown)
+            (used, used)
         }
         CAST if casts_to_primitive(node) => (
             node.child_by_field_name(VALUE_FIELD),
@@ -201,6 +203,7 @@ pub(super) fn dereference(analysis: &mut Analysis<'_, '_>, node: Node<'_>, mut s
     };
     state = reread(analysis, state, &receiver);
     if let Some(origin) = forget(&mut state, &receiver) {
+        note_dereferenced(analysis, origin);
         let used = dereference_at(analysis, used);
         if let Some(flow) = analysis.flows.get_mut(origin) {
             flow.dereferences.push(used);

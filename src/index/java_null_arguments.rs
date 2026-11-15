@@ -3,7 +3,9 @@ use super::java::{
 };
 use super::java_dereference::{known_not_null, may_return_null};
 use super::java_inferred_arguments::context_inferred_non_null;
-use super::java_library_arguments::{called_type, inherited_library_class, library_substituted_non_null};
+use super::java_library_arguments::{
+    called_type, inherited_library_class, library_annotated_non_null, library_substituted_non_null,
+};
 use super::java_null_origins::may_be_null;
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use super::java_variable_returns::{inherited_project_class, returns_nullable_variable};
@@ -155,14 +157,16 @@ pub(super) fn non_null_parameter(
     if let Receiver::Type(written) = &argument.receiver
         && let Resolved::Library(class) = resolve(types, library, summary, written)
     {
-        return library_non_null(library, &class, argument).or_else(|| {
-            library_substituted_non_null(
-                library,
-                &class,
-                argument,
-                types.is_marked(summary, argument.receiver_arguments.marking),
-            )
-        });
+        return library_non_null(library, &class, argument)
+            .or_else(|| library_annotated_non_null(library, &class, argument))
+            .or_else(|| {
+                library_substituted_non_null(
+                    library,
+                    &class,
+                    argument,
+                    types.is_marked(summary, argument.receiver_arguments.marking),
+                )
+            });
     }
     if argument.receiver == Receiver::Unknown
         && let Some(called) = &argument.receiver_arguments.called

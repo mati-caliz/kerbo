@@ -11,6 +11,7 @@ mod java_failing_calls;
 mod java_forwarded_returns;
 mod java_header;
 mod java_inferred_arguments;
+mod java_inspection_suppressions;
 mod java_jdk;
 mod java_lambda_null_returns;
 mod java_library_arguments;
@@ -56,6 +57,8 @@ mod java_deserialization_tests;
 mod java_escapes_tests;
 #[cfg(test)]
 mod java_failing_calls_tests;
+#[cfg(test)]
+mod java_null_assertion_tests;
 #[cfg(test)]
 mod java_null_iteration_tests;
 #[cfg(test)]

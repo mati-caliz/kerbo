@@ -8,6 +8,7 @@ use super::java_null_conditions::{
     without_cast,
 };
 use super::java_null_forwarding::forwarding_chain;
+use super::java_null_getters::{Getters, forget_getters_of, is_known_getter, remember_getter};
 use super::java_null_keys::{
     VolatileField, forget, join, reread, seed_nullable_variables, spellings, tracked_key,
 };
@@ -89,6 +90,7 @@ pub(super) struct Analysis<'source, 'context> {
     pub(super) volatile_fields: Vec<VolatileField>,
     pub(super) nullable_elements: Vec<String>,
     pub(super) only_dereferences: bool,
+    pub(super) getters: Getters,
     pub(super) return_marking: Option<NullMarking>,
 }
 
@@ -114,6 +116,7 @@ pub fn null_flows(
         volatile_fields: Vec::new(),
         nullable_elements: Vec::new(),
         only_dereferences: false,
+        getters: Getters::default(),
         return_marking: method_marking(method, source),
     };
     let entry = seed_nullable_variables(&mut analysis, method);
@@ -286,14 +289,17 @@ impl Analysis<'_, '_> {
             state = reread(self, state, source_key);
         }
         let copied = source_key.and_then(|source_key| state.get(&source_key).copied());
-        let chain = (copied.is_none() && value.kind() == INVOCATION)
+        let chain = (copied.is_none() && value.kind() == INVOCATION && !is_known_getter(self, value))
             .then(|| forwarding_chain(self, value, &state))
             .flatten();
         for key in &keys {
             state.remove(key);
+            forget_getters_of(self, key);
         }
         let origin = copied.or_else(|| {
-            self.flows.push(NullFlow::new(NullOrigin::Call(chain?)));
+            let chain = chain?;
+            remember_getter(self, self.flows.len(), &chain, value);
+            self.flows.push(NullFlow::new(NullOrigin::Call(chain)));
             Some(self.flows.len() - 1)
         });
         if let Some(origin) = origin {

@@ -18,6 +18,7 @@ use super::null_codec::{
 use super::taint_codec::{read_taints, write_taints};
 use super::throws_codec::{read_method_throws, write_method_throws};
 use crate::index::java::{CallSite, Field, JavaSummary, Position};
+use crate::lint::java_pmd_suppressions::SuppressedSpan;
 
 use crate::index::java_exposure::{DeclaredType, Exposure};
 use crate::lint::java_calls::{ResultUse, Visibility};
@@ -121,6 +122,7 @@ pub fn write_summary(writer: &mut Writer, summary: Option<&JavaSummary>) {
     writer.list(&summary.annotation_defaults, write_annotation_default);
     writer.list(&summary.annotation_values, write_annotation_value);
     writer.list(&summary.sequenced_candidates, write_sequenced_candidate);
+    writer.list(&summary.suppressed_spans, write_suppressed_span);
 }
 
 pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corrupt> {
@@ -198,6 +200,7 @@ pub fn read_summary(reader: &mut Reader<'_>) -> Result<Option<JavaSummary>, Corr
         annotation_defaults: reader.list(read_annotation_default)?,
         annotation_values: reader.list(read_annotation_value)?,
         sequenced_candidates: reader.list(read_sequenced_candidate)?,
+        suppressed_spans: reader.list(read_suppressed_span)?,
     }))
 }
 
@@ -301,4 +304,20 @@ fn read_optional_text(reader: &mut Reader<'_>) -> Result<Option<String>, Corrupt
         PRESENT => reader.text().map(Some),
         _ => Err(Corrupt),
     }
+}
+
+fn write_suppressed_span(writer: &mut Writer, span: &SuppressedSpan) {
+    writer.size(span.start.0);
+    writer.size(span.start.1);
+    writer.size(span.end.0);
+    writer.size(span.end.1);
+    writer.list(&span.names, |writer, name| writer.text(name));
+}
+
+fn read_suppressed_span(reader: &mut Reader<'_>) -> Result<SuppressedSpan, Corrupt> {
+    Ok(SuppressedSpan {
+        start: (reader.size()?, reader.size()?),
+        end: (reader.size()?, reader.size()?),
+        names: reader.list(Reader::text)?,
+    })
 }

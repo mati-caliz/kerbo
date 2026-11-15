@@ -16,6 +16,7 @@ const CAST: &str = "cast_expression";
 const ASSERTS_PRESENT: &[&str] = &["requireNonNull", "assertNotNull", "notNull", "checkNotNull"];
 const ASSERT_THAT: &str = "assertThat";
 const IS_NOT_NULL: &str = "isNotNull";
+const NOT_NULL_MATCHERS: &[&str] = &["notNullValue()", "not(nullValue())"];
 const VALUE_FIELD: &str = "value";
 const TRUE_MEANS_PRESENT: &[&str] = &[
     "nonNull",
@@ -274,6 +275,26 @@ pub(super) fn condition_asserted<'tree>(expression: Node<'tree>, source: &[u8]) 
 
 // Una sentencia que asegura que la variable no es null: `requireNonNull(x)`, `assertNotNull(x)`,
 // `assertThat(x).isNotNull()`.
+// `assertThat(x, notNullValue())` o `assertThat("motivo", x, is(not(nullValue())))` de Hamcrest:
+// el valor es el anteúltimo argumento.
+fn matched_not_null<'tree>(assertion: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
+    let arguments: Vec<Node<'tree>> = assertion
+        .child_by_field_name(ARGUMENTS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|argument| !COMMENTS.contains(&argument.kind()))
+        .collect();
+    let [.., value, matcher] = arguments.as_slice() else {
+        return None;
+    };
+    let written: String = text(*matcher, source).split_whitespace().collect();
+    NOT_NULL_MATCHERS
+        .iter()
+        .any(|expected| written.contains(expected))
+        .then_some(*value)
+}
+
 pub(super) fn asserted_present<'tree>(expression: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
     if expression.kind() != INVOCATION {
         return None;
@@ -281,6 +302,8 @@ pub(super) fn asserted_present<'tree>(expression: Node<'tree>, source: &[u8]) ->
     let name = text(expression.child_by_field_name(NAME_FIELD)?, source);
     if ASSERTS_PRESENT.contains(&name) {
         first_argument(expression)
+    } else if name == ASSERT_THAT {
+        matched_not_null(expression, source)
     } else if name == IS_NOT_NULL {
         expression
             .child_by_field_name(OBJECT_FIELD)

@@ -14,6 +14,8 @@ use crate::lint::java_receivers::Receiver;
 // límite `@Nullable`). Con sobrecargas, todas tienen que coincidir.
 // Los parámetros del JDK que las anotaciones externas de IntelliJ marcan `@Nullable`: clase,
 // método, cantidad de argumentos y posición.
+const NON_NULL_ANNOTATIONS: &[&str] = &["NonNull", "Nonnull", "NotNull"];
+const QUALIFIER_SEPARATOR: char = '.';
 const LIBRARY_NULLABLE: &[(&str, &str, usize, usize)] = &[("java.util.Optional", "orElse", 1, 0)];
 
 pub(super) fn library_substituted_non_null(
@@ -56,6 +58,30 @@ pub(super) fn library_substituted_non_null(
     });
     let first = names.next()??;
     names.all(|other| other.is_some()).then_some(first)
+}
+
+// Un parámetro que el jar anota no nulo (`@NonNull`, `@Nonnull`, `@NotNull`) en todas las
+// sobrecargas que pueden recibir el argumento, fuera del lugar de un varargs.
+pub(super) fn library_annotated_non_null(
+    library: &Library,
+    class: &str,
+    argument: &NullArgument,
+) -> Option<String> {
+    let overloads = library.overloads(class, &argument.name, argument.arity);
+    let first = overloads.first()?;
+    let annotated = overloads.iter().all(|method| {
+        !method.is_varargs()
+            && method
+                .parameter_annotations
+                .get(argument.index)
+                .is_some_and(|annotations| {
+                    annotations.iter().any(|annotation| {
+                        NON_NULL_ANNOTATIONS
+                            .contains(&annotation.rsplit(QUALIFIER_SEPARATOR).next().unwrap_or_default())
+                    })
+                })
+    });
+    annotated.then(|| first.parameter_class(argument.index)).flatten()
 }
 
 fn class_variables(library: &Library, class: &str) -> Option<Vec<String>> {

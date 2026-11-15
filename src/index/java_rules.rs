@@ -3,6 +3,7 @@ use super::java_default_annotation_params::{AnnotationDefaults, redundant_annota
 use super::java_dereference::nullable_dereferences;
 use super::java_escapes::{PackageTypes, escaped_types};
 use super::java_failing_calls::failing_calls;
+use super::java_inspection_suppressions::drop_inspection_suppressed;
 use super::java_null_arguments::null_arguments;
 use super::java_nullable_returns::nullable_returns;
 use super::java_nullness::{ProjectTypes, unannotated_overrides};
@@ -51,6 +52,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
             ));
             in_file.extend(sequenced_on_library_types(library, summary));
             in_file.extend(redundant_throws(&throw_lookup, &throws_facts, summary));
+            drop_inspection_suppressed(&mut in_file, summary);
             in_file.extend(
                 summary
                     .fields
