@@ -1,26 +1,19 @@
 use tree_sitter::Node;
 
-use super::java::{
-    BODY_FIELD, IDENTIFIER, METHOD, NAME_FIELD, TYPE_FIELD, VARIABLE_DECLARATOR, is_type_declaration, text,
-    unparenthesized,
-};
-use super::java_receivers::declared_type;
+use super::java::{NAME_FIELD, text, unparenthesized};
+use super::java_sequenced_receivers::{inside_type_named, receiver_type, simple_name};
 use super::{LintFinding, LintKind, finding};
 use crate::fix::Fix;
 use crate::rules::JavaRule;
-use crate::syntax::{descendants, named_children};
+use crate::syntax::{descendants, named_children, one_based};
 
 const SEQUENCED_COLLECTIONS_RELEASE: u32 = 21;
 const INVOCATION: &str = "method_invocation";
-const FIELD_ACCESS: &str = "field_access";
 const BINARY: &str = "binary_expression";
-const FIELD_DECLARATION: &str = "field_declaration";
 const BLOCK: &str = "block";
-const THIS: &str = "this";
 const THIS_QUALIFIER: &str = "this.";
 const DECIMAL_LITERAL: &str = "decimal_integer_literal";
 const OBJECT_FIELD: &str = "object";
-const FIELD_FIELD: &str = "field";
 const ARGUMENTS_FIELD: &str = "arguments";
 const LEFT_FIELD: &str = "left";
 const RIGHT_FIELD: &str = "right";
@@ -38,8 +31,9 @@ const SIZE: &str = "size";
 const FIRST_SUFFIX: &str = "First";
 const LAST_SUFFIX: &str = "Last";
 const GET_FIRST: &str = "getFirst";
-const TYPE_ARGUMENTS_START: char = '<';
+const ARRAY_TYPE: &str = "array_type";
 const NAME_SEPARATOR: char = '.';
+const TYPE_ARGUMENTS_START: char = '<';
 const ADDED_ELEMENT: usize = 1;
 const NEARBY_STATEMENTS: usize = 2;
 const NEARBY_INDICES: std::ops::Range<u32> = 1..10;
@@ -85,6 +79,56 @@ const OTHER_SEQUENCED_TYPES: [&str; 15] = [
 // `get(size() - 1)` y `iterator().next()` donde Java 21 ya tiene `getFirst()`, `getLast()`,
 // `removeFirst()`, `addFirst()`. El tipo del receptor sale de cómo se declara la variable.
 pub fn reported(root: Node<'_>, source: &[u8], release: Option<u32>) -> Vec<LintFinding> {
+    calls(root, source, release)
+        .into_iter()
+        .filter_map(|(call, name, found)| {
+            if found.typed != Typed::Known {
+                return None;
+            }
+            let rest = if found.method.starts_with(ADD) {
+                arguments(call)
+                    .get(ADDED_ELEMENT)
+                    .map_or_else(String::new, |element| text(*element, source).to_owned())
+            } else {
+                String::new()
+            };
+            let replacement = format!("{}.{}({rest})", text(found.receiver, source), found.method);
+            Some(finding(
+                LintKind::Java(JavaRule::SequencedCollectionMethod),
+                name,
+                &found.method,
+                Some(Fix::replace(call, &replacement, source)),
+            ))
+        })
+        .collect()
+}
+
+// Los mismos casos cuando el receptor se declara con un tipo que no está en las tablas: el índice
+// los resuelve con las dependencias (un `DomNodeList` de htmlunit es una `List`).
+pub fn library_candidates(root: Node<'_>, source: &[u8], release: Option<u32>) -> Vec<SequencedCandidate> {
+    calls(root, source, release)
+        .into_iter()
+        .filter_map(|(_, name, found)| {
+            let Typed::Written(type_name) = found.typed else {
+                return None;
+            };
+            let start = name.start_position();
+            Some(SequencedCandidate {
+                type_name,
+                needs_list: found.needs_list,
+                method: found.method,
+                line: one_based(start.row),
+                column: one_based(start.column),
+            })
+        })
+        .collect()
+}
+
+fn calls<'tree>(
+    root: Node<'tree>,
+    source: &[u8],
+    release: Option<u32>,
+) -> Vec<(Node<'tree>, Node<'tree>, Detected<'tree>)> {
     if release.is_some_and(|release| release < SEQUENCED_COLLECTIONS_RELEASE) {
         return Vec::new();
     }
@@ -93,46 +137,53 @@ pub fn reported(root: Node<'_>, source: &[u8], release: Option<u32>) -> Vec<Lint
         .filter(|node| node.kind() == INVOCATION)
         .filter_map(|call| {
             let name = call.child_by_field_name(NAME_FIELD)?;
-            let (receiver, method) = replacement(call, text(name, source), source)?;
-            let rest = if method.starts_with(ADD) {
-                arguments(call)
-                    .get(ADDED_ELEMENT)
-                    .map_or_else(String::new, |element| text(*element, source).to_owned())
-            } else {
-                String::new()
-            };
-            let replacement = format!("{}.{method}({rest})", text(receiver, source));
-            Some(finding(
-                LintKind::Java(JavaRule::SequencedCollectionMethod),
-                name,
-                &method,
-                Some(Fix::replace(call, &replacement, source)),
-            ))
+            let found = detected(call, text(name, source), source)?;
+            Some((call, name, found))
         })
         .collect()
 }
 
-fn replacement<'tree>(call: Node<'tree>, name: &str, source: &[u8]) -> Option<(Node<'tree>, String)> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SequencedCandidate {
+    pub type_name: String,
+    pub needs_list: bool,
+    pub method: String,
+    pub line: usize,
+    pub column: usize,
+}
+
+struct Detected<'tree> {
+    receiver: Node<'tree>,
+    method: String,
+    typed: Typed,
+    needs_list: bool,
+}
+
+fn detected<'tree>(call: Node<'tree>, name: &str, source: &[u8]) -> Option<Detected<'tree>> {
     let receiver = call.child_by_field_name(OBJECT_FIELD)?;
     let listed = arguments(call);
+    let in_list = |method: String, typed: Typed| Detected {
+        receiver,
+        method,
+        typed,
+        needs_list: true,
+    };
     match (name, listed.as_slice()) {
         (GET | REMOVE, [index]) => {
             let list = unparenthesized(receiver);
-            if !is_of_type(list, &LIST_TYPES, source) {
-                return None;
-            }
+            let list_type = typed(list, true, source)?;
             let index = unparenthesized(*index);
             if is_zero(index, source) && !has_different_index_nearby(call, name, list, source) {
-                return Some((receiver, format!("{name}{FIRST_SUFFIX}")));
+                return Some(in_list(format!("{name}{FIRST_SUFFIX}"), list_type));
             }
-            is_last_index(index, list, source).then(|| (receiver, format!("{name}{LAST_SUFFIX}")))
+            is_last_index(index, list, source).then(|| in_list(format!("{name}{LAST_SUFFIX}"), list_type))
         }
         (ADD, [index, _]) => {
             let list = unparenthesized(receiver);
-            let starts = is_of_type(list, &LIST_TYPES, source)
-                && is_zero(unparenthesized(*index), source)
+            let list_type = typed(list, true, source)?;
+            let starts = is_zero(unparenthesized(*index), source)
                 && !has_different_index_nearby(call, name, list, source);
-            starts.then(|| (receiver, format!("{ADD}{FIRST_SUFFIX}")))
+            starts.then(|| in_list(format!("{ADD}{FIRST_SUFFIX}"), list_type))
         }
         (NEXT, []) => {
             let iterator = unparenthesized(receiver);
@@ -142,10 +193,13 @@ fn replacement<'tree>(call: Node<'tree>, name: &str, source: &[u8]) -> Option<(N
                     .is_some_and(|called| text(called, source) == ITERATOR)
                 && arguments(iterator).is_empty();
             let collection = iterator.child_by_field_name(OBJECT_FIELD)?;
-            let sequenced = is_iterator_call
-                && (is_of_type(collection, &LIST_TYPES, source)
-                    || is_of_type(collection, &OTHER_SEQUENCED_TYPES, source));
-            sequenced.then(|| (collection, GET_FIRST.to_owned()))
+            let collection_type = typed(collection, false, source).filter(|_| is_iterator_call)?;
+            Some(Detected {
+                receiver: collection,
+                method: GET_FIRST.to_owned(),
+                typed: collection_type,
+                needs_list: false,
+            })
         }
         _ => None,
     }
@@ -192,102 +246,34 @@ fn is_last_index(index: Node<'_>, list: Node<'_>, source: &[u8]) -> bool {
     is_one && size_of_list
 }
 
-fn is_of_type(receiver: Node<'_>, types: &[&str], source: &[u8]) -> bool {
-    let Some(written) = receiver_type(receiver, source) else {
-        return false;
-    };
+// Lo que se sabe del tipo del receptor: que está en las tablas, o el nombre escrito de otro tipo
+// que hay que buscar en las dependencias para saber si es una lista o una colección secuenciada.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Typed {
+    Known,
+    Written(String),
+}
+
+fn typed(receiver: Node<'_>, needs_list: bool, source: &[u8]) -> Option<Typed> {
+    let written = receiver_type(receiver, source)?;
     let simple = simple_name(text(written, source));
-    types.contains(&simple.as_str()) && !inside_type_named(receiver, &simple, source)
-}
-
-// El tipo escrito del receptor: una variable o un campo propio, el campo de una variable cuya clase
-// se declara en el mismo archivo, o lo que devuelve un método de las clases que encierran la
-// llamada (si todas sus declaraciones con ese nombre devuelven lo mismo).
-fn receiver_type<'tree>(receiver: Node<'tree>, source: &[u8]) -> Option<Node<'tree>> {
-    match receiver.kind() {
-        IDENTIFIER => declared_type(receiver, text(receiver, source), source),
-        FIELD_ACCESS => {
-            let object = receiver.child_by_field_name(OBJECT_FIELD)?;
-            let field = receiver.child_by_field_name(FIELD_FIELD)?;
-            if object.kind() == THIS {
-                return declared_type(field, text(field, source), source);
-            }
-            let owner = receiver_type(object, source)?;
-            let owner_name = simple_name(text(owner, source));
-            let declaration = type_declared_in_file(receiver, &owner_name, source)?;
-            field_type(declaration, text(field, source), source)
-        }
-        INVOCATION if receiver.child_by_field_name(OBJECT_FIELD).is_none() => {
-            let name = text(receiver.child_by_field_name(NAME_FIELD)?, source);
-            own_method_type(receiver, name, source)
-        }
-        _ => None,
+    if inside_type_named(receiver, &simple, source) {
+        return None;
     }
+    if is_sequenced_name(&simple, needs_list) {
+        return Some(Typed::Known);
+    }
+    let raw = text(written, source)
+        .split(TYPE_ARGUMENTS_START)
+        .next()
+        .unwrap_or_default()
+        .trim();
+    let is_class = raw.starts_with(|first: char| first.is_ascii_uppercase()) || raw.contains(NAME_SEPARATOR);
+    (written.kind() != ARRAY_TYPE && is_class).then(|| Typed::Written(raw.to_owned()))
 }
 
-fn simple_name(written: &str) -> String {
-    let raw = written.split(TYPE_ARGUMENTS_START).next().unwrap_or_default();
-    raw.rsplit(NAME_SEPARATOR).next().unwrap_or(raw).trim().to_owned()
-}
-
-fn type_declared_in_file<'tree>(usage: Node<'tree>, name: &str, source: &[u8]) -> Option<Node<'tree>> {
-    let root = std::iter::successors(Some(usage), Node::parent).last()?;
-    descendants(root).into_iter().find(|declaration| {
-        is_type_declaration(*declaration)
-            && declaration
-                .child_by_field_name(NAME_FIELD)
-                .is_some_and(|declared| text(declared, source) == name)
-    })
-}
-
-fn field_type<'tree>(declaration: Node<'tree>, name: &str, source: &[u8]) -> Option<Node<'tree>> {
-    let body = declaration.child_by_field_name(BODY_FIELD)?;
-    named_children(body)
-        .into_iter()
-        .filter(|member| member.kind() == FIELD_DECLARATION)
-        .find(|member| {
-            named_children(*member).into_iter().any(|child| {
-                child.kind() == VARIABLE_DECLARATOR
-                    && child
-                        .child_by_field_name(NAME_FIELD)
-                        .is_some_and(|declared| text(declared, source) == name)
-            })
-        })
-        .and_then(|member| member.child_by_field_name(TYPE_FIELD))
-}
-
-fn own_method_type<'tree>(call: Node<'tree>, name: &str, source: &[u8]) -> Option<Node<'tree>> {
-    std::iter::successors(call.parent(), Node::parent)
-        .filter(|ancestor| is_type_declaration(*ancestor))
-        .find_map(|declaration| {
-            let returned: Vec<Node<'tree>> = declaration
-                .child_by_field_name(BODY_FIELD)
-                .map(named_children)
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|member| {
-                    member.kind() == METHOD
-                        && member
-                            .child_by_field_name(NAME_FIELD)
-                            .is_some_and(|declared| text(declared, source) == name)
-                })
-                .filter_map(|method| method.child_by_field_name(TYPE_FIELD))
-                .collect();
-            let first = *returned.first()?;
-            returned
-                .iter()
-                .all(|other| text(*other, source) == text(first, source))
-                .then_some(first)
-        })
-}
-
-fn inside_type_named(node: Node<'_>, name: &str, source: &[u8]) -> bool {
-    std::iter::successors(node.parent(), Node::parent).any(|ancestor| {
-        is_type_declaration(ancestor)
-            && ancestor
-                .child_by_field_name(NAME_FIELD)
-                .is_some_and(|declared| text(declared, source) == name)
-    })
+pub fn is_sequenced_name(simple: &str, needs_list: bool) -> bool {
+    LIST_TYPES.contains(&simple) || !needs_list && OTHER_SEQUENCED_TYPES.contains(&simple)
 }
 
 // IntelliJ no avisa en una serie como `list.get(0); list.get(1);`: otra llamada al mismo método

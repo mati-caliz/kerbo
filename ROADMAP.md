@@ -1790,10 +1790,12 @@ las firmas de la etapa 9. Qodana está en el arnés (`scripts/parity/java/qodana
   Checkstyle (42.410).
 - La API nueva, igual a Qodana en el corpus: bloques de texto (`text-block-migration`),
   `Math.clamp` (`math-clamp-migration`), `StringBuilder.repeat` (`string-repeat-can-be-used`) y
-  `getFirst()`/`getLast()` (`sequenced-collection-method`, 7 de 10). Faltan los 3 de un
-  `DomNodeList` de htmlunit: saber que es una `List` pide leer el jar, y la regla corre por
-  archivo. `DefaultAnnotationParam` lee el valor por defecto de las anotaciones de las
-  dependencias (`AnnotationDefault` del `.class`): Jenkins 10 de 10.
+  `getFirst()`/`getLast()` (`sequenced-collection-method`, 10, con los tipos de las dependencias
+  resueltos en el índice). `DefaultAnnotationParam` lee el valor por defecto de las anotaciones de
+  las dependencias (`AnnotationDefault` del `.class`): Jenkins 10 de 10.
+- Las inspecciones de flujo (`DataFlowIssue`, `AutoCloseableResource`, `RedundantThrows`) no se
+  midieron contra Qodana en Jenkins: kerbo da 708 `auto-closeable-resource`, casi todos por el
+  `WebClient` de htmlunit en los tests.
 - Quedan sin hacer, porque no aparecen en el corpus: `List.of` (`Java9CollectionFactory`, que pide
   saber si los elementos pueden ser null), `Files.readString` (`ReadWriteStringCanBeUsed`), el
   bucle de `StringRepeatCanBeUsed`, `PatternVariableCanBeUsed` y `EnhancedSwitchMigration` (las

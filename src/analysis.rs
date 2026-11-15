@@ -13,6 +13,7 @@ use crate::lint::ecmascript::taint::ecmascript_taints;
 use crate::lint::go::platform::GoPlatform;
 use crate::lint::go::taint::go_taints;
 use crate::lint::go::{GoPackageFacts, package_facts};
+use crate::lint::java_sequenced_collection::library_candidates;
 use crate::lint::python::taint::python_taints;
 use crate::lint::taint::{TaintFamily, TaintMethod};
 use crate::lint::{LintFinding, find_lints};
@@ -28,7 +29,7 @@ use crate::shell;
 use crate::syntax::rust_parse_text;
 
 // Las reglas de Java que miran el proyecto entero: sin ninguna prendida, no hace falta el resumen.
-const PROJECT_RULES: [JavaRule; 17] = [
+const PROJECT_RULES: [JavaRule; 18] = [
     JavaRule::RedundantThrows,
     JavaRule::UnreadField,
     JavaRule::ClassEscapesItsScope,
@@ -46,6 +47,7 @@ const PROJECT_RULES: [JavaRule; 17] = [
     JavaRule::UnusedReturnValue,
     JavaRule::SameReturnValue,
     JavaRule::UnusedMethod,
+    JavaRule::SequencedCollectionMethod,
 ];
 
 #[derive(Debug)]
@@ -179,7 +181,11 @@ pub fn analyze_unit(
                 || TaintRule::ALL
                     .iter()
                     .any(|rule| limits.get(RuleId::Taint(*rule)).is_some())))
-        .then(|| summarize(root, source)),
+        .then(|| {
+            let mut summary = summarize(root, source);
+            summary.sequenced_candidates = library_candidates(root, source, limits.java_release());
+            summary
+        }),
         taints: TaintRule::ALL
             .iter()
             .any(|rule| limits.get(RuleId::Taint(*rule)).is_some())

@@ -8,6 +8,7 @@ use super::java_nullable_returns::nullable_returns;
 use super::java_nullness::{ProjectTypes, unannotated_overrides};
 use super::java_project::{IndexedSummary, Project, key_of};
 use super::java_resources::unclosed_resources;
+use super::java_sequenced_types::sequenced_on_library_types;
 use super::java_taint::tainted_sinks;
 use super::java_throw_lookup::ThrowLookup;
 use super::java_throws::{ThrowsFacts, redundant_throws};
@@ -48,6 +49,7 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
                 library,
                 summary,
             ));
+            in_file.extend(sequenced_on_library_types(library, summary));
             in_file.extend(redundant_throws(&throw_lookup, &throws_facts, summary));
             in_file.extend(
                 summary

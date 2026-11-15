@@ -222,9 +222,10 @@ De las inspecciones de IntelliJ, kerbo hace:
 - `SequencedCollectionMethodCanBeUsed` (`sequenced-collection-method`): `get(0)`, `remove(0)`,
   `add(0, x)`, `get(size() - 1)` e `iterator().next()` donde Java 21 tiene `getFirst()`,
   `getLast()`, `removeFirst()` y `addFirst()`. El tipo sale de la declaración: una variable, un
-  campo, el campo de una clase del mismo archivo o lo que devuelve un método propio. No avisa en
-  una serie como `get(0)`, `get(1)`, igual que IntelliJ. En Jenkins faltan 3 de 10, sobre un
-  `DomNodeList` de htmlunit: saber que es una `List` pide leer el jar.
+  campo, el campo de una clase del mismo archivo o lo que devuelve un método propio. Si el tipo
+  declarado no es una de las colecciones conocidas, se busca en las dependencias si alguno de sus
+  padres lo es (un `DomNodeList` de htmlunit es una `List`). No avisa en una serie como `get(0)`,
+  `get(1)`, igual que IntelliJ. Coincide con Qodana en el corpus (10, en Jenkins).
 
 - `MathClampMigration` (`math-clamp-migration`): `Math.max(0, Math.min(60, x))` donde Java 21 tiene
   `Math.clamp`. Como el modo por defecto de IntelliJ: alcanza con que algo dentro de la llamada

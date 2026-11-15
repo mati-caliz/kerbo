@@ -22,6 +22,7 @@ mod java_project;
 mod java_reference_unboxing;
 mod java_resources;
 mod java_rules;
+mod java_sequenced_types;
 mod java_substituted_returns;
 mod java_taint;
 mod java_throw_functional;
@@ -76,6 +77,8 @@ mod java_null_variable_return_tests;
 mod java_nullable_field_tests;
 #[cfg(test)]
 mod java_nullable_return_tests;
+#[cfg(test)]
+mod java_sequenced_types_tests;
 #[cfg(test)]
 mod java_throw_abstract_tests;
 #[cfg(test)]

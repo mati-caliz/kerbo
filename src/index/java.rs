@@ -32,6 +32,7 @@ use crate::lint::java_owner::Owner;
 use crate::lint::java_receivers::Receiver;
 use crate::lint::java_resources::ResourceCandidate;
 use crate::lint::java_returns::returned_field;
+use crate::lint::java_sequenced_collection::SequencedCandidate;
 use crate::lint::java_throws::MethodThrows;
 use crate::lint::java_type_arguments::{TypeArgument, parameter_type_arguments};
 use crate::lint::java_type_variables::is_type_variable;
@@ -172,6 +173,7 @@ pub struct JavaSummary {
     pub references: Vec<ReferenceArgument>,
     pub annotation_defaults: Vec<AnnotationDefault>,
     pub annotation_values: Vec<AnnotationValue>,
+    pub sequenced_candidates: Vec<SequencedCandidate>,
 }
 
 pub fn summarize(root: Node<'_>, source: &[u8]) -> JavaSummary {

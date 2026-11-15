@@ -17,11 +17,13 @@ use crate::lint::LintFinding;
 use crate::lint::taint::{TaintFamily, TaintMethod};
 use crate::rules::{Diagnostic, FileIdentity, JavaRule, RuleId, finding_diagnostics};
 
-const LIBRARY_RULES: [JavaRule; 4] = [
+const LIBRARY_RULES: [JavaRule; 6] = [
     JavaRule::RedundantThrows,
     JavaRule::NullableProblems,
     JavaRule::DataFlowIssue,
     JavaRule::AutoCloseableResource,
+    JavaRule::DefaultAnnotationParam,
+    JavaRule::SequencedCollectionMethod,
 ];
 
 // Un archivo de Python, JavaScript o TypeScript con lo que hacen sus funciones con los datos.

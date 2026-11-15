@@ -100,3 +100,32 @@ fn the_fix_calls_the_sequenced_method() {
     assert!(fixed.contains("names.addFirst(\"x\");"));
     assert!(fixed.contains("String head = queue.getFirst();"));
 }
+
+#[test]
+fn a_receiver_of_a_type_outside_the_tables_is_left_to_the_index() {
+    use crate::language::Language;
+    use crate::lint::java_sequenced_collection::library_candidates;
+    let source = "import org.htmlunit.html.DomNodeList;\n\nclass Page {\n    Object first(DomNodeList<String> anchors, String[] names, int count) {\n        return anchors.get(0);\n    }\n}\n";
+    let mut parser = tree_sitter::Parser::new();
+    parser
+        .set_language(&Language::Java.grammar().expect("tiene gramática"))
+        .expect("la gramática carga");
+    let tree = parser.parse(source, None).expect("se parsea");
+    let found = library_candidates(tree.root_node(), source.as_bytes(), Some(21));
+    let described: Vec<(String, bool, String, usize)> = found
+        .into_iter()
+        .map(|candidate| {
+            (
+                candidate.type_name,
+                candidate.needs_list,
+                candidate.method,
+                candidate.line,
+            )
+        })
+        .collect();
+    assert_eq!(
+        described,
+        [("DomNodeList".to_owned(), true, "getFirst".to_owned(), 5)]
+    );
+    assert_eq!(sequenced(&strict()).len(), 9);
+}
