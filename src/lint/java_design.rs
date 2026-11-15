@@ -53,7 +53,7 @@ pub fn reported(nodes: &[Node<'_>], source: &[u8]) -> Vec<LintFinding> {
                     .filter(|member| member.kind() == FIELD)
                     .flat_map(|field| visible_fields(field, source, &imports)),
             ),
-            LOCAL | RESOURCE | ENHANCED_FOR => findings.extend(local_final_names(node, source)),
+            LOCAL | RESOURCE | ENHANCED_FOR => findings.extend(local_names(node, source)),
             _ => {}
         }
     }
@@ -263,12 +263,13 @@ fn allowed_annotation(field: Node<'_>, source: &[u8], imports: &[String]) -> boo
 }
 
 // LocalFinalVariableName: las variables locales final (también la de un for mejorado) y los
-// recursos de un try, que son final aunque no lo digan.
-fn local_final_names(node: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
-    let is_final = node.kind() == RESOURCE || has_modifier(node, FINAL, source);
-    if !is_final {
-        return Vec::new();
-    }
+// recursos de un try, que son final aunque no lo digan. LocalVariableName: las demás.
+fn local_names(node: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
+    let rule = if node.kind() == RESOURCE || has_modifier(node, FINAL, source) {
+        JavaRule::LocalFinalVariableName
+    } else {
+        JavaRule::LocalVariableName
+    };
     let names: Vec<Node<'_>> = match node.kind() {
         LOCAL => named_children(node)
             .into_iter()
@@ -279,19 +280,12 @@ fn local_final_names(node: Node<'_>, source: &[u8]) -> Vec<LintFinding> {
     };
     names
         .into_iter()
-        .filter(|name| !is_local_final_name(text(*name, source)))
-        .map(|name| {
-            finding(
-                LintKind::Java(JavaRule::LocalFinalVariableName),
-                name,
-                text(name, source),
-                None,
-            )
-        })
+        .filter(|name| !is_local_name(text(*name, source)))
+        .map(|name| finding(LintKind::Java(rule), name, text(name, source), None))
         .collect()
 }
 
-fn is_local_final_name(name: &str) -> bool {
+fn is_local_name(name: &str) -> bool {
     if name == WORD_SEPARATOR.to_string() {
         return true;
     }

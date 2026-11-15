@@ -37,6 +37,8 @@ pub const JAVADOC_RULES: [JavaRule; 6] = [
 ];
 const STATEMENT_LISTS: &[&str] = &["block", "constructor_body", "switch_block_statement_group"];
 const BODY_FIELDS: &[&str] = &["body", "consequence", "alternative"];
+const TYPE_BODIES: &[&str] = &["class_body", "interface_body"];
+const ENUM_DECLARATIONS: &str = "enum_body_declarations";
 const WORD_SEPARATOR: char = '_';
 
 pub fn reported(nodes: &[Node<'_>], source: &[u8]) -> Vec<LintFinding> {
@@ -179,9 +181,16 @@ fn lowercase_ell(literal: Node<'_>, source: &[u8]) -> Option<LintFinding> {
 // desde el contenedor: subir al padre en tree-sitter es caro.
 fn empty_statements(container: Node<'_>) -> Vec<Node<'_>> {
     let is_semicolon = |node: &Node<'_>| node.kind() == SEMICOLON && !node.is_named();
-    if STATEMENT_LISTS.contains(&container.kind()) {
+    if STATEMENT_LISTS.contains(&container.kind()) || TYPE_BODIES.contains(&container.kind()) {
         return super::java::children(container)
             .into_iter()
+            .filter(is_semicolon)
+            .collect();
+    }
+    if container.kind() == ENUM_DECLARATIONS {
+        return super::java::children(container)
+            .into_iter()
+            .skip(1)
             .filter(is_semicolon)
             .collect();
     }

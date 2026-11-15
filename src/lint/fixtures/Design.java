@@ -87,3 +87,22 @@ enum Kind {
     A;
     public void inEnum() { System.out.println("e"); }
 }
+
+class Locals {
+    void names(java.util.List<String> items) throws Exception {
+        int COUNT = 1;
+        int good = 2, Bad_one = 3;
+        for (int I = 0; I < COUNT; I++) { good++; }
+        for (String Item : items) { good++; }
+        for (final String Fixed : items) { good++; }
+        try (java.io.StringReader Reader = new java.io.StringReader("")) { good++; }
+        Runnable task = () -> { int Inner = 0; };
+        switch (good) {
+            case 1:
+                int Cased = 0;
+                break;
+            default:
+                break;
+        }
+    }
+}

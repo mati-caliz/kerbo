@@ -9,12 +9,13 @@ use crate::limits::{Limits, Preset};
 use crate::profile::LintStyle;
 use crate::rules::{JavaRule, RuleId};
 
-const DESIGN_JAVA_RULES: [JavaRule; 5] = [
+const DESIGN_JAVA_RULES: [JavaRule; 6] = [
     JavaRule::DesignForExtension,
     JavaRule::HiddenField,
     JavaRule::VisibilityModifier,
     JavaRule::DeclarationOrder,
     JavaRule::LocalFinalVariableName,
+    JavaRule::LocalVariableName,
 ];
 const SPACING_JAVA_RULES: [JavaRule; 10] = [
     JavaRule::WhitespaceAround,

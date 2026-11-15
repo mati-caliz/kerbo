@@ -190,6 +190,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT - java_inspect
         "final int Total = sum(); becomes final int total = sum();.",
     ),
     RuleText::new(
+        "Local variable whose name is not camelCase",
+        "name it with a lowercase initial, letters and digits",
+        "A local variable goes in camelCase (^([a-z][a-zA-Z0-9]*|_)$): in capitals it looks like a constant, and with underscores it breaks from the rest of the code. So do for and enhanced for variables.",
+        "int TOTAL = sum(); becomes int total = sum();.",
+    ),
+    RuleText::new(
         "Operator, brace or control keyword without whitespace around it",
         "separate it with a space on each side",
         "An operator stuck to its operands, or an if( or }else, reads as a single word. Empty braces too: {} is written { }.",

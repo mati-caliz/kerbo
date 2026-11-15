@@ -62,6 +62,7 @@ mod java_shapes;
 mod java_size_is_empty;
 mod java_spacing;
 pub mod java_static_imports;
+mod java_static_modifiers;
 mod java_style;
 mod java_switch;
 pub mod java_taint;
@@ -248,6 +249,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     findings.extend(java_map_api::reported(root, source, limits.java_release()));
     findings.extend(java_min_max::reported(root, source));
     findings.extend(java_size_is_empty::reported(root, source, limits.java_release()));
+    findings.extend(java_static_modifiers::reported(root, source));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
     if limits.java_reference() == JavaReference::Pmd {
         java_pmd_suppressions::drop_suppressed(&mut findings, root, source);
@@ -271,6 +273,8 @@ pub fn finding_at(kind: LintKind, start: Point, subject: &str, fix: Option<Fix>)
 }
 
 #[cfg(test)]
+mod java_empty_statement_tests;
+#[cfg(test)]
 mod java_inspection_tests;
 #[cfg(test)]
 mod java_javadoc_tests;
@@ -284,6 +288,8 @@ mod java_min_max_tests;
 mod java_pmd_tests;
 #[cfg(test)]
 mod java_size_is_empty_tests;
+#[cfg(test)]
+mod java_static_modifiers_tests;
 #[cfg(test)]
 mod java_unicode_escape_tests;
 #[cfg(test)]

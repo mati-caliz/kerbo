@@ -190,6 +190,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT - java_inspect
         "final int Total = sumar(); se vuelve final int total = sumar();.",
     ),
     RuleText::new(
+        "Variable local con un nombre que no es camelCase",
+        "nombrala con minúscula inicial, letras y números",
+        "Una variable local va en camelCase (^([a-z][a-zA-Z0-9]*|_)$): en mayúsculas parece una constante y con guiones bajos no sigue al resto del código. También la de un for y la de un for mejorado.",
+        "int TOTAL = sumar(); se vuelve int total = sumar();.",
+    ),
+    RuleText::new(
         "Operador, llave o palabra de control sin blanco alrededor",
         "separalo con un espacio de cada lado",
         "Un operador pegado a sus operandos, o un if( o }else, se lee como una sola palabra. Las llaves vacías también: {} se escribe { }.",

@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::JavaRule;
 
-pub const RULE_COUNT: usize = 6;
+pub const RULE_COUNT: usize = 8;
 
 const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
     (
@@ -56,6 +56,24 @@ const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
             "use Map.computeIfAbsent",
             "computeIfAbsent says in one call what the get, the null check and the put spread over several lines, and looks the key up once. Like IntelliJ's Java8MapApi in the computeIfAbsent form: only when the declared type is a Map, the release is 8 or later and the computed value has no side effects (an array or a literal).",
             "Class<?>[] result = cache.get(type); if (result == null) { result = new Class[] { type }; cache.put(type, result); } becomes Class<?>[] result = cache.computeIfAbsent(type, key -> new Class[] { key });.",
+        ),
+    ),
+    (
+        JavaRule::FinalStaticMethod,
+        RuleText::new(
+            "Static method declared final",
+            "remove the final",
+            "A static method is never overridden: final only stops a subclass from declaring one with the same signature, which is rarely intended, and usually reveals the mistaken idea that it prevents an override. Like IntelliJ's FinalStaticMethod, which Checkstyle and PMD lack.",
+            "public static final int twice(int value) becomes public static int twice(int value).",
+        ),
+    ),
+    (
+        JavaRule::TransientStaticField,
+        RuleText::new(
+            "Static field declared transient",
+            "remove the transient",
+            "Serialization never writes static fields, so transient changes nothing and suggests it does. Like IntelliJ's UnnecessaryModifier, which Checkstyle and PMD lack.",
+            "private static transient Logger log; becomes private static Logger log;.",
         ),
     ),
 ];

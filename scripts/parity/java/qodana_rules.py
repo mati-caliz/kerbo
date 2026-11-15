@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Compara las inspecciones de Qodana que tienen par en una regla de kerbo (imports sin usar,
-modificadores redundantes, escapes Unicode de más y la API nueva) con kerbo imitando a Checkstyle y a PMD, por
+modificadores redundantes (`final` en un método `static` y `transient` en un campo `static` aparte), escapes Unicode de más y la API nueva) con kerbo imitando a Checkstyle y a PMD, por
 regla, archivo y línea. Las columnas no coinciden (Qodana cuenta caracteres, kerbo bytes): de los
 modificadores cuenta una vez cada línea, y de los escapes, cuántos hay en cada línea.
 
@@ -26,7 +26,7 @@ INSPECTIONS = {
     "UnnecessaryEnumModifier": "redundant-modifier",
     "UnnecessaryRecordModifier": "redundant-modifier",
     "FinalPrivateMethod": "redundant-modifier",
-    "FinalStaticMethod": "redundant-modifier",
+    "FinalStaticMethod": "final-static-method",
     "FinalMethodInFinalClass": "redundant-modifier",
     "UnnecessaryUnicodeEscape": "unnecessary-unicode-escape",
     "Java8ListSort": "java8-list-sort",
@@ -35,11 +35,20 @@ INSPECTIONS = {
     "DefaultAnnotationParam": "default-annotation-param",
     "Java8MapApi": "java8-map-api",
 }
+TRANSIENT_STATIC = ("UnnecessaryModifier", "is redundant for a 'static' field", "transient-static-field")
+KERBO_RULES = {*INSPECTIONS.values(), TRANSIENT_STATIC[2]}
 COUNTED_PER_LINE = {"unnecessary-unicode-escape"}
 RESULTS = "results-UNUSED_IMPORT"
 REPORTS = {"Checkstyle": "kerbo.json", "PMD": "kerbo-pmd.json"}
 UNANALYZED = {"guava": ("android/",)}
 SHOWN = int(os.environ.get("SHOWN", "15"))
+
+
+def kerbo_rule(result):
+    inspection, message, rule = TRANSIENT_STATIC
+    if result["ruleId"] == inspection and message in result["message"]["text"]:
+        return rule
+    return INSPECTIONS.get(result["ruleId"])
 
 
 def qodana_findings(repo, results_folder):
@@ -53,8 +62,10 @@ def qodana_findings(repo, results_folder):
         for inspection in extension.get("rules", [])
         if inspection["id"] in INSPECTIONS and inspection.get("defaultConfiguration", {}).get("enabled")
     }
+    if INSPECTIONS[TRANSIENT_STATIC[0]] in enabled:
+        enabled.add(TRANSIENT_STATIC[2])
     for result in run.get("results", []):
-        rule = INSPECTIONS.get(result["ruleId"])
+        rule = kerbo_rule(result)
         if rule:
             location = result["locations"][0]["physicalLocation"]
             key = (location["artifactLocation"]["uri"], location["region"]["startLine"])
@@ -68,7 +79,7 @@ def kerbo_findings(repo, report):
     for item in json.loads((PARITY / repo / report).read_text(encoding="utf-8")):
         path = item["path"].removeprefix("./")
         rule = item["rule"]
-        if rule in INSPECTIONS.values() and not path.startswith(UNANALYZED.get(repo, ())):
+        if rule in KERBO_RULES and not path.startswith(UNANALYZED.get(repo, ())):
             key = (path, item["line"])
             found[rule][key] = found[rule][key] + 1 if rule in COUNTED_PER_LINE else 1
     return found

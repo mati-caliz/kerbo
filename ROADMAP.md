@@ -1759,15 +1759,19 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
 
 Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_checks.xml`. Las seis de
 Javadoc ya están (en `docs/java.md`): commons-lang y junit4 coinciden con Checkstyle 14.4 en todo
-`sun_checks.xml`, y guava, sin `android/`, en 67.527 de 67.552. Contra PMD 7.29 (con
+`sun_checks.xml`, y guava, sin `android/`, en 67.550 de 67.552. Contra PMD 7.29 (con
 `[java] reference`, en `docs/java.md`) coinciden `UnnecessaryModifier` y
 `ClassWithOnlyPrivateConstructorsShouldBeFinal` en los tres, y `UnnecessaryImport` salvo los que
 necesitan resolver tipos (2 en junit4, 11 en guava), que esperan las firmas de la etapa 9. Qodana
 ya está en el arnés (`scripts/parity/java/qodana_rules.py`).
 
-- Decidir si `redundant-modifier` suma las dos inspecciones de IntelliJ que no tienen Checkstyle
-  ni PMD (`FinalStaticMethod`, 23 en el corpus, y `transient` en un campo estático, 2), o si van
-  como reglas aparte con la API nueva.
+- Las dos inspecciones de IntelliJ que no tienen Checkstyle ni PMD van como reglas aparte:
+  `final-static-method` (23 en el corpus) y `transient-static-field` (2), iguales a Qodana. De
+  `sun_checks.xml` se sumó `local-variable-name` (22 en guava) y `empty-statement` marca el `;`
+  suelto en el cuerpo de una clase, interfaz o enum. Contra Checkstyle en guava quedan 2
+  `javadoc-type`: errores del parser de Javadoc de Checkstyle con `<N, E>` en un comentario
+  (`graph/AbstractGraphTest.java:48`, `AbstractNetworkTest.java:55`); imitarlos pide calcar su
+  gramática ANTLR.
 - Por lo que más aparece en Qodana, ya sin los escapes Unicode de más (`unnecessary-unicode-escape`,
   igual a Qodana en el corpus), `Collections.sort()` por `List.sort()` (`java8-list-sort`) y
   `size() == 0` por `isEmpty()` (`size-replaceable-by-is-empty`), min/max a mano

@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::JavaRule;
 
-pub const RULE_COUNT: usize = 6;
+pub const RULE_COUNT: usize = 8;
 
 const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
     (
@@ -56,6 +56,24 @@ const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
             "usá Map.computeIfAbsent",
             "computeIfAbsent dice en una llamada lo que el get, el chequeo de null y el put reparten en varias líneas, y busca la clave una sola vez. Como Java8MapApi de IntelliJ en la forma de computeIfAbsent: sólo cuando el tipo declarado es un Map, el release es 8 o más y lo calculado no tiene efectos (un arreglo o un literal).",
             "Class<?>[] resultado = cache.get(tipo); if (resultado == null) { resultado = new Class[] { tipo }; cache.put(tipo, resultado); } se vuelve Class<?>[] resultado = cache.computeIfAbsent(tipo, clave -> new Class[] { clave });.",
+        ),
+    ),
+    (
+        JavaRule::FinalStaticMethod,
+        RuleText::new(
+            "Método static declarado final",
+            "sacá el final",
+            "Un método static no se redefine: final sólo impide que una subclase declare otro con la misma firma, que casi nunca es lo que se quiso, y suele delatar la idea equivocada de que evita un override. Como FinalStaticMethod de IntelliJ, que Checkstyle y PMD no tienen.",
+            "public static final int doble(int valor) se vuelve public static int doble(int valor).",
+        ),
+    ),
+    (
+        JavaRule::TransientStaticField,
+        RuleText::new(
+            "Campo static declarado transient",
+            "sacá el transient",
+            "La serialización nunca guarda los campos static, así que transient no cambia nada y hace pensar que sí. Como UnnecessaryModifier de IntelliJ, que Checkstyle y PMD no tienen.",
+            "private static transient Logger registro; se vuelve private static Logger registro;.",
         ),
     ),
 ];

@@ -24,3 +24,11 @@
 75:14 design-for-extension 
 78:5 design-for-extension 
 83:5 declaration-order 
+93:13 local-variable-name COUNT
+94:23 local-variable-name Bad_one
+95:18 local-variable-name I
+96:21 local-variable-name Item
+97:27 local-final-variable-name Fixed
+98:35 local-final-variable-name Reader
+99:37 local-variable-name Inner
+102:21 local-variable-name Cased

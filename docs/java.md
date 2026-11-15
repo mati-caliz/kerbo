@@ -20,7 +20,7 @@ Del resto de `sun_checks.xml`, kerbo hace los nombres (`TypeName`, `MethodName`,
 `TodoComment`, `IllegalImport`, `FileTabCharacter`, los espacios al final de línea
 (`trailing-spaces`, el `RegexpSingleline` de `sun_checks`), `NewlineAtEndOfFile`,
 `DesignForExtension`, `HiddenField`, `VisibilityModifier`, `DeclarationOrder`,
-`LocalFinalVariableName` y los de espacios y llaves: `WhitespaceAround`, `WhitespaceAfter`,
+`LocalVariableName`, `LocalFinalVariableName` y los de espacios y llaves: `WhitespaceAround`, `WhitespaceAfter`,
 `NoWhitespaceBefore`, `NoWhitespaceAfter`, `GenericWhitespace`, `MethodParamPad`,
 `EmptyForIteratorPad`, `LeftCurly`, `RightCurly` y `OperatorWrap`. Se arreglan solos los espacios
 al final, `NewlineAtEndOfFile` y los de espacios (no las llaves ni `OperatorWrap`, que piden
@@ -200,6 +200,14 @@ De las inspecciones de IntelliJ, kerbo hace:
   se calcula si es `null` y se guarda con `put`. Desde Java 8, cuando el tipo declarado es un `Map`
   y lo calculado no puede tener efectos (un arreglo o un literal, sin llamadas): con efectos,
   IntelliJ lo deja como información. Coincide con Qodana en el corpus (2, en commons-lang).
+
+- `FinalStaticMethod` (`final-static-method`): `final` en un método `static`, que no se redefine;
+  sólo impide que una subclase declare otro con la misma firma. Se arregla sacando el `final`.
+  Coincide con Qodana en el corpus (23).
+
+- `transient` en un campo `static` (`transient-static-field`, la parte de `UnnecessaryModifier`
+  que no tienen Checkstyle ni PMD): la serialización nunca guarda un campo `static`. Se arregla
+  sacando el `transient`. Coincide con Qodana en el corpus (2, en commons-lang).
 
 - `AutoCloseableResource` (`auto-closeable-resource`): una llamada que crea algo que se cierra
   (un `InputStream`, una `Connection`, un `ResultSet`, un `ExecutorService`, un `HttpClient`...)
