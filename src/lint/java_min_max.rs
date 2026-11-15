@@ -1,7 +1,7 @@
 use tree_sitter::{Node, Point};
 
 use super::java::{IDENTIFIER, NAME_FIELD, VARIABLE_DECLARATOR, text, unparenthesized};
-use super::java_receivers::declared_type;
+use super::java_numeric_types::numeric_type;
 use super::{LintFinding, LintKind, finding_at};
 use crate::fix::Fix;
 use crate::rules::JavaRule;
@@ -25,21 +25,12 @@ const LEFT_FIELD: &str = "left";
 const RIGHT_FIELD: &str = "right";
 const OPERATOR_FIELD: &str = "operator";
 const TYPE_FIELD: &str = "type";
-const OPERAND_FIELD: &str = "operand";
 const PACKAGE: &str = "package_declaration";
 const VALUE_FIELD: &str = "value";
 const NAME_FIELD_OF_CLASS: &str = "name";
 const ASSIGN: &str = "=";
-const MINUS: &str = "-";
 const LESS_OPERATORS: [&str; 2] = ["<", "<="];
 const GREATER_OPERATORS: [&str; 2] = [">", ">="];
-const NUMERIC_TYPES: [&str; 4] = ["int", "long", "float", "double"];
-const INT: &str = "int";
-const LONG: &str = "long";
-const FLOAT: &str = "float";
-const DOUBLE: &str = "double";
-const LONG_SUFFIXES: [char; 2] = ['L', 'l'];
-const FLOAT_SUFFIXES: [char; 2] = ['F', 'f'];
 const MATH_CLASS: &str = "Math";
 const MATH_PACKAGE_DECLARATION: &str = "java.lang";
 const MIN: &str = "min";
@@ -342,36 +333,6 @@ fn report(conditional: &Conditional<'_>, replaced: &Replaced<'_>, source: &[u8])
         function,
         Some(Fix::replace_range(start, end, &replacement, source)),
     ))
-}
-
-fn numeric_type<'source>(expression: Node<'_>, source: &'source [u8]) -> Option<&'source str> {
-    let expression = unparenthesized(expression);
-    match expression.kind() {
-        IDENTIFIER => {
-            let written = declared_type(expression, text(expression, source), source)?;
-            let written = text(written, source);
-            NUMERIC_TYPES.iter().find(|numeric| **numeric == written).copied()
-        }
-        DECIMAL_INTEGER => Some(if text(expression, source).ends_with(LONG_SUFFIXES) {
-            LONG
-        } else {
-            INT
-        }),
-        DECIMAL_FLOAT => Some(if text(expression, source).ends_with(FLOAT_SUFFIXES) {
-            FLOAT
-        } else {
-            DOUBLE
-        }),
-        UNARY => {
-            let negated = expression
-                .child_by_field_name(OPERATOR_FIELD)
-                .is_some_and(|operator| text(operator, source) == MINUS);
-            negated
-                .then(|| numeric_type(expression.child_by_field_name(OPERAND_FIELD)?, source))
-                .flatten()
-        }
-        _ => None,
-    }
 }
 
 fn equivalent(left: Node<'_>, right: Node<'_>, source: &[u8]) -> bool {

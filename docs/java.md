@@ -23,7 +23,7 @@ Del resto de `sun_checks.xml`, kerbo hace los nombres (`TypeName`, `MethodName`,
 `DesignForExtension`, `HiddenField`, `VisibilityModifier`, `DeclarationOrder`,
 `LocalVariableName`, `LocalFinalVariableName` y los de espacios y llaves: `WhitespaceAround`, `WhitespaceAfter`,
 `NoWhitespaceBefore`, `NoWhitespaceAfter`, `GenericWhitespace`, `MethodParamPad`,
-`EmptyForIteratorPad`, `LeftCurly`, `RightCurly` y `OperatorWrap`. Se arreglan solos los espacios
+`EmptyForIteratorPad`, `ParenPad`, `LeftCurly`, `RightCurly` y `OperatorWrap`. Se arreglan solos los espacios
 al final, `NewlineAtEndOfFile` y los de espacios (no las llaves ni `OperatorWrap`, que piden
 reacomodar líneas). Siguen a Checkstyle en lo que no se ve: `MethodName` no mira lo que lleva
 `@Override` y marca el método que se llama como su clase; un campo de interfaz es una constante;
@@ -35,7 +35,9 @@ minúsculas (`//$FALL-THROUGH$` no cuenta); `HiddenField` toma los componentes d
 campos; `LeftCurly` pide salto de línea después de la llave de cualquier cuerpo de clase (también
 la anónima y la de una constante de enum) o de `switch` si el primer miembro sigue en la misma
 línea, salvo en el cuerpo de un enum y en una anónima que empieza con un bloque de inicialización;
-`OperatorWrap` mira el token de al lado tal cual: con `&& (` al final de la línea no avisa.
+`OperatorWrap` mira el token de al lado tal cual: con `&& (` al final de la línea no avisa;
+`ParenPad` no mira los paréntesis de un cast; `VisibilityModifier` deja pasar `@Rule`,
+`@ClassRule` y `@VisibleForTesting`, pero no `@TempDir` (Checkstyle 14 la sacó de la lista).
 `minimal` no las pide.
 
 Las de Javadoc de `sun_checks.xml` sólo las pide `strict`: `JavadocVariable` (`javadoc-variable`),
@@ -84,7 +86,8 @@ inspecciones que no tienen ni Checkstyle ni PMD: `static` y `final` juntos en un
 
 Las que dependen de la versión de Java usan el `release` de cada módulo, como el nivel de
 lenguaje por módulo de IntelliJ: el del `pom.xml` o `build.gradle` de la carpeta, o el del módulo
-que la contiene, y si nadie lo dice, el del JDK. Jenkins compila `war/` con 11 y el resto con 21.
+que la contiene, y si nadie lo dice, el del JDK. Jenkins compila `war/` con 11 y el resto con 21;
+Maven dice el suyo en `<javaVersion>`, que el pom padre de Apache pasa a `maven.compiler.release`.
 
 De las inspecciones de IntelliJ, kerbo hace:
 
@@ -231,9 +234,35 @@ De las inspecciones de IntelliJ, kerbo hace:
   `Math.clamp`. Como el modo por defecto de IntelliJ: alcanza con que algo dentro de la llamada
   interna no sea constante. Coincide con Qodana en el corpus (2).
 
-- `StringRepeatCanBeUsed` (`string-repeat-can-be-used`), la forma de Java 21:
-  `builder.append(texto.repeat(n))` sobre un `StringBuilder` o `StringBuffer`. La del bucle `for`
-  que agrega lo mismo n veces no está. Coincide con Qodana en el corpus (2).
+- `StringRepeatCanBeUsed` (`string-repeat-can-be-used`): desde Java 21,
+  `builder.append(texto.repeat(n))` sobre un `StringBuilder` o `StringBuffer`; desde Java 11, un
+  `for` que cuenta con un `int` (`i < n`, `i++`) y en cada vuelta sólo agrega lo mismo al builder,
+  sin usar el contador ni llamar a nada. Coincide con Qodana en el corpus (3).
+
+- `PatternVariableCanBeUsed` (`pattern-variable-can-be-used`), desde Java 16: una variable local
+  que se inicializa con un cast (`Foo foo = (Foo) valor;`) que un `valor instanceof Foo` anterior ya
+  garantiza, y un cast suelto donde el instanceof ya declara la variable (`valor instanceof Foo f`).
+  El instanceof se busca como IntelliJ: el `&&` o el ternario que encierra el cast, la condición del
+  if o del bucle que encierra la sentencia, o un if anterior del mismo bloque que sale cuando no se
+  cumple; si lo casteado se reasigna en el medio, no vale. Coincide con Qodana en el corpus (5).
+
+- `EnhancedSwitchMigration` (`enhanced-switch-migration`), desde Java 14, en la forma que avisa por
+  defecto: un switch viejo que devuelve o tira en todas sus ramas (de hasta dos sentencias), con
+  `default` o con un `return` o `throw` después, que se puede escribir como `return switch`. El que
+  asigna una variable en cada rama no está. Coincide con Qodana en el corpus (2).
+
+- `Java9CollectionFactory` (`java9-collection-factory`): `Collections.unmodifiableList(new
+  ArrayList<>(otra))` donde Java 10 tiene `List.copyOf(otra)` (igual con `Set` y `Map`), y
+  `Collections.unmodifiableList(Arrays.asList(a, b))` donde alcanza `List.of(a, b)` si ningún
+  elemento puede ser null. Un `ArrayList` copiado sólo compila con una colección o un int, así que
+  basta con que lo copiado no sea un número; en un `Map`, el origen tiene que ser `Map`,
+  `AbstractMap` o `HashMap`. Las formas que arman la colección con `add` en una variable no están.
+  Coincide con Qodana en el corpus (19).
+
+- `ReadWriteStringCanBeUsed` (`read-write-string`): `new String(Files.readAllBytes(ruta), juego)`
+  donde Java 11 tiene `Files.readString`, y `Files.write(ruta, texto.getBytes(juego))` donde Java 12
+  tiene `Files.writeString`, cuando el juego de caracteres es un `Charset`. Coincide con Qodana en el
+  corpus (5).
 
 - `FinalStaticMethod` (`final-static-method`): `final` en un método `static`, que no se redefine;
   sólo impide que una subclase declare otro con la misma firma. Se arregla sacando el `final`.

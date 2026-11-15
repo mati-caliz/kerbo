@@ -73,3 +73,14 @@ fn the_fix_calls_math() {
     assert!(fixed.contains("result = Math.max(a, b);"));
     assert!(fixed.contains("int smallest = Math.min(b, a);"));
 }
+
+#[test]
+fn a_size_call_counts_as_an_int_operand() {
+    let source = "import java.util.List;\n\nclass Insert {\n    int at(int upper, List<String> items) {\n        return upper < items.size() ? upper : items.size();\n    }\n}\n";
+    let found: Vec<(usize, String)> = lints(source, &strict())
+        .into_iter()
+        .filter(|finding| finding.kind.rule() == RuleId::Java(JavaRule::ManualMinMaxCalculation))
+        .map(|finding| (finding.line, finding.subject))
+        .collect();
+    assert_eq!(found, [(5, "min".to_owned())]);
+}

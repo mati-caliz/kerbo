@@ -38,6 +38,10 @@ INSPECTIONS = {
     "SequencedCollectionMethodCanBeUsed": "sequenced-collection-method",
     "MathClampMigration": "math-clamp-migration",
     "StringRepeatCanBeUsed": "string-repeat-can-be-used",
+    "PatternVariableCanBeUsed": "pattern-variable-can-be-used",
+    "EnhancedSwitchMigration": "enhanced-switch-migration",
+    "Java9CollectionFactory": "java9-collection-factory",
+    "ReadWriteStringCanBeUsed": "read-write-string",
 }
 TRANSIENT_STATIC = ("UnnecessaryModifier", "is redundant for a 'static' field", "transient-static-field")
 KERBO_RULES = {*INSPECTIONS.values(), TRANSIENT_STATIC[2]}

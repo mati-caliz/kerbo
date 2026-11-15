@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::JavaRule;
 
-pub const RULE_COUNT: usize = 12;
+pub const RULE_COUNT: usize = 16;
 
 const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
     (
@@ -110,6 +110,42 @@ const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
             "call repeat on the builder",
             "builder.repeat(text, n) writes the copies straight into the builder instead of building an intermediate String first. Like IntelliJ's StringRepeatCanBeUsed in its Java 21 form: the receiver is a declared StringBuilder or StringBuffer and the repeated value is a String.",
             "line.append(\"-\".repeat(width)) becomes line.repeat(\"-\", width).",
+        ),
+    ),
+    (
+        JavaRule::PatternVariableCanBeUsed,
+        RuleText::new(
+            "Local variable initialized with a cast that an earlier instanceof already guarantees",
+            "declare it in the instanceof as a pattern variable",
+            "With Java 16 patterns, value instanceof Order order checks and declares in one step; the separate cast repeats the type and can fall out of step with the check. Like IntelliJ's PatternVariableCanBeUsed: the instanceof is the condition of the enclosing if or loop, or an earlier if in the same block that leaves when it fails, and the cast value is not reassigned in between.",
+            "if (value instanceof Order) { Order order = (Order) value; ... } becomes if (value instanceof Order order) { ... }.",
+        ),
+    ),
+    (
+        JavaRule::ReadWriteString,
+        RuleText::new(
+            "Bytes read or written with Files only to turn them into a String, where Files.readString and Files.writeString do it",
+            "use Files.readString or Files.writeString",
+            "Files.readString(path, charset) says in one call what new String(Files.readAllBytes(path), charset) builds in two. Like IntelliJ's ReadWriteStringCanBeUsed: readString since Java 11 and writeString since Java 12, when the charset is a Charset.",
+            "new String(Files.readAllBytes(path), UTF_8) becomes Files.readString(path, UTF_8).",
+        ),
+    ),
+    (
+        JavaRule::Java9CollectionFactory,
+        RuleText::new(
+            "Unmodifiable copy or fixed list built by hand where List.of or List.copyOf do it",
+            "use List.of, Set.of, Map.of or their copyOf",
+            "List.copyOf(other) says in one call what Collections.unmodifiableList(new ArrayList<>(other)) builds in two, and the result rejects nulls. Like IntelliJ's Java9CollectionFactory: copyOf since Java 10 when the copied value is declared as a collection; of since Java 9 when no element can be null.",
+            "Collections.unmodifiableList(new ArrayList<>(orders)) becomes List.copyOf(orders).",
+        ),
+    ),
+    (
+        JavaRule::EnhancedSwitchMigration,
+        RuleText::new(
+            "Old switch that returns in every branch, where a switch expression says it at once",
+            "return a switch expression with case ... ->",
+            "return switch (kind) { case A -> 1; default -> 0; }; shows that every branch gives a value and the compiler checks none is missing. Like IntelliJ's EnhancedSwitchMigration in its default form: every branch, of up to two statements, ends in return or throw, and without default a return or throw follows the switch.",
+            "switch (kind) { case A: return 1; default: return 0; } becomes return switch (kind) { case A -> 1; default -> 0; };.",
         ),
     ),
 ];

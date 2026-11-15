@@ -68,3 +68,14 @@ fn both_need_release_twenty_one() {
     assert_eq!(reported(&java17, JavaRule::MathClampMigration), []);
     assert_eq!(reported(&java17, JavaRule::StringRepeatCanBeUsed), []);
 }
+
+#[test]
+fn reports_a_counting_loop_that_only_appends_the_same_value() {
+    let source = "class Lines {\n    void pad(StringBuilder line, char c, int width, String[] parts) {\n        for (int i = 0; i < width; i++) {\n            line.append(c);\n        }\n        for (int i = width; i > 0; i--) line.append(' ');\n        for (int i = 0; i < width; i++) {\n            line.append(parts[i]);\n        }\n        for (int i = 0; i <= width; i++) {\n            line.append(c);\n        }\n        for (int i = 0; i < width; i++) {\n            line.append(c);\n            line.append(c);\n        }\n        for (long i = 0; i < width; i++) {\n            line.append(c);\n        }\n    }\n}\n";
+    let found: Vec<usize> = lints(source, &strict())
+        .into_iter()
+        .filter(|finding| finding.kind.rule() == RuleId::Java(JavaRule::StringRepeatCanBeUsed))
+        .map(|finding| finding.line)
+        .collect();
+    assert_eq!(found, [3, 6]);
+}

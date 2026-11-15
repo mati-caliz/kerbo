@@ -1,0 +1,12 @@
+[[ignore]]
+paths = ["its/**", "apache-maven/src/assembly/**", "src/mdo/**", "src/graph/**"]
+reason = "Qodana analiza los módulos del pom raíz: its/ sólo entra con el perfil run-its, src/assembly y src/mdo son material del paquete y plantillas de Modello, y src/graph un script de JBang: no son raíces de fuentes."
+
+[[ignore]]
+paths = [
+    "compat/maven-model/src/main/java/org/apache/maven/model/InputLocation.java",
+    "compat/maven-model/src/main/java/org/apache/maven/model/InputLocationTracker.java",
+    "compat/maven-model/src/main/java/org/apache/maven/model/InputSource.java",
+    "compat/maven-embedder/src/main/java/org/apache/maven/cli/internal/extension/model/**",
+]
+reason = "Copias de las clases que Modello genera desde maven.mdo y core-extensions.mdo: Qodana no las analiza."

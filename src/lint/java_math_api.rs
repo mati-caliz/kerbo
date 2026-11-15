@@ -167,7 +167,7 @@ fn appends_a_repeat(call: Node<'_>, source: &[u8]) -> bool {
             .is_some_and(|builder| is_builder(unparenthesized(builder), source))
 }
 
-fn is_builder(receiver: Node<'_>, source: &[u8]) -> bool {
+pub(super) fn is_builder(receiver: Node<'_>, source: &[u8]) -> bool {
     match receiver.kind() {
         IDENTIFIER => {
             declared_simple(receiver, source).is_some_and(|written| BUILDERS.contains(&written.as_str()))

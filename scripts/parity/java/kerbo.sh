@@ -7,7 +7,8 @@
 #
 # Los jars de cada repo del corpus están en classpaths.txt. Con "*.jar" entra el propio jar del repo,
 # que tapa a sus clases y ensucia la comparación. Si existe configs/<repo>.kerbo.toml, se copia como
-# kerbo.toml del repo, para dejar afuera lo que Qodana no analiza. Con JAVA_REFERENCE=pmd la misma
+# kerbo.toml del repo, para dejar afuera lo que Qodana no analiza, con `[java] reference =
+# "checkstyle"`. Con JAVA_REFERENCE=pmd la misma
 # configuración más `[java] reference = "pmd"` va a kerbo-pmd.toml (aparte, para que otra corrida
 # sobre el mismo repo no la pise) y la salida queda en kerbo-pmd.json.
 set -euo pipefail
@@ -29,10 +30,9 @@ repo_config="$here/configs/$repo_name.kerbo.toml"
 corpus_config="$parity/corpus/$repo_name/kerbo.toml"
 output="kerbo.json"
 config_arguments=""
-rm -f "$corpus_config"
-if [[ -f "$repo_config" ]]; then
-  cp "$repo_config" "$corpus_config"
-fi
+# La referencia va siempre explícita: sin ella kerbo la deduce del build, y un repo con
+# maven-pmd-plugin (como Maven) se mediría contra PMD en la corrida de Checkstyle.
+{ [[ -f "$repo_config" ]] && cat "$repo_config"; printf '\n[java]\nreference = "checkstyle"\n'; } > "$corpus_config"
 if [[ -n "${JAVA_REFERENCE:-}" ]]; then
   reference_config="kerbo-$JAVA_REFERENCE.toml"
   { [[ -f "$repo_config" ]] && cat "$repo_config"; printf '\n[java]\nreference = "%s"\n' "$JAVA_REFERENCE"; } \

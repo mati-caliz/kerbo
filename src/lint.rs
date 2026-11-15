@@ -10,6 +10,7 @@ pub mod java_called_receivers;
 pub mod java_calls;
 mod java_chain_uses;
 pub mod java_chains;
+mod java_collection_factory;
 pub mod java_constants;
 mod java_constructor_throws;
 pub mod java_contract_calls;
@@ -18,6 +19,7 @@ pub mod java_contracts;
 mod java_curly;
 mod java_deserialization;
 mod java_design;
+mod java_enhanced_switch;
 pub mod java_exact_receivers;
 pub mod java_exact_roots;
 mod java_fall_through;
@@ -52,13 +54,19 @@ mod java_null_origin;
 mod java_null_returns;
 mod java_null_uses;
 pub mod java_nullable_fields;
+mod java_numeric_types;
 mod java_optional;
 mod java_order;
 pub mod java_owner;
 mod java_padding;
+mod java_paren_pad;
+mod java_pattern_casts;
+mod java_pattern_variable;
 mod java_pmd_suppressions;
+mod java_read_write_string;
 pub mod java_receiver_arguments;
 pub mod java_receivers;
+mod java_repeat_loop;
 mod java_resource_escapes;
 pub mod java_resources;
 mod java_results;
@@ -235,6 +243,11 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     findings.extend(java_shapes::reported(&nodes, source));
     findings.extend(java_flow::reported(&nodes, source));
     findings.extend(java_fall_through::reported(&nodes, source));
+    findings.extend(java_enhanced_switch::reported(
+        &nodes,
+        source,
+        limits.java_release(),
+    ));
     findings.extend(java_text::reported(&nodes, source));
     findings.extend(java_javadoc::reported(&nodes, source));
     findings.extend(java_design::reported(&nodes, source));
@@ -246,6 +259,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     findings.extend(java_padding::reported(&nodes, &tokens, &lines, source));
     findings.extend(java_curly::reported(&nodes, &lines));
     findings.extend(java_wrap::reported(&tokens));
+    findings.extend(java_paren_pad::reported(&tokens, &lines));
     findings.extend(java_same_value::reported(root, source));
     findings.extend(java_optional::reported(&nodes, source));
     findings.extend(java_already_assigned::reported(&nodes, source));
@@ -266,6 +280,23 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
         limits.java_release(),
     ));
     findings.extend(java_text_block::reported(root, source, limits.java_release()));
+    findings.extend(java_pattern_variable::reported(
+        root,
+        source,
+        limits.java_release(),
+    ));
+    findings.extend(java_pattern_casts::reported(root, source, limits.java_release()));
+    findings.extend(java_repeat_loop::reported(root, source, limits.java_release()));
+    findings.extend(java_read_write_string::reported(
+        root,
+        source,
+        limits.java_release(),
+    ));
+    findings.extend(java_collection_factory::reported(
+        root,
+        source,
+        limits.java_release(),
+    ));
     findings.extend(java_static_modifiers::reported(root, source));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
     if limits.java_reference() == JavaReference::Pmd {
@@ -290,9 +321,13 @@ pub fn finding_at(kind: LintKind, start: Point, subject: &str, fix: Option<Fix>)
 }
 
 #[cfg(test)]
+mod java_collection_factory_tests;
+#[cfg(test)]
 mod java_curly_tests;
 #[cfg(test)]
 mod java_empty_statement_tests;
+#[cfg(test)]
+mod java_enhanced_switch_tests;
 #[cfg(test)]
 mod java_fall_through_tests;
 #[cfg(test)]
@@ -310,7 +345,11 @@ mod java_math_api_tests;
 #[cfg(test)]
 mod java_min_max_tests;
 #[cfg(test)]
+mod java_pattern_variable_tests;
+#[cfg(test)]
 mod java_pmd_tests;
+#[cfg(test)]
+mod java_read_write_string_tests;
 #[cfg(test)]
 mod java_sequenced_collection_tests;
 #[cfg(test)]

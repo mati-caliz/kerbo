@@ -4,10 +4,11 @@ use std::path::{Path, PathBuf};
 use super::classpath::{files_named, pom_files};
 use super::gradle::BUILD_FILES;
 
-const POM_PROPERTIES: [&str; 7] = [
+const POM_PROPERTIES: [&str; 8] = [
     "<maven.compiler.release>",
     "<release>",
     "<java.version>",
+    "<javaVersion>",
     "<maven.compiler.target>",
     "<maven.compiler.source>",
     "<target>",

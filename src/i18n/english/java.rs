@@ -268,6 +268,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT - java_inspect
         "a +\n b becomes a\n + b.",
     ),
     RuleText::new(
+        "Space after ( or before )",
+        "remove the space next to the parenthesis",
+        "Parentheses hug what they enclose, as in the rest of the code. Like Checkstyle's ParenPad with nospace: casts are not checked, nor a ( at the end of a line or a ) at the start.",
+        "main( String[] args ) becomes main(String[] args).",
+    ),
+    RuleText::new(
         "Private parameter that always receives the same value",
         "remove the parameter and use the value inside the method",
         "If every call passes the same constant, the parameter parameterizes nothing: it only adds noise to each call. Like IntelliJ's SameParameterValue, for private methods and constructors.",

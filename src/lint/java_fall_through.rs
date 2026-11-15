@@ -173,6 +173,12 @@ fn mentions_fall_through(comment: &str) -> bool {
     })
 }
 
+// Una sentencia que nunca sigue con la siguiente: termina en return, throw, break, continue o
+// yield en todas sus ramas.
+pub(super) fn cannot_complete_normally(statement: Node<'_>, source: &[u8]) -> bool {
+    is_terminated(statement, ANY_EXIT, &mut HashSet::new(), source)
+}
+
 fn is_terminated(statement: Node<'_>, exits: Exits, labels: &mut HashSet<String>, source: &[u8]) -> bool {
     match statement.kind() {
         RETURN | YIELD | THROW => true,

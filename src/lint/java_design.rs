@@ -1,8 +1,8 @@
 use tree_sitter::Node;
 
 use super::java::{
-    ABSTRACT, CLASS, CONSTRUCTOR, FINAL, METHOD, NAME_FIELD, PRIVATE, PROTECTED, PUBLIC, STATIC,
-    TYPE_DECLARATIONS, VARIABLE_DECLARATOR, children, modifiers, text,
+    ABSTRACT, ANNOTATION_TYPE, CLASS, CONSTRUCTOR, FINAL, INTERFACE, METHOD, NAME_FIELD, OBJECT_CREATION,
+    PRIVATE, PROTECTED, PUBLIC, STATIC, TYPE_DECLARATIONS, VARIABLE_DECLARATOR, children, modifiers, text,
 };
 use super::{LintFinding, LintKind, finding};
 use crate::rules::JavaRule;
@@ -22,7 +22,6 @@ const BODY_FIELD: &str = "body";
 const IGNORED_EXTENSION_ANNOTATIONS: &[&str] = &["Test", "Before", "After", "BeforeClass", "AfterClass"];
 const VISIBLE_FIELD_ANNOTATIONS: &[&str] = &[
     "org.junit.Rule",
-    "org.junit.jupiter.api.io.TempDir",
     "org.junit.ClassRule",
     "com.google.common.annotations.VisibleForTesting",
 ];
@@ -207,20 +206,22 @@ fn can_be_subclassed(class: Node<'_>, source: &[u8]) -> bool {
 }
 
 // La clase y todas las que la encierran son públicas o protegidas; un miembro de una interfaz es
-// público aunque no lo diga, y una clase anónima o local no se ve desde afuera.
+// público aunque no lo diga, y una clase anónima o local no se ve desde afuera, salvo la local de un
+// método de una interfaz, que Checkstyle toma como pública (`ScopeUtil.getDefaultScope`).
 fn visible_outside_package(class: Node<'_>, source: &[u8]) -> bool {
     let mut current = Some(class);
     while let Some(node) = current {
         if TYPE_DECLARATIONS.contains(&node.kind()) {
             let in_interface = node
                 .parent()
-                .is_some_and(|body| body.kind() == INTERFACE_BODY || body.kind() == ANNOTATION_BODY);
+                .is_some_and(|body| body.kind() == INTERFACE_BODY || body.kind() == ANNOTATION_BODY)
+                || in_interface_method(node);
             let visible =
                 has_modifier(node, PUBLIC, source) || has_modifier(node, PROTECTED, source) || in_interface;
             if !visible {
                 return false;
             }
-        } else if LOCAL_SCOPES.contains(&node.kind()) {
+        } else if LOCAL_SCOPES.contains(&node.kind()) && !in_interface_method(node) {
             return false;
         }
         current = node.parent();
@@ -228,8 +229,17 @@ fn visible_outside_package(class: Node<'_>, source: &[u8]) -> bool {
     true
 }
 
+fn in_interface_method(node: Node<'_>) -> bool {
+    std::iter::successors(node.parent(), Node::parent)
+        .take_while(|ancestor| ancestor.kind() != OBJECT_CREATION)
+        .find(|ancestor| TYPE_DECLARATIONS.contains(&ancestor.kind()))
+        .is_some_and(|owner| owner.kind() == INTERFACE || owner.kind() == ANNOTATION_TYPE)
+        && node.kind() != OBJECT_CREATION
+}
+
 // Calca VisibilityModifier con sun_checks: todo campo que no es privado ni static final, salvo
-// serialVersionUID público y los que llevan @Rule, @ClassRule, @TempDir o @VisibleForTesting.
+// serialVersionUID público y los que llevan @Rule, @ClassRule o @VisibleForTesting (Checkstyle 14
+// sacó @TempDir de la lista por defecto).
 fn visible_fields(field: Node<'_>, source: &[u8], imports: &[String]) -> Vec<LintFinding> {
     let constant = has_modifier(field, STATIC, source) && has_modifier(field, FINAL, source);
     if constant || has_modifier(field, PRIVATE, source) || allowed_annotation(field, source, imports) {

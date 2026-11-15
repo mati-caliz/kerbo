@@ -92,6 +92,11 @@ url = "https://github.com/junit-team/junit4.git"
 commit = "890f3c972647de378f25e7271d8fbbd9d3456b79"
 uso = "Java contra Qodana"
 
+[repos.maven]
+url = "https://github.com/apache/maven.git"
+commit = "6145dae0de2b5d63465fa08215804cc98c1b25f9"
+uso = "Java 17 contra Qodana"
+
 [repos.pydantic]
 url = "https://github.com/pydantic/pydantic.git"
 commit = "b947584cc89eb0f4e57ba6efd0debdcccdcd3515"

@@ -268,6 +268,12 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT - java_inspect
         "a +\n b se vuelve a\n + b.",
     ),
     RuleText::new(
+        "Espacio después de ( o antes de )",
+        "sacá el espacio pegado al paréntesis",
+        "Los paréntesis van pegados a lo que encierran, como en el resto del código. Como ParenPad de Checkstyle con nospace: no mira los casts, ni un ( al final de la línea o un ) al principio.",
+        "main( String[] args ) se vuelve main(String[] args).",
+    ),
+    RuleText::new(
         "Parámetro privado que siempre recibe el mismo valor",
         "sacá el parámetro y usá el valor adentro del método",
         "Si todas las llamadas pasan la misma constante, el parámetro no parametriza nada: sólo agrega ruido en cada llamada. Como SameParameterValue de IntelliJ, para métodos y constructores privados.",

@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::JavaRule;
 
-pub const RULE_COUNT: usize = 12;
+pub const RULE_COUNT: usize = 16;
 
 const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
     (
@@ -110,6 +110,42 @@ const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
             "llamá a repeat sobre el builder",
             "builder.repeat(texto, n) escribe las copias directo en el builder en vez de armar antes un String intermedio. Como StringRepeatCanBeUsed de IntelliJ en su forma de Java 21: el receptor es un StringBuilder o StringBuffer declarado y lo que se repite es un String.",
             "linea.append(\"-\".repeat(ancho)) se vuelve linea.repeat(\"-\", ancho).",
+        ),
+    ),
+    (
+        JavaRule::PatternVariableCanBeUsed,
+        RuleText::new(
+            "Variable local que se inicializa con un cast que un instanceof anterior ya garantiza",
+            "declarala en el instanceof como variable de patrón",
+            "Con los patrones de Java 16, valor instanceof Pedido pedido chequea y declara de una vez; el cast aparte repite el tipo y puede quedar desfasado del chequeo. Como PatternVariableCanBeUsed de IntelliJ: el instanceof es la condición del if o el bucle que encierra la declaración, o un if anterior del mismo bloque que sale cuando no se cumple, y lo que se castea no se reasigna en el medio.",
+            "if (valor instanceof Pedido) { Pedido pedido = (Pedido) valor; ... } se vuelve if (valor instanceof Pedido pedido) { ... }.",
+        ),
+    ),
+    (
+        JavaRule::ReadWriteString,
+        RuleText::new(
+            "Bytes leídos o escritos con Files sólo para pasarlos a String, donde Files.readString y Files.writeString lo hacen",
+            "usá Files.readString o Files.writeString",
+            "Files.readString(ruta, juego) dice en una llamada lo que new String(Files.readAllBytes(ruta), juego) arma en dos. Como ReadWriteStringCanBeUsed de IntelliJ: readString desde Java 11 y writeString desde Java 12, cuando el juego de caracteres es un Charset.",
+            "new String(Files.readAllBytes(ruta), UTF_8) se vuelve Files.readString(ruta, UTF_8).",
+        ),
+    ),
+    (
+        JavaRule::Java9CollectionFactory,
+        RuleText::new(
+            "Copia inmodificable o lista fija armada a mano donde List.of o List.copyOf la hacen",
+            "usá List.of, Set.of, Map.of o sus copyOf",
+            "List.copyOf(otra) dice en una llamada lo que Collections.unmodifiableList(new ArrayList<>(otra)) arma en dos, y el resultado no acepta nulls. Como Java9CollectionFactory de IntelliJ: copyOf desde Java 10 cuando lo copiado se declara como colección; of desde Java 9 cuando ningún elemento puede ser null.",
+            "Collections.unmodifiableList(new ArrayList<>(pedidos)) se vuelve List.copyOf(pedidos).",
+        ),
+    ),
+    (
+        JavaRule::EnhancedSwitchMigration,
+        RuleText::new(
+            "Switch viejo que devuelve en todas sus ramas, donde una expresión switch lo dice de una vez",
+            "devolvé una expresión switch con case ... ->",
+            "return switch (tipo) { case A -> 1; default -> 0; }; muestra que todas las ramas dan un valor y el compilador controla que no falte ninguna. Como EnhancedSwitchMigration de IntelliJ en su forma por defecto: cada rama, de hasta dos sentencias, termina en return o throw, y sin default al switch le sigue un return o un throw.",
+            "switch (tipo) { case A: return 1; default: return 0; } se vuelve return switch (tipo) { case A -> 1; default -> 0; };.",
         ),
     ),
 ];

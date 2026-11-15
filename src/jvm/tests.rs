@@ -278,6 +278,12 @@ fn the_release_comes_from_the_build_and_skips_what_is_not_a_number() {
         "java { sourceCompatibility = JavaVersion.VERSION_11 }",
     );
     assert_eq!(project_release(gradle.path()), Some(11));
+    let apache = TempTree::new("jvm-release-apache");
+    apache.write(
+        "pom.xml",
+        "<project><properties><javaVersion>17</javaVersion></properties></project>",
+    );
+    assert_eq!(project_release(apache.path()), Some(17));
     assert_eq!(project_release(TempTree::new("jvm-release-none").path()), None);
 }
 
