@@ -1594,7 +1594,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 824 de los 972 (474 `data-flow-issue`, 301 `null-argument`, 25
+  de más en los dos. En guava, 829 de los 972 (479 `data-flow-issue`, 301 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
@@ -1653,7 +1653,13 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `@Nullable` (propio o de otra variable, como `segment.table`) puede ser null aunque se acabe de
   chequear, desreferenciar o asignar (`whenClosed = new CountDownLatch(1); return whenClosed;`). Los
   que no son `volatile` se siguen como una variable (Qodana no los vuelve a marcar en TreeMultiset
-  ni en LinkedHashMultimapTest). `throw x` desreferencia a `x`. Un campo `@Nullable` puede alcanzarse por un elemento de un arreglo que es
+  ni en LinkedHashMultimapTest). `throw x` desreferencia a `x`, y asignar `x.campo = ...` también.
+  Un `while` o un `for` se recorre una segunda vez con lo que dejó la primera (el avance y el
+  cuerpo), anotando sólo desreferencias: `for (n = primero; ; n = n.siguiente)` con un `siguiente`
+  `@Nullable` marca el avance. En esa vuelta un argumento ni se marca ni deja presente la variable
+  (LocalCache: Qodana marca `e.getNext()` después de `copyEntry(e, ...)` sin marcar el argumento).
+  `p == guarda`, con una `guarda` que el flujo no da por posiblemente null (una variable que no
+  sigue, `this`, un `new` o un literal), deja presente a `p`. Un campo `@Nullable` puede alcanzarse por un elemento de un arreglo que es
   campo de una variable (`map.segments[0].table`). Desempaquetan lo que puede ser null un casteo a
   primitivo (`(int) mmHeap.peek()`, también de una variable), una cuenta (`queue.poll() ^ x`; no
   `+` ni `==`) y pasarlo a un parámetro primitivo de un método del proyecto. El `@Nullable` de un

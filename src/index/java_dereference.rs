@@ -66,6 +66,8 @@ pub fn nullable_dereferences(
             );
         }
     }
+    findings.sort_by_key(|finding| (finding.line, finding.column));
+    findings.dedup_by_key(|finding| (finding.line, finding.column));
     findings
 }
 

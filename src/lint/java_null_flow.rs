@@ -10,7 +10,7 @@ use super::java_null_forwarding::forwarding_chain;
 use super::java_null_keys::{
     VolatileField, forget, join, reread, seed_nullable_variables, spellings, tracked_key,
 };
-use super::java_null_loops::runs_at_least_once;
+use super::java_null_loops::iterate;
 use super::java_null_returns::{method_marking, note_return};
 use super::java_null_uses::{dereference, passed};
 use super::java_owner::NullMarking;
@@ -28,6 +28,7 @@ pub(super) const BINARY: &str = "binary_expression";
 const TERNARY: &str = "ternary_expression";
 pub(super) const INSTANCEOF: &str = "instanceof_expression";
 const ASSIGNMENT: &str = "assignment_expression";
+const FIELD_ACCESS: &str = "field_access";
 pub(super) const NULL: &str = "null_literal";
 const SKIPPED_EXPRESSIONS: &[&str] = &["lambda_expression", "class_body"];
 const BLOCK: &str = "block";
@@ -62,8 +63,6 @@ const CONDITION_FIELD: &str = "condition";
 const CONSEQUENCE_FIELD: &str = "consequence";
 const ALTERNATIVE_FIELD: &str = "alternative";
 const BODY_FIELD: &str = "body";
-const INIT_FIELD: &str = "init";
-const UPDATE_FIELD: &str = "update";
 const VALUE_FIELD: &str = "value";
 pub(super) const LEFT_FIELD: &str = "left";
 pub(super) const RIGHT_FIELD: &str = "right";
@@ -87,6 +86,7 @@ pub(super) struct Analysis<'source, 'context> {
     pub(super) partners: HashMap<String, String>,
     pub(super) volatile_fields: Vec<VolatileField>,
     pub(super) nullable_elements: Vec<String>,
+    pub(super) only_dereferences: bool,
     pub(super) return_marking: Option<NullMarking>,
 }
 
@@ -111,6 +111,7 @@ pub fn null_flows(
         partners: HashMap::new(),
         volatile_fields: Vec::new(),
         nullable_elements: Vec::new(),
+        only_dereferences: false,
         return_marking: method_marking(method, source),
     };
     let entry = seed_nullable_variables(&mut analysis, method);
@@ -129,7 +130,7 @@ impl Analysis<'_, '_> {
         text(node, self.source)
     }
 
-    fn statement(&mut self, node: Node<'_>, state: State) -> Option<State> {
+    pub(super) fn statement(&mut self, node: Node<'_>, state: State) -> Option<State> {
         let kind = node.kind();
         let field = |name: &str| node.child_by_field_name(name);
         match kind {
@@ -151,24 +152,7 @@ impl Analysis<'_, '_> {
                 };
                 join(taken, other)
             }
-            WHILE | FOR => {
-                let mut current = state;
-                if let Some(init) = field(INIT_FIELD) {
-                    current = self.expression(init, current);
-                }
-                let (when_true, when_false) = match field(CONDITION_FIELD) {
-                    Some(condition) => branch_states(self, condition, current),
-                    None => (current.clone(), current),
-                };
-                let after_body = field(BODY_FIELD).and_then(|body| self.statement(body, when_true));
-                if let (Some(update), Some(after)) = (field(UPDATE_FIELD), after_body.clone()) {
-                    self.expression(update, after);
-                }
-                if kind == FOR && after_body.is_some() && runs_at_least_once(node, self.source) {
-                    return after_body;
-                }
-                join(Some(when_false), after_body)
-            }
+            WHILE | FOR => iterate(self, node, state),
             DO => {
                 let after_body = field(BODY_FIELD).and_then(|body| self.statement(body, state.clone()));
                 let after = join(Some(state), after_body)?;
@@ -355,7 +339,10 @@ impl Analysis<'_, '_> {
             ) else {
                 return state;
             };
-            let after = self.expression(right, state);
+            let mut after = self.expression(right, state);
+            if left.kind() == FIELD_ACCESS {
+                after = dereference(self, left, after);
+            }
             return match tracked_key(self, left) {
                 Some(variable) => self.assign(variable, right, after),
                 None => self.expression(left, after),

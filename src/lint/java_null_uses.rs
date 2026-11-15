@@ -35,6 +35,9 @@ const PRIMITIVE_TYPES: &[&str] = &["integral_type", "floating_point_type", "bool
 // un flujo nuevo que recuerda la llamada: si el método no las desreferencia, el uso que viene
 // después es el que cuenta.
 pub(super) fn passed(analysis: &mut Analysis<'_, '_>, call: Node<'_>, mut state: State) -> State {
+    if analysis.only_dereferences {
+        return state;
+    }
     let arguments: Vec<Node<'_>> = call
         .child_by_field_name(ARGUMENTS_FIELD)
         .map(named_children)

@@ -178,6 +178,6 @@ final class Queue {
 fn a_nullable_result_passed_to_a_primitive_or_operated_is_unboxed() {
     assert_eq!(
         findings_in(UNBOXED_ARGUMENTS, "data-flow-issue"),
-        ["17:17 poll()", "15:16 poll()"]
+        ["15:16 poll()", "17:17 poll()"]
     );
 }

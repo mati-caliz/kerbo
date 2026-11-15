@@ -1,6 +1,9 @@
 use tree_sitter::Node;
 
 use super::java::{text, unparenthesized};
+use super::java_null_conditions::branch_states;
+use super::java_null_flow::{Analysis, State};
+use super::java_null_keys::join;
 use crate::syntax::{descendants, named_children};
 
 const LOCAL: &str = "local_variable_declaration";
@@ -28,6 +31,9 @@ const ZERO: &str = "0";
 const LESS: &str = "<";
 const LESS_OR_EQUAL: &str = "<=";
 const IDENTIFIER: &str = "identifier";
+const FOR: &str = "for_statement";
+const BODY_FIELD: &str = "body";
+const UPDATE_FIELD: &str = "update";
 const DECIMAL: &str = "decimal_integer_literal";
 const UPDATE: &str = "update_expression";
 const METHODS: &[&str] = &[
@@ -36,6 +42,53 @@ const METHODS: &[&str] = &[
     "lambda_expression",
 ];
 const EQUAL: &str = "==";
+
+// Un `while` o un `for`: la primera vuelta da el estado al salir (o el del cuerpo, si el `for` da
+// al menos una vuelta) y la siguiente sólo anota usos.
+pub(super) fn iterate(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) -> Option<State> {
+    let field = |name: &str| node.child_by_field_name(name);
+    let mut current = state;
+    if let Some(init) = field(INIT_FIELD) {
+        current = analysis.expression(init, current);
+    }
+    let (when_true, when_false) = match field(CONDITION_FIELD) {
+        Some(condition) => branch_states(analysis, condition, current),
+        None => (current.clone(), current),
+    };
+    let after_body = field(BODY_FIELD).and_then(|body| analysis.statement(body, when_true));
+    let after_update = match (field(UPDATE_FIELD), after_body.clone()) {
+        (Some(update), Some(after)) => Some(analysis.expression(update, after)),
+        (None, after) => after,
+        (Some(_), None) => None,
+    };
+    if let Some(again) = after_update {
+        next_iteration(analysis, node, again);
+    }
+    if node.kind() == FOR && after_body.is_some() && runs_at_least_once(node, analysis.source) {
+        return after_body;
+    }
+    join(Some(when_false), after_body)
+}
+
+// La vuelta siguiente, con lo que dejó la anterior: lo que el cuerpo o el avance asignaron puede
+// llegar null a la condición, al cuerpo y al avance (`for (n = primero; ; n = n.siguiente)`). Sólo
+// cuentan las desreferencias: en LocalCache Qodana marca `e.getHash()` en el cuerpo de una vuelta y
+// `e.getNext()` en el avance de otra después de `copyEntry(e, ...)`, sin marcar ese argumento ni
+// darlo por presente.
+fn next_iteration(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) {
+    let field = |name: &str| node.child_by_field_name(name);
+    let outer = analysis.only_dereferences;
+    analysis.only_dereferences = true;
+    let when_true = match field(CONDITION_FIELD) {
+        Some(condition) => branch_states(analysis, condition, state).0,
+        None => state,
+    };
+    let after_body = field(BODY_FIELD).and_then(|body| analysis.statement(body, when_true));
+    if let (Some(update), Some(after)) = (field(UPDATE_FIELD), after_body) {
+        analysis.expression(update, after);
+    }
+    analysis.only_dereferences = outer;
+}
 
 // Si el `for (i = 0; i < arreglo.length; ...)` da al menos una vuelta porque antes, en el mismo
 // bloque, un `if (arreglo.length == 0)` sale del método: IntelliJ sigue el largo del arreglo. O si

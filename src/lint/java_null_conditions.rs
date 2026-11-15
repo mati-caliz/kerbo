@@ -36,6 +36,9 @@ const FAILS_WHEN_FALSE: &[&str] = &[
 const EAGER_AND: &str = "&";
 const EAGER_OR: &str = "|";
 const ASSIGNMENT: &str = "assignment_expression";
+const THIS: &str = "this";
+const CREATION: &str = "object_creation_expression";
+const LITERAL_SUFFIX: &str = "_literal";
 
 // Los estados si la condición da verdadero y si da falso.
 pub(super) fn branch_states(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) -> (State, State) {
@@ -122,21 +125,16 @@ fn binary_condition(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: Stat
             )
         }
         EQUAL | NOT_EQUAL => {
-            let tested = match (left.kind(), right.kind()) {
-                (_, NULL) => compared_key(analysis, left),
-                (NULL, _) => compared_key(analysis, right),
-                _ => None,
-            };
             let after = analysis.expression(node, state);
-            let Some(tested) = tested else {
-                return (after.clone(), after);
+            let (when_equal, when_different) = match (left.kind(), right.kind()) {
+                (_, NULL) => compared_with_null(analysis, left, after),
+                (NULL, _) => compared_with_null(analysis, right, after),
+                _ => compared_with_value(analysis, (left, right), after),
             };
-            let mut present = after.clone();
-            forget(&mut present, &tested);
             if operator == NOT_EQUAL {
-                (present, after)
+                (when_different, when_equal)
             } else {
-                (after, present)
+                (when_equal, when_different)
             }
         }
         _ => {
@@ -145,6 +143,44 @@ fn binary_condition(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: Stat
         }
     }
 }
+// Los estados si `x == null` da verdadero y si da falso.
+fn compared_with_null(analysis: &Analysis<'_, '_>, compared: Node<'_>, after: State) -> (State, State) {
+    let mut present = after.clone();
+    if let Some(tested) = compared_key(analysis, compared) {
+        forget(&mut present, &tested);
+    }
+    (after, present)
+}
+
+// `p == guarda`: si son iguales, `p` vale lo que la otra expresión, y si el flujo no la da por
+// posiblemente null, IntelliJ tampoco a `p`.
+fn compared_with_value(
+    analysis: &Analysis<'_, '_>,
+    (left, right): (Node<'_>, Node<'_>),
+    after: State,
+) -> (State, State) {
+    let mut equal = after.clone();
+    for (tested, other) in [(left, right), (right, left)] {
+        if let Some(key) = compared_key(analysis, tested)
+            && is_present_value(analysis, other, &after)
+        {
+            forget(&mut equal, &key);
+        }
+    }
+    (equal, after)
+}
+
+// Una expresión que el flujo no da por posiblemente null: `this`, un `new`, un literal o una
+// variable que no sigue.
+fn is_present_value(analysis: &Analysis<'_, '_>, value: Node<'_>, state: &State) -> bool {
+    let value = without_cast(value);
+    match value.kind() {
+        THIS | CREATION => true,
+        kind if kind.ends_with(LITERAL_SUFFIX) => kind != NULL,
+        _ => tracked_key(analysis, value).is_some_and(|key| !state.contains_key(&key)),
+    }
+}
+
 // Lo que se compara contra null: en `(x = campo) != null` el chequeo vale para `x`.
 fn compared_key(analysis: &Analysis<'_, '_>, compared: Node<'_>) -> Option<String> {
     let inner = without_cast(compared);

@@ -55,6 +55,8 @@ mod java_escapes_tests;
 #[cfg(test)]
 mod java_failing_calls_tests;
 #[cfg(test)]
+mod java_null_iteration_tests;
+#[cfg(test)]
 mod java_null_lambda_return_tests;
 #[cfg(test)]
 mod java_null_library_argument_tests;

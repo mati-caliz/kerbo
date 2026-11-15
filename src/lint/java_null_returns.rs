@@ -79,7 +79,10 @@ fn returned(expression: Node<'_>, source: &[u8], marking: NullMarking) -> NullRe
 // Anota lo que sale por el `return`: un `null` escrito es un flujo propio, y una variable que el
 // flujo sigue suma la devolución a su flujo.
 pub(super) fn note_return(analysis: &mut Analysis<'_, '_>, statement: Node<'_>, state: State) {
-    let Some(marking) = analysis.return_marking.filter(|_| statement.kind() == RETURN) else {
+    let Some(marking) = analysis
+        .return_marking
+        .filter(|_| statement.kind() == RETURN && !analysis.only_dereferences)
+    else {
         return;
     };
     let Some(value) = named_children(statement)
