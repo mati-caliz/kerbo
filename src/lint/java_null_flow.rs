@@ -4,12 +4,14 @@ use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_null_conditions::{
-    asserted_condition, asserted_present, branch_states, condition_asserted, is_logical, without_cast,
+    always_fails, asserted_condition, asserted_present, branch_states, condition_asserted, is_logical,
+    without_cast,
 };
 use super::java_null_forwarding::forwarding_chain;
 use super::java_null_keys::{
     VolatileField, forget, join, reread, seed_nullable_variables, spellings, tracked_key,
 };
+use super::java_null_literals::{catch_entry, failure_nulls};
 use super::java_null_loops::iterate;
 use super::java_null_returns::{method_marking, note_return};
 use super::java_null_uses::{dereference, passed};
@@ -139,7 +141,10 @@ impl Analysis<'_, '_> {
                 .filter(|child| !COMMENTS.contains(&child.kind()))
                 .try_fold(state, |current, child| self.statement(child, current)),
             LOCAL => Some(self.declaration(node, state)),
-            EXPRESSION_STATEMENT => Some(self.expression_statement(node, state)),
+            EXPRESSION_STATEMENT => {
+                let after = self.expression_statement(node, state);
+                (!always_fails(node, self.source)).then_some(after)
+            }
             IF => {
                 let (when_true, when_false) = branch_states(self, field(CONDITION_FIELD)?, state);
                 let taken = match field(CONSEQUENCE_FIELD) {
@@ -217,6 +222,7 @@ impl Analysis<'_, '_> {
                 state = self.assign(self.text(name).to_owned(), value, state);
             }
         }
+        let failure_nulls = failure_nulls(self, node);
         let body = node
             .child_by_field_name(BODY_FIELD)
             .and_then(|body| self.statement(body, state.clone()));
@@ -225,9 +231,10 @@ impl Analysis<'_, '_> {
         for clause in named_children(node) {
             match clause.kind() {
                 CATCH => {
+                    let entry = catch_entry(&state, &failure_nulls);
                     let handled = clause
                         .child_by_field_name(BODY_FIELD)
-                        .and_then(|block| self.statement(block, state.clone()));
+                        .and_then(|block| self.statement(block, entry));
                     result = join(result, handled);
                 }
                 FINALLY => finally = Some(clause),

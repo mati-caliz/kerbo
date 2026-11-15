@@ -1594,7 +1594,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   en guava y spring-boot, que no tienen corrida de esta regla.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 16 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 836 de los 972 (479 `data-flow-issue`, 308 `null-argument`, 25
+  de más en los dos. En guava, 838 de los 972 (481 `data-flow-issue`, 308 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
@@ -1661,7 +1661,12 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `@Nullable` marca el avance. En esa vuelta un argumento ni se marca ni deja presente la variable
   (LocalCache: Qodana marca `e.getNext()` después de `copyEntry(e, ...)` sin marcar el argumento).
   `p == guarda`, con una `guarda` que el flujo no da por posiblemente null (una variable que no
-  sigue, `this`, un `new` o un literal), deja presente a `p`. Un campo `@Nullable` puede alcanzarse por un elemento de un arreglo que es
+  sigue, `this`, un `new` o un literal), deja presente a `p`. Una local que arranca en `null`,
+  sigue así al entrar a un `try` y se asigna adentro puede seguir en null en el `catch` (CloserTest);
+  fuera de ese camino el `null` inicial no se sigue, porque IntelliJ separa estados por condiciones
+  que lo correlacionan con otra variable (`hp2` sólo si `!badDefaultPort` en HostAndPortTest,
+  `calendarUtils` sólo si `monthOnly` en FastDatePrinter) y kerbo no: probado, daba 14 de más. Una
+  sentencia `fail(...)` corta el camino. Un campo `@Nullable` puede alcanzarse por un elemento de un arreglo que es
   campo de una variable (`map.segments[0].table`). Desempaquetan lo que puede ser null un casteo a
   primitivo (`(int) mmHeap.peek()`, también de una variable), una cuenta (`queue.poll() ^ x`; no
   `+` ni `==`) y pasarlo a un parámetro primitivo de un método del proyecto. El `@Nullable` de un

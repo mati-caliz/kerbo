@@ -67,3 +67,59 @@ fn the_next_iteration_sees_what_the_previous_one_assigned() {
         ["11:42 node()", "28:16 current()", "34:9 tail()", "44:54 node()"]
     );
 }
+
+const NULL_LOCALS: &str = r"package app;
+
+final class Locals {
+    static Locals make() {
+        return new Locals();
+    }
+
+    void run() {}
+
+    static void tried() {
+        Locals first = null;
+        Locals second = null;
+        try {
+            first = make();
+            second = make();
+        } catch (RuntimeException e) {
+            second = make();
+        }
+        first.run();
+        second.run();
+    }
+
+    static void failed() {
+        Locals found = null;
+        try {
+            found = make();
+        } catch (RuntimeException e) {
+            fail(e.getMessage());
+        }
+        found.run();
+    }
+
+    static void fail(String message) {
+        throw new AssertionError(message);
+    }
+
+    static void branches(boolean flag) {
+        Locals chosen = null;
+        if (flag) {
+            chosen = make();
+        }
+        if (flag) {
+            chosen.run();
+        }
+    }
+}
+";
+
+// Una local que arranca en `null` y se asigna en un `try` puede seguir en null en el `catch`, y de
+// ahí a lo que viene después. Fuera de ese camino el `null` inicial no se sigue: una condición que
+// lo correlaciona con otra variable no se entiende.
+#[test]
+fn a_local_assigned_null_is_possibly_null_where_no_branch_reassigned_it() {
+    assert_eq!(findings_in(NULL_LOCALS, "data-flow-issue"), ["19:15 run()"]);
+}

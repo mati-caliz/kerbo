@@ -33,6 +33,7 @@ const FAILS_WHEN_FALSE: &[&str] = &[
     "verify",
     "assertTrue",
 ];
+const ALWAYS_FAILS: &[&str] = &["fail"];
 const EAGER_AND: &str = "&";
 const EAGER_OR: &str = "|";
 const ASSIGNMENT: &str = "assignment_expression";
@@ -198,6 +199,16 @@ fn guard_by_call(name: &str, tested: &str, when_true: &mut State, when_false: &m
     } else if FALSE_MEANS_PRESENT.contains(&name) {
         forget(when_false, tested);
     }
+}
+
+// `fail(...)` como sentencia (JUnit, TestNG): IntelliJ sabe que siempre tira, así que corta el camino.
+pub(super) fn always_fails(statement: Node<'_>, source: &[u8]) -> bool {
+    named_children(statement)
+        .into_iter()
+        .find(|child| !COMMENTS.contains(&child.kind()))
+        .filter(|expression| expression.kind() == INVOCATION)
+        .and_then(|invocation| invocation.child_by_field_name(NAME_FIELD))
+        .is_some_and(|name| ALWAYS_FAILS.contains(&text(name, source)))
 }
 
 pub(super) fn is_logical(node: Node<'_>) -> bool {

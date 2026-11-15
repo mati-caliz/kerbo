@@ -45,6 +45,7 @@ pub mod java_null_flow;
 mod java_null_forwarding;
 pub mod java_null_inference;
 mod java_null_keys;
+mod java_null_literals;
 mod java_null_loops;
 mod java_null_origin;
 mod java_null_returns;
