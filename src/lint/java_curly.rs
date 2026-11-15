@@ -17,6 +17,8 @@ const TYPE_BODIES: &[&str] = &[
     "annotation_type_body",
     "switch_block",
 ];
+const ENUM_BODY: &str = "enum_body";
+const ANONYMOUS_CLASS: &str = "object_creation_expression";
 const BODY_FIELD: &str = "body";
 const BODY_OWNERS: &[&str] = &[
     "method_declaration",
@@ -89,9 +91,10 @@ fn first_child(node: Node<'_>) -> Option<Node<'_>> {
 // inicialización no entra.
 fn left_braces(node: Node<'_>, lines: &Lines<'_>) -> Vec<LintFinding> {
     if TYPE_BODIES.contains(&node.kind()) {
+        let members = checks_first_member(node).then_some(node);
         return first_child(node)
             .filter(|brace| brace.kind() == OPEN_CURLY)
-            .and_then(|brace| misplaced_brace(brace, None, lines))
+            .and_then(|brace| misplaced_brace(brace, members, lines))
             .into_iter()
             .collect();
     }
@@ -102,6 +105,17 @@ fn left_braces(node: Node<'_>, lines: &Lines<'_>) -> Vec<LintFinding> {
             misplaced_brace(brace, Some(block), lines)
         })
         .collect()
+}
+
+// Checkstyle mira si el primer miembro sigue en la línea de la llave en todos los cuerpos de tipo
+// (también los anónimos y los de una constante de enum) y en el switch; en el del enum no
+// (ignoreEnums), ni en una clase anónima que empieza con un bloque de inicialización.
+fn checks_first_member(body: Node<'_>) -> bool {
+    let anonymous_initializer = body.parent().is_some_and(|owner| owner.kind() == ANONYMOUS_CLASS)
+        && statements(body)
+            .first()
+            .is_some_and(|member| member.kind() == BLOCK);
+    body.kind() != ENUM_BODY && !anonymous_initializer
 }
 
 fn owned_blocks(node: Node<'_>) -> Vec<Node<'_>> {

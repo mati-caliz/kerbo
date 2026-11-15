@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::JavaRule;
 
-pub const RULE_COUNT: usize = 8;
+pub const RULE_COUNT: usize = 12;
 
 const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
     (
@@ -74,6 +74,42 @@ const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
             "sacá el transient",
             "La serialización nunca guarda los campos static, así que transient no cambia nada y hace pensar que sí. Como UnnecessaryModifier de IntelliJ, que Checkstyle y PMD no tienen.",
             "private static transient Logger registro; se vuelve private static Logger registro;.",
+        ),
+    ),
+    (
+        JavaRule::TextBlockMigration,
+        RuleText::new(
+            "Literales de texto concatenados con dos o más saltos de línea, donde un bloque de texto se lee mejor",
+            "escribilo como bloque de texto",
+            "Un bloque de texto muestra el texto como va a salir, sin los escapes de salto de línea ni el + al final de cada renglón. Como TextBlockMigration de IntelliJ: sólo cuando todas las partes son literales, hay al menos dos saltos de línea escritos como escape y ningún comentario en el medio, con release 15 o más.",
+            "Dos literales seguidos que terminan en salto de línea, como la consulta select y su from, se vuelven un bloque de texto con las dos líneas.",
+        ),
+    ),
+    (
+        JavaRule::SequencedCollectionMethod,
+        RuleText::new(
+            "get(0), get(size() - 1), remove(0), add(0, x) o iterator().next() donde Java 21 tiene getFirst, getLast, removeFirst o addFirst",
+            "llamá al método de la colección secuenciada",
+            "getFirst() dice qué elemento se busca; get(0) y la cuenta de size() - 1 obligan a deducirlo. Como SequencedCollectionMethodCanBeUsed de IntelliJ: con release 21 o más, cuando el tipo declarado es una lista u otra colección secuenciada, y no en una serie como get(0), get(1).",
+            "pedidos.get(pedidos.size() - 1) se vuelve pedidos.getLast().",
+        ),
+    ),
+    (
+        JavaRule::MathClampMigration,
+        RuleText::new(
+            "Math.min y Math.max anidados donde Java 21 tiene Math.clamp",
+            "usá Math.clamp",
+            "Math.clamp(valor, minimo, maximo) dice que el valor queda dentro de un rango; el min y el max anidados obligan a deducir cuál es cada borde. Como MathClampMigration de IntelliJ: con release 21 o más, cuando algo dentro de la llamada interna no es una constante.",
+            "Math.max(0, Math.min(60, minutos)) se vuelve Math.clamp(minutos, 0, 60).",
+        ),
+    ),
+    (
+        JavaRule::StringRepeatCanBeUsed,
+        RuleText::new(
+            "append(texto.repeat(n)) donde Java 21 tiene StringBuilder.repeat",
+            "llamá a repeat sobre el builder",
+            "builder.repeat(texto, n) escribe las copias directo en el builder en vez de armar antes un String intermedio. Como StringRepeatCanBeUsed de IntelliJ en su forma de Java 21: el receptor es un StringBuilder o StringBuffer declarado y lo que se repite es un String.",
+            "linea.append(\"-\".repeat(ancho)) se vuelve linea.repeat(\"-\", ancho).",
         ),
     ),
 ];

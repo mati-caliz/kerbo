@@ -82,6 +82,11 @@ url = "https://github.com/juice-shop/juice-shop.git"
 commit = "717f5efa886b0417eeecb52378b03cf10567b7e2"
 uso = "JS/TS contra ESLint, secretos"
 
+[repos.jenkins]
+url = "https://github.com/jenkinsci/jenkins.git"
+commit = "013d2021650e8cc1838c0f5502894515edac0d76"
+uso = "Java 21 contra Qodana"
+
 [repos.junit4]
 url = "https://github.com/junit-team/junit4.git"
 commit = "890f3c972647de378f25e7271d8fbbd9d3456b79"

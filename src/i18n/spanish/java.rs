@@ -244,6 +244,18 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT - java_inspect
         "void f()\n{ hacer(); } se vuelve void f() {\n    hacer();\n}.",
     ),
     RuleText::new(
+        "Un case sigue de largo al siguiente sin un comentario que lo diga",
+        "terminá el case con break, return o throw, o avisá con un comentario fall through",
+        "Que un case siga de largo es fácil de hacer sin querer, y quien lee no sabe si fue a propósito. Como FallThrough de Checkstyle: el case tiene que terminar en todas sus ramas, o tener un comentario fall through justo antes del siguiente.",
+        "case ACTIVO: activar(); case PAUSADO: ... se vuelve case ACTIVO: activar(); break; case PAUSADO: ....",
+    ),
+    RuleText::new(
+        "if con else que sólo devuelve true o false",
+        "devolvé la condición",
+        "if (x) { return true; } else { return false; } dice en cuatro líneas lo mismo que return x;. Como SimplifyBooleanReturn de Checkstyle.",
+        "if (pedido.pagado()) { return true; } else { return false; } se vuelve return pedido.pagado();.",
+    ),
+    RuleText::new(
         "Llave que cierra fuera de lugar en un if, else, try, catch o finally",
         "ponela en su propia línea, y en la misma que el else, catch o finally que sigue",
         "} else { y } catch ( en una línea marcan que el bloque sigue; una llave que cierra después de una sentencia la esconde.",

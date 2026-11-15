@@ -12,13 +12,11 @@ const TYPE_AND_OWNERS: &[&str] = &["type_bound", "cast_expression"];
 const CATCH_OR: &str = "|";
 const CATCH_TYPE: &str = "catch_type";
 const INSTANCEOF: &str = "instanceof";
-const PARENTHESIZED: &str = "parenthesized_expression";
-const OPEN_PAREN: &str = "(";
-const CLOSE_PAREN: &str = ")";
 
 // Calca OperatorWrap con nl: un operador binario, los de un ternario, el `:` de un for mejorado o un
 // assert, el `&` de los límites de un genérico, el `|` de un multi-catch e `instanceof` no terminan
-// la línea: van al principio de la siguiente. Los paréntesis que envuelven un operando no cuentan.
+// la línea: van al principio de la siguiente. Los vecinos son los tokens de al lado, paréntesis
+// incluidos: con `&& (` al final de la línea, Checkstyle no avisa.
 pub fn reported(tokens: &[Token<'_>]) -> Vec<LintFinding> {
     let code: Vec<Token<'_>> = tokens
         .iter()
@@ -29,13 +27,8 @@ pub fn reported(tokens: &[Token<'_>]) -> Vec<LintFinding> {
         .enumerate()
         .filter(|(_, token)| wraps(token))
         .filter_map(|(index, token)| {
-            let left = code.get(..index)?.iter().rev().find(|previous| {
-                !(previous.kind() == CLOSE_PAREN && previous.parent_kind() == PARENTHESIZED)
-            })?;
-            let right = code
-                .get(index.saturating_add(1)..)?
-                .iter()
-                .find(|next| !(next.kind() == OPEN_PAREN && next.parent_kind() == PARENTHESIZED))?;
+            let left = code.get(index.checked_sub(1)?)?;
+            let right = code.get(index.saturating_add(1))?;
             let row = token.start().row;
             (left.start().row == row && right.start().row != row).then(|| {
                 finding(

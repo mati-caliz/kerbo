@@ -1769,29 +1769,32 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
 
 ### 15. Java: paridad con PMD y Qodana, y la API nueva
 
-Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_checks.xml`. Las seis de
-Javadoc ya están (en `docs/java.md`): commons-lang y junit4 coinciden con Checkstyle 14.4 en todo
-`sun_checks.xml`, y guava, sin `android/`, en 67.550 de 67.552. Contra PMD 7.29 (con
-`[java] reference`, en `docs/java.md`) coinciden `UnnecessaryModifier` y
-`ClassWithOnlyPrivateConstructorsShouldBeFinal` en los tres, y `UnnecessaryImport` salvo los que
-necesitan resolver tipos (2 en junit4, 11 en guava), que esperan las firmas de la etapa 9. Qodana
-ya está en el arnés (`scripts/parity/java/qodana_rules.py`).
+Lo que quedó de la etapa 8 cuando se cerraron las reglas de forma de `sun_checks.xml`. Contra
+Checkstyle 14.4 coinciden commons-lang, junit4 y Jenkins en todo `sun_checks.xml`, y guava, sin
+`android/`, en 67.550 de 67.552. Contra PMD 7.29 (con `[java] reference`, en `docs/java.md`)
+coinciden `UnnecessaryModifier` y `ClassWithOnlyPrivateConstructorsShouldBeFinal` en los tres, y
+`UnnecessaryImport` salvo los que necesitan resolver tipos (2 en junit4, 11 en guava), que esperan
+las firmas de la etapa 9. Qodana está en el arnés (`scripts/parity/java/qodana_rules.py`), y
+`scripts/parity/java/measure_all.sh` mide todo el corpus Java de una vez.
 
-- Las dos inspecciones de IntelliJ que no tienen Checkstyle ni PMD van como reglas aparte:
-  `final-static-method` (23 en el corpus) y `transient-static-field` (2), iguales a Qodana. De
-  `sun_checks.xml` se sumó `local-variable-name` (22 en guava) y `empty-statement` marca el `;`
-  suelto en el cuerpo de una clase, interfaz o enum. Contra Checkstyle en guava quedan 2
-  `javadoc-type`: errores del parser de Javadoc de Checkstyle con `<N, E>` en un comentario
-  (`graph/AbstractGraphTest.java:48`, `AbstractNetworkTest.java:55`); imitarlos pide calcar su
-  gramática ANTLR.
-- Por lo que más aparece en Qodana, ya sin los escapes Unicode de más (`unnecessary-unicode-escape`,
-  igual a Qodana en el corpus), `Collections.sort()` por `List.sort()` (`java8-list-sort`) y
-  `size() == 0` por `isEmpty()` (`size-replaceable-by-is-empty`), min/max a mano
-  (`manual-min-max-calculation`), el valor por defecto repetido en una anotación
-  (`default-annotation-param`) y `computeIfAbsent` (`java8-map-api`): todas iguales a Qodana en el
-  corpus, sin ninguna de más. La API de Java 21 (`getFirst()`, `List.of`,
-  `Math.clamp`, bloques de texto) no aparece en el corpus, que compila con Java 8: hace falta un
-  repo con `release` 21 para medirla.
+- El corpus suma Jenkins (`release` 21, Maven) para medir la API nueva. El `release` es por módulo,
+  como en IntelliJ (`war/` compila con 11). Jenkins destapó `FallThrough` y `SimplifyBooleanReturn`
+  de `sun_checks.xml` (ahora reglas), `HiddenField` con los componentes de un record, `LeftCurly`
+  con un miembro en la línea de la llave de una clase y `OperatorWrap` con `&& (`: quedó igual a
+  Checkstyle (42.410).
+- La API nueva, igual a Qodana en el corpus: bloques de texto (`text-block-migration`),
+  `Math.clamp` (`math-clamp-migration`), `StringBuilder.repeat` (`string-repeat-can-be-used`) y
+  `getFirst()`/`getLast()` (`sequenced-collection-method`, 7 de 10). Faltan los 3 de un
+  `DomNodeList` de htmlunit: saber que es una `List` pide leer el jar, y la regla corre por
+  archivo. `DefaultAnnotationParam` lee el valor por defecto de las anotaciones de las
+  dependencias (`AnnotationDefault` del `.class`): Jenkins 10 de 10.
+- Quedan sin hacer, porque no aparecen en el corpus: `List.of` (`Java9CollectionFactory`, que pide
+  saber si los elementos pueden ser null), `Files.readString` (`ReadWriteStringCanBeUsed`), el
+  bucle de `StringRepeatCanBeUsed`, `PatternVariableCanBeUsed` y `EnhancedSwitchMigration` (las
+  dos dan 0 en Jenkins).
+- Contra Checkstyle en guava quedan 2 `javadoc-type`: errores del parser de Javadoc de Checkstyle
+  con `<N, E>` en un comentario (`graph/AbstractGraphTest.java:48`,
+  `AbstractNetworkTest.java:55`); imitarlos pide calcar su gramática ANTLR.
 
 ### 13. Formateo propio (empezada: Go medido contra gofmt)
 

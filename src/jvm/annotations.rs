@@ -22,7 +22,7 @@ pub(super) fn annotation_list(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<Ve
 
 // El tipo de una anotación (de `Lorg/jspecify/annotations/Nullable;` a su nombre completo),
 // salteando sus valores.
-fn annotation(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<String, Malformed> {
+pub(super) fn annotation(cursor: &mut Cursor<'_>, pool: &Pool) -> Result<String, Malformed> {
     let name = descriptor_to_source(pool.text(cursor.u16()?)?);
     let pairs = cursor.u16()?;
     for _ in 0..pairs {

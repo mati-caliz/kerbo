@@ -10,8 +10,8 @@ pub(super) const OBJECT_END: u8 = b';';
 pub(super) const ARRAY: u8 = b'[';
 const CLASS_DESCRIPTOR: &str = "Ljava/lang/Class;";
 
-// Un método de un `.class`: su firma, los bits de acceso y las anotaciones de cada parámetro y del
-// retorno.
+// Un método de un `.class`: su firma, los bits de acceso, las anotaciones de cada parámetro y del
+// retorno y, en una anotación, el valor por defecto del elemento.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Method {
     pub name: String,
@@ -21,6 +21,7 @@ pub struct Method {
     pub return_annotations: Vec<String>,
     pub exceptions: Vec<String>,
     pub signature: Option<String>,
+    pub default_value: Option<String>,
 }
 
 impl Method {

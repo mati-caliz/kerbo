@@ -19,6 +19,7 @@ fn method(name: &str, descriptor: &str, signature: &str) -> Method {
         return_annotations: Vec::new(),
         exceptions: Vec::new(),
         signature: Some(signature.to_owned()),
+        default_value: None,
     }
 }
 

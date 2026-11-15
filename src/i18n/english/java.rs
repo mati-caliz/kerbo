@@ -244,6 +244,18 @@ const TEXTS: [RuleText; JavaRule::ALL.len() - javadoc::RULE_COUNT - java_inspect
         "void f()\n{ work(); } becomes void f() {\n    work();\n}.",
     ),
     RuleText::new(
+        "A case falls through to the next one without a comment saying so",
+        "end the case with break, return or throw, or say it with a fall through comment",
+        "Falling through is easy to do by accident, and the reader cannot tell whether it was meant. Like Checkstyle's FallThrough: the case has to end on every branch, or have a fall through comment right before the next one.",
+        "case ACTIVE: activate(); case PAUSED: ... becomes case ACTIVE: activate(); break; case PAUSED: ....",
+    ),
+    RuleText::new(
+        "if with else that only returns true or false",
+        "return the condition",
+        "if (x) { return true; } else { return false; } takes four lines to say return x;. Like Checkstyle's SimplifyBooleanReturn.",
+        "if (order.paid()) { return true; } else { return false; } becomes return order.paid();.",
+    ),
+    RuleText::new(
         "Misplaced closing brace in an if, else, try, catch or finally",
         "put it on its own line, and on the same one as the following else, catch or finally",
         "} else { and } catch ( on one line show that the block goes on; a closing brace after a statement hides it.",

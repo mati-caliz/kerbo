@@ -37,6 +37,7 @@ const STATIC_OWNERS: &[&str] = &[
     "annotation_type_declaration",
     "record_declaration",
 ];
+const RECORD: &str = "record_declaration";
 const ANONYMOUS_OWNER: &str = "object_creation_expression";
 const STATIC_INITIALIZER: &str = "static_initializer";
 
@@ -136,12 +137,34 @@ fn declared_names(node: Node<'_>) -> Vec<Node<'_>> {
             .filter(|child| child.kind() == VARIABLE_DECLARATOR)
             .filter_map(|declarator| declarator.child_by_field_name(NAME_FIELD))
             .collect(),
+        FORMAL_PARAMETER if is_record_component(node) => Vec::new(),
         FORMAL_PARAMETER | CATCH_PARAMETER | ENHANCED_FOR | INSTANCEOF => {
             node.child_by_field_name(NAME_FIELD).into_iter().collect()
         }
         LAMBDA => lambda_names(node),
         _ => Vec::new(),
     }
+}
+
+fn is_record_component(parameter: Node<'_>) -> bool {
+    parameter
+        .parent()
+        .and_then(|list| list.parent())
+        .is_some_and(|owner| owner.kind() == RECORD)
+}
+
+fn record_components(owner: Node<'_>) -> Vec<Node<'_>> {
+    if owner.kind() != RECORD {
+        return Vec::new();
+    }
+    owner
+        .child_by_field_name(PARAMETERS_FIELD)
+        .map(named_children)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|component| component.kind() == FORMAL_PARAMETER)
+        .filter_map(|component| component.child_by_field_name(NAME_FIELD))
+        .collect()
 }
 
 fn lambda_names(lambda: Node<'_>) -> Vec<Node<'_>> {
@@ -182,6 +205,11 @@ fn frame_of(owner: Node<'_>, source: &[u8]) -> Frame {
         statics: HashSet::new(),
         is_static: STATIC_OWNERS.contains(&owner.kind()) || has_modifier(owner, STATIC, source),
     };
+    frame.instance.extend(
+        record_components(owner)
+            .into_iter()
+            .map(|name| text(name, source).to_owned()),
+    );
     for field in fields_of(owner) {
         let target = if has_modifier(field, STATIC, source) {
             &mut frame.statics

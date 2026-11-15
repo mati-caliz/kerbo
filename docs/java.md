@@ -15,8 +15,9 @@ Del resto de `sun_checks.xml`, kerbo hace los nombres (`TypeName`, `MethodName`,
 `StaticVariableName`, `MemberName` y `ParameterName`, con los mismos nombres de regla en kebab:
 `type-name`, `method-name`...), `UpperEll` (`upper-ell`, se arregla solo), `EmptyStatement`
 (`empty-statement`), `ModifierOrder`, `ArrayTypeStyle`, `MultipleVariableDeclarations`,
-`InterfaceIsType`, `MissingSwitchDefault`, `NeedBraces`, `EmptyBlock`, `AvoidNestedBlocks`,
-`InnerAssignment`, `SimplifyBooleanExpression`, `EqualsHashCode`, `HideUtilityClassConstructor`,
+`InterfaceIsType`, `MissingSwitchDefault`, `FallThrough`, `NeedBraces`, `EmptyBlock`,
+`AvoidNestedBlocks`, `InnerAssignment`, `SimplifyBooleanExpression`, `SimplifyBooleanReturn`,
+`EqualsHashCode`, `HideUtilityClassConstructor`,
 `TodoComment`, `IllegalImport`, `FileTabCharacter`, los espacios al final de línea
 (`trailing-spaces`, el `RegexpSingleline` de `sun_checks`), `NewlineAtEndOfFile`,
 `DesignForExtension`, `HiddenField`, `VisibilityModifier`, `DeclarationOrder`,
@@ -27,8 +28,15 @@ al final, `NewlineAtEndOfFile` y los de espacios (no las llaves ni `OperatorWrap
 reacomodar líneas). Siguen a Checkstyle en lo que no se ve: `MethodName` no mira lo que lleva
 `@Override` y marca el método que se llama como su clase; un campo de interfaz es una constante;
 `serialVersionUID` queda afuera; los patrones son ASCII, así que una `ñ` en un nombre se marca;
-`WhitespaceAround` también marca las llaves vacías pegadas (`{}`), como `sun_checks`. `minimal`
-no las pide.
+`WhitespaceAround` también marca las llaves vacías pegadas (`{}`), como `sun_checks`;
+`FallThrough` toma por terminado un `case` como `CheckUtil.isTerminated` (un `if` sin `else` no
+termina, un `while (true)` sin `break` sí) y sólo acepta el comentario `fall through` en
+minúsculas (`//$FALL-THROUGH$` no cuenta); `HiddenField` toma los componentes de un record como
+campos; `LeftCurly` pide salto de línea después de la llave de cualquier cuerpo de clase (también
+la anónima y la de una constante de enum) o de `switch` si el primer miembro sigue en la misma
+línea, salvo en el cuerpo de un enum y en una anónima que empieza con un bloque de inicialización;
+`OperatorWrap` mira el token de al lado tal cual: con `&& (` al final de la línea no avisa.
+`minimal` no las pide.
 
 Las de Javadoc de `sun_checks.xml` sólo las pide `strict`: `JavadocVariable` (`javadoc-variable`),
 `MissingJavadocMethod`, `JavadocMethod`, `JavadocType`, `JavadocPackage` e
@@ -73,6 +81,10 @@ inspecciones que no tienen ni Checkstyle ni PMD: `static` y `final` juntos en un
 (`FinalStaticMethod`) y `transient` en un campo estático.
 
 ## Inspecciones de IntelliJ
+
+Las que dependen de la versión de Java usan el `release` de cada módulo, como el nivel de
+lenguaje por módulo de IntelliJ: el del `pom.xml` o `build.gradle` de la carpeta, o el del módulo
+que la contiene, y si nadie lo dice, el del JDK. Jenkins compila `war/` con 11 y el resto con 21.
 
 De las inspecciones de IntelliJ, kerbo hace:
 
@@ -192,14 +204,35 @@ De las inspecciones de IntelliJ, kerbo hace:
 
 - `DefaultAnnotationParam` (`default-annotation-param`): un elemento de una anotación escrito con
   el mismo valor que ya tiene por defecto (`@Reintento(intentos = 3)` con `intentos() default 3`).
-  Sólo con las anotaciones que declara el proyecto, que es donde se ve el valor por defecto; si el
-  nombre de la anotación puede ser de más de una, no se reporta. Coincide con Qodana en el corpus
-  (7, todos en junit4).
+  El valor por defecto sale de la anotación si la declara el proyecto (si el nombre puede ser de
+  más de una, no se reporta) y si no, del `AnnotationDefault` del `.class` en las dependencias,
+  como `@Argument(index = 0)` de args4j. Coincide con Qodana en el corpus (17: 7 en junit4 y 10 en
+  Jenkins).
 
 - `Java8MapApi` (`java8-map-api`), en la forma de `computeIfAbsent`: un valor que se lee con `get`,
   se calcula si es `null` y se guarda con `put`. Desde Java 8, cuando el tipo declarado es un `Map`
   y lo calculado no puede tener efectos (un arreglo o un literal, sin llamadas): con efectos,
   IntelliJ lo deja como información. Coincide con Qodana en el corpus (2, en commons-lang).
+
+- `TextBlockMigration` (`text-block-migration`): literales de texto concatenados con dos o más
+  `
+` escritos como escape, donde un bloque de texto se lee mejor. Desde Java 15, sólo si todas las
+  partes son literales y no hay comentarios en el medio. Coincide con Qodana en el corpus (1).
+
+- `SequencedCollectionMethodCanBeUsed` (`sequenced-collection-method`): `get(0)`, `remove(0)`,
+  `add(0, x)`, `get(size() - 1)` e `iterator().next()` donde Java 21 tiene `getFirst()`,
+  `getLast()`, `removeFirst()` y `addFirst()`. El tipo sale de la declaración: una variable, un
+  campo, el campo de una clase del mismo archivo o lo que devuelve un método propio. No avisa en
+  una serie como `get(0)`, `get(1)`, igual que IntelliJ. En Jenkins faltan 3 de 10, sobre un
+  `DomNodeList` de htmlunit: saber que es una `List` pide leer el jar.
+
+- `MathClampMigration` (`math-clamp-migration`): `Math.max(0, Math.min(60, x))` donde Java 21 tiene
+  `Math.clamp`. Como el modo por defecto de IntelliJ: alcanza con que algo dentro de la llamada
+  interna no sea constante. Coincide con Qodana en el corpus (2).
+
+- `StringRepeatCanBeUsed` (`string-repeat-can-be-used`), la forma de Java 21:
+  `builder.append(texto.repeat(n))` sobre un `StringBuilder` o `StringBuffer`. La del bucle `for`
+  que agrega lo mismo n veces no está. Coincide con Qodana en el corpus (2).
 
 - `FinalStaticMethod` (`final-static-method`): `final` en un método `static`, que no se redefine;
   sólo impide que una subclase declare otro con la misma firma. Se arregla sacando el `final`.

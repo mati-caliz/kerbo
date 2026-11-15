@@ -19,6 +19,7 @@ mod java_curly;
 mod java_deserialization;
 mod java_design;
 pub mod java_exact_receivers;
+mod java_fall_through;
 pub mod java_fields;
 mod java_final_fields;
 mod java_flow;
@@ -35,6 +36,7 @@ pub mod java_lambda_returns;
 pub mod java_lambda_targets;
 mod java_list_sort;
 mod java_map_api;
+mod java_math_api;
 mod java_min_max;
 pub mod java_nested_arguments;
 mod java_null_checks;
@@ -59,6 +61,7 @@ pub mod java_resources;
 mod java_results;
 pub mod java_returns;
 mod java_same_value;
+mod java_sequenced_collection;
 mod java_shapes;
 mod java_size_is_empty;
 mod java_spacing;
@@ -68,6 +71,7 @@ mod java_style;
 mod java_switch;
 pub mod java_taint;
 mod java_text;
+mod java_text_block;
 pub mod java_throws;
 mod java_tokens;
 pub mod java_type_arguments;
@@ -226,6 +230,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     findings.extend(java_style::reported(&nodes, source));
     findings.extend(java_shapes::reported(&nodes, source));
     findings.extend(java_flow::reported(&nodes, source));
+    findings.extend(java_fall_through::reported(&nodes, source));
     findings.extend(java_text::reported(&nodes, source));
     findings.extend(java_javadoc::reported(&nodes, source));
     findings.extend(java_design::reported(&nodes, source));
@@ -249,7 +254,14 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     findings.extend(java_list_sort::reported(root, source, limits.java_release()));
     findings.extend(java_map_api::reported(root, source, limits.java_release()));
     findings.extend(java_min_max::reported(root, source));
+    findings.extend(java_math_api::reported(root, source, limits.java_release()));
     findings.extend(java_size_is_empty::reported(root, source, limits.java_release()));
+    findings.extend(java_sequenced_collection::reported(
+        root,
+        source,
+        limits.java_release(),
+    ));
+    findings.extend(java_text_block::reported(root, source, limits.java_release()));
     findings.extend(java_static_modifiers::reported(root, source));
     findings.retain(|finding| limits.get(finding.kind.rule()).is_some());
     if limits.java_reference() == JavaReference::Pmd {
@@ -274,7 +286,13 @@ pub fn finding_at(kind: LintKind, start: Point, subject: &str, fix: Option<Fix>)
 }
 
 #[cfg(test)]
+mod java_curly_tests;
+#[cfg(test)]
 mod java_empty_statement_tests;
+#[cfg(test)]
+mod java_fall_through_tests;
+#[cfg(test)]
+mod java_hidden_tests;
 #[cfg(test)]
 mod java_inspection_tests;
 #[cfg(test)]
@@ -284,13 +302,19 @@ mod java_list_sort_tests;
 #[cfg(test)]
 mod java_map_api_tests;
 #[cfg(test)]
+mod java_math_api_tests;
+#[cfg(test)]
 mod java_min_max_tests;
 #[cfg(test)]
 mod java_pmd_tests;
 #[cfg(test)]
+mod java_sequenced_collection_tests;
+#[cfg(test)]
 mod java_size_is_empty_tests;
 #[cfg(test)]
 mod java_static_modifiers_tests;
+#[cfg(test)]
+mod java_text_block_tests;
 #[cfg(test)]
 mod java_unicode_escape_tests;
 #[cfg(test)]

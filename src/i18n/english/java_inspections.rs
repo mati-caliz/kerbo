@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::JavaRule;
 
-pub const RULE_COUNT: usize = 8;
+pub const RULE_COUNT: usize = 12;
 
 const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
     (
@@ -74,6 +74,42 @@ const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
             "remove the transient",
             "Serialization never writes static fields, so transient changes nothing and suggests it does. Like IntelliJ's UnnecessaryModifier, which Checkstyle and PMD lack.",
             "private static transient Logger log; becomes private static Logger log;.",
+        ),
+    ),
+    (
+        JavaRule::TextBlockMigration,
+        RuleText::new(
+            "String literals concatenated with two or more line breaks, where a text block reads better",
+            "write it as a text block",
+            "A text block shows the text as it will come out, without the line break escapes and the + at the end of each line. Like IntelliJ's TextBlockMigration: only when every part is a literal, there are at least two escaped line breaks and no comment in between, with release 15 or later.",
+            "Two literals in a row that end in a line break, like a select query and its from, become a text block with the two lines.",
+        ),
+    ),
+    (
+        JavaRule::SequencedCollectionMethod,
+        RuleText::new(
+            "get(0), get(size() - 1), remove(0), add(0, x) or iterator().next() where Java 21 has getFirst, getLast, removeFirst or addFirst",
+            "call the sequenced collection method",
+            "getFirst() says which element is wanted; get(0) and the size() - 1 arithmetic make the reader work it out. Like IntelliJ's SequencedCollectionMethodCanBeUsed: with release 21 or later, when the declared type is a list or another sequenced collection, and not in a series like get(0), get(1).",
+            "orders.get(orders.size() - 1) becomes orders.getLast().",
+        ),
+    ),
+    (
+        JavaRule::MathClampMigration,
+        RuleText::new(
+            "Math.min and Math.max nested where Java 21 has Math.clamp",
+            "use Math.clamp",
+            "Math.clamp(value, low, high) says the value is kept within a range; nested min and max make the reader work out which bound is which. Like IntelliJ's MathClampMigration: with release 21 or later, when something inside the inner call is not a constant.",
+            "Math.max(0, Math.min(60, minutes)) becomes Math.clamp(minutes, 0, 60).",
+        ),
+    ),
+    (
+        JavaRule::StringRepeatCanBeUsed,
+        RuleText::new(
+            "append(text.repeat(n)) where Java 21 has StringBuilder.repeat",
+            "call repeat on the builder",
+            "builder.repeat(text, n) writes the copies straight into the builder instead of building an intermediate String first. Like IntelliJ's StringRepeatCanBeUsed in its Java 21 form: the receiver is a declared StringBuilder or StringBuffer and the repeated value is a String.",
+            "line.append(\"-\".repeat(width)) becomes line.repeat(\"-\", width).",
         ),
     ),
 ];

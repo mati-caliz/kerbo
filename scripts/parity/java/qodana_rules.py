@@ -34,6 +34,10 @@ INSPECTIONS = {
     "ManualMinMaxCalculation": "manual-min-max-calculation",
     "DefaultAnnotationParam": "default-annotation-param",
     "Java8MapApi": "java8-map-api",
+    "TextBlockMigration": "text-block-migration",
+    "SequencedCollectionMethodCanBeUsed": "sequenced-collection-method",
+    "MathClampMigration": "math-clamp-migration",
+    "StringRepeatCanBeUsed": "string-repeat-can-be-used",
 }
 TRANSIENT_STATIC = ("UnnecessaryModifier", "is redundant for a 'static' field", "transient-static-field")
 KERBO_RULES = {*INSPECTIONS.values(), TRANSIENT_STATIC[2]}

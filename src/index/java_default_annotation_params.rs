@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use super::java::{JavaSummary, lint_at};
 use super::java_annotation_values::{AnnotationValue, qualified};
 use super::java_project::IndexedSummary;
+use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::rules::JavaRule;
 
@@ -41,19 +42,25 @@ impl<'summary> AnnotationDefaults<'summary> {
 }
 
 // `DefaultAnnotationParam` de IntelliJ: un elemento de una anotación al que se le escribe el mismo
-// valor que ya tiene por defecto. Sólo las anotaciones del proyecto, que es donde se ve el default.
+// valor que ya tiene por defecto. El default sale de la anotación si la declara el proyecto, y si
+// no, del `.class` de las dependencias (como `@Argument(index = 0)` de args4j).
 pub fn redundant_annotation_params(
     defaults: &AnnotationDefaults<'_>,
+    library: &Library,
     summary: &JavaSummary,
 ) -> Vec<LintFinding> {
     summary
         .annotation_values
         .iter()
         .filter(|value| {
-            defaults
-                .resolve(summary, value)
-                .and_then(|elements| elements.get(value.element.as_str()))
-                .is_some_and(|default| *default == value.value)
+            defaults.resolve(summary, value).map_or_else(
+                || library_default(library, summary, value).is_some_and(|default| default == value.value),
+                |elements| {
+                    elements
+                        .get(value.element.as_str())
+                        .is_some_and(|default| *default == value.value)
+                },
+            )
         })
         .map(|value| {
             lint_at(
@@ -63,6 +70,16 @@ pub fn redundant_annotation_params(
             )
         })
         .collect()
+}
+
+fn library_default(library: &Library, summary: &JavaSummary, value: &AnnotationValue) -> Option<String> {
+    candidates(summary, value)
+        .into_iter()
+        .map(|candidate| library.annotation_defaults(&candidate))
+        .find(|defaults| !defaults.is_empty())?
+        .into_iter()
+        .find(|(element, _)| *element == value.element)
+        .map(|(_, default)| default)
 }
 
 // Los nombres calificados a los que puede referirse lo escrito: por un import del primer tramo, por

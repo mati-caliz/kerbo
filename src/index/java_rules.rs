@@ -43,7 +43,11 @@ pub fn project_lints(files: &[IndexedSummary<'_>], library: &Library) -> Vec<Vec
             in_file.extend(failing_calls(&types, library, summary, file.in_tests));
             in_file.extend(unclosed_resources(&types, library, summary));
             in_file.extend(escaped_types(&package_types, summary));
-            in_file.extend(redundant_annotation_params(&annotation_defaults, summary));
+            in_file.extend(redundant_annotation_params(
+                &annotation_defaults,
+                library,
+                summary,
+            ));
             in_file.extend(redundant_throws(&throw_lookup, &throws_facts, summary));
             in_file.extend(
                 summary

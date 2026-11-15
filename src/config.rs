@@ -5,6 +5,7 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 
 use crate::i18n::{Lang, Problem};
+use crate::jvm::release::ModuleReleases;
 use crate::language::{Language, Stack};
 use crate::limits::{JavaSettings, Limits, Preset, REPORT_EVERY_OCCURRENCE};
 use crate::rules::RuleId;
@@ -100,6 +101,7 @@ pub struct Config {
     rust: RustTarget,
     go: GoTarget,
     java: JavaSettings,
+    java_releases: ModuleReleases,
 }
 
 impl Config {
@@ -123,6 +125,7 @@ impl Config {
 
     fn defaults(root: PathBuf) -> Self {
         let java = RawJava::default().resolve(&root);
+        let java_releases = ModuleReleases::read(&root);
         Self {
             root,
             preset: Preset::default(),
@@ -135,6 +138,7 @@ impl Config {
             rust: RustTarget::default(),
             go: GoTarget::default(),
             java,
+            java_releases,
         }
     }
 
@@ -176,6 +180,7 @@ impl Config {
             rust: raw.rust,
             go: raw.go,
             java: raw.java.resolve(&root),
+            java_releases: ModuleReleases::read(&root),
             root,
         })
     }
@@ -214,7 +219,10 @@ impl Config {
             Some(language.stack()),
             relative,
         )
-        .with_java(self.java)
+        .with_java(JavaSettings {
+            release: self.java_releases.release_for(relative),
+            ..self.java
+        })
     }
 
     pub fn reports(&self, relative: &Path, rule: RuleId) -> bool {

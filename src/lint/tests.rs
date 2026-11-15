@@ -192,7 +192,7 @@ fn columns_count_bytes_where_checkstyle_expands_tabs() {
 
 #[test]
 fn respects_each_rule_switch_and_other_languages() {
-    let source = "import a.B;\nclass A { void m(int value) { } }\n";
+    let source = "import a.B;\nclass A {\n    void m(int value) { }\n}\n";
     let without_final = strict().with_rule(RuleId::FinalParameter, None);
     assert_eq!(
         rendered(&lints(source, &without_final)),

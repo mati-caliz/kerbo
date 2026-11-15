@@ -150,6 +150,7 @@ fn a_varargs_method_accepts_more_arguments_and_knows_its_class_parameters() {
         return_annotations: Vec::new(),
         exceptions: Vec::new(),
         signature: None,
+        default_value: None,
     };
     assert!(method.accepts(3) && method.accepts(2) && method.accepts(6));
     assert!(!method.accepts(1));
@@ -348,9 +349,33 @@ fn a_fixed_method_rejects_only_the_arguments_that_cannot_fit() {
         return_annotations: Vec::new(),
         exceptions: Vec::new(),
         signature: None,
+        default_value: None,
     };
     assert!(method.rejects_argument(0, &["Ljava/nio/charset/Charset;"]));
     assert!(!method.rejects_argument(0, &["Ljava/lang/String;"]));
     assert!(!method.rejects_argument(1, &[]));
     assert!(!method.is_varargs());
+}
+
+#[test]
+fn each_module_takes_its_own_release_or_the_one_of_the_module_that_holds_it() {
+    use crate::test_support::TempTree;
+    use std::path::Path;
+    let project = TempTree::new("jvm-release-modules");
+    project.write(
+        "pom.xml",
+        "<project><modules><module>core</module></modules></project>",
+    );
+    project.write("core/pom.xml", "<project></project>");
+    project.write("war/pom.xml", "<project><release>11</release></project>");
+    project.write("api/pom.xml", "<project><release>17</release></project>");
+    project.write("api/nested/pom.xml", "<project></project>");
+    let releases = super::release::ModuleReleases::read(project.path());
+    assert_eq!(releases.release_for(Path::new("war/src/Main.java")), Some(11));
+    assert_eq!(
+        releases.release_for(Path::new("api/nested/src/Api.java")),
+        Some(17)
+    );
+    assert_eq!(releases.release_for(Path::new("core/src/Core.java")), None);
+    assert_eq!(releases.release_for(Path::new("Root.java")), None);
 }

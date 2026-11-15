@@ -166,6 +166,20 @@ impl Library {
         None
     }
 
+    // Los valores por defecto de los elementos de una anotación de las dependencias o del JDK, por
+    // elemento.
+    pub fn annotation_defaults(&self, name: &str) -> Vec<(String, String)> {
+        self.class_or_jdk(name)
+            .map(|class| {
+                class
+                    .methods
+                    .iter()
+                    .filter_map(|method| Some((method.name.clone(), method.default_value.clone()?)))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     // La clase y todas las de arriba (padres e interfaces) que se pueden leer.
     pub fn supertypes(&self, class: &str) -> Vec<String> {
         let mut pending = vec![class.to_owned()];
