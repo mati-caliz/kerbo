@@ -112,3 +112,84 @@ fn assertions_cached_getters_references_and_suppressions_follow_intellij() {
         ["43:15 getNumber()", "50:14 getNumber()", "69:15 build()"]
     );
 }
+
+const FAILING_GUARDS: &str = r"package app;
+
+final class Names {
+    static void checkGoodName(String name) {
+        if (name == null || name.isEmpty()) {
+            throw new IllegalArgumentException();
+        }
+    }
+
+    static String find(String id) {
+        if (id.isEmpty()) {
+            return null;
+        }
+        return id;
+    }
+
+    static boolean rename(String id) {
+        String proposed = find(id);
+        checkGoodName(proposed);
+        return proposed.equals(id);
+    }
+}
+";
+
+// Pasar un valor a un método que siempre falla con null en ese lugar (cláusula `fail` inferida de su
+// cuerpo) lo deja presente después, aunque el parámetro no sea no nulo.
+#[test]
+fn a_call_that_fails_on_null_leaves_its_argument_present() {
+    assert_eq!(
+        findings_in(FAILING_GUARDS, "data-flow-issue"),
+        Vec::<String>::new()
+    );
+}
+
+const PASSED_TWICE: &str = r"package app;
+
+import java.util.List;
+
+final class Client {
+    Client withToken(String user) {
+        user.length();
+        return this;
+    }
+}
+
+final class Rule {
+    Client createClient() {
+        return new Client();
+    }
+}
+
+final class Queue {
+    static String find(String id) {
+        if (id.isEmpty()) {
+            return null;
+        }
+        return id;
+    }
+
+    static void check(Rule rule, List<String> items) {
+        String bob = find(rule.toString());
+        Client client = rule.createClient();
+        client.withToken(bob);
+        for (String item : items) {
+            if (item.isEmpty()) {
+                item.hashCode();
+            }
+        }
+        client = rule.createClient();
+        rule.createClient().withToken(bob);
+    }
+}
+";
+
+// Un valor ya pasado a un parámetro no nulo no se vuelve a marcar al pasarlo de nuevo, aunque la
+// segunda llamada sea sobre el resultado de otra.
+#[test]
+fn a_value_already_passed_to_a_non_null_parameter_is_not_reported_again() {
+    assert_eq!(findings_in(PASSED_TWICE, "null-argument"), ["29:26 user"]);
+}

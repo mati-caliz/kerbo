@@ -161,6 +161,7 @@ impl Checker<'_, '_, '_> {
         let declared = self.lookup.named(self.summary, &clause.written);
         self.is_checked(&declared)
             && declared != Resolved::Library(REMOTE_EXCEPTION.to_owned())
+            && !matches!(&declared, Resolved::Library(name) if self.lookup.library.is_duplicated(name))
             && !escaping.iter().any(|point| self.escapes_as(point, &declared))
             && !self.thrown_by_overrider(&declared, declaration)
     }

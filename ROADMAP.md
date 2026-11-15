@@ -1565,10 +1565,12 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
 (`qodana.sh <repo> <inspección>`, `kerbo.sh`, `compare_all.py`), 2026-11-07.
 
 - `RedundantThrows` (`redundant-throws`): Guava 28 de 28, commons-lang 124 de 125, junit4 218 de
-  219, **ninguno de más en los tres** (2026-11-10). jenkins (primera corrida, 2026-11-15): 379 de
-  504 con 52 de más, 49 de ellos `jakarta.servlet.ServletException`: Qodana no marca ninguno de esos
-  (sí 6 `javax.servlet.ServletException`) aunque la librería está en su proyecto y el cuerpo no lo
-  tira; sin explicación todavía, no se calca a mano. Guava se mide sin `android/` ni los
+  219, **ninguno de más en los tres** (2026-11-10). jenkins (2026-11-15): 381 de 504 con 3 de más.
+  Qodana no marca una excepción cuya clase traen dos jars (`jakarta.servlet.ServletException` está
+  en `jakarta.servlet-api` y en `winstone`; IntelliJ compara el `PsiClass` que resuelve contra el
+  de `findClass`, y con dos copias no coinciden): kerbo tampoco (`Library::is_duplicated`), y el
+  classpath de jenkins suma `winstone` como el proyecto de Qodana. maven (primera corrida): 492 de
+  588 con 10 de más. Guava se mide sin `android/` ni los
   `src-super`/`test-super` de GWT (`scripts/parity/java/configs/guava.kerbo.toml`, que `kerbo.sh`
   copia al repo): Qodana sólo analiza los módulos del pom raíz. Falta medir spring-boot.
   - Ya se calca el análisis global de IntelliJ (`RefMethodImpl.updateThrowsList`): lo que tiran los
@@ -1592,9 +1594,11 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     sin resolver de una anónima anidada y de un overrider sin `throws` (sólo pesa con classpath
     incompleto); una interfaz del proyecto sin métodos no se reconoce en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
-  commons-lang 2 de 2, guava 42 de 42 y jenkins 607 de 750, ninguno de más en los cuatro
-  (2026-11-15). En jenkins falta sobre todo el `JenkinsRule.WebClient` local que no se cierra, los
-  `listener.error(...)` (devuelven un `PrintWriter`) y los `ExecutorService` (con Java 21 se cierran).
+  commons-lang 2 de 2, guava 42 de 42 y jenkins 633 de 750, ninguno de más en los cuatro
+  (2026-11-15); maven 67 de 89 con 4 de más (primera corrida). En jenkins faltan sobre todo los
+  `listener.error(...)` (devuelven un `PrintWriter`) y los `ExecutorService` (con Java 21 se
+  cierran). Un nombre simple que no se importa puede ser una clase anidada de una importada
+  (`JenkinsRule.WebClient` llega como `WebClient`).
   Como `ResourceInspection.getParent`, las llamadas que devuelven el mismo tipo que lo creado (un
   builder) llevan a la variable de la de más afuera: en un `try (...)` o en una local que escapa no
   se marca, pero un `return` o un argumento al final de la cadena no lo salvan. Un receptor sólo
@@ -1614,8 +1618,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   de más en los dos. En guava, 842 de los 972 (485 `data-flow-issue`, 308 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
-  (primera corrida, 2026-11-15) 472 de 1258 (448 `data-flow-issue`, 15 `null-argument`, 9
-  `nullable-return`) con 14 de más: correlaciones que IntelliJ sigue partiendo estados, contratos inferidos
+  (2026-11-15) 482 de 1258 (448 `data-flow-issue`, 25 `null-argument`, 9 `nullable-return`) con
+  10 de más: correlaciones que IntelliJ sigue partiendo estados, contratos inferidos
   (`if (!isValidData(data)) return null;`) y el `(fp = fp.getParent()).getRemote()` de FilePathTest.
   Para jenkins sumaron: Hamcrest `assertThat(x, notNullValue())` deja presente a `x`; un getter sin
   argumentos ya desreferenciado por una variable (`b1 = p.getLastBuild(); b1.getNumber()`) da lo
@@ -1625,7 +1629,9 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   (o `"DataFlowIssue"`) apaga las cinco subreglas en la declaración. Dos correlaciones: una local
   `boolean` que no se reasigna guarda su chequeo (`boolean colapsado = ... && padre != null; if
   (colapsado) padre.x`), y `ws = b != null ? b.getWorkspace() : null` hace que `ws` no nulo deje
-  presente a `b`. Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
+  presente a `b`. Pasar un valor a un método del proyecto que siempre falla con null en ese lugar
+  (cláusula `fail` inferida: `checkGoodName(name)`) lo deja presente después. maven (primera
+  corrida, 2026-11-15): 40 de 140 con 98 de más, sin mirar todavía. Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en
   `char[] @Nullable []` el arreglo no lo es. La desreferencia de un campo se marca en el
   calificador. El campo de una variable de tipo conocido (`segment.table`) entra al flujo con su

@@ -315,8 +315,9 @@ fn supertypes_of(
 }
 
 // Un nombre simple de padre, con los imports del archivo: el importado (de la librería si la
-// tiene, si no del proyecto), uno del proyecto, uno de un import con comodín o del mismo paquete
-// que esté en la librería, o uno de `java.lang`.
+// tiene, si no del proyecto), uno del proyecto, uno de un import con comodín, del mismo paquete o
+// anidado en una clase importada (`JenkinsRule.WebClient` llega como `WebClient`) que esté en la
+// librería, o uno de `java.lang`.
 pub fn resolve(types: &ProjectTypes<'_>, library: &Library, summary: &JavaSummary, simple: &str) -> Resolved {
     if simple.contains(QUALIFIER_SEPARATOR) {
         return types
@@ -338,11 +339,17 @@ pub fn resolve(types: &ProjectTypes<'_>, library: &Library, summary: &JavaSummar
     if in_project {
         return Resolved::Project(simple.to_owned());
     }
+    let nested_in_imported = summary
+        .imports
+        .iter()
+        .filter(|path| !path.ends_with(WILDCARD_SUFFIX))
+        .map(String::as_str);
     summary
         .imports
         .iter()
         .filter_map(|path| path.strip_suffix(WILDCARD_SUFFIX))
         .chain(std::iter::once(summary.package.as_str()))
+        .chain(nested_in_imported)
         .map(|package| format!("{package}{QUALIFIER_SEPARATOR}{simple}"))
         .find(|candidate| library.has_class(candidate))
         .map_or_else(

@@ -326,3 +326,19 @@ fn each_module_takes_its_own_release_or_the_one_of_the_module_that_holds_it() {
     assert_eq!(releases.release_for(Path::new("core/src/Core.java")), None);
     assert_eq!(releases.release_for(Path::new("Root.java")), None);
 }
+
+// Una clase que traen dos jars distintos está duplicada; el mismo jar nombrado dos veces, no.
+#[test]
+fn a_class_in_two_different_jars_is_duplicated() {
+    use crate::test_support::TempTree;
+    let tree = TempTree::new("jvm-duplicated");
+    let sample = fixture("sample.jar");
+    let copy = tree.path().join("otra-copia.jar");
+    std::fs::copy(&sample, &copy).expect("se copia");
+    assert!(
+        !super::library::Library::load(&[sample.clone(), sample.clone()]).is_duplicated("sample.web.Filter")
+    );
+    let both = super::library::Library::load(&[sample, copy]);
+    assert!(both.is_duplicated("sample.web.Filter"));
+    assert!(!both.is_duplicated("sample.web.Missing"));
+}

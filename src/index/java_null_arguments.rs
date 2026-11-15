@@ -6,7 +6,7 @@ use super::java_inferred_arguments::context_inferred_non_null;
 use super::java_library_arguments::{
     called_type, inherited_library_class, library_annotated_non_null, library_substituted_non_null,
 };
-use super::java_null_origins::may_be_null;
+use super::java_null_origins::{fails_on_null, may_be_null};
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use super::java_variable_returns::{inherited_project_class, returns_nullable_variable};
 use crate::jvm::library::Library;
@@ -120,10 +120,10 @@ pub(super) fn reaches(
     flow: &NullFlow,
 ) -> bool {
     may_be_null(types, library, summary, &flow.origin)
-        && flow
-            .passed_before
-            .iter()
-            .all(|argument| non_null_parameter(types, library, summary, argument).is_none())
+        && flow.passed_before.iter().all(|argument| {
+            non_null_parameter(types, library, summary, argument).is_none()
+                && !fails_on_null(types, library, summary, argument)
+        })
 }
 
 // Las clases del proyecto donde buscar el método que recibe el argumento, de la más cercana a la

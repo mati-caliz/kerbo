@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -23,6 +24,7 @@ const NON_NULL_API_LABEL: &str = "@NonNullApi";
 pub struct Library {
     archives: Vec<Archive>,
     owners: HashMap<String, usize>,
+    duplicated: HashSet<String>,
     classes: RefCell<HashMap<String, Option<Rc<ClassFile>>>>,
     jdk: Option<Jdk>,
     jdk_classes: RefCell<HashMap<String, Option<Rc<ClassFile>>>>,
@@ -31,16 +33,23 @@ pub struct Library {
 
 impl Library {
     pub fn load(jars: &[PathBuf]) -> Self {
-        let archives: Vec<Archive> = jars.iter().filter_map(|jar| Archive::open(jar).ok()).collect();
+        let mut seen_jars = HashSet::new();
+        let archives: Vec<Archive> = jars
+            .iter()
+            .filter(|jar| seen_jars.insert(jar.file_name().map(ToOwned::to_owned)))
+            .filter_map(|jar| Archive::open(jar).ok())
+            .collect();
         let mut owners = HashMap::new();
+        let mut duplicated = HashSet::new();
         for (index, archive) in archives.iter().enumerate() {
             for name in archive.names().filter(|name| name.ends_with(CLASS_EXTENSION)) {
-                owners.entry(name.to_owned()).or_insert(index);
+                register(&mut owners, &mut duplicated, name, index);
             }
         }
         Self {
             archives,
             owners,
+            duplicated,
             classes: RefCell::new(HashMap::new()),
             jdk: None,
             jdk_classes: RefCell::new(HashMap::new()),
@@ -78,6 +87,14 @@ impl Library {
             .find_map(|entry| self.read_class(&entry));
         self.classes.borrow_mut().insert(name.to_owned(), found.clone());
         found
+    }
+
+    // Si más de un jar trae la clase (`jakarta.servlet.ServletException` en `jakarta.servlet-api` y en
+    // `winstone`): IntelliJ la resuelve a veces con uno y a veces con otro.
+    pub fn is_duplicated(&self, name: &str) -> bool {
+        entry_candidates(name)
+            .iter()
+            .any(|entry| self.duplicated.contains(entry))
     }
 
     pub fn has_class(&self, name: &str) -> bool {
@@ -221,6 +238,18 @@ impl Library {
             pending.extend(found.superclass.clone());
         }
         None
+    }
+}
+
+// La primera clase de cada nombre manda; si otro jar la vuelve a traer, queda como duplicada.
+fn register(owners: &mut HashMap<String, usize>, duplicated: &mut HashSet<String>, name: &str, index: usize) {
+    match owners.entry(name.to_owned()) {
+        Entry::Vacant(vacant) => {
+            vacant.insert(index);
+        }
+        Entry::Occupied(_) => {
+            duplicated.insert(name.to_owned());
+        }
     }
 }
 

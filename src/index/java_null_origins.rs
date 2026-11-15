@@ -1,9 +1,12 @@
-use super::java::JavaSummary;
+use super::java::{Declaration, JavaSummary};
 use super::java_dereference::may_return_null;
+use super::java_null_arguments::{accepts, project_owners};
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::library::Library;
+use crate::lint::java_contracts::Constraint;
 use crate::lint::java_fields::Volatility;
 use crate::lint::java_null_flow::NullOrigin;
+use crate::lint::java_null_inference::NullArgument;
 
 // Si lo que dio valor a la variable puede ser null: un `null` escrito, un campo o parámetro
 // `@Nullable`, una llamada que puede devolverlo o el campo `@Nullable` de otra variable.
@@ -60,4 +63,48 @@ fn is_nullable_field(
         .is_some_and(|(_, declared)| {
             declared.is_nullable && (!after_call || declared.volatility == Volatility::Volatile)
         })
+}
+
+// Si el método del proyecto que recibe el argumento siempre falla con null en ese lugar (una cláusula
+// `fail` inferida de su cuerpo, como `checkGoodName(name)` con `if (name == null) throw ...`): después
+// de la llamada el valor ya no es null, aunque el parámetro no sea no nulo.
+pub(super) fn fails_on_null(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    argument: &NullArgument,
+) -> bool {
+    project_owners(types, library, summary, argument)
+        .iter()
+        .find_map(|owner| {
+            let found: Vec<&Declaration> = types
+                .declarations_of(owner)
+                .map(|(_, declaration)| declaration)
+                .filter(|declaration| {
+                    declaration.is_constructor == argument.is_constructor
+                        && declaration.name == argument.name
+                        && accepts(declaration, argument.arity)
+                })
+                .collect();
+            (!found.is_empty()).then_some(found)
+        })
+        .is_some_and(|candidates| {
+            candidates.iter().all(|declaration| {
+                declaration
+                    .fail_clauses
+                    .iter()
+                    .any(|clause| fails_only_on_null(clause, argument.index))
+            })
+        })
+}
+
+// Una cláusula que falla con null en esa posición, sea lo que sea el resto.
+fn fails_only_on_null(clause: &[Option<Constraint>], index: usize) -> bool {
+    clause.iter().enumerate().all(|(position, constraint)| {
+        if position == index {
+            *constraint == Some(Constraint::Null)
+        } else {
+            constraint.is_none()
+        }
+    })
 }
