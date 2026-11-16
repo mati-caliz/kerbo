@@ -85,16 +85,17 @@ module.exports = grammar({
   word: $ => $.identifier,
 
   conflicts: $ => [
-    [$._simple_type, $._expression],
-    [$._simple_type, $.generic_type, $._expression],
+    [$._type_after_chan, $._expression],
+    [$._type_after_chan, $.generic_type, $._expression],
     [$.qualified_type, $._expression],
-    [$.generic_type, $._simple_type],
-    [$.parameter_declaration, $._simple_type],
-    [$.type_parameter_declaration, $._simple_type, $._expression],
+    [$.generic_type, $._type_after_chan],
+    [$.parameter_declaration, $._type_after_chan],
+    [$.type_parameter_declaration, $._type_after_chan, $._expression],
     [$.type_parameter_declaration, $._expression],
-    [$.type_parameter_declaration, $._simple_type, $.generic_type, $._expression],
-    [$.type_parameter_declaration, $._simple_type],
+    [$.type_parameter_declaration, $._type_after_chan, $.generic_type, $._expression],
+    [$.type_parameter_declaration, $._type_after_chan],
     [$.special_argument_list, $.argument_list],
+    [$._expression, $._parenthesized_builtin],
   ],
 
   reserved: {
@@ -188,8 +189,8 @@ module.exports = grammar({
 
     const_spec: $ => prec.left(seq(
       field('name', commaSep1($.identifier)),
+      optional(field('type', $._type)),
       optional(seq(
-        optional(field('type', $._type)),
         '=',
         field('value', $.expression_list),
       )),
@@ -309,6 +310,11 @@ module.exports = grammar({
     parenthesized_type: $ => seq('(', $._type, ')'),
 
     _simple_type: $ => choice(
+      $._type_after_chan,
+      alias($.receive_channel_type, $.channel_type),
+    ),
+
+    _type_after_chan: $ => choice(
       prec.dynamic(-1, $._type_identifier),
       $.generic_type,
       $.qualified_type,
@@ -316,6 +322,7 @@ module.exports = grammar({
       $.struct_type,
       $.interface_type,
       $.array_type,
+      $.implicit_length_array_type,
       $.slice_type,
       prec.dynamic(3, $.map_type),
       $.channel_type,
@@ -428,10 +435,11 @@ module.exports = grammar({
     )),
 
     channel_type: $ => prec.left(choice(
-      seq('chan', field('value', $._type)),
+      prec.left(-1, seq('chan', field('value', choice($._type_after_chan, $.parenthesized_type)))),
       seq('chan', '<-', field('value', $._type)),
-      prec(PREC.unary, seq('<-', 'chan', field('value', $._type))),
     )),
+
+    receive_channel_type: $ => prec(PREC.unary, seq('<-', 'chan', field('value', $._type))),
 
     function_type: $ => prec.right(seq(
       'func',
@@ -537,6 +545,7 @@ module.exports = grammar({
     empty_labeled_statement: $ => seq(
       field('label', alias($.identifier, $.label_name)),
       ':',
+      optional(alias($.empty_labeled_statement, $.labeled_statement)),
     ),
 
     // This is a hack to prevent `fallthrough_statement` from being parsed as
@@ -698,8 +707,12 @@ module.exports = grammar({
         field('arguments', alias($.special_argument_list, $.argument_list)),
       )),
       prec.dynamic(-1, seq(
-        field('function', alias('new', $.identifier)),
+        field('function', alias(choice('new', 'make'), $.identifier)),
         field('arguments', $.argument_list),
+      )),
+      prec.dynamic(1, seq(
+        field('function', alias($._parenthesized_builtin, $.parenthesized_expression)),
+        field('arguments', alias($.special_argument_list, $.argument_list)),
       )),
       seq(
         field('function', $._expression),
@@ -707,6 +720,8 @@ module.exports = grammar({
         field('arguments', $.argument_list),
       ),
     )),
+
+    _parenthesized_builtin: $ => seq('(', alias(choice('new', 'make'), $.identifier), ')'),
 
     variadic_argument: $ => prec.right(seq(
       $._expression,
@@ -717,7 +732,7 @@ module.exports = grammar({
       '(',
       optional(seq(
         $._type,
-        repeat(seq(',', $._expression)),
+        repeat(seq(',', choice($._expression, $.variadic_argument))),
         optional(','),
       )),
       ')',
@@ -790,7 +805,7 @@ module.exports = grammar({
       ']',
     )),
 
-    composite_literal: $ => prec(PREC.composite_literal, seq(
+    composite_literal: $ => prec.dynamic(-1, prec(PREC.composite_literal, seq(
       field('type', choice(
         $.map_type,
         $.slice_type,
@@ -802,7 +817,7 @@ module.exports = grammar({
         $.qualified_type,
       )),
       field('body', $.literal_value),
-    )),
+    ))),
 
     literal_value: $ => seq(
       '{',

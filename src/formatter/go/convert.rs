@@ -24,19 +24,26 @@ pub struct Converter<'source> {
     comments: &'source Comments,
 }
 
-pub fn file(root: Node<'_>, source: &str, lines: &LineTable) -> Option<File> {
+// Si algo no se puede convertir, el error es el nodo de la declaración que lo tiene.
+pub fn file<'tree>(root: Node<'tree>, source: &str, lines: &LineTable) -> Result<File, Node<'tree>> {
     let comments = comments::scan(root, source, lines);
     let converter = Converter {
         source,
         comments: &comments,
     };
     let mut nodes = named(root).into_iter();
-    let package = nodes.next().filter(|node| node.kind() == PACKAGE_CLAUSE)?;
-    let name = package.named_child(0).map(|node| converter.ident(node))?;
+    let package = nodes
+        .next()
+        .filter(|node| node.kind() == PACKAGE_CLAUSE)
+        .ok_or(root)?;
+    let name = package
+        .named_child(0)
+        .map(|node| converter.ident(node))
+        .ok_or(package)?;
     let decls = nodes
-        .map(|node| declarations::top_level(&converter, node))
-        .collect::<Option<Vec<_>>>()?;
-    Some(File {
+        .map(|node| declarations::top_level(&converter, node).ok_or(node))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(File {
         package: start(package),
         name,
         decls,

@@ -1,12 +1,11 @@
 use tree_sitter::Node;
 
-use crate::syntax::{descendants, named_children};
+use crate::syntax::descendants;
 
 const COMPOSITE: &str = "composite_literal";
 const UNARY: &str = "unary_expression";
 const CHANNEL: &str = "channel_type";
 const ARROW: &str = "<-";
-const CHAN: &str = "chan";
 const CONVERSION: &str = "type_conversion_expression";
 const POINTER: &str = "pointer_type";
 const POSTFIX_OPERANDS: &[(&str, &str)] = &[
@@ -44,9 +43,9 @@ const ENCLOSING: &[&str] = &[
 ];
 
 // En el encabezado de un `if`, `for` o `switch`, Go no lee `T{` como un literal compuesto sin
-// paréntesis: la llave abre el cuerpo. tree-sitter-go sí, y entonces `if x {...}` seguido de un
-// bloque suelto `{...}` le queda como condición `x{...}` y cuerpo el bloque. Ese árbol no es el de
-// Go: formatearlo rompería el archivo.
+// paréntesis: la llave abre el cuerpo. La gramática prefiere esa lectura (`if x {...}` seguido de
+// un bloque suelto ya no queda como condición `x{...}`), pero la otra sigue en la gramática: si
+// alguna forma la vuelve a armar, ese árbol no es el de Go y formatearlo rompería el archivo.
 fn misreads_a_body_as_literal(node: Node<'_>) -> bool {
     node.kind() == COMPOSITE
         && node
@@ -75,26 +74,15 @@ fn is_pointer_conversion(node: Node<'_>) -> bool {
             .is_some_and(|typ| typ.kind() == POINTER || starts_with_arrow(typ))
 }
 
-// `chan<- chan T` es un canal de envío de `chan T`: el `<-` va con el `chan` de más a la izquierda.
-// tree-sitter-go lo lee como un `chan` sin dirección de `<-chan T`, que en Go pide paréntesis.
-// `<-chan <-chan T` y `chan<- <-chan T` sí son eso.
-fn misreads_a_send_channel(node: Node<'_>) -> bool {
-    let token = |position: u32| node.child(position).map(|child| child.kind());
-    node.kind() == CHANNEL
-        && token(0) == Some(CHAN)
-        && token(1) != Some(ARROW)
-        && named_children(node).into_iter().any(starts_with_arrow)
-}
-
 fn starts_with_arrow(typ: Node<'_>) -> bool {
     typ.kind() == CHANNEL && typ.child(0).is_some_and(|first| first.kind() == ARROW)
 }
 
 // Los árboles que tree-sitter-go arma distinto que go/parser: formatearlos cambiaría el programa.
-pub fn misreads_go(root: Node<'_>) -> bool {
-    descendants(root).into_iter().any(|node| {
-        misreads_a_body_as_literal(node) || misreads_a_unary_operand(node) || misreads_a_send_channel(node)
-    })
+pub fn first_misread(root: Node<'_>) -> Option<Node<'_>> {
+    descendants(root)
+        .into_iter()
+        .find(|&node| misreads_a_body_as_literal(node) || misreads_a_unary_operand(node))
 }
 
 fn in_a_header(literal: Node<'_>) -> bool {

@@ -1,0 +1,27 @@
+package p
+const _   int
+type a [ ... ]byte
+var _ = make(n-1)
+var _ = make(100)
+var _ = (make)(map[int]string,2)
+var _ = (new)(int)
+var c chan<- chan string
+var d chan<- <-chan string
+var e chan (<-chan int)
+func f() {
+	goto L
+L: L1:
+}
+func g() {
+	if !c.Ready {
+		g(c)
+	}
+	{
+		h()
+	}
+	for x.y {
+	}
+	{
+	}
+}
+var _ = make([]int, t...)

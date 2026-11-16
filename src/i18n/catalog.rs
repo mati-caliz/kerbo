@@ -1,3 +1,4 @@
+use crate::formatter::Unparsable;
 use crate::lint::LintKind;
 use crate::rules::RuleId;
 
@@ -325,7 +326,7 @@ pub enum FixNotice {
 pub enum FormatNotice {
     Written { files: usize, total: usize },
     Unformatted { files: usize, total: usize },
-    Unparsable { path: String },
+    Unparsable { path: String, cause: Unparsable },
 }
 
 pub(super) const SINGLE: usize = 1;

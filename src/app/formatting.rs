@@ -8,7 +8,7 @@ use super::fixing::write_atomically;
 use super::{EXIT_CLEAN, EXIT_FAILURE, EXIT_FINDINGS, Terminal, write_error, write_failures};
 use crate::cli::FmtArgs;
 use crate::config::Config;
-use crate::formatter::format_go;
+use crate::formatter::{Unparsable, format_go};
 use crate::i18n::{FormatNotice, Lang, Notice, Problem};
 use crate::language::Language;
 use crate::rules::FileIdentity;
@@ -18,7 +18,7 @@ use crate::scan::{ScanFailure, identities};
 enum Formatted {
     Unchanged,
     Changed,
-    Unparsable,
+    Unparsable(Unparsable),
 }
 
 pub fn run(
@@ -43,7 +43,7 @@ pub fn run(
     for (file, result) in results {
         match result {
             Ok(Formatted::Changed) => changed.push(file.display.clone()),
-            Ok(Formatted::Unparsable) => unparsable.push(file.display.clone()),
+            Ok(Formatted::Unparsable(cause)) => unparsable.push((file.display.clone(), cause)),
             Ok(Formatted::Unchanged) => {}
             Err(failure) => failures.push(failure),
         }
@@ -80,11 +80,14 @@ pub fn run(
 fn report_notices(
     lang: Lang,
     terminal: &mut Terminal<'_>,
-    unparsable: &[String],
+    unparsable: &[(String, Unparsable)],
     summary: FormatNotice,
 ) -> io::Result<()> {
-    for path in unparsable {
-        let notice = Notice::Format(FormatNotice::Unparsable { path: path.clone() });
+    for (path, cause) in unparsable {
+        let notice = Notice::Format(FormatNotice::Unparsable {
+            path: path.clone(),
+            cause: *cause,
+        });
         writeln!(terminal.log, "kerbo: {}", lang.notice(&notice))?;
     }
     writeln!(terminal.log, "kerbo: {}", lang.notice(&Notice::Format(summary)))
@@ -98,8 +101,9 @@ fn format_file(file: &FileIdentity, write: bool) -> Result<Formatted, ScanFailur
         },
     };
     let original = fs::read_to_string(&file.absolute).map_err(|error| failure(&error))?;
-    let Ok(formatted) = format_go(&original) else {
-        return Ok(Formatted::Unparsable);
+    let formatted = match format_go(&original) {
+        Ok(formatted) => formatted,
+        Err(cause) => return Ok(Formatted::Unparsable(cause)),
     };
     if formatted == original {
         return Ok(Formatted::Unchanged);

@@ -1869,24 +1869,35 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     golang/tools, terraform, consul, hugo, caddy, etcd, prometheus, syncthing, tailscale, gin,
     cobra, chi y fzf), en tres versiones: el original, uno desordenado a propósito (sangrías,
     espacios y líneas en blanco cambiados sin tocar textos ni comentarios) y el desordenado con
-    CRLF. Los 72 que gofmt no parsea, afuera. Distintos de gofmt: 11 originales y 21 desordenados
-    (igual con CRLF), todos archivos que kerbo deja como están porque tree-sitter-go no los lee; lo
-    que kerbo formatea sale idéntico. Antes del port de los comentarios eran 28 y 50.
+    CRLF. Los 72 que gofmt no parsea, afuera. Distintos de gofmt: 2 originales y 5 desordenados
+    (igual con CRLF), todos archivos que kerbo no lee y deja como están; lo que kerbo formatea sale
+    idéntico. Eran 28 y 50 antes del port de los comentarios, y 11 y 21 antes de los arreglos de la
+    gramática.
+  - Lo que gofmt lee y kerbo no pasó de 22 archivos a 5 arreglando la gramática propia
+    (`grammars/tree-sitter-go`, el detalle en su README): `chan<- chan T`, `if x {...}` seguido de
+    un bloque suelto (los dos se leían distinto que Go y había una guarda que frenaba el archivo),
+    funciones propias llamadas `make`, `(make)(tipo)`, `const x T` sin valor, `[...]T` fuera de un
+    literal y etiquetas seguidas. Un archivo sin salto de línea final que cierra con `}` daba error
+    con tree-sitter 0.27: el formateador le agrega el salto antes de parsear.
+  - El aviso de un archivo que queda como está dice la línea y el motivo: no parsea, tree-sitter lo
+    lee distinto que Go, o sintaxis que el conversor no conoce.
+  - Formatear dos veces cambia 8 archivos desordenados (datos de prueba de `go/types` y uno de
+    `buildtag`), igual que gofmt: la segunda pasada de kerbo es idéntica a la segunda de gofmt.
   - Se mide con `scripts/parity/go/fmt_measure.sh` (por `heavy_lock.py`), sobre el volumen de
     Docker `fmt-parity`: ahí están las tres versiones del corpus y lo que gofmt deja de cada una,
     porque las rutas no entran en el largo máximo de Windows. El script que desordena se perdió con
     la rama del agente; el corpus desordenado quedó en el volumen, que es la única copia.
   - Pendientes, en orden:
-    - Los 22 archivos que gofmt lee y kerbo no (17 con errores de tree-sitter-go, casi todos datos
-      de prueba de `go/types` con comentarios `/* ERROR */` en lugares raros; 5 sin errores, que
-      frena la guarda de lecturas distintas o la conversión al AST): arreglar la gramática
-      (`grammars/tree-sitter-go`) o la guarda, y que el aviso diga la línea y el motivo.
     - 5 archivos que gofmt rechaza por error de sintaxis y kerbo formatea igual (tree-sitter los
-      acepta; en uno agrega una coma que faltaba): deberían quedar como están.
-    - 8 archivos desordenados cambian al formatear por segunda vez (datos de prueba de `go/types` y
-      uno de `buildtag`).
-    - Recién con eso, recomendar `kerbo fmt`. Después de Go: ruff format (Python), Prettier (JS/TS)
-      y google-java-format (Java).
+      acepta): parámetros con y sin nombre mezclados, una coma que falta antes del salto de línea
+      en un literal (kerbo la agrega), un `import` después de otra declaración y dos datos de prueba
+      de `go/types`. Deberían quedar como están, con el aviso de error de sintaxis.
+    - Los 5 que gofmt lee y kerbo no: `*(*struct{...})(p).f` (la guarda de lectura distinta),
+      `struct{ A }.m` y `(*struct{ J }).m` (un tipo literal como operando), `~x` como operador
+      unario y `x.(type)` fuera de un `switch`. Salvo el primero, son datos de prueba del
+      compilador que no compilan.
+    - Recomendar `kerbo fmt` en la documentación. Después de Go: ruff format (Python), Prettier
+      (JS/TS) y google-java-format (Java).
 - Con el formateador, compilar los tests con cobertura queda al borde de los 1,5 GB del gate: sin
   la caché caliente lo mata el límite de memoria (SIGKILL). Pasa, pero hay que ganar margen
   (partir el crate o bajar la información de depuración de los tests) antes de que crezca más.

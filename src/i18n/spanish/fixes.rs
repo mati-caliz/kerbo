@@ -1,4 +1,5 @@
 use super::counted;
+use crate::formatter::Unparsable;
 use crate::i18n::catalog::{FixNotice, FormatNotice, SINGLE};
 use crate::rules::RuleId;
 
@@ -37,9 +38,17 @@ pub fn format_notice(notice: &FormatNotice) -> String {
             "{} de {total} sin el formato de gofmt",
             counted(*files, "archivo", "archivos")
         ),
-        FormatNotice::Unparsable { path } => {
-            format!("{path}: no parsea limpio con tree-sitter-go; quedó como estaba")
-        }
+        FormatNotice::Unparsable { path, cause } => match cause {
+            Unparsable::SyntaxError { line } => {
+                format!("{path}:{line}: no parsea limpio con tree-sitter-go; quedó como estaba")
+            }
+            Unparsable::ReadsUnlikeGo { line } => {
+                format!("{path}:{line}: tree-sitter-go lo lee distinto que Go; quedó como estaba")
+            }
+            Unparsable::Unsupported { line } => {
+                format!("{path}:{line}: kerbo todavía no formatea esta sintaxis; quedó como estaba")
+            }
+        },
     }
 }
 

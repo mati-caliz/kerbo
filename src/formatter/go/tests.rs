@@ -7,6 +7,8 @@ const COMMENTS_SOURCE: &str = include_str!("fixtures/comments.go");
 const COMMENTS_EXPECTED: &str = include_str!("fixtures/comments.gofmt");
 const DOC_COMMENTS_SOURCE: &str = include_str!("fixtures/doc_comments.go");
 const DOC_COMMENTS_EXPECTED: &str = include_str!("fixtures/doc_comments.gofmt");
+const RARE_SYNTAX_SOURCE: &str = include_str!("fixtures/rare_syntax.go");
+const RARE_SYNTAX_EXPECTED: &str = include_str!("fixtures/rare_syntax.gofmt");
 
 fn assert_formats_like_gofmt(source: &str, expected: &str) {
     assert_eq!(format(source).as_deref(), Ok(expected));
@@ -39,6 +41,21 @@ fn rewrites_doc_comments_like_gofmt() {
     assert_formats_like_gofmt(DOC_COMMENTS_SOURCE, DOC_COMMENTS_EXPECTED);
 }
 
+// Sintaxis que gofmt acepta y la gramática de upstream no: constantes con tipo y sin valor, `[...]T`
+// fuera de un literal, funciones propias llamadas `make`, `(make)(tipo)` y etiquetas seguidas.
+#[test]
+fn formats_the_syntax_that_only_the_go_parser_accepts() {
+    assert_formats_like_gofmt(RARE_SYNTAX_SOURCE, RARE_SYNTAX_EXPECTED);
+}
+
+#[test]
+fn formats_a_file_without_a_final_newline() {
+    assert_eq!(
+        format("package p\n\ntype T struct {\n\tA\n}").as_deref(),
+        Ok("package p\n\ntype T struct {\n\tA\n}\n")
+    );
+}
+
 #[test]
 fn converts_line_endings_to_newlines() {
     let source = "package main\r\n\r\nvar x = `a\r\nb`\r\n// fin\r\n";
@@ -56,8 +73,11 @@ fn reads_new_with_an_expression_from_go_1_26() {
 
 #[test]
 fn leaves_files_with_syntax_errors_untouched() {
-    assert_eq!(format("package main\nfunc {\n"), Err(Unparsable));
-    assert_eq!(format("x := 1\n"), Err(Unparsable));
+    assert_eq!(
+        format("package main\nfunc {\n"),
+        Err(Unparsable::SyntaxError { line: 2 })
+    );
+    assert_eq!(format("x := 1\n"), Err(Unparsable::Unsupported { line: 1 }));
 }
 
 // Un grupo con `/* */` no se reacomoda, y las directivas van al final de la documentación separadas
@@ -77,25 +97,27 @@ fn drops_the_blank_lines_before_the_closing_paren_of_the_imports() {
     assert_formats_like_gofmt(source, expected);
 }
 
-// tree-sitter-go lee `if ok {...}` seguido de un bloque suelto como el literal `ok{...}` con el bloque
-// de cuerpo; Go no. Mejor no tocar el archivo que romperlo.
+// `if ok {...}` seguido de un bloque suelto es un `if` y un bloque, no el literal `ok{...}` con el
+// bloque de cuerpo. Cuando el cuerpo sólo vale como literal es un error de sintaxis, como en Go.
 #[test]
-fn leaves_untouched_an_if_that_tree_sitter_reads_as_a_literal() {
+fn reads_the_brace_after_a_condition_as_the_body() {
     let source = "package main\n\nfunc f() {\n\tif !c.Ready {\n\t\tg(c)\n\t}\n\n\t{\n\t\th()\n\t}\n}\n";
-    assert_eq!(format(source), Err(Unparsable));
+    assert_eq!(format(source).as_deref(), Ok(source));
+    let only_a_literal = "package main\n\nfunc f() {\n\tif x {1, 2}\n\t{\n\t}\n}\n";
+    assert_eq!(format(only_a_literal), Err(Unparsable::SyntaxError { line: 4 }));
     let literal = "package main\n\nfunc f() {\n\tif x == (T{}) {\n\t}\n\tfor _, v := range []T{{}} {\n\t\tg(v)\n\t}\n}\n";
     assert_eq!(format(literal).as_deref(), Ok(literal));
 }
 
-// `*(*struct{...})(p).f` y `chan<- chan T` tree-sitter-go los lee distinto que Go: formatearlos cambiaría el
-// programa. Lo que sí es así (`(*p).f`, `<-chan <-chan T`) se formatea.
+// `*(*struct{...})(p).f` tree-sitter-go lo lee distinto que Go: formatearlo cambiaría el programa.
+// Lo que sí es así (`(*p).f`) se formatea, y los canales de canales quedan como los escribe gofmt.
 #[test]
 fn leaves_untouched_what_tree_sitter_reads_with_another_meaning() {
     let deref =
         "package main\n\nfunc f() {\n\t*(*struct {\n\t\tp *byte\n\t})(unsafe.Pointer(&s)).p = 'H'\n}\n";
-    assert_eq!(format(deref), Err(Unparsable));
+    assert_eq!(format(deref), Err(Unparsable::ReadsUnlikeGo { line: 4 }));
     let send = "package main\n\nvar c chan<- chan string\n";
-    assert_eq!(format(send), Err(Unparsable));
+    assert_eq!(format(send).as_deref(), Ok(send));
     let valid = "package main\n\nvar c <-chan <-chan string\nvar d chan<- <-chan int\n\nfunc f() {\n\t(*p).f = 1\n}\n";
     assert_eq!(format(valid).as_deref(), Ok(valid));
 }

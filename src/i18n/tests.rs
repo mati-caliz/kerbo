@@ -2,6 +2,7 @@ use super::{
     BlockUnit, Cheat, FixNotice, FormatNotice, FunctionName, Lang, LangPreference, Message, Notice,
     OsvProblem, Problem, Summary, Text,
 };
+use crate::formatter::Unparsable;
 use crate::rules::RuleId;
 
 const LANGS: [Lang; 2] = [Lang::Spanish, Lang::English];
@@ -249,6 +250,7 @@ fn notices() -> Vec<Notice> {
         Notice::Format(FormatNotice::Unformatted { files: 2, total: 2 }),
         Notice::Format(FormatNotice::Unparsable {
             path: "main.go".to_owned(),
+            cause: Unparsable::SyntaxError { line: 1 },
         }),
         Notice::OsvDatabaseSaved {
             ecosystem: "npm".to_owned(),
@@ -390,5 +392,6 @@ fn the_flag_wins_over_the_configuration_and_the_locale() {
     assert_eq!(flagged.resolve(Some(Lang::Spanish)), Lang::English);
 }
 
+mod formatting;
 mod javadoc;
 mod security;

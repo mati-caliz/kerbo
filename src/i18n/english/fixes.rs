@@ -1,4 +1,5 @@
 use super::counted;
+use crate::formatter::Unparsable;
 use crate::i18n::catalog::{FixNotice, FormatNotice};
 use crate::rules::RuleId;
 
@@ -37,9 +38,17 @@ pub fn format_notice(notice: &FormatNotice) -> String {
                 counted(*files, "file", "files")
             )
         }
-        FormatNotice::Unparsable { path } => {
-            format!("{path}: does not parse cleanly with tree-sitter-go; left as it was")
-        }
+        FormatNotice::Unparsable { path, cause } => match cause {
+            Unparsable::SyntaxError { line } => {
+                format!("{path}:{line}: does not parse cleanly with tree-sitter-go; left as it was")
+            }
+            Unparsable::ReadsUnlikeGo { line } => {
+                format!("{path}:{line}: tree-sitter-go reads it differently than Go; left as it was")
+            }
+            Unparsable::Unsupported { line } => {
+                format!("{path}:{line}: kerbo does not format this syntax yet; left as it was")
+            }
+        },
     }
 }
 
