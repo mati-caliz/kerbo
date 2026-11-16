@@ -11,8 +11,8 @@ en .parity\autopilot\bucle\.
   .\scripts\autopilot\sesion.ps1                      # carril principal, en la carpeta kerbo
   .\scripts\autopilot\sesion.ps1 -Carril b            # otro carril, en ..\kerbo-b
   .\scripts\autopilot\sesion.ps1 -Etapa 14            # una etapa fija
-  .\scripts\autopilot\sesion.ps1 -Modelo sonnet       # otro modelo que el de la tabla
-  .\scripts\autopilot\sesion.ps1 -Esfuerzo high       # otro esfuerzo que el de la tabla
+  .\scripts\autopilot\sesion.ps1 -Modelo sonnet       # otro modelo que Fable
+  .\scripts\autopilot\sesion.ps1 -Esfuerzo high       # otro esfuerzo que el bajo
   .\scripts\autopilot\sesion.ps1 -Continuo            # sin intervención
 #>
 param(
@@ -31,12 +31,8 @@ $Paridad = Join-Path $Principal '.parity'
 $Tomas = Join-Path $Paridad 'autopilot'
 $Parada = Join-Path $Tomas 'STOP'
 $EtapasExcluidas = @('10')
-# Mecánico con arnés (versiones, tandas de reglas): Sonnet. Diseño con paridad: Opus en medio.
-# Investigación difícil (tipos, tests inteligentes): Opus en alto.
-$ModeloPorDefecto = 'opus'
-$EsfuerzoPorDefecto = 'medium'
-$ModelosPorEtapa = @{ '17' = 'sonnet' }
-$EsfuerzosPorEtapa = @{ '16' = 'high'; '11' = 'high' }
+$ModeloPorDefecto = 'fable'
+$EsfuerzoPorDefecto = 'low'
 $Registros = Join-Path $Tomas 'bucle'
 $SesionesSinAvanceParaSaltear = 2
 $EsperaInicialTrasErrorEnMinutos = 5
@@ -186,10 +182,8 @@ while (-not (Test-Path $Parada)) {
     if (-not $Elegida) { Write-Host 'No queda ninguna etapa libre.' -ForegroundColor Yellow; break }
     $Toma = Join-Path $Tomas "etapa-$($Elegida.Numero).carril"
     $ElModelo = $Modelo
-    if (-not $ElModelo) { $ElModelo = $ModelosPorEtapa[$Elegida.Numero] }
     if (-not $ElModelo) { $ElModelo = $ModeloPorDefecto }
     $ElEsfuerzo = $Esfuerzo
-    if (-not $ElEsfuerzo) { $ElEsfuerzo = $EsfuerzosPorEtapa[$Elegida.Numero] }
     if (-not $ElEsfuerzo) { $ElEsfuerzo = $EsfuerzoPorDefecto }
     $Mensaje = "Seguí la etapa $($Elegida.Numero) del ROADMAP ($($Elegida.Titulo)), carril $Carril. Leé scripts/autopilot/pedido.md y hacé lo que dice."
     Write-Host "== Etapa $($Elegida.Numero): $($Elegida.Titulo) | carril $Carril | $ElModelo, esfuerzo $ElEsfuerzo" -ForegroundColor Cyan
