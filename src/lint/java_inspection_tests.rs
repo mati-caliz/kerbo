@@ -1,6 +1,64 @@
 use super::tests::{expected, lints, rendered_where, strict};
 use crate::rules::{JavaRule, RuleId};
 
+// Un método que nadie puede redefinir y siempre devuelve uno de sus parámetros o `this` deja la
+// variable como estaba. No cuenta si el método se puede redefinir, si reasigna el parámetro o si la
+// variable va en otro lugar.
+#[test]
+fn assigning_what_a_closed_method_always_returns_is_reported() {
+    let source = "class Queue {
+    private java.util.List<String> items;
+
+    java.util.List<String> all(java.util.List<String> found, String item) {
+        found = keep(found, item);
+        found = keep(items, item);
+        found = open(found, item);
+        found = replaced(found, item);
+        Queue queue = new Queue();
+        queue = queue.with(item);
+        queue = queue.other(item);
+        return found;
+    }
+
+    private java.util.List<String> keep(java.util.List<String> kept, String item) {
+        if (item.isEmpty()) {
+            return kept;
+        }
+        kept.add(item);
+        return kept;
+    }
+
+    java.util.List<String> open(java.util.List<String> kept, String item) {
+        return kept;
+    }
+
+    private java.util.List<String> replaced(java.util.List<String> kept, String item) {
+        kept = new java.util.ArrayList<>();
+        return kept;
+    }
+
+    private Queue with(String item) {
+        items.add(item);
+        return this;
+    }
+
+    private Queue other(String item) {
+        return item.isEmpty() ? this : new Queue();
+    }
+}
+";
+    let found = rendered_where(&lints(source, &strict()), |rule| {
+        rule == RuleId::Java(JavaRule::AlreadyAssigned)
+    });
+    assert_eq!(
+        found,
+        expected(
+            "5:9 already-assigned found
+10:9 already-assigned queue"
+        )
+    );
+}
+
 #[test]
 fn a_private_field_assigned_only_once_may_be_final() {
     let source = "class A {

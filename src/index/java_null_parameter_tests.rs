@@ -161,3 +161,34 @@ fn a_method_returning_its_parameter_forwards_a_possibly_null_argument() {
     let dereferences = findings_in_files(&[CASTS, FORWARDING], "data-flow-issue");
     assert_eq!(dereferences, ["28:21 hashCode()"]);
 }
+
+const ANNOTATED_PARAMETERS: &str = r"package app;
+
+import edu.umd.cs.findbugs.annotations.CheckForNull;
+import edu.umd.cs.findbugs.annotations.NonNull;
+
+public class Symlinks {
+    public void create(@NonNull String target, String listener) {
+        listener.hashCode();
+        target.hashCode();
+    }
+
+    public @CheckForNull String find(String name) {
+        return name;
+    }
+
+    void use(Symlinks other) {
+        other.create(null, null);
+        other.create(find(other.toString()), other.toString());
+    }
+}
+";
+
+// Un parámetro que el proyecto anota `@NonNull` no admite un `null` ni una llamada que puede darlo,
+// aunque el método se pueda redefinir; el que no se anota sólo cuenta si nadie lo redefine.
+#[test]
+fn a_project_parameter_annotated_non_null_rejects_null() {
+    let mut arguments = findings_in_files(&[ANNOTATED_PARAMETERS], "null-argument");
+    arguments.sort();
+    assert_eq!(arguments, ["17:22 target", "18:22 target"]);
+}

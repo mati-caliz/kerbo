@@ -214,7 +214,9 @@ pub(super) fn non_null_parameter(
     let mut names = candidates
         .iter()
         .map(|(declaring, declaration, parameter, slot)| {
-            (*slot == Slot::Whole && inferred_non_null(declaration, parameter, argument)
+            (*slot == Slot::Whole
+                && (inferred_non_null(declaration, parameter, argument)
+                    || parameter.nullness == ParameterNullness::NonNull)
                 || marked_non_null(types, declaring, declaration, parameter)
                 || substituted_non_null(types, summary, (*declaring, *declaration, *parameter), argument))
             .then(|| parameter.name.clone())

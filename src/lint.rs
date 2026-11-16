@@ -77,6 +77,7 @@ mod java_repeat_loop;
 mod java_resource_escapes;
 pub mod java_resources;
 mod java_results;
+mod java_returned_operands;
 pub mod java_returns;
 mod java_same_value;
 pub mod java_sequenced_collection;
@@ -272,6 +273,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     findings.extend(java_same_value::reported(root, source));
     findings.extend(java_optional::reported(&nodes, source));
     findings.extend(java_already_assigned::reported(&nodes, source));
+    findings.extend(java_returned_operands::reported(&nodes, source));
     findings.extend(java_final_fields::reported(root, source));
     findings.extend(java_unicode_escapes::reported(
         root,
