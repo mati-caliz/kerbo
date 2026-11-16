@@ -34,6 +34,7 @@ const FAILS_WHEN_FALSE: &[&str] = &[
     "checkRemove",
     "verify",
     "assertTrue",
+    "assumeTrue",
 ];
 const ALWAYS_FAILS: &[&str] = &["fail"];
 const EAGER_AND: &str = "&";

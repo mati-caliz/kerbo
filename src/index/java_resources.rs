@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use super::java::{JavaSummary, Position, lint_at};
+use super::java_dereference::resolve_root;
 use super::java_jdk::{CLOSEABLE, NOT_RESOURCES, STREAM_HOLDERS, returned_by};
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, resolve};
 use super::java_resource_owners::{creates_a_resource, keeps_its_type};
@@ -157,8 +158,7 @@ pub(super) fn created_place(
     summary: &JavaSummary,
     chain: &Chain,
 ) -> Option<Place> {
-    let (ChainRoot::Instance(root) | ChainRoot::Class(root)) = &chain.root;
-    let mut place = place_of(resolve(types, library, summary, root));
+    let mut place = place_of(resolve_root(types, library, summary, &chain.root));
     for (index, step) in chain.steps.iter().enumerate() {
         let next = next_place(types, library, place, step).or_else(|| {
             let imported = (index == 0)
@@ -288,7 +288,9 @@ fn inherited_return(library: &Library, classes: &[String], method: &str, arity: 
 // `Files.lines(ruta)` y compañía: un `Stream` que IntelliJ pide cerrar.
 fn holds_a_file(types: &ProjectTypes<'_>, library: &Library, summary: &JavaSummary, chain: &Chain) -> bool {
     let (holder, methods) = STREAM_HOLDERS;
-    let (ChainRoot::Instance(root) | ChainRoot::Class(root)) = &chain.root;
+    let (ChainRoot::Instance(root) | ChainRoot::Class(root)) = &chain.root else {
+        return false;
+    };
     matches!(chain.steps.as_slice(), [step] if methods.contains(&step.name.as_str()))
         && resolve(types, library, summary, root) == Resolved::Library(holder.to_owned())
 }

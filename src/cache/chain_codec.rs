@@ -13,6 +13,7 @@ const ABSENT: u64 = 0;
 const PRESENT: u64 = 1;
 const ROOT_INSTANCE: u64 = 0;
 const ROOT_CLASS: u64 = 1;
+const ROOT_MEMBER: u64 = 2;
 const ORIGIN_CALL: u64 = 0;
 const ORIGIN_CONSTRUCTION: u64 = 1;
 const NULL_FROM_CALL: u64 = 0;
@@ -29,6 +30,11 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
         ChainRoot::Class(name) => {
             writer.number(ROOT_CLASS);
             writer.text(name);
+        }
+        ChainRoot::Member { owner, field } => {
+            writer.number(ROOT_MEMBER);
+            writer.text(owner);
+            writer.text(field);
         }
     }
     writer.list(&chain.steps, |writer, step| {
@@ -108,6 +114,10 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
         root: match reader.number()? {
             ROOT_INSTANCE => ChainRoot::Instance(reader.text()?),
             ROOT_CLASS => ChainRoot::Class(reader.text()?),
+            ROOT_MEMBER => ChainRoot::Member {
+                owner: reader.text()?,
+                field: reader.text()?,
+            },
             _ => return Err(Corrupt),
         },
         steps: reader.list(|reader| {
@@ -225,7 +235,7 @@ pub(super) fn read_resource_origin(reader: &mut Reader<'_>) -> Result<ResourceOr
 fn read_origin(reader: &mut Reader<'_>) -> Result<NullOrigin, Corrupt> {
     Ok(match reader.number()? {
         NULL_FROM_LITERAL => NullOrigin::Literal,
-        NULL_FROM_CALL => NullOrigin::Call(read_chain(reader)?),
+        NULL_FROM_CALL => NullOrigin::Call(Box::new(read_chain(reader)?)),
         NULL_FROM_ANNOTATED => NullOrigin::Annotated,
         NULL_FROM_QUALIFIED_FIELD => NullOrigin::QualifiedField {
             owner: reader.text()?,

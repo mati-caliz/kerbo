@@ -289,3 +289,68 @@ fn only_pure_calls_are_remembered_after_a_dereference() {
         ["28:28 lookup()", "29:28 lookup()", "30:24 lookup()"]
     );
 }
+
+const NODES: &str = r#"package app;
+
+import edu.umd.cs.findbugs.annotations.CheckForNull;
+
+abstract class Node {
+    @CheckForNull
+    public final Computer toComputer() {
+        Registry registry = Registry.get();
+        return registry.computerOf(this);
+    }
+}
+
+abstract class Slave extends Node {
+}
+
+final class DumbSlave extends Slave {
+}
+
+final class Computer {
+    boolean isOnline() {
+        return true;
+    }
+}
+
+final class Registry {
+    static Registry get() {
+        return new Registry();
+    }
+
+    Computer computerOf(Node node) {
+        return null;
+    }
+}
+
+final class Rule {
+    DumbSlave createSlave(String name) {
+        throw new UnsupportedOperationException();
+    }
+}
+
+final class NodeTest {
+    void online(Rule rule) {
+        DumbSlave slave = rule.createSlave("a");
+        slave.toComputer().isOnline();
+        slave.toComputer().isOnline();
+        assertThat(slave.toComputer().isOnline(), equalTo(true));
+    }
+
+    static void assertThat(Object value, Object matcher) {}
+
+    static Object equalTo(Object value) {
+        return value;
+    }
+}
+"#;
+
+// `toComputer()` no es un getter ni puro: cada cadena se marca.
+#[test]
+fn an_impure_inherited_call_is_reported_in_every_chain() {
+    assert_eq!(
+        findings_in(NODES, "data-flow-issue"),
+        ["44:28 isOnline()", "45:28 isOnline()", "46:39 isOnline()"]
+    );
+}

@@ -16,6 +16,7 @@ mod java_inspection_suppressions;
 mod java_jdk;
 mod java_lambda_null_returns;
 mod java_library_arguments;
+mod java_member_types;
 mod java_null_arguments;
 mod java_null_origins;
 mod java_nullable_returns;
@@ -62,6 +63,8 @@ mod java_escapes_tests;
 mod java_failing_calls_tests;
 #[cfg(test)]
 mod java_import_shadow_tests;
+#[cfg(test)]
+mod java_member_type_tests;
 #[cfg(test)]
 mod java_null_assertion_tests;
 #[cfg(test)]

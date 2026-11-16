@@ -11,7 +11,7 @@ use crate::lint::java_receivers::Receiver;
 
 fn sample_flow() -> NullFlow {
     NullFlow {
-        origin: NullOrigin::Call(Chain {
+        origin: NullOrigin::Call(Box::new(Chain {
             root: ChainRoot::Instance("JdbcTemplate".to_owned()),
             steps: vec![ChainStep {
                 name: "queryForObject".to_owned(),
@@ -32,7 +32,7 @@ fn sample_flow() -> NullFlow {
             enclosing: vec!["Inner".to_owned(), "Outer".to_owned()],
             forwarded: Vec::new(),
             exact_root: Some(ExactRoot::Construction("HashBiMap".to_owned())),
-        }),
+        })),
         dereferences: vec![Dereference {
             name: "intValue".to_owned(),
             line: 13,
@@ -63,7 +63,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
         unreachable!("el flujo de arriba sale de una llamada");
     };
     let classes = NullFlow {
-        origin: NullOrigin::Call(Chain {
+        origin: NullOrigin::Call(Box::new(Chain {
             root: ChainRoot::Class("System".to_owned()),
             steps: called
                 .steps
@@ -84,7 +84,7 @@ fn chains_and_null_flows_survive_the_round_trip() {
                 method: "create".to_owned(),
                 arity: 1,
             }),
-        }),
+        })),
         passed_before: flow.arguments.clone(),
         ..NullFlow::new(NullOrigin::Literal)
     };
@@ -113,7 +113,7 @@ fn null_returns_survive_the_round_trip() {
         returns: vec![returned("null", NullMarking::Marked)],
         ..NullFlow::new(NullOrigin::Literal)
     };
-    let call = NullFlow::new(NullOrigin::Call(Chain {
+    let call = NullFlow::new(NullOrigin::Call(Box::new(Chain {
         root: ChainRoot::Class("Converter".to_owned()),
         steps: Vec::new(),
         dereferenced_at: None,
@@ -123,7 +123,7 @@ fn null_returns_survive_the_round_trip() {
         enclosing: Vec::new(),
         forwarded: Vec::new(),
         exact_root: None,
-    }));
+    })));
     let mut writer = Writer::default();
     write_flow(&mut writer, &literal);
     write_flow(&mut writer, &call);

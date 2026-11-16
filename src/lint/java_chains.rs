@@ -6,13 +6,14 @@ use super::java::{NAME_FIELD, text};
 use super::java_called_receivers::receiver_facts;
 pub(super) use super::java_chain_uses::argument_count;
 use super::java_chain_uses::{
-    class_arguments, field_read_at, guarded_by_non_empty, nullable_root_arguments, text_arguments, thrown_at,
+    argument_types, class_arguments, field_read_at, guarded_by_non_empty, member_root,
+    nullable_root_arguments, text_arguments, thrown_at,
 };
 use super::java_exact_roots::{ExactRoot, exact_root};
 use super::java_null_checks::{
     checked_expression, dereferenced_local, getter_local, is_stable_call, is_stable_getter,
 };
-use super::java_null_inference::{CallTarget, NullArgument, call_target, cast_type};
+use super::java_null_inference::{CallTarget, NullArgument, call_target};
 use super::java_null_origin::{ArgumentShape, NullOrigin, NullReturn};
 use super::java_null_returns::returned_by_method;
 use super::java_receivers::{StaticImports, Variables, declared_simple_type, enclosing_types};
@@ -41,6 +42,7 @@ const CHARSET_FACTORIES: &[&str] = &["defaultCharset", "forName"];
 pub enum ChainRoot {
     Instance(String),
     Class(String),
+    Member { owner: String, field: String },
 }
 
 // Un paso de una cadena de llamadas: el método, la cantidad de argumentos, dónde está su nombre,
@@ -323,7 +325,10 @@ fn walk(
                 .next()
                 .is_some_and(|last| last.starts_with(|first: char| first.is_ascii_uppercase()))
                 && written.starts_with(|first: char| first.is_ascii_lowercase());
-            return qualified_class.then(|| (ChainRoot::Class(written.to_owned()), steps, Vec::new()));
+            if qualified_class {
+                return Some((ChainRoot::Class(written.to_owned()), steps, Vec::new()));
+            }
+            return member_root(object, source, variables).map(|root| (root, steps, Vec::new()));
         }
         if object.kind() != IDENTIFIER {
             return None;
@@ -339,19 +344,6 @@ fn walk(
         };
         return Some((root, steps, Vec::new()));
     }
-}
-
-// El tipo de cada argumento cuando se sabe: una variable con su tipo declarado o un casteo.
-fn argument_types(invocation: Node<'_>, source: &[u8], variables: &Variables) -> Vec<Option<String>> {
-    call_arguments(invocation)
-        .into_iter()
-        .map(|argument| {
-            if argument.kind() == IDENTIFIER {
-                return variables.get(text(argument, source)).cloned().flatten();
-            }
-            cast_type(argument, source)
-        })
-        .collect()
 }
 
 pub(super) fn call_arguments(invocation: Node<'_>) -> Vec<Node<'_>> {

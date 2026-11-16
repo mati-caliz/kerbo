@@ -54,7 +54,7 @@ impl NullFlow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NullOrigin {
     Literal,
-    Call(Chain),
+    Call(Box<Chain>),
     Annotated,
     QualifiedField {
         owner: String,

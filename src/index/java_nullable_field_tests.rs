@@ -73,6 +73,11 @@ final class Guarded {
         tail.hashCode();
     }
 
+    void assumed() {
+        assumeTrue(tail != null);
+        tail.hashCode();
+    }
+
     void eager(boolean flag) {
         if (tail != null & flag) {
             tail.hashCode();
@@ -97,9 +102,10 @@ final class Guarded {
 }
 "#;
 
-// El campo de un campo se marca en el calificador. Lo dejan presente un `checkState` de la
-// condición, un `&` sin cortocircuito y un `requireNonNull` anidado. En `char[] @Nullable []` la
-// anotación habla de los elementos, y una clase anónima no ve los campos de la de afuera.
+// El campo de un campo se marca en el calificador. Lo dejan presente un `checkState` o un
+// `assumeTrue` de la condición, un `&` sin cortocircuito y un `requireNonNull` anidado. En
+// `char[] @Nullable []` la anotación habla de los elementos, y una clase anónima no ve los campos
+// de la de afuera.
 #[test]
 fn a_guarded_nullable_field_is_not_reported() {
     assert_eq!(findings_in(GUARDED_FIELDS, "data-flow-issue"), ["12:16 tail()"]);

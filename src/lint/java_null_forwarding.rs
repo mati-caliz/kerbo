@@ -44,7 +44,7 @@ fn forwarded_sources(
                 Some(flow) => analysis.flows.get(flow)?.origin.clone(),
                 None if is_nullable_element(analysis, argument) => NullOrigin::Annotated,
                 None if argument.kind() == INVOCATION => {
-                    NullOrigin::Call(forwarding_chain(analysis, argument, state)?)
+                    NullOrigin::Call(Box::new(forwarding_chain(analysis, argument, state)?))
                 }
                 None => return None,
             };

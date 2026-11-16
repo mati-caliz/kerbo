@@ -1,11 +1,15 @@
 use tree_sitter::Node;
 
 use super::java::text;
+use super::java_chains::{ChainRoot, call_arguments};
+use super::java_null_inference::cast_type;
 use super::java_receiver_arguments::{ArgumentNullness, receiver_arguments};
+use super::java_receivers::{Variables, declared_simple_type};
 use crate::syntax::{named_children, one_based};
 
 const INVOCATION: &str = "method_invocation";
 const FIELD_ACCESS: &str = "field_access";
+const FIELD_FIELD: &str = "field";
 const THROW: &str = "throw_statement";
 const OBJECT_FIELD: &str = "object";
 const NAME_FIELD: &str = "name";
@@ -119,4 +123,36 @@ pub(super) fn argument_count(invocation: Node<'_>) -> usize {
         .iter()
         .filter(|argument| !COMMENTS.contains(&argument.kind()))
         .count()
+}
+
+// `j.jenkins`: el campo de una variable de tipo conocido; el índice sabe de qué tipo es el campo.
+pub(super) fn member_root(access: Node<'_>, source: &[u8], variables: &Variables) -> Option<ChainRoot> {
+    let object = access
+        .child_by_field_name(OBJECT_FIELD)
+        .filter(|object| object.kind() == IDENTIFIER)?;
+    let written = text(object, source);
+    let owner = match variables.get(written) {
+        Some(Some(declared)) => declared.clone(),
+        Some(None) => declared_simple_type(object, written, source)?,
+        None => return None,
+    };
+    let field = text(access.child_by_field_name(FIELD_FIELD)?, source).to_owned();
+    Some(ChainRoot::Member { owner, field })
+}
+
+// El tipo de cada argumento cuando se sabe: una variable con su tipo declarado o un casteo.
+pub(super) fn argument_types(
+    invocation: Node<'_>,
+    source: &[u8],
+    variables: &Variables,
+) -> Vec<Option<String>> {
+    call_arguments(invocation)
+        .into_iter()
+        .map(|argument| {
+            if argument.kind() == IDENTIFIER {
+                return variables.get(text(argument, source)).cloned().flatten();
+            }
+            cast_type(argument, source)
+        })
+        .collect()
 }

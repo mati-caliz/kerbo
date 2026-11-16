@@ -121,7 +121,7 @@ fn untracked_arguments<'tree>(
                 return None;
             }
             let chain = forwarding_chain(analysis, *argument, state)?;
-            (!chain.forwarded.is_empty()).then_some((index, *argument, NullOrigin::Call(chain)))
+            (!chain.forwarded.is_empty()).then_some((index, *argument, NullOrigin::Call(Box::new(chain))))
         })
         .collect()
 }

@@ -2,6 +2,7 @@ use super::java::{Declaration, JavaSummary, NullInference, Position, Purity, lin
 use super::java_exact_classes::exact_class;
 use super::java_forwarded_returns::forwards_null;
 use super::java_jdk::{is_always_defined, jdk_method};
+use super::java_member_types::member_type;
 use super::java_null_arguments::{accepts, non_null_parameter, project_owners, reaches};
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
 use super::java_reference_unboxing::unboxed_references;
@@ -236,7 +237,7 @@ fn nullable_steps(
 
 // El tipo de la raíz: el de la variable, la clase, o el de una constante importada con
 // `import static` (`OS_NAME.value()`), que es un valor de su enum o un campo estático.
-fn resolve_root(
+pub(super) fn resolve_root(
     types: &ProjectTypes<'_>,
     library: &Library,
     summary: &JavaSummary,
@@ -246,6 +247,7 @@ fn resolve_root(
         ChainRoot::Instance(written) => resolve(types, library, summary, written),
         ChainRoot::Class(written) => imported_constant(types, library, summary, written)
             .unwrap_or_else(|| resolve(types, library, summary, written)),
+        ChainRoot::Member { owner, field } => member_type(types, library, summary, (owner, field)),
     }
 }
 

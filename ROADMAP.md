@@ -1621,13 +1621,15 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   crea uno lo pierde. Pendiente: medir spring-boot.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 17 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 843 de los 972 (486 `data-flow-issue`, 308 `null-argument`, 25
+  de más en los dos. En guava, 845 de los 972 (488 `data-flow-issue`, 308 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
-  (2026-11-15) 708 de 1258 (674 `data-flow-issue`, 25 `null-argument`, 9 `nullable-return`) con
-  10 de más: correlaciones que IntelliJ sigue partiendo estados, contratos inferidos
+  (2026-11-16) 863 de 1258 (826 `data-flow-issue`, 28 `null-argument`, 9 `nullable-return`) con
+  11 de más: correlaciones que IntelliJ sigue partiendo estados, contratos inferidos
   (`if (!isValidData(data)) return null;`) y el `(fp = fp.getParent()).getRemote()` de FilePathTest.
-  Para jenkins sumaron: Hamcrest `assertThat(x, notNullValue())` deja presente a `x`; un getter sin
+  Para jenkins sumaron: una cadena que empieza en el campo de una variable (`j.jenkins.getView(...)`)
+  toma el tipo del campo, de la clase del proyecto o del `.class` del jar (eso sumó 155);
+  `assumeTrue(x != null)` deja presente a `x`; Hamcrest `assertThat(x, notNullValue())` deja presente a `x`; un getter sin
   argumentos ya desreferenciado por una variable (`b1 = p.getLastBuild(); b1.getNumber()`) da lo
   mismo después (`b2 = p.getLastBuild()`, también `p.getLastBuild().getNumber()`), sólo si es un
   getter por el nombre (`getX`, `isX`) o un método del proyecto que IntelliJ infiere puro (aproximado:

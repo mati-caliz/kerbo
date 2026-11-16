@@ -304,7 +304,7 @@ impl Analysis<'_, '_> {
         let origin = copied.or_else(|| {
             let chain = chain?;
             remember_getter(self, self.flows.len(), &chain, value);
-            self.flows.push(NullFlow::new(NullOrigin::Call(chain)));
+            self.flows.push(NullFlow::new(NullOrigin::Call(Box::new(chain))));
             Some(self.flows.len() - 1)
         });
         if let Some(origin) = origin {
