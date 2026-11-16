@@ -5,6 +5,8 @@ const SYNTAX_SOURCE: &str = include_str!("fixtures/syntax.go");
 const SYNTAX_EXPECTED: &str = include_str!("fixtures/syntax.gofmt");
 const COMMENTS_SOURCE: &str = include_str!("fixtures/comments.go");
 const COMMENTS_EXPECTED: &str = include_str!("fixtures/comments.gofmt");
+const DOC_COMMENTS_SOURCE: &str = include_str!("fixtures/doc_comments.go");
+const DOC_COMMENTS_EXPECTED: &str = include_str!("fixtures/doc_comments.gofmt");
 
 fn assert_formats_like_gofmt(source: &str, expected: &str) {
     assert_eq!(format(source).as_deref(), Ok(expected));
@@ -30,6 +32,11 @@ fn formats_the_syntax_fixture_like_gofmt() {
 #[test]
 fn formats_the_comments_fixture_like_gofmt() {
     assert_formats_like_gofmt(COMMENTS_SOURCE, COMMENTS_EXPECTED);
+}
+
+#[test]
+fn rewrites_doc_comments_like_gofmt() {
+    assert_formats_like_gofmt(DOC_COMMENTS_SOURCE, DOC_COMMENTS_EXPECTED);
 }
 
 #[test]

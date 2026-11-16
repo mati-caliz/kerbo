@@ -102,6 +102,19 @@ fn intersperse_comments(printer: &mut Printer<'_, '_>, next: Position, tok: Toke
         } else {
             group.list.clone()
         };
+        if shown.is_empty() && !group.list.is_empty() {
+            let spot = Spot {
+                pos: printer.pos_for(group.pos()),
+                next,
+                prev: last.as_ref(),
+                tok,
+            };
+            write_comment_prefix(printer, &spot);
+            printer.pos = next;
+            printer.last = next;
+            next_comment(printer);
+            return write_comment_suffix(printer, false);
+        }
         for current in shown {
             let spot = Spot {
                 pos: printer.pos_for(current.slash),
