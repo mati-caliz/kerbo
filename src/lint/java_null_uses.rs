@@ -18,6 +18,9 @@ use super::java_receivers::declared_type;
 use crate::syntax::{named_children, one_based};
 
 const FIELD_ACCESS: &str = "field_access";
+const ASSIGNMENT: &str = "assignment_expression";
+const ENHANCED_FOR: &str = "enhanced_for_statement";
+const LEFT_FIELD: &str = "left";
 const ARRAY_ACCESS: &str = "array_access";
 const FIELD_FIELD: &str = "field";
 const ARRAY_FIELD: &str = "array";
@@ -180,13 +183,17 @@ pub(super) fn dereference(analysis: &mut Analysis<'_, '_>, node: Node<'_>, mut s
                 .find(|child| !COMMENTS.contains(&child.kind()));
             (used, used)
         }
+        ENHANCED_FOR => (
+            node.child_by_field_name(VALUE_FIELD),
+            node.child_by_field_name(VALUE_FIELD),
+        ),
         CAST if casts_to_primitive(node) => (
             node.child_by_field_name(VALUE_FIELD),
             node.child_by_field_name(VALUE_FIELD),
         ),
         _ => (None, None),
     };
-    let receiver = receiver.map(without_cast);
+    let receiver = receiver.map(without_cast).map(assigned_variable);
     if let (Some(element), Some(used)) = (receiver, used)
         && is_nullable_element(analysis, element)
     {
@@ -210,6 +217,14 @@ pub(super) fn dereference(analysis: &mut Analysis<'_, '_>, node: Node<'_>, mut s
         }
     }
     state
+}
+
+// `(padre = padre.getParent()).getRemote()`: lo que se desreferencia es la variable recién asignada.
+fn assigned_variable(receiver: Node<'_>) -> Node<'_> {
+    receiver
+        .child_by_field_name(LEFT_FIELD)
+        .filter(|_| receiver.kind() == ASSIGNMENT)
+        .unwrap_or(receiver)
 }
 
 fn dereference_at(analysis: &Analysis<'_, '_>, used: Node<'_>) -> Dereference {

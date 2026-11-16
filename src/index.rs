@@ -12,6 +12,7 @@ mod java_forwarded_returns;
 mod java_header;
 mod java_import_shadow_rule;
 mod java_inferred_arguments;
+mod java_inherited_returns;
 mod java_inspection_suppressions;
 mod java_jdk;
 mod java_lambda_null_returns;

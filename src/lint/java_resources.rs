@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
+use super::java_chain_uses::field_chain;
 use super::java_chains::{Chain, origin_chain};
 use super::java_receivers::Variables;
 use super::java_resource_escapes::{
@@ -197,15 +198,21 @@ fn owner_origin(owner: Node<'_>, source: &[u8], variables: &Variables) -> Option
             .get(text(owner, source))
             .cloned()
             .flatten()
-            .map(ResourceOrigin::Construction),
+            .map(ResourceOrigin::Construction)
+            .or_else(|| field_origin(owner, source, variables)),
         FIELD_ACCESS => owner
             .child_by_field_name(OBJECT_FIELD)
             .filter(|object| object.kind() == THIS)
             .and_then(|_| owner.child_by_field_name(FIELD_FIELD))
             .and_then(|field| variables.get(text(field, source)).cloned().flatten())
-            .map(ResourceOrigin::Construction),
+            .map(ResourceOrigin::Construction)
+            .or_else(|| field_origin(owner, source, variables)),
         _ => None,
     }
+}
+
+fn field_origin(owner: Node<'_>, source: &[u8], variables: &Variables) -> Option<ResourceOrigin> {
+    field_chain(owner, source, variables).map(|chain| ResourceOrigin::Call(Box::new(chain)))
 }
 
 fn is_close(invocation: Node<'_>, source: &[u8]) -> bool {

@@ -1,15 +1,19 @@
 use tree_sitter::Node;
 
 use super::java::text;
-use super::java_chains::{ChainRoot, call_arguments};
+use super::java_chains::{Chain, ChainRoot, call_arguments};
 use super::java_null_inference::cast_type;
 use super::java_receiver_arguments::{ArgumentNullness, receiver_arguments};
-use super::java_receivers::{Variables, declared_simple_type};
+use super::java_receivers::{Variables, declared_simple_type, enclosing_types};
 use crate::syntax::{named_children, one_based};
 
 const INVOCATION: &str = "method_invocation";
 const FIELD_ACCESS: &str = "field_access";
 const FIELD_FIELD: &str = "field";
+const CAST: &str = "cast_expression";
+const ENHANCED_FOR: &str = "enhanced_for_statement";
+const PARENTHESIZED: &str = "parenthesized_expression";
+const VALUE_FIELD: &str = "value";
 const THROW: &str = "throw_statement";
 const OBJECT_FIELD: &str = "object";
 const NAME_FIELD: &str = "name";
@@ -39,7 +43,7 @@ pub(super) fn field_read_at(invocation: Node<'_>) -> Option<(usize, usize)> {
 
 // Dónde empieza la llamada si se tira lo que devuelve (`throw Throwables.rethrowAsException(e)`):
 // tirar null es una desreferencia.
-pub(super) fn thrown_at(invocation: Node<'_>) -> Option<(usize, usize)> {
+fn thrown_at(invocation: Node<'_>) -> Option<(usize, usize)> {
     let start = invocation.start_position();
     invocation
         .parent()
@@ -125,19 +129,106 @@ pub(super) fn argument_count(invocation: Node<'_>) -> usize {
         .count()
 }
 
-// `j.jenkins`: el campo de una variable de tipo conocido; el índice sabe de qué tipo es el campo.
+// `j.jenkins` o `r.jenkins.pluginManager`: los campos que se leen a partir de una variable de tipo
+// conocido; el índice sabe de qué tipo es cada campo. Una variable que el archivo no declara puede
+// ser un campo heredado.
 pub(super) fn member_root(access: Node<'_>, source: &[u8], variables: &Variables) -> Option<ChainRoot> {
-    let object = access
-        .child_by_field_name(OBJECT_FIELD)
-        .filter(|object| object.kind() == IDENTIFIER)?;
-    let written = text(object, source);
+    let mut fields = Vec::new();
+    let mut current = access;
+    while current.kind() == FIELD_ACCESS {
+        fields.push(text(current.child_by_field_name(FIELD_FIELD)?, source).to_owned());
+        current = current.child_by_field_name(OBJECT_FIELD)?;
+    }
+    if current.kind() != IDENTIFIER {
+        return None;
+    }
+    fields.reverse();
+    let written = text(current, source);
     let owner = match variables.get(written) {
         Some(Some(declared)) => declared.clone(),
-        Some(None) => declared_simple_type(object, written, source)?,
-        None => return None,
+        Some(None) => declared_simple_type(current, written, source)?,
+        None => return Some(inherited_root(current, source, fields)),
     };
-    let field = text(access.child_by_field_name(FIELD_FIELD)?, source).to_owned();
-    Some(ChainRoot::Member { owner, field })
+    Some(ChainRoot::Member {
+        owners: vec![owner],
+        fields,
+    })
+}
+
+// Una variable que el archivo no declara (`j` en una clase de test cuyo padre declara
+// `protected JenkinsRule j`): el campo de una de las clases que encierran al uso o de sus padres.
+pub(super) fn inherited_root(variable: Node<'_>, source: &[u8], following: Vec<String>) -> ChainRoot {
+    let mut fields = vec![text(variable, source).to_owned()];
+    fields.extend(following);
+    ChainRoot::Member {
+        owners: enclosing_types(variable, source),
+        fields,
+    }
+}
+
+// Una expresión sin llamadas que lee campos (`context.terminal`) o nombra uno heredado, como una
+// cadena sin pasos: el índice dice de qué tipo es.
+pub(super) fn field_chain(expression: Node<'_>, source: &[u8], variables: &Variables) -> Option<Chain> {
+    let root = match expression.kind() {
+        FIELD_ACCESS => member_root(expression, source, variables)?,
+        IDENTIFIER => {
+            let written = text(expression, source);
+            let is_undeclared_variable = !variables.contains_key(written)
+                && written.starts_with(|first: char| first.is_ascii_lowercase());
+            is_undeclared_variable.then(|| inherited_root(expression, source, Vec::new()))?
+        }
+        _ => return None,
+    };
+    Some(Chain {
+        root,
+        steps: Vec::new(),
+        dereferenced_at: None,
+        passed_as: None,
+        returned: None,
+        nullable_root_arguments: Vec::new(),
+        enclosing: Vec::new(),
+        forwarded: Vec::new(),
+        exact_root: None,
+    })
+}
+
+// Dónde se desreferencia la llamada por el lugar que ocupa: se tira, se castea para llamar a otro
+// método o se recorre con un `for`.
+pub(super) fn used_by_parent_at(invocation: Node<'_>) -> Option<(usize, usize)> {
+    thrown_at(invocation)
+        .or_else(|| cast_receiver_at(invocation))
+        .or_else(|| iterated_at(invocation))
+}
+
+// Dónde empieza la llamada si es lo que recorre un `for (Archivo hijo : carpeta.listFiles())`.
+fn iterated_at(invocation: Node<'_>) -> Option<(usize, usize)> {
+    let start = invocation.start_position();
+    invocation
+        .parent()
+        .filter(|parent| parent.kind() == ENHANCED_FOR)
+        .and_then(|parent| parent.child_by_field_name(VALUE_FIELD))
+        .filter(|iterated| iterated.id() == invocation.id())
+        .map(|_| (one_based(start.row), one_based(start.column)))
+}
+
+// Dónde está el nombre del método que se llama sobre la llamada casteada
+// (`((FreeStyleProject) jenkins.getItem(nombre)).getBuilds()`): el casteo deja pasar el null.
+fn cast_receiver_at(invocation: Node<'_>) -> Option<(usize, usize)> {
+    let cast = invocation.parent().filter(|parent| {
+        parent.kind() == CAST
+            && parent
+                .child_by_field_name(VALUE_FIELD)
+                .is_some_and(|value| value.id() == invocation.id())
+    })?;
+    let parenthesized = cast.parent().filter(|parent| parent.kind() == PARENTHESIZED)?;
+    let outer = parenthesized.parent().filter(|parent| {
+        parent.kind() == INVOCATION
+            && parent
+                .child_by_field_name(OBJECT_FIELD)
+                .is_some_and(|object| object.id() == parenthesized.id())
+    })?;
+    let start = outer.child_by_field_name(NAME_FIELD)?.start_position();
+    Some((one_based(start.row), one_based(start.column)))
 }
 
 // El tipo de cada argumento cuando se sabe: una variable con su tipo declarado o un casteo.

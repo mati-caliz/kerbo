@@ -1621,12 +1621,22 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   crea uno lo pierde. Pendiente: medir spring-boot.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 17 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 845 de los 972 (488 `data-flow-issue`, 308 `null-argument`, 25
+  de más en los dos. En guava, 847 de los 972 (490 `data-flow-issue`, 308 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
-  (2026-11-16) 863 de 1258 (826 `data-flow-issue`, 28 `null-argument`, 9 `nullable-return`) con
-  11 de más: correlaciones que IntelliJ sigue partiendo estados, contratos inferidos
-  (`if (!isValidData(data)) return null;`) y el `(fp = fp.getParent()).getRemote()` de FilePathTest.
+  (2026-11-16) 1021 de 1258 (982 `data-flow-issue`, 30 `null-argument`, 9 `nullable-return`) con
+  8 de más: correlaciones que IntelliJ sigue partiendo estados y contratos inferidos
+  (`if (!isValidData(data)) return null;`). La última tanda sumó 158: una variable que el archivo no
+  declara es un campo heredado (`j` de la clase de test de arriba, también desde una anónima) y la
+  raíz sigue por varios campos (`r.jenkins.pluginManager`); el casteo de una llamada nula usado como
+  receptor (`((FreeStyleProject) j.jenkins.getItem(n)).getBuilds()`); un literal de clase elige la
+  sobrecarga que declara `Class` (`ExtensionList.get(Class)` y no `get(int)`); un método sin anotar
+  hereda la `@Nullable`/`@CheckForNull` del que redefine con los mismos tipos escritos (no si el
+  nombre simple de su clase es ambiguo); `(fp = fp.getParent()).getRemote()` desreferencia la
+  variable recién asignada; y un `for (x : algo)` desreferencia lo que recorre (`listFiles` con
+  filtro también puede dar null). Lo que falta (237): `Argument might be null` de llamadas pasadas a
+  parámetros de jars (~60), `already-assigned` (11), `@Nullable method always returns non-null` (9),
+  y desreferencias sueltas.
   Para jenkins sumaron: una cadena que empieza en el campo de una variable (`j.jenkins.getView(...)`)
   toma el tipo del campo, de la clase del proyecto o del `.class` del jar (eso sumó 155);
   `assumeTrue(x != null)` deja presente a `x`; Hamcrest `assertThat(x, notNullValue())` deja presente a `x`; un getter sin
@@ -1640,8 +1650,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `boolean` que no se reasigna guarda su chequeo (`boolean colapsado = ... && padre != null; if
   (colapsado) padre.x`), y `ws = b != null ? b.getWorkspace() : null` hace que `ws` no nulo deje
   presente a `b`. Pasar un valor a un método del proyecto que siempre falla con null en ese lugar
-  (cláusula `fail` inferida: `checkGoodName(name)`) lo deja presente después. maven (2026-11-15):
-  40 de 140, ninguno de más. Una anotación de nulidad sólo cuenta si es de un paquete que IntelliJ
+  (cláusula `fail` inferida: `checkGoodName(name)`) lo deja presente después. maven (2026-11-16):
+  41 de 140, ninguno de más. Una anotación de nulidad sólo cuenta si es de un paquete que IntelliJ
   conoce sin configurar (JetBrains, JSR-305, JSpecify, Checker, Android, Spring, ...): el
   `org.apache.maven.api.annotations.Nullable` propio de maven no dice nada (daba 98 de más). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en

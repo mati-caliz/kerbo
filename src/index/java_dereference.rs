@@ -1,6 +1,7 @@
 use super::java::{Declaration, JavaSummary, NullInference, Position, Purity, lint_at};
 use super::java_exact_classes::exact_class;
 use super::java_forwarded_returns::forwards_null;
+use super::java_inherited_returns::{is_annotated_nullable, overrides_nullable};
 use super::java_jdk::{is_always_defined, jdk_method};
 use super::java_member_types::member_type;
 use super::java_null_arguments::{accepts, non_null_parameter, project_owners, reaches};
@@ -18,7 +19,7 @@ use crate::lint::java_owner::OwnerKind;
 use crate::rules::JavaRule;
 
 const QUALIFIER_SEPARATOR: char = '.';
-const NULLABLE: &str = "Nullable";
+const CLASS_TYPE: &str = "Class";
 
 // Calca el DataFlowIssue de IntelliJ en sus dos formas sin flujo entre métodos: en una cadena de
 // llamadas, un paso que la librería declara `@Nullable` seguido de otra llamada sobre su resultado
@@ -214,12 +215,7 @@ fn nullable_steps(
         let Some(first) = candidates.first() else {
             break;
         };
-        let annotated_nullable = candidates.iter().all(|method| {
-            method
-                .return_annotations
-                .iter()
-                .any(|annotation| annotation.rsplit(QUALIFIER_SEPARATOR).next() == Some(NULLABLE))
-        });
+        let annotated_nullable = candidates.iter().all(is_annotated_nullable);
         nullable.push(
             annotated_nullable || returns_nullable_argument(types, library, &current, (step, substituted)),
         );
@@ -247,7 +243,7 @@ pub(super) fn resolve_root(
         ChainRoot::Instance(written) => resolve(types, library, summary, written),
         ChainRoot::Class(written) => imported_constant(types, library, summary, written)
             .unwrap_or_else(|| resolve(types, library, summary, written)),
-        ChainRoot::Member { owner, field } => member_type(types, library, summary, (owner, field)),
+        ChainRoot::Member { owners, fields } => member_type(types, library, summary, (owners, fields)),
     }
 }
 
@@ -300,6 +296,7 @@ fn project_step(
                 || (declaration.inference == NullInference::ClosedReturnsNull
                     && declaration.body == Body::Written)
                 || returns_nullable_field(types, library, declaration)
+                || overrides_nullable(types, library, declaration)
         });
     let mut returned = candidates.iter().map(|(declaring, declaration)| {
         (declaration.return_type == ReturnType::Reference)
@@ -333,12 +330,22 @@ pub(super) fn project_candidates<'summary>(
             .filter(|(_, declaration)| declaration.arity == Arity::Fixed)
             .collect();
         let preferred = if fixed.is_empty() { found } else { fixed };
-        let exact: Vec<_> = preferred
+        let taking_classes: Vec<_> = preferred
+            .iter()
+            .copied()
+            .filter(|(_, declaration)| declares_class_parameters(declaration, &step.class_arguments))
+            .collect();
+        let fitting = if taking_classes.is_empty() {
+            preferred
+        } else {
+            taking_classes
+        };
+        let exact: Vec<_> = fitting
             .iter()
             .copied()
             .filter(|(_, declaration)| declares_argument_types(declaration, &step.argument_types))
             .collect();
-        let chosen = if exact.is_empty() { preferred } else { exact };
+        let chosen = if exact.is_empty() { fitting } else { exact };
         (!chosen.is_empty()).then_some(chosen)
     })
 }
@@ -351,6 +358,16 @@ fn returns_nullable_field(types: &ProjectTypes<'_>, library: &Library, declarati
             .iter()
             .find_map(|class| types.field_of(class, field))
             .is_some_and(|(_, declared)| declared.is_nullable)
+    })
+}
+
+// `lista.get(Monitor.class)` va a `get(Class<U>)` y no a `get(int)`.
+fn declares_class_parameters(declaration: &Declaration, class_arguments: &[usize]) -> bool {
+    class_arguments.iter().all(|position| {
+        declaration
+            .parameters
+            .get(*position)
+            .is_some_and(|parameter| parameter.type_name == CLASS_TYPE)
     })
 }
 

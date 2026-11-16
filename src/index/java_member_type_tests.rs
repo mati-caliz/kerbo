@@ -68,3 +68,208 @@ fn the_field_of_a_library_class_comes_from_its_class_file() {
         .collect();
     assert_eq!(found, ["24:54 size()", "28:54 size()"]);
 }
+
+const INHERITED_ROOTS: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+
+public class Jenkins {
+    PluginManager pluginManager;
+
+    @Nullable View getView(String name) {
+        return null;
+    }
+
+    @Nullable Object getItem(String name) {
+        return null;
+    }
+}
+
+final class PluginManager {
+    @Nullable View getPlugin(String name) {
+        return null;
+    }
+}
+
+final class View {
+    int size() {
+        return 0;
+    }
+}
+
+final class JenkinsRule {
+    Jenkins jenkins;
+}
+
+class TestBase {
+    protected JenkinsRule j;
+    protected Jenkins direct;
+}
+
+final class ViewTest extends TestBase {
+    int inherited() {
+        return j.jenkins.getView(j.toString()).size();
+    }
+
+    int inheritedDirectly() {
+        return direct.getView(direct.toString()).size();
+    }
+
+    int throughTwoFields(JenkinsRule rule) {
+        return rule.jenkins.pluginManager.getPlugin(rule.toString()).size();
+    }
+
+    int fromAnonymous() {
+        return new Object() {
+            int count() {
+                return j.jenkins.getView(j.toString()).size();
+            }
+        }.count();
+    }
+
+    int cast() {
+        return ((View) j.jenkins.getItem(j.toString())).size();
+    }
+
+    int undeclared() {
+        return missing.getView(j.toString()).size();
+    }
+}
+";
+
+// `j` lo declara la clase de arriba: la cadena toma el tipo del campo heredado, también desde una
+// clase anónima, y sigue por varios campos (`rule.jenkins.pluginManager`). El casteo de una llamada
+// que puede dar null no la salva.
+#[test]
+fn a_chain_rooted_at_an_inherited_field_uses_the_field_type() {
+    assert_eq!(
+        findings_in(INHERITED_ROOTS, "data-flow-issue"),
+        [
+            "40:48 size()",
+            "44:50 size()",
+            "48:70 size()",
+            "54:56 size()",
+            "60:57 getItem()"
+        ]
+    );
+}
+
+const CLASS_OVERLOADS: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+
+public class ExtensionList {
+    @Nullable Monitor get(Class<Monitor> type) {
+        return null;
+    }
+
+    Monitor get(int index) {
+        return new Monitor();
+    }
+
+    static ExtensionList lookup() {
+        return new ExtensionList();
+    }
+}
+
+final class Monitor {
+    boolean active;
+
+    boolean isActivated() {
+        return active;
+    }
+
+    static boolean byClass() {
+        return ExtensionList.lookup().get(Monitor.class).isActivated();
+    }
+
+    static boolean byIndex() {
+        return ExtensionList.lookup().get(0).isActivated();
+    }
+
+    static boolean fromVariable() {
+        Monitor monitor = ExtensionList.lookup().get(Monitor.class);
+        return monitor.isActivated();
+    }
+}
+";
+
+// Con un literal de clase como argumento, la sobrecarga es la que declara `Class`, no `get(int)`.
+#[test]
+fn a_class_literal_picks_the_overload_that_declares_a_class_parameter() {
+    assert_eq!(
+        findings_in(CLASS_OVERLOADS, "data-flow-issue"),
+        ["27:58 isActivated()", "36:24 isActivated()"]
+    );
+}
+
+const INHERITED_NULLNESS: &str = r"package app;
+
+import java.io.File;
+import org.jspecify.annotations.Nullable;
+
+interface ItemGroup {
+    @Nullable Item getItem(String name);
+
+    @Nullable Item getParent();
+}
+
+class Item {
+    void delete() {
+    }
+
+    Item getParent() {
+        return this;
+    }
+}
+
+class Folder implements ItemGroup {
+    @Override
+    public Item getItem(String name) {
+        return new Item();
+    }
+
+    @Override
+    public Item getParent() {
+        return new Item();
+    }
+
+    static void overridden(Folder folder) {
+        folder.getItem(folder.toString()).delete();
+    }
+
+    static void assignedInside(Folder folder) {
+        Item item = new Item();
+        (item = folder.getItem(folder.toString())).delete();
+        item.delete();
+    }
+
+    static int iterated(File folder) {
+        int count = 0;
+        for (File child : folder.listFiles()) {
+            count += child.hashCode();
+        }
+        File[] children = folder.listFiles();
+        for (File child : children) {
+            count += child.hashCode();
+        }
+        return count;
+    }
+}
+";
+
+// Un método sin anotación hereda la `@Nullable` del que redefine; una asignación entre paréntesis
+// usada como receptor desreferencia la variable recién asignada, y un `for` desreferencia lo que
+// recorre.
+#[test]
+fn inherited_annotations_parenthesized_assignments_and_iterated_values_are_dereferenced() {
+    assert_eq!(
+        findings_in(INHERITED_NULLNESS, "data-flow-issue"),
+        [
+            "33:43 delete()",
+            "38:52 delete()",
+            "44:27 listFiles()",
+            "48:27 children()"
+        ]
+    );
+}

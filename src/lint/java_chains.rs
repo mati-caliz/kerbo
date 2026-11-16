@@ -6,8 +6,8 @@ use super::java::{NAME_FIELD, text};
 use super::java_called_receivers::receiver_facts;
 pub(super) use super::java_chain_uses::argument_count;
 use super::java_chain_uses::{
-    argument_types, class_arguments, field_read_at, guarded_by_non_empty, member_root,
-    nullable_root_arguments, text_arguments, thrown_at,
+    argument_types, class_arguments, field_read_at, guarded_by_non_empty, inherited_root, member_root,
+    nullable_root_arguments, text_arguments, used_by_parent_at,
 };
 use super::java_exact_roots::{ExactRoot, exact_root};
 use super::java_null_checks::{
@@ -42,7 +42,10 @@ const CHARSET_FACTORIES: &[&str] = &["defaultCharset", "forName"];
 pub enum ChainRoot {
     Instance(String),
     Class(String),
-    Member { owner: String, field: String },
+    Member {
+        owners: Vec<String>,
+        fields: Vec<String>,
+    },
 }
 
 // Un paso de una cadena de llamadas: el método, la cantidad de argumentos, dónde está su nombre,
@@ -246,7 +249,7 @@ pub fn chain_of(
     }
     let dereferenced_at = unboxed_at(invocation, source)
         .or(field_read)
-        .or_else(|| thrown_at(invocation));
+        .or_else(|| used_by_parent_at(invocation));
     let passed_as = facts.passed_as(invocation, source);
     let returned = returned_by_method(invocation, source);
     let interesting =
@@ -340,7 +343,7 @@ fn walk(
                 ChainRoot::Class(written.to_owned())
             }
             Some(None) => ChainRoot::Instance(declared_simple_type(object, written, source)?),
-            None => return None,
+            None => inherited_root(object, source, Vec::new()),
         };
         return Some((root, steps, Vec::new()));
     }

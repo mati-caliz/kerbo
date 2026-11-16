@@ -14,7 +14,7 @@ use crate::lint::java_receivers::Receiver;
 // límite `@Nullable`). Con sobrecargas, todas tienen que coincidir.
 // Los parámetros del JDK que las anotaciones externas de IntelliJ marcan `@Nullable`: clase,
 // método, cantidad de argumentos y posición.
-const NON_NULL_ANNOTATIONS: &[&str] = &["NonNull", "Nonnull", "NotNull"];
+pub(super) const NON_NULL_ANNOTATIONS: &[&str] = &["NonNull", "Nonnull", "NotNull"];
 const QUALIFIER_SEPARATOR: char = '.';
 const LIBRARY_NULLABLE: &[(&str, &str, usize, usize)] = &[("java.util.Optional", "orElse", 1, 0)];
 

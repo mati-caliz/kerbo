@@ -170,10 +170,11 @@ impl Analysis<'_, '_> {
                 field(CONDITION_FIELD).map(|condition| branch_states(self, condition, after.clone()).1)
             }
             ENHANCED_FOR => {
-                let current = match field(VALUE_FIELD) {
+                let evaluated = match field(VALUE_FIELD) {
                     Some(iterable) => self.expression(iterable, state),
                     None => state,
                 };
+                let current = dereference(self, node, evaluated);
                 let after_body = field(BODY_FIELD).and_then(|body| self.statement(body, current.clone()));
                 join(Some(current), after_body)
             }

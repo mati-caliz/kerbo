@@ -202,3 +202,73 @@ fn builder_chains_follow_the_outermost_call_and_closeable_receivers_own_the_resu
     found.sort();
     assert_eq!(found, ["53:14 Client", "57:30 Client", "84:21 Client"]);
 }
+
+const FIELD_RECEIVERS: &str = r"package app;
+
+import java.io.Closeable;
+
+class Output implements Closeable {
+    public void close() {
+    }
+
+    void flush() {
+    }
+}
+
+class Terminal implements Closeable {
+    public void close() {
+    }
+
+    Output writer() {
+        throw new UnsupportedOperationException();
+    }
+}
+
+final class Plain {
+    Output writer() {
+        throw new UnsupportedOperationException();
+    }
+}
+
+final class Context {
+    Terminal terminal;
+    Plain plain;
+}
+
+class GoalSupport {
+    protected Context context;
+    protected Terminal terminal;
+}
+
+final class Goal extends GoalSupport {
+    void throughFields() {
+        context.terminal.writer().flush();
+    }
+
+    void inherited() {
+        terminal.writer().flush();
+    }
+
+    void notCloseable() {
+        context.plain.writer().flush();
+    }
+}
+";
+
+// Un receptor que se cierra es dueño de lo que crea también si es el campo de otro objeto
+// (`context.terminal.writer()`) o un campo heredado.
+#[test]
+fn a_closeable_receiver_read_from_a_field_owns_the_result() {
+    let summary = summary_of(FIELD_RECEIVERS);
+    let files = [IndexedSummary {
+        summary: &summary,
+        in_tests: false,
+    }];
+    let found: Vec<String> = project_lints(&files, &Library::load(&[]))
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "auto-closeable-resource")
+        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
+        .collect();
+    assert_eq!(found, ["48:23 Output"]);
+}

@@ -31,10 +31,10 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
             writer.number(ROOT_CLASS);
             writer.text(name);
         }
-        ChainRoot::Member { owner, field } => {
+        ChainRoot::Member { owners, fields } => {
             writer.number(ROOT_MEMBER);
-            writer.text(owner);
-            writer.text(field);
+            writer.list(owners, |writer, owner| writer.text(owner));
+            writer.list(fields, |writer, field| writer.text(field));
         }
     }
     writer.list(&chain.steps, |writer, step| {
@@ -115,8 +115,8 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
             ROOT_INSTANCE => ChainRoot::Instance(reader.text()?),
             ROOT_CLASS => ChainRoot::Class(reader.text()?),
             ROOT_MEMBER => ChainRoot::Member {
-                owner: reader.text()?,
-                field: reader.text()?,
+                owners: reader.list(Reader::text)?,
+                fields: reader.list(Reader::text)?,
             },
             _ => return Err(Corrupt),
         },
