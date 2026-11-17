@@ -6,8 +6,8 @@ use super::java::{NAME_FIELD, text};
 use super::java_called_receivers::receiver_facts;
 pub(super) use super::java_chain_uses::argument_count;
 use super::java_chain_uses::{
-    argument_types, class_arguments, field_read_at, guarded_by_non_empty, inherited_root, member_root,
-    nullable_root_arguments, text_arguments, used_by_parent_at,
+    CLASS_LITERAL, argument_types, arguments_of_kind, field_read_at, guarded_by_non_empty,
+    nullable_root_arguments, receiver_root, text_arguments, used_by_parent_at,
 };
 use super::java_exact_roots::{ExactRoot, exact_root};
 use super::java_null_checks::{
@@ -16,7 +16,7 @@ use super::java_null_checks::{
 use super::java_null_inference::{CallTarget, NullArgument, call_target};
 use super::java_null_origin::{ArgumentShape, NullOrigin, NullReturn};
 use super::java_null_returns::returned_by_method;
-use super::java_receivers::{StaticImports, Variables, declared_simple_type, enclosing_types};
+use super::java_receivers::{StaticImports, Variables, enclosing_types};
 use super::java_throws::ArgumentKind;
 use super::java_unboxing::unboxed_at;
 use crate::syntax::{named_children, one_based};
@@ -59,6 +59,7 @@ pub struct ChainStep {
     pub column: usize,
     pub checked: bool,
     pub class_arguments: Vec<usize>,
+    pub null_arguments: Vec<usize>,
     pub text_arguments: Vec<String>,
     pub argument_types: Vec<Option<String>>,
     pub passed_before: Vec<NullArgument>,
@@ -301,7 +302,8 @@ fn walk(
             line: one_based(start.row),
             column: one_based(start.column),
             checked: facts.is_checked(current, source) || guarded_by_non_empty(current, source),
-            class_arguments: class_arguments(current),
+            class_arguments: arguments_of_kind(current, CLASS_LITERAL),
+            null_arguments: arguments_of_kind(current, NULL),
             text_arguments: text_arguments(current, source),
             argument_types: argument_types(current, source, variables),
             passed_before: facts.passed_before(current, source),
@@ -321,31 +323,7 @@ fn walk(
             continue;
         }
         steps.reverse();
-        if object.kind() == FIELD_ACCESS {
-            let written = text(object, source);
-            let qualified_class = written
-                .rsplit(QUALIFIER_SEPARATOR)
-                .next()
-                .is_some_and(|last| last.starts_with(|first: char| first.is_ascii_uppercase()))
-                && written.starts_with(|first: char| first.is_ascii_lowercase());
-            if qualified_class {
-                return Some((ChainRoot::Class(written.to_owned()), steps, Vec::new()));
-            }
-            return member_root(object, source, variables).map(|root| (root, steps, Vec::new()));
-        }
-        if object.kind() != IDENTIFIER {
-            return None;
-        }
-        let written = text(object, source);
-        let root = match variables.get(written) {
-            Some(Some(declared)) => ChainRoot::Instance(declared.clone()),
-            None if written.starts_with(|first: char| first.is_ascii_uppercase()) => {
-                ChainRoot::Class(written.to_owned())
-            }
-            Some(None) => ChainRoot::Instance(declared_simple_type(object, written, source)?),
-            None => inherited_root(object, source, Vec::new()),
-        };
-        return Some((root, steps, Vec::new()));
+        return receiver_root(object, source, variables).map(|root| (root, steps, Vec::new()));
     }
 }
 

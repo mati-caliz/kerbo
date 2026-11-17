@@ -273,3 +273,86 @@ fn inherited_annotations_parenthesized_assignments_and_iterated_values_are_deref
         ]
     );
 }
+
+const ABSENT_ALTERNATIVES: &str = r#"package app;
+
+import java.util.Optional;
+
+final class Element {
+    Optional<Element> child(String name) {
+        return Optional.empty();
+    }
+
+    String text() {
+        return "";
+    }
+
+    static String chained(Element root) {
+        return root.child("a").orElse(null).text();
+    }
+
+    static String assigned(Element root) {
+        Element found = root.child("a").orElse(null);
+        return found.text();
+    }
+
+    static String unresolved(Unknown root) {
+        return root.child("a").orElse(null).text();
+    }
+
+    static String withDefault(Element root) {
+        return root.child("a").orElse(root).text();
+    }
+}
+"#;
+
+// `orElse(null)` puede dar null aunque no se sepa el tipo de lo que está antes; con otro valor, no.
+#[test]
+fn an_optional_resolved_with_a_null_alternative_may_be_null() {
+    assert_eq!(
+        findings_in(ABSENT_ALTERNATIVES, "data-flow-issue"),
+        ["15:45 text()", "20:22 text()", "24:45 text()"]
+    );
+}
+
+const INHERITED_QUEUE_METHODS: &str = r"package app;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
+
+final class Pending {
+    static int first(Deque<String> names) {
+        return names.peek().length();
+    }
+
+    static int last(ArrayDeque<String> names) {
+        return names.pollLast().length();
+    }
+
+    static int guarded(Deque<String> names) {
+        while (!names.isEmpty()) {
+            return names.poll().length();
+        }
+        return 0;
+    }
+
+    static int assigned(ArrayDeque<String> names) {
+        if (!names.isEmpty()) {
+            String name = names.peek();
+            return name.length();
+        }
+        String name = names.peek();
+        return name.length();
+    }
+}
+";
+
+// `Deque` hereda `peek()` de `Queue`: lo que el JDK da por posiblemente null vale para sus hijos,
+// salvo adentro de un `if` o un `while` que da la cola por no vacía, también si pasa por una variable.
+#[test]
+fn queue_methods_inherited_by_a_deque_may_return_null() {
+    assert_eq!(
+        findings_in(INHERITED_QUEUE_METHODS, "data-flow-issue"),
+        ["8:29 length()", "12:33 length()", "28:21 length()"]
+    );
+}

@@ -1621,10 +1621,10 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   crea uno lo pierde. Pendiente: medir spring-boot.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 17 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 847 de los 972 (490 `data-flow-issue`, 308 `null-argument`, 25
+  de más en los dos. En guava, 849 de los 972 (491 `data-flow-issue`, 309 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
-  (2026-11-16) 1056 de 1258 (982 `data-flow-issue`, 56 `null-argument`, 9 `already-assigned`, 9
+  (2026-11-17) 1061 de 1258 (987 `data-flow-issue`, 56 `null-argument`, 9 `already-assigned`, 9
   `nullable-return`) con
   9 de más: correlaciones que IntelliJ sigue partiendo estados y contratos inferidos
   (`if (!isValidData(data)) return null;`). La última tanda sumó 158: una variable que el archivo no
@@ -1638,7 +1638,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   filtro también puede dar null). Un parámetro que el proyecto anota `@NonNull` no admite null
   aunque el método se pueda redefinir (sumó 26 `null-argument`), y `already-assigned` calca el
   contrato inferido de un método del archivo que nadie redefine y siempre devuelve uno de sus
-  parámetros o `this` (`r = agregar(r, p)`, `vista = vista.withJobs(...)`). Lo que falta (202):
+  parámetros o `this` (`r = agregar(r, p)`, `vista = vista.withJobs(...)`). Lo que falta (197):
   `Argument might be null` de llamadas pasadas a parámetros de jars o del JDK (~45: IntelliJ los
   infiere del bytecode, `new URL(x)`, `IOUtils.readLines(is, ...)`; kerbo no lee el código de los
   `.class`), el mensaje `@Nullable method 'x' always returns a non-null value` (9 acá y 7 en guava:
@@ -1657,8 +1657,12 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `boolean` que no se reasigna guarda su chequeo (`boolean colapsado = ... && padre != null; if
   (colapsado) padre.x`), y `ws = b != null ? b.getWorkspace() : null` hace que `ws` no nulo deje
   presente a `b`. Pasar un valor a un método del proyecto que siempre falla con null en ese lugar
-  (cláusula `fail` inferida: `checkGoodName(name)`) lo deja presente después. maven (2026-11-16):
-  43 de 140, ninguno de más. Una anotación de nulidad sólo cuenta si es de un paquete que IntelliJ
+  (cláusula `fail` inferida: `checkGoodName(name)`) lo deja presente después. maven (2026-11-17):
+  118 de 140, ninguno de más: `opcional.orElse(null)` puede dar null aunque no se resuelva lo que
+  está antes en la cadena (sumó 51), una cadena puede empezar en un literal de clase
+  (`X.class.getResourceAsStream(...)`) o en una variable sin tipo escrito, y lo que el JDK da por
+  posiblemente null vale para los hijos (`Deque.peek()` vía `Queue`, más `peekFirst`/`pollLast`),
+  salvo bajo un `if`/`while (!cola.isEmpty())`, también si el valor pasa por una variable. Una anotación de nulidad sólo cuenta si es de un paquete que IntelliJ
   conoce sin configurar (JetBrains, JSR-305, JSpecify, Checker, Android, Spring, ...): el
   `org.apache.maven.api.annotations.Nullable` propio de maven no dice nada (daba 98 de más). Los campos `@Nullable` de las clases que encierran al método (no las de afuera de una
   clase anónima) entran al flujo como posiblemente nulos, como `x` y como `this.x`, y en

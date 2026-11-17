@@ -6,6 +6,7 @@ use super::java_jdk::{is_always_defined, jdk_method};
 use super::java_member_types::member_type;
 use super::java_null_arguments::{accepts, non_null_parameter, project_owners, reaches};
 use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
+use super::java_optional_returns::with_absent_alternatives;
 use super::java_reference_unboxing::unboxed_references;
 use super::java_substituted_returns::returns_nullable_argument;
 use super::java_variable_returns::enclosing_owner;
@@ -185,7 +186,7 @@ fn nullable_steps(
             continue;
         }
         let classes = match &current {
-            Resolved::Library(class) => vec![class.clone()],
+            Resolved::Library(class) => library.supertypes(class),
             Resolved::Project(name) => library_ancestors(types, library, name),
         };
         if let Some((returned, is_nullable)) = jdk_method(&classes, &step.name, step.arity) {
@@ -228,7 +229,7 @@ fn nullable_steps(
         };
         current = Resolved::Library(returned);
     }
-    nullable
+    with_absent_alternatives(chain, nullable)
 }
 
 // El tipo de la raíz: el de la variable, la clase, o el de una constante importada con

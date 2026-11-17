@@ -20,6 +20,7 @@ fn sample_flow() -> NullFlow {
                 column: 21,
                 checked: false,
                 class_arguments: vec![1],
+                null_arguments: vec![0],
                 text_arguments: vec!["java.version".to_owned()],
                 argument_types: vec![Some("String".to_owned()), None],
                 passed_before: Vec::new(),

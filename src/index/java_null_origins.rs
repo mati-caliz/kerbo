@@ -17,7 +17,10 @@ pub(super) fn may_be_null(
     origin: &NullOrigin,
 ) -> bool {
     match origin {
-        NullOrigin::Call(chain) => may_return_null(types, library, summary, chain),
+        NullOrigin::Call(chain) => {
+            may_return_null(types, library, summary, chain)
+                && !chain.steps.last().is_some_and(|last| last.checked)
+        }
         NullOrigin::Annotated | NullOrigin::Literal => true,
         NullOrigin::QualifiedField {
             owner,

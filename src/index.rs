@@ -22,6 +22,7 @@ mod java_null_arguments;
 mod java_null_origins;
 mod java_nullable_returns;
 mod java_nullness;
+mod java_optional_returns;
 mod java_parameter_nullness;
 mod java_project;
 mod java_reference_unboxing;

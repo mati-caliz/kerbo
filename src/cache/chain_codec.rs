@@ -44,6 +44,7 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
         writer.size(step.column);
         write_flag(writer, step.checked);
         writer.list(&step.class_arguments, |writer, position| writer.size(*position));
+        writer.list(&step.null_arguments, |writer, position| writer.size(*position));
         writer.list(&step.text_arguments, |writer, argument| writer.text(argument));
         writer.list(&step.argument_types, |writer, argument| match argument {
             Some(declared) => {
@@ -128,6 +129,7 @@ pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
                 column: reader.size()?,
                 checked: read_flag(reader)?,
                 class_arguments: reader.list(Reader::size)?,
+                null_arguments: reader.list(Reader::size)?,
                 text_arguments: reader.list(Reader::text)?,
                 argument_types: reader.list(read_optional_text)?,
                 passed_before: reader.list(read_null_argument)?,

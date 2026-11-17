@@ -41,6 +41,7 @@ pub(super) fn keeps_its_type(
             column: candidate.column,
             checked: false,
             class_arguments: Vec::new(),
+            null_arguments: Vec::new(),
             text_arguments: Vec::new(),
             argument_types: Vec::new(),
             passed_before: Vec::new(),

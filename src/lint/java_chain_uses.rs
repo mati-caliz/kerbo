@@ -10,6 +10,8 @@ use crate::syntax::{named_children, one_based};
 const INVOCATION: &str = "method_invocation";
 const FIELD_ACCESS: &str = "field_access";
 const FIELD_FIELD: &str = "field";
+const CLASS_TYPE: &str = "java.lang.Class";
+const QUALIFIER_SEPARATOR: char = '.';
 const CAST: &str = "cast_expression";
 const ENHANCED_FOR: &str = "enhanced_for_statement";
 const PARENTHESIZED: &str = "parenthesized_expression";
@@ -25,7 +27,7 @@ const NOT_EMPTY_SUFFIX: &str = ".isEmpty()";
 const NEGATION: &str = "!";
 const ARGUMENTS_FIELD: &str = "arguments";
 const COMMENTS: &[&str] = &["line_comment", "block_comment"];
-const CLASS_LITERAL: &str = "class_literal";
+pub(super) const CLASS_LITERAL: &str = "class_literal";
 const STRING_LITERAL: &str = "string_literal";
 const QUOTE: char = '"';
 
@@ -93,8 +95,8 @@ pub(super) fn guarded_by_non_empty(invocation: Node<'_>, source: &[u8]) -> bool 
         })
 }
 
-// Las posiciones de los argumentos que son un literal de clase (`Long.class`).
-pub(super) fn class_arguments(invocation: Node<'_>) -> Vec<usize> {
+// Las posiciones de los argumentos de una clase de nodo: un literal de clase (`Long.class`) o `null`.
+pub(super) fn arguments_of_kind(invocation: Node<'_>, kind: &str) -> Vec<usize> {
     invocation
         .child_by_field_name(ARGUMENTS_FIELD)
         .map(named_children)
@@ -102,7 +104,7 @@ pub(super) fn class_arguments(invocation: Node<'_>) -> Vec<usize> {
         .iter()
         .filter(|argument| !COMMENTS.contains(&argument.kind()))
         .enumerate()
-        .filter(|(_, argument)| argument.kind() == CLASS_LITERAL)
+        .filter(|(_, argument)| argument.kind() == kind)
         .map(|(position, _)| position)
         .collect()
 }
@@ -153,6 +155,39 @@ pub(super) fn member_root(access: Node<'_>, source: &[u8], variables: &Variables
         owners: vec![owner],
         fields,
     })
+}
+
+// De dónde sale el objeto que recibe la primera llamada de la cadena: una variable con su tipo, una
+// clase (también calificada con su paquete), los campos de una variable o un literal de clase
+// (`Muestra.class.getResourceAsStream(...)`). Una variable sin tipo escrito (el parámetro de una
+// lambda) deja la raíz sin resolver: la cadena sirve igual para lo que no depende del tipo.
+pub(super) fn receiver_root(object: Node<'_>, source: &[u8], variables: &Variables) -> Option<ChainRoot> {
+    let written = text(object, source);
+    match object.kind() {
+        CLASS_LITERAL => Some(ChainRoot::Instance(CLASS_TYPE.to_owned())),
+        FIELD_ACCESS => {
+            let qualified_class = written
+                .rsplit(QUALIFIER_SEPARATOR)
+                .next()
+                .is_some_and(|last| last.starts_with(|first: char| first.is_ascii_uppercase()))
+                && written.starts_with(|first: char| first.is_ascii_lowercase());
+            if qualified_class {
+                return Some(ChainRoot::Class(written.to_owned()));
+            }
+            member_root(object, source, variables)
+        }
+        IDENTIFIER => Some(match variables.get(written) {
+            Some(Some(declared)) => ChainRoot::Instance(declared.clone()),
+            None if written.starts_with(|first: char| first.is_ascii_uppercase()) => {
+                ChainRoot::Class(written.to_owned())
+            }
+            Some(None) => {
+                ChainRoot::Instance(declared_simple_type(object, written, source).unwrap_or_default())
+            }
+            None => inherited_root(object, source, Vec::new()),
+        }),
+        _ => None,
+    }
 }
 
 // Una variable que el archivo no declara (`j` en una clase de test cuyo padre declara
