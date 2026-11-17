@@ -4,7 +4,8 @@
 # que gofmt 1.27 deja de cada una (`gofmt_<versión>`, con los archivos que no parsea en
 # `gofmt_<versión>.err`). Copia cada versión, la formatea con kerbo y lista en
 # `/v/diff_<versión>.txt` los archivos que no quedan idénticos; `second` formatea otra vez lo ya
-# formateado de `scr` y lista lo que cambia. Corre en el volumen porque las rutas del corpus no
+# formateado de `scr` y lista lo que cambia. `/v/rejected_<versión>.txt` son los que gofmt no parsea y
+# kerbo no deja como están. Corre en el volumen porque las rutas del corpus no
 # entran en el largo máximo de Windows.
 #
 #   heavy_lock.py -- bash scripts/parity/go/fmt_measure.sh
@@ -45,8 +46,11 @@ for version in orig scr crlf; do
   { diff -rq "/v/gofmt_${version}" "/v/kerbo_${version}" || true; } |
     sed -n "s#^Files /v/gofmt_${version}/\(.*\) and .* differ\$#\1#p" | sort |
     comm -23 - <(printf '%s\n' "${unparsed_by_gofmt}") >"/v/diff_${version}.txt"
+  sed -n "s#^kerbo: /v/kerbo_${version}/\(.*\.go\):[0-9]*: .*quedó como estaba\$#\1#p" "/v/kerbo_${version}.log" |
+    sort -u >"/v/untouched_${version}.txt"
+  comm -23 <(printf '%s\n' "${unparsed_by_gofmt}") "/v/untouched_${version}.txt" >"/v/rejected_${version}.txt"
   total="$(find "/v/${version}" -name '*.go' | wc -l)"
-  echo "${version}: $(wc -l <"/v/diff_${version}.txt") distintos de ${total} ($(printf '%s\n' "${unparsed_by_gofmt}" | grep -c . || true) que gofmt no parsea, afuera); $(grep -c 'no parsea limpio\|quedó como estaba' "/v/kerbo_${version}.log" || true) que kerbo deja como están"
+  echo "${version}: $(wc -l <"/v/diff_${version}.txt") distintos de ${total} ($(printf '%s\n' "${unparsed_by_gofmt}" | grep -c . || true) que gofmt no parsea, afuera); $(grep -c 'quedó como estaba' "/v/kerbo_${version}.log" || true) que kerbo deja como están; $(wc -l <"/v/rejected_${version}.txt") que gofmt rechaza y kerbo formatea"
 done
 rm -rf /v/kerbo_second
 cp -a /v/kerbo_scr /v/kerbo_second
@@ -56,5 +60,9 @@ echo "second: $(wc -l </v/diff_second.txt) cambian al formatear otra vez"
 for version in orig scr crlf second; do
   echo "== ${version}"
   cat "/v/diff_${version}.txt"
+done
+for version in orig scr crlf; do
+  echo "== ${version}: gofmt lo rechaza y kerbo lo formatea"
+  cat "/v/rejected_${version}.txt"
 done
 MEASURE

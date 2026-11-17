@@ -635,7 +635,7 @@ module.exports = grammar({
       '}',
     ),
 
-    _type_switch_header: $ => seq(
+    _type_switch_header: $ => prec(PREC.primary + 1, seq(
       optional(seq(
         field('initializer', $._simple_statement),
         ';',
@@ -646,7 +646,7 @@ module.exports = grammar({
       '(',
       'type',
       ')',
-    ),
+    )),
 
     type_case: $ => seq(
       'case',
@@ -749,7 +749,7 @@ module.exports = grammar({
     ),
 
     selector_expression: $ => prec(PREC.primary, seq(
-      field('operand', $._expression),
+      field('operand', choice($._expression, $.struct_type, prec.dynamic(-1, $.parenthesized_type))),
       '.',
       field('field', $._field_identifier),
     )),
@@ -785,17 +785,17 @@ module.exports = grammar({
       field('operand', $._expression),
       '.',
       '(',
-      field('type', $._type),
+      choice(field('type', $._type), 'type'),
       ')',
     )),
 
-    type_conversion_expression: $ => prec.dynamic(-1, seq(
+    type_conversion_expression: $ => prec.dynamic(-1, prec(PREC.primary, seq(
       field('type', $._type),
       '(',
       field('operand', $._expression),
       optional(','),
       ')',
-    )),
+    ))),
 
     type_instantiation_expression: $ => prec.dynamic(-1, seq(
       field('type', $._type),
@@ -849,7 +849,7 @@ module.exports = grammar({
     ),
 
     unary_expression: $ => prec(PREC.unary, seq(
-      field('operator', choice('+', '-', '!', '^', '*', '&', '<-')),
+      field('operator', choice('+', '-', '!', '^', '*', '&', '<-', '~')),
       field('operand', $._expression),
     )),
 

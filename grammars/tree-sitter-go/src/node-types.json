@@ -2004,6 +2004,14 @@
           {
             "type": "_expression",
             "named": true
+          },
+          {
+            "type": "parenthesized_type",
+            "named": true
+          },
+          {
+            "type": "struct_type",
+            "named": true
           }
         ]
       }
@@ -2252,7 +2260,7 @@
       },
       "type": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "_type",
@@ -2564,6 +2572,10 @@
           },
           {
             "type": "^",
+            "named": false
+          },
+          {
+            "type": "~",
             "named": false
           }
         ]

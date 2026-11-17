@@ -191,7 +191,7 @@ pub fn assertion(converter: &Converter<'_>, node: Node<'_>) -> Option<Expr> {
     Some(Expr::TypeAssert(Box::new(TypeAssert {
         x: field_expr(converter, node, OPERAND)?,
         lparen: token(node, "("),
-        typ: Some(field_expr(converter, node, "type")?),
+        typ: optional_expr(converter, node, "type").ok()?,
         rparen: last_token(node, ")"),
     })))
 }

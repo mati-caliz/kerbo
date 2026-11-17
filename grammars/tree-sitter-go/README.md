@@ -18,6 +18,15 @@ reglas de Go en esos archivos:
     (`_parenthesized_builtin`), y `make(tipo, x...)`.
   - `const x T` sin valor, `[...]T` como tipo fuera de un literal y etiquetas seguidas antes de un
     `}` (`L: L1:`).
+  - `*(*T)(p).f` desreferencia el campo, no es el campo de una conversión al tipo `*(*T)`: la
+    conversión tiene la precedencia de una expresión primaria, así `*` nunca cierra un tipo puntero
+    delante de un `(`. Es lo que pide la especificación (`*T(x)` es `*(T(x))`).
+  - Un tipo literal como operando de un punto (`struct{ A }.m`, `(*struct{ J }).m`): el operando de
+    `selector_expression` puede ser un `struct_type` o un `parenthesized_type`, este último con
+    precedencia dinámica negativa para que `(x.y).f` siga siendo una expresión entre paréntesis.
+  - `~x` como operador unario y `x.(type)` fuera de un `switch` (un `type_assertion_expression` sin
+    campo `type`): Go los parsea y los rechaza después. `_type_switch_header` tiene más precedencia,
+    así `switch x.(type) {` sigue siendo un `type_switch_statement`.
 
 `src/parser.c` se regenera con `scripts/parity/go/grammar.sh generate` (tree-sitter-cli 0.25.8, la
 misma versión que usó upstream); `grammar.sh test` corre el corpus de tests de upstream, que pasa

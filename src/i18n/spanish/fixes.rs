@@ -40,7 +40,7 @@ pub fn format_notice(notice: &FormatNotice) -> String {
         ),
         FormatNotice::Unparsable { path, cause } => match cause {
             Unparsable::SyntaxError { line } => {
-                format!("{path}:{line}: no parsea limpio con tree-sitter-go; quedó como estaba")
+                format!("{path}:{line}: tiene un error de sintaxis; quedó como estaba")
             }
             Unparsable::ReadsUnlikeGo { line } => {
                 format!("{path}:{line}: tree-sitter-go lo lee distinto que Go; quedó como estaba")

@@ -1850,7 +1850,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   - Ver si conviene usar `tsrs_lint` para las reglas con tipos, en vez de portarlas, midiendo
     paridad contra typescript-eslint igual que las demás.
 
-### 13. Formateo propio (empezada: Go medido contra gofmt)
+### 13. Formateo propio (Go idéntico a gofmt; faltan Python, JS/TS y Java)
 
 - Lenguaje por lenguaje, y sólo cuando la salida sea idéntica a la de la herramienta actual.
 - Go (2026-10-22; la primera versión la armó un agente en una rama aparte que quedó cortada):
@@ -1859,32 +1859,33 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   port de `go/printer` (`src/formatter/go/`: tabwriter, comentarios, cortes de línea, orden de
   imports, paréntesis que se sacan de las condiciones). `new(expresión)` de Go 1.26, que
   tree-sitter-go todavía no conoce, se parsea cambiando `new` por un nombre del mismo largo.
-  - Un archivo que tree-sitter-go no lee, o que lee distinto que Go, queda como está y se avisa:
-    formatearlo cambiaría el programa. Las lecturas distintas que se detectan: `if x {...}` seguido
-    de un bloque suelto (tree-sitter toma `x{...}` como literal), `*(*T)(p).f` (lo lee como el campo
-    de una conversión al tipo `*(*T)`) y `chan<- chan T` (lo lee como un `chan` de `<-chan T`).
-    Las dos últimas, sin la guarda, cambiaban el significado del archivo.
+  - Un archivo que gofmt no parsea queda como está y se avisa, con la línea y el motivo: error de
+    sintaxis, una lectura de tree-sitter distinta a la de Go, o sintaxis que el conversor no conoce.
+    La única lectura distinta que queda con guarda es `<-chan T(x).f` (tree-sitter lo toma como el
+    campo de una conversión a `<-chan T`; Go, como una recepción): no aparece en el corpus.
   - Los comentarios de documentación se reescriben como gofmt desde Go 1.19 (2026-11-16): port de
     `go/doc/comment` en `src/formatter/go/printer/doc_comment/` (`//texto` pasa a `// texto`, el
     código sangrado a bloques con tab, las listas a ` - ` y ` 1. `, los títulos viejos a `# Título`,
     `` y '' a comillas curvas, las definiciones de enlace al final) y un comentario que queda sin
     texto desaparece. No se portó la búsqueda de `[paquete.Nombre]`: no cambia lo que se imprime.
-  - Paridad contra gofmt 1.27 (2026-11-16) sobre 19.144 archivos (la biblioteca estándar de Go,
-    golang/tools, terraform, consul, hugo, caddy, etcd, prometheus, syncthing, tailscale, gin,
-    cobra, chi y fzf), en tres versiones: el original, uno desordenado a propósito (sangrías,
-    espacios y líneas en blanco cambiados sin tocar textos ni comentarios) y el desordenado con
-    CRLF. Los 72 que gofmt no parsea, afuera. Distintos de gofmt: 2 originales y 5 desordenados
-    (igual con CRLF), todos archivos que kerbo no lee y deja como están; lo que kerbo formatea sale
-    idéntico. Eran 28 y 50 antes del port de los comentarios, y 11 y 21 antes de los arreglos de la
-    gramática.
-  - Lo que gofmt lee y kerbo no pasó de 22 archivos a 5 arreglando la gramática propia
-    (`grammars/tree-sitter-go`, el detalle en su README): `chan<- chan T`, `if x {...}` seguido de
-    un bloque suelto (los dos se leían distinto que Go y había una guarda que frenaba el archivo),
+  - **Paridad completa contra gofmt 1.27 (2026-11-17)** sobre 19.144 archivos (la biblioteca
+    estándar de Go, golang/tools, terraform, consul, hugo, caddy, etcd, prometheus, syncthing,
+    tailscale, gin, cobra, chi y fzf), en tres versiones: el original, uno desordenado a propósito
+    (sangrías, espacios y líneas en blanco cambiados sin tocar textos ni comentarios) y el
+    desordenado con CRLF. 0 archivos distintos en las tres, y kerbo deja como están exactamente
+    los que gofmt no parsea (72 originales, 75 desordenados). Eran 2 y 5 distintos antes de esta
+    tanda, 28 y 50 antes del port de los comentarios.
+  - Lo que gofmt lee y upstream no se arregló en la gramática propia (`grammars/tree-sitter-go`,
+    el detalle en su README): `chan<- chan T`, `if x {...}` seguido de un bloque suelto,
     funciones propias llamadas `make`, `(make)(tipo)`, `const x T` sin valor, `[...]T` fuera de un
-    literal y etiquetas seguidas. Un archivo sin salto de línea final que cierra con `}` daba error
-    con tree-sitter 0.27: el formateador le agrega el salto antes de parsear.
-  - El aviso de un archivo que queda como está dice la línea y el motivo: no parsea, tree-sitter lo
-    lee distinto que Go, o sintaxis que el conversor no conoce.
+    literal, etiquetas seguidas, `*(*T)(p).f` (desreferencia del campo, no el campo de una
+    conversión a `*(*T)`), un tipo literal como operando (`struct{ A }.m`), `~x` como operador
+    unario y `x.(type)` fuera de un `switch`. Un archivo sin salto de línea final que cierra con
+    `}` daba error con tree-sitter 0.27: el formateador le agrega el salto antes de parsear.
+  - Lo que tree-sitter-go acepta y `go/parser` rechaza se valida aparte
+    (`src/formatter/go/rejected.rs`) y da error de sintaxis: parámetros con y sin nombre mezclados,
+    un `range` con más de dos variables, un `import` después de otra declaración y un salto de
+    línea sin coma antes de cerrar una lista (Go pone ahí un punto y coma).
   - Formatear dos veces cambia 8 archivos desordenados (datos de prueba de `go/types` y uno de
     `buildtag`), igual que gofmt: la segunda pasada de kerbo es idéntica a la segunda de gofmt.
   - Se mide con `scripts/parity/go/fmt_measure.sh` (por `heavy_lock.py`), sobre el volumen de
@@ -1892,14 +1893,6 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     porque las rutas no entran en el largo máximo de Windows. El script que desordena se perdió con
     la rama del agente; el corpus desordenado quedó en el volumen, que es la única copia.
   - Pendientes, en orden:
-    - 5 archivos que gofmt rechaza por error de sintaxis y kerbo formatea igual (tree-sitter los
-      acepta): parámetros con y sin nombre mezclados, una coma que falta antes del salto de línea
-      en un literal (kerbo la agrega), un `import` después de otra declaración y dos datos de prueba
-      de `go/types`. Deberían quedar como están, con el aviso de error de sintaxis.
-    - Los 5 que gofmt lee y kerbo no: `*(*struct{...})(p).f` (la guarda de lectura distinta),
-      `struct{ A }.m` y `(*struct{ J }).m` (un tipo literal como operando), `~x` como operador
-      unario y `x.(type)` fuera de un `switch`. Salvo el primero, son datos de prueba del
-      compilador que no compilan.
     - Recomendar `kerbo fmt` en la documentación. Después de Go: ruff format (Python), Prettier
       (JS/TS) y google-java-format (Java).
 - Con el formateador, compilar los tests con cobertura queda al borde de los 1,5 GB del gate: sin

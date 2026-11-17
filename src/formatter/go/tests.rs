@@ -9,6 +9,8 @@ const DOC_COMMENTS_SOURCE: &str = include_str!("fixtures/doc_comments.go");
 const DOC_COMMENTS_EXPECTED: &str = include_str!("fixtures/doc_comments.gofmt");
 const RARE_SYNTAX_SOURCE: &str = include_str!("fixtures/rare_syntax.go");
 const RARE_SYNTAX_EXPECTED: &str = include_str!("fixtures/rare_syntax.gofmt");
+const OPERANDS_SOURCE: &str = include_str!("fixtures/operands.go");
+const OPERANDS_EXPECTED: &str = include_str!("fixtures/operands.gofmt");
 
 fn assert_formats_like_gofmt(source: &str, expected: &str) {
     assert_eq!(format(source).as_deref(), Ok(expected));
@@ -109,13 +111,16 @@ fn reads_the_brace_after_a_condition_as_the_body() {
     assert_eq!(format(literal).as_deref(), Ok(literal));
 }
 
-// `*(*struct{...})(p).f` tree-sitter-go lo lee distinto que Go: formatearlo cambiaría el programa.
-// Lo que sí es así (`(*p).f`) se formatea, y los canales de canales quedan como los escribe gofmt.
+// `<-chan int(c).f` tree-sitter-go lo lee como el campo de una conversión a `<-chan int` y Go como
+// una recepción: formatearlo cambiaría el programa. `*(*T)(p).f` sí se lee como Go, y los canales
+// de canales quedan como los escribe gofmt.
 #[test]
 fn leaves_untouched_what_tree_sitter_reads_with_another_meaning() {
+    let receive = "package main\n\nfunc f() {\n\t_ = <-chan int(c).f\n}\n";
+    assert_eq!(format(receive), Err(Unparsable::ReadsUnlikeGo { line: 4 }));
     let deref =
         "package main\n\nfunc f() {\n\t*(*struct {\n\t\tp *byte\n\t})(unsafe.Pointer(&s)).p = 'H'\n}\n";
-    assert_eq!(format(deref), Err(Unparsable::ReadsUnlikeGo { line: 4 }));
+    assert_eq!(format(deref).as_deref(), Ok(deref));
     let send = "package main\n\nvar c chan<- chan string\n";
     assert_eq!(format(send).as_deref(), Ok(send));
     let valid = "package main\n\nvar c <-chan <-chan string\nvar d chan<- <-chan int\n\nfunc f() {\n\t(*p).f = 1\n}\n";
@@ -174,4 +179,31 @@ fn keeps_the_parentheses_that_protect_a_composite_literal() {
     let formatted = format(KEPT_PARENS).expect("se formatea");
     assert!(formatted.contains("\tif (func() bool {\n"), "{formatted}");
     assert!(formatted.contains("\tif x {\n"), "{formatted}");
+}
+
+// Operandos que go/parser lee y upstream no: `*(*T)(p).f` como desreferencia del campo, un tipo
+// literal antes de un punto, `~x` y `x.(type)` fuera de un `switch`.
+#[test]
+fn formats_the_operands_that_only_the_go_parser_reads() {
+    assert_formats_like_gofmt(OPERANDS_SOURCE, OPERANDS_EXPECTED);
+}
+
+// Lo que tree-sitter-go acepta y go/parser rechaza queda como está, igual que con gofmt.
+#[test]
+fn leaves_untouched_what_only_tree_sitter_accepts() {
+    const REJECTED: [(&str, usize); 8] = [
+        ("package p\n\nvar x int\n\nimport \"fmt\"\n", 5),
+        ("package p\n\nfunc f(a int, b)\n", 3),
+        ("package p\n\nfunc f() (n int, error)\n", 3),
+        ("package p\n\nfunc f() {\n\tfor i, j, k := range s {\n\t}\n}\n", 4),
+        ("package p\n\nvar x = T{\n\ta: 1\n}\n", 4),
+        ("package p\n\nvar x = f(\n\t1,\n\tg() // c\n)\n", 5),
+        ("package p\n\nvar x = a[i /* c\n*/]\n", 3),
+        ("package p\n\nvar x = (a +\n\t\"b\"\n)\n", 4),
+    ];
+    for (source, line) in REJECTED {
+        assert_eq!(format(source), Err(Unparsable::SyntaxError { line }), "{source}");
+    }
+    let accepted = "package p\n\nimport \"a\"\nimport (\n\t\"b\"\n)\n\nvar (\n\tx = f(\n\t\ta...,\n\t)\n\ty = g(b...,\n\t)\n\tz = s[1:\n\t]\n)\n\nfunc h(a, b int, c ...string) (int, error) {\n\tfor i, j := range s {\n\t}\n\treturn f(\n\t), T{\n\t}\n}\n";
+    assert!(format(accepted).is_ok(), "{:?}", format(accepted));
 }

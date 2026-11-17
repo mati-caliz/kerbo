@@ -6,6 +6,7 @@ mod imports;
 mod nodes;
 mod position;
 mod printer;
+mod rejected;
 mod token;
 
 use std::sync::LazyLock;
@@ -37,6 +38,11 @@ pub fn format(source: &str) -> Result<String, Unparsable> {
 // (y no deja ningún nodo de error en el árbol): por eso el fuente llega siempre con su salto final.
 fn format_terminated(source: &str) -> Result<String, Unparsable> {
     let tree = parse(source)?;
+    if let Some(rejected) = rejected::first_rejected(tree.root_node()) {
+        return Err(Unparsable::SyntaxError {
+            line: line_of(rejected),
+        });
+    }
     if let Some(misread) = ambiguity::first_misread(tree.root_node()) {
         return Err(Unparsable::ReadsUnlikeGo {
             line: line_of(misread),
