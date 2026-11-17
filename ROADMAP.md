@@ -1892,9 +1892,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     Docker `fmt-parity`: ahí están las tres versiones del corpus y lo que gofmt deja de cada una,
     porque las rutas no entran en el largo máximo de Windows. El script que desordena se perdió con
     la rama del agente; el corpus desordenado quedó en el volumen, que es la única copia.
-  - Pendientes, en orden:
-    - Recomendar `kerbo fmt` en la documentación. Después de Go: ruff format (Python), Prettier
-      (JS/TS) y google-java-format (Java).
+  - Lo que sigue: ruff format (Python), Prettier (JS/TS) y google-java-format (Java), en ese
+    orden y cada uno con su corpus medido antes de recomendarlo.
 - Con el formateador, compilar los tests con cobertura queda al borde de los 1,5 GB del gate: sin
   la caché caliente lo mata el límite de memoria (SIGKILL). Pasa, pero hay que ganar margen
   (partir el crate o bajar la información de depuración de los tests) antes de que crezca más.

@@ -94,7 +94,8 @@ encuentra en cada edición, para que lo corrija en la misma vuelta:
 
 ## Documentación
 
-- [Uso](docs/uso.md): todas las opciones, la caché, `kerbo fix`, la línea de base y la antitrampa.
+- [Uso](docs/uso.md): todas las opciones, la caché, `kerbo fix`, `kerbo fmt`, la línea de base y la
+  antitrampa.
 - [Configuración](docs/configuracion.md): `kerbo.toml`, los presets y GitHub Actions.
 - [Agentes de IA y editores](docs/agentes-y-editores.md): el hook, el demonio, MCP y LSP.
 - [Reglas](docs/reglas.md): las métricas comunes y sus umbrales por lenguaje.

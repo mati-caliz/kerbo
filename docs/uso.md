@@ -12,6 +12,8 @@ kerbo osv-download                # baja la base de OSV para usar --osv=offline 
 kerbo baseline                    # acepta lo que ya hay: desde ahora sólo se reporta lo nuevo
 kerbo fix                         # aplica de una vez todos los arreglos mecánicos
 kerbo fix --dry-run --rule unused-import src  # sólo muestra el parche, de una regla y una carpeta
+kerbo fmt                         # formatea los .go igual que gofmt, sin tener Go instalado
+kerbo fmt --check                 # no escribe: lista los que cambiarían
 kerbo explain cognitive-complexity  # por qué existe una regla y cómo se arregla
 ```
 
@@ -55,6 +57,21 @@ sólo se aplican con `--unsafe-fixes`; el "arreglar todo" del LSP tampoco los to
 problemas de las líneas que cambiaron desde esa referencia de git. Una vuelta de arreglos que deja
 errores de sintaxis nuevos no se acepta. Sale con `0` si todo quedó escrito, `1` si algún archivo
 no se escribió porque el arreglo dejaba algo nuevo y `2` si algo no se pudo leer o escribir.
+
+## Formatear
+
+`kerbo fmt` reescribe los archivos `.go` con el formato de gofmt, sin tener Go instalado: usalo en
+lugar de `gofmt -w` (o de `gofmt -l` con `--check`) en el hook, en el editor y en CI. No es una
+imitación a ojo: arma el mismo árbol que `go/parser` y lo imprime con un port de `go/printer`, y
+está medido contra gofmt 1.27 sobre 19.144 archivos (el detalle en
+[Paridad](paridad.md#go-contra-golangci-lint)). Por ahora sólo Go; los demás lenguajes se suman
+cuando su salida sea idéntica a la de su formateador.
+
+Sin rutas formatea el directorio actual, con las mismas exclusiones que `kerbo check`. Un archivo
+con un error de sintaxis queda como está y se avisa con la línea, igual que con gofmt. Cada archivo
+se escribe entero a un temporal que después se renombra. `--check` no escribe nada y lista los
+archivos que cambiarían. Sale con `0` si todo quedó formateado (o ya lo estaba), `1` si `--check`
+encontró alguno sin formatear y `2` si algún archivo no se pudo leer, escribir o parsear.
 
 ## Adoptarlo en un repo que ya existe
 

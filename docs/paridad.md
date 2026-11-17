@@ -146,6 +146,12 @@ staticcheck (`s1009`, `s1011`, `s1017`, `s1038`, `sa1006`, `sa2001`, `sa4004`, `
 `st1008`, `qf1007` y más) que dan lo mismo que golangci-lint en sus casos de prueba y en los 26 avisos del corpus. Lo demás de
 govet y de staticcheck sigue en golangci-lint.
 
+`kerbo fmt` contra gofmt 1.27: salida idéntica en los 19.144 archivos de la biblioteca estándar de
+Go, golang/tools, terraform, consul, hugo, caddy, etcd, prometheus, syncthing, tailscale, gin,
+cobra, chi y fzf, medidos tres veces: como están, desordenados a propósito (sangrías, espacios y
+líneas en blanco cambiados) y desordenados con CRLF. Los únicos que deja como están son los que
+gofmt tampoco parsea (72 y 75), y formatear dos veces da lo mismo que gofmt dos veces.
+
 ## Migraciones y contenedores
 
 kerbo también revisa lo que se despliega junto al código: las migraciones de Postgres, los

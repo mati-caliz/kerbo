@@ -95,7 +95,8 @@ finds on every edit, so it fixes it in the same turn:
 
 ## Documentation
 
-- [Usage](docs/en/uso.md): every option, the cache, `kerbo fix`, the baseline and the anti-cheat.
+- [Usage](docs/en/uso.md): every option, the cache, `kerbo fix`, `kerbo fmt`, the baseline and the
+  anti-cheat.
 - [Configuration](docs/en/configuracion.md): `kerbo.toml`, the presets and GitHub Actions.
 - [AI agents and editors](docs/en/agentes-y-editores.md): the hook, the daemon, MCP and LSP.
 - [Rules](docs/en/reglas.md): the shared metrics and their thresholds per language.

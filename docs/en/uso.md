@@ -12,6 +12,8 @@ kerbo osv-download                # download the OSV database to use --osv=offli
 kerbo baseline                    # accept what is already there: from now on only new problems
 kerbo fix                         # apply every mechanical fix at once
 kerbo fix --dry-run --rule unused-import src  # only show the patch, for one rule and one folder
+kerbo fmt                         # format .go files exactly like gofmt, without Go installed
+kerbo fmt --check                 # write nothing: list the ones that would change
 kerbo explain cognitive-complexity  # why a rule exists and how to fix it
 ```
 
@@ -57,6 +59,21 @@ only applied with `--unsafe-fixes`; the LSP "fix all" skips them too. `--since <
 on lines changed since that git reference. A round of fixes that leaves new syntax errors is not
 accepted. It exits with `0` if everything was written, `1` if some file was not written because the
 fix left something new and `2` if something could not be read or written.
+
+## Formatting
+
+`kerbo fmt` rewrites `.go` files with gofmt's format, without Go installed: use it instead of
+`gofmt -w` (or `gofmt -l`, with `--check`) in the hook, in the editor and in CI. It is not an
+approximation: it builds the same tree as `go/parser` and prints it with a port of `go/printer`,
+and it is measured against gofmt 1.27 on 19,144 files (the details are in
+[Parity](paridad.md#go-against-golangci-lint)). Only Go for now; the other languages are added
+once their output is identical to their formatter's.
+
+Without paths it formats the current directory, with the same exclusions as `kerbo check`. A file
+with a syntax error is left as it was and reported with its line, just like gofmt does. Each file
+is written whole to a temporary file that is then renamed. `--check` writes nothing and lists the
+files that would change. It exits with `0` if everything was formatted (or already was), `1` if
+`--check` found an unformatted file and `2` if a file could not be read, written or parsed.
 
 ## Adopting it in an existing repo
 
