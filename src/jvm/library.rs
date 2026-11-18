@@ -4,9 +4,11 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use super::class_code::{ClassCode, parse_code};
 use super::class_file::{ClassFile, parse};
 use super::jdk::Jdk;
 use super::method::Method;
+use super::null_parameters::ParameterKey;
 use super::zip::Archive;
 
 const CLASS_EXTENSION: &str = ".class";
@@ -28,6 +30,8 @@ pub struct Library {
     classes: RefCell<HashMap<String, Option<Rc<ClassFile>>>>,
     jdk: Option<Jdk>,
     jdk_classes: RefCell<HashMap<String, Option<Rc<ClassFile>>>>,
+    codes: RefCell<HashMap<String, Option<Rc<ClassCode>>>>,
+    inferred_parameters: RefCell<HashMap<ParameterKey, Option<bool>>>,
     release: Option<u32>,
 }
 
@@ -53,6 +57,8 @@ impl Library {
             classes: RefCell::new(HashMap::new()),
             jdk: None,
             jdk_classes: RefCell::new(HashMap::new()),
+            codes: RefCell::new(HashMap::new()),
+            inferred_parameters: RefCell::new(HashMap::new()),
             release: None,
         }
     }
@@ -120,6 +126,35 @@ impl Library {
             .borrow_mut()
             .insert(name.to_owned(), found.clone());
         found
+    }
+
+    // El bytecode de una clase por su nombre de Java (`a.b.C.D`), de las dependencias o del JDK.
+    pub fn code_of(&self, name: &str) -> Option<Rc<ClassCode>> {
+        entry_candidates(name)
+            .into_iter()
+            .find_map(|entry| self.code_entry(&entry))
+    }
+
+    // Lo mismo por su nombre en el bytecode (`a/b/C$D`).
+    pub fn code_at(&self, binary: &str) -> Option<Rc<ClassCode>> {
+        self.code_entry(&format!("{binary}{CLASS_EXTENSION}"))
+    }
+
+    fn code_entry(&self, entry: &str) -> Option<Rc<ClassCode>> {
+        if let Some(known) = self.codes.borrow().get(entry) {
+            return known.clone();
+        }
+        let bytes = match self.owners.get(entry) {
+            Some(owner) => self.archives.get(*owner)?.read(entry),
+            None => self.jdk.as_ref()?.read_code(entry),
+        };
+        let found = bytes.and_then(|bytes| parse_code(&bytes).ok().map(Rc::new));
+        self.codes.borrow_mut().insert(entry.to_owned(), found.clone());
+        found
+    }
+
+    pub(super) const fn inferred_parameters(&self) -> &RefCell<HashMap<ParameterKey, Option<bool>>> {
+        &self.inferred_parameters
     }
 
     fn read_class(&self, entry: &str) -> Option<Rc<ClassFile>> {

@@ -1,0 +1,99 @@
+use std::path::Path;
+
+use super::java_hardcoded_contracts::has_hardcoded_contract;
+use super::java_throws_tests::fixture_jdk;
+use super::tests::summary_of;
+use super::{IndexedSummary, project_lints};
+use crate::jvm::library::Library;
+
+const CALLS: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+import sample.inferred.Checks;
+import sample.inferred.Overloads;
+
+final class Calls {
+    static @Nullable String first() {
+        return null;
+    }
+
+    static @Nullable String second() {
+        return null;
+    }
+
+    static @Nullable String third() {
+        return null;
+    }
+
+    static @Nullable String fourth() {
+        return null;
+    }
+
+    static @Nullable String fifth() {
+        return null;
+    }
+
+    static @Nullable String sixth() {
+        return null;
+    }
+
+    static @Nullable String seventh() {
+        return null;
+    }
+
+    void call() {
+        Checks.direct(first());
+        Checks.untouched(second());
+        Checks.forwarded(third());
+        new Checks(fourth());
+        Overloads.size(fifth());
+        Overloads.exported(fifth());
+        Overloads.all(sixth());
+        Overloads.any(seventh());
+    }
+}
+";
+
+// Lo que IntelliJ infiere del bytecode de un jar: `direct` desreferencia su parámetro, `forwarded`
+// se lo pasa a `direct` y el constructor también lo usa. `untouched` lo devuelve tal cual y las dos
+// `size` públicas no coinciden; la `exported` que no se ve desde otro paquete no cuenta. Con una sobrecarga de varargs al lado (`all`, `any`) sólo se sabe que corre
+// la fija si recibe un `Object`.
+#[test]
+fn a_nullable_call_passed_to_a_parameter_the_bytecode_dereferences_is_reported() {
+    let jar = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/jvm/fixtures/inferred.jar");
+    let summary = summary_of(CALLS);
+    let files = [IndexedSummary {
+        summary: &summary,
+        in_tests: false,
+    }];
+    let library = Library::load(&[jar]).with_jdk(fixture_jdk());
+    let found: Vec<String> = project_lints(&files, &library)
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == "null-argument")
+        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            "37:23 String",
+            "39:26 String",
+            "40:20 String",
+            "42:28 String",
+            "44:23 Object"
+        ]
+    );
+}
+
+// `requireNonNull`, los asserts de JUnit y cualquier `equals` tienen contrato propio en IntelliJ; un
+// método cualquiera de esas clases, no.
+#[test]
+fn methods_with_a_hardcoded_contract_are_known() {
+    assert!(has_hardcoded_contract("java.util.Objects", "requireNonNull", 1));
+    assert!(has_hardcoded_contract("org.junit.Assert", "assertNotNull", 1));
+    assert!(has_hardcoded_contract("org.hamcrest.MatcherAssert", "fail", 0));
+    assert!(has_hardcoded_contract("sample.inferred.Checks", "equals", 1));
+    assert!(!has_hardcoded_contract("java.util.Objects", "hash", 1));
+    assert!(!has_hardcoded_contract("org.junit.Assert", "assertEquals", 2));
+    assert!(!has_hardcoded_contract("sample.inferred.Checks", "equals", 2));
+}

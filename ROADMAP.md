@@ -1621,10 +1621,10 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   crea uno lo pierde. Pendiente: medir spring-boot.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 17 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 849 de los 972 (491 `data-flow-issue`, 309 `null-argument`, 25
+  de más en los dos. En guava, 851 de los 972 (491 `data-flow-issue`, 311 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
-  (2026-11-17) 1061 de 1258 (987 `data-flow-issue`, 56 `null-argument`, 9 `already-assigned`, 9
+  (2026-11-18) 1088 de 1258 (987 `data-flow-issue`, 83 `null-argument`, 9 `already-assigned`, 9
   `nullable-return`) con
   9 de más: correlaciones que IntelliJ sigue partiendo estados y contratos inferidos
   (`if (!isValidData(data)) return null;`). La última tanda sumó 158: una variable que el archivo no
@@ -1638,10 +1638,25 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   filtro también puede dar null). Un parámetro que el proyecto anota `@NonNull` no admite null
   aunque el método se pueda redefinir (sumó 26 `null-argument`), y `already-assigned` calca el
   contrato inferido de un método del archivo que nadie redefine y siempre devuelve uno de sus
-  parámetros o `this` (`r = agregar(r, p)`, `vista = vista.withJobs(...)`). Lo que falta (197):
-  `Argument might be null` de llamadas pasadas a parámetros de jars o del JDK (~45: IntelliJ los
-  infiere del bytecode, `new URL(x)`, `IOUtils.readLines(is, ...)`; kerbo no lee el código de los
-  `.class`), el mensaje `@Nullable method 'x' always returns a non-null value` (9 acá y 7 en guava:
+  parámetros o `this` (`r = agregar(r, p)`, `vista = vista.withJobs(...)`). kerbo ya lee el
+  bytecode de los jars y del JDK y calca el `@NotNull` que IntelliJ infiere para un parámetro
+  (`NonNullInAnalysis`, en `src/jvm/null_parameters.rs`): el método lo desreferencia, o tira cuando
+  es null, en todos los caminos que terminan bien, directo o pasándolo a otro método que lo exige
+  (`FileUtils.copyURLToFile(getClass().getResource(..), f)`, `new ExtractResourceSCM(url)`,
+  `IOUtils.toString(stream)`); sumó 27 en jenkins y 2 en guava sin ninguno de más. Sólo vale, como
+  en IntelliJ, para un método que nadie puede redefinir (estático, `final`, privado, constructor o
+  de clase `final`: `canInferFromByteCode`) y que no tiene contrato escrito a mano
+  (`HardcodedContracts`: `requireNonNull`, `checkNotNull`, los asserts; tabla en
+  `src/index/java_hardcoded_contracts.rs`); con sobrecargas, todas las públicas de esa cantidad de
+  parámetros tienen que exigirlo, y con una de varargs al lado sólo si la fija recibe un `Object`.
+  Lo que falta (170): los `Argument might be null` en que hay que elegir la sobrecarga por el tipo
+  del argumento (`new PrintStream(p.stdout())` frente a `PrintStream(String)`,
+  `IOUtils.toString(url, charset)`, `Files.copy(stream, path, opciones...)`: unos 12 entre jenkins
+  y maven), los que salen de una variable (`copyURLToFile(res, f)` dentro de una lambda,
+  `includePattern.matcher(itemName)`), el `@Nullable` que IntelliJ infiere del bytecode para lo que
+  devuelve un método de librería (`FileUtils.toFile(url)` pasado a `Util.loadFile`, 7), el contrato
+  `null -> fail` que infiere para un método puro (`hasFailContract`: ahí no anota el parámetro;
+  kerbo no lo calca y no dio de más en el corpus), el mensaje `@Nullable method 'x' always returns a non-null value` (9 acá y 7 en guava:
   pide una subregla nueva), parámetros que heredan el `@CheckForNull` del método que redefinen,
   variables `var` y parámetros de lambda sin tipo como raíz de una cadena, y desreferencias sueltas.
   Para jenkins sumaron: una cadena que empieza en el campo de una variable (`j.jenkins.getView(...)`)

@@ -1,3 +1,4 @@
+use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -32,6 +33,8 @@ pub enum Jdk {
     Symbols {
         archive: Archive,
         entries: HashMap<String, String>,
+        home: PathBuf,
+        runtime: OnceCell<Option<ModulesImage>>,
     },
     Image(ModulesImage),
 }
@@ -58,7 +61,18 @@ impl Jdk {
 
     pub fn read(&self, entry: &str) -> Option<Vec<u8>> {
         match self {
-            Self::Symbols { archive, entries } => archive.read(entries.get(entry)?),
+            Self::Symbols { archive, entries, .. } => archive.read(entries.get(entry)?),
+            Self::Image(image) => image.read(entry),
+        }
+    }
+
+    // Una clase con su bytecode: `ct.sym` sólo trae las firmas, así que sale siempre de `lib/modules`.
+    pub fn read_code(&self, entry: &str) -> Option<Vec<u8>> {
+        match self {
+            Self::Symbols { home, runtime, .. } => runtime
+                .get_or_init(|| ModulesImage::open(&home.join(MODULES_FILE)))
+                .as_ref()?
+                .read(entry),
             Self::Image(image) => image.read(entry),
         }
     }
@@ -105,7 +119,12 @@ fn symbols(home: &Path, release: u32) -> Option<Jdk> {
         .names()
         .filter_map(|name| Some((class_entry(name, code)?, name.to_owned())))
         .collect();
-    (!entries.is_empty()).then_some(Jdk::Symbols { archive, entries })
+    (!entries.is_empty()).then(|| Jdk::Symbols {
+        archive,
+        entries,
+        home: home.to_path_buf(),
+        runtime: OnceCell::new(),
+    })
 }
 
 fn release_code(release: u32) -> Option<char> {

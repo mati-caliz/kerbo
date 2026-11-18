@@ -9,6 +9,7 @@ mod java_exact_classes;
 pub mod java_exposure;
 mod java_failing_calls;
 mod java_forwarded_returns;
+mod java_hardcoded_contracts;
 mod java_header;
 mod java_import_shadow_rule;
 mod java_inferred_arguments;
@@ -69,6 +70,8 @@ mod java_import_shadow_tests;
 mod java_member_type_tests;
 #[cfg(test)]
 mod java_null_assertion_tests;
+#[cfg(test)]
+mod java_null_bytecode_argument_tests;
 #[cfg(test)]
 mod java_null_iteration_tests;
 #[cfg(test)]

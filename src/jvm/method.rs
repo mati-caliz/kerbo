@@ -1,7 +1,9 @@
 use super::class_file::binary_to_source;
 
 const PACKAGE_SEPARATOR: char = '.';
+const ACCESS_PUBLIC: u16 = 0x0001;
 const ACCESS_PRIVATE: u16 = 0x0002;
+const ACCESS_PROTECTED: u16 = 0x0004;
 const ACCESS_STATIC: u16 = 0x0008;
 const ACCESS_VARARGS: u16 = 0x0080;
 pub(super) const DESCRIPTOR_OPEN: u8 = b'(';
@@ -28,6 +30,11 @@ pub struct Method {
 impl Method {
     pub const fn is_private(&self) -> bool {
         self.access & ACCESS_PRIVATE != 0
+    }
+
+    // Si se lo puede llamar desde otro paquete: público o protegido.
+    pub const fn is_exported(&self) -> bool {
+        self.access & (ACCESS_PUBLIC | ACCESS_PROTECTED) != 0
     }
 
     pub const fn is_varargs(&self) -> bool {

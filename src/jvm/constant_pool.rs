@@ -1,20 +1,20 @@
 use super::class_file::{Cursor, FOUR_BYTES, Malformed, THREE_BYTES, TWO_BYTES, binary_to_source};
 
-const UTF8: u8 = 1;
+pub(super) const UTF8: u8 = 1;
 const INTEGER: u8 = 3;
 const FLOAT: u8 = 4;
 pub(super) const LONG: u8 = 5;
 pub(super) const DOUBLE: u8 = 6;
-const CLASS: u8 = 7;
+pub(super) const CLASS: u8 = 7;
 const STRING: u8 = 8;
-const FIELD_REFERENCE: u8 = 9;
-const METHOD_REFERENCE: u8 = 10;
-const INTERFACE_METHOD_REFERENCE: u8 = 11;
-const NAME_AND_TYPE: u8 = 12;
+pub(super) const FIELD_REFERENCE: u8 = 9;
+pub(super) const METHOD_REFERENCE: u8 = 10;
+pub(super) const INTERFACE_METHOD_REFERENCE: u8 = 11;
+pub(super) const NAME_AND_TYPE: u8 = 12;
 const METHOD_HANDLE: u8 = 15;
 const METHOD_TYPE: u8 = 16;
-const DYNAMIC: u8 = 17;
-const INVOKE_DYNAMIC: u8 = 18;
+pub(super) const DYNAMIC: u8 = 17;
+pub(super) const INVOKE_DYNAMIC: u8 = 18;
 const MODULE: u8 = 19;
 const PACKAGE: u8 = 20;
 const EIGHT_BYTES: usize = 8;

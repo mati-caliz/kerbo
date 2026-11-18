@@ -4,7 +4,8 @@ use super::java::{
 use super::java_dereference::{known_not_null, may_return_null};
 use super::java_inferred_arguments::context_inferred_non_null;
 use super::java_library_arguments::{
-    called_type, inherited_library_class, library_annotated_non_null, library_substituted_non_null,
+    called_type, inherited_library_class, library_annotated_non_null, library_inferred_non_null,
+    library_substituted_non_null,
 };
 use super::java_null_origins::{fails_on_null, may_be_null};
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
@@ -38,6 +39,9 @@ const LIBRARY_NON_NULL: &[(&str, &str, usize, usize, &str)] = &[
     ("java.io.OutputStream", "write", 1, 0, "b"),
     ("java.io.OutputStream", "write", 3, 0, "b"),
     ("java.lang.Comparable", "compareTo", 1, 0, "o"),
+    ("java.util.regex.Pattern", "matcher", 1, 0, "input"),
+    ("java.lang.String", "endsWith", 1, 0, "suffix"),
+    ("java.lang.String", "compareToIgnoreCase", 1, 0, "str"),
 ];
 
 // Calca el "Passing 'null' argument to parameter annotated as non-null" de DataFlowIssue con lo que
@@ -159,6 +163,7 @@ pub(super) fn non_null_parameter(
     {
         return library_non_null(library, &class, argument)
             .or_else(|| library_annotated_non_null(library, &class, argument))
+            .or_else(|| library_inferred_non_null(library, &class, argument))
             .or_else(|| {
                 library_substituted_non_null(
                     library,

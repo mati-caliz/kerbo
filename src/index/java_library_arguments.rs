@@ -1,8 +1,10 @@
 use super::java::JavaSummary;
+use super::java_hardcoded_contracts::has_hardcoded_contract;
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::generics::{Generic, class_signature, method_signature};
 use crate::jvm::library::Library;
 use crate::jvm::method::Method;
+use crate::jvm::null_parameters::requires_non_null;
 use crate::lint::java_called_receivers::CalledReceiver;
 use crate::lint::java_null_inference::NullArgument;
 use crate::lint::java_receiver_arguments::{ArgumentNullness, InheritedMember};
@@ -16,6 +18,9 @@ use crate::lint::java_receivers::Receiver;
 // método, cantidad de argumentos y posición.
 pub(super) const NON_NULL_ANNOTATIONS: &[&str] = &["NonNull", "Nonnull", "NotNull"];
 const QUALIFIER_SEPARATOR: char = '.';
+const CONSTRUCTOR: &str = "<init>";
+const OBJECT: &str = "Object";
+const UNNAMED_PARAMETER: &str = "arg";
 const LIBRARY_NULLABLE: &[(&str, &str, usize, usize)] = &[("java.util.Optional", "orElse", 1, 0)];
 
 pub(super) fn library_substituted_non_null(
@@ -82,6 +87,39 @@ pub(super) fn library_annotated_non_null(
                 })
     });
     annotated.then(|| first.parameter_class(argument.index)).flatten()
+}
+
+// Un parámetro que IntelliJ infiere no nulo del bytecode del jar o del JDK (`FileUtils.copyURLToFile`
+// desreferencia su `URL`, `new PrintStream(out)` tira si `out` es null), salvo en los métodos con
+// contrato escrito a mano. Como el compilador, primero las sobrecargas sin varargs con esa cantidad
+// de parámetros que se pueden llamar desde afuera, y todas tienen que exigirlo; si también entra una con varargs (`Path.of(String,
+// String...)` junto a `Path.of(URI)`), sólo se sabe cuál corre cuando la fija recibe un `Object`.
+pub(super) fn library_inferred_non_null(
+    library: &Library,
+    class: &str,
+    argument: &NullArgument,
+) -> Option<String> {
+    let name = if argument.is_constructor {
+        CONSTRUCTOR
+    } else {
+        argument.name.as_str()
+    };
+    let (declaring, overloads) = library.declared_overloads(class, name, argument.arity)?;
+    if has_hardcoded_contract(&declaring.name, name, argument.arity) {
+        return None;
+    }
+    let (variadic, fixed): (Vec<&Method>, Vec<&Method>) = overloads
+        .iter()
+        .filter(|method| method.is_exported())
+        .partition(|method| method.is_varargs());
+    let first = *fixed.first()?;
+    let parameter = first.parameter_class(argument.index);
+    let is_chosen = variadic.is_empty() || (fixed.len() == 1 && parameter.as_deref() == Some(OBJECT));
+    (is_chosen
+        && fixed
+            .iter()
+            .all(|method| requires_non_null(library, &declaring.name, method, argument.index)))
+    .then(|| parameter.unwrap_or_else(|| format!("{UNNAMED_PARAMETER}{}", argument.index)))
 }
 
 fn class_variables(library: &Library, class: &str) -> Option<Vec<String>> {
