@@ -82,6 +82,15 @@ impl Method {
             .map(str::to_owned)
     }
 
+    // La clase del parámetro con su paquete (`java.io.InputStream`), si es un objeto.
+    pub fn parameter_type(&self, position: usize) -> Option<String> {
+        let descriptor = self.parameter_descriptors().into_iter().nth(position)?;
+        let binary = descriptor
+            .strip_prefix(char::from(OBJECT_START))?
+            .strip_suffix(char::from(OBJECT_END))?;
+        Some(binary_to_source(binary))
+    }
+
     fn parameter_descriptors(&self) -> Vec<&str> {
         let parameters = self
             .descriptor

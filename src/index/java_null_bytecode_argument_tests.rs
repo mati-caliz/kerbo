@@ -50,14 +50,17 @@ final class Calls {
         Overloads.exported(fifth());
         Overloads.all(sixth());
         Overloads.any(seventh());
+        Overloads.any(null);
+        Overloads.size(null);
     }
 }
 ";
 
 // Lo que IntelliJ infiere del bytecode de un jar: `direct` desreferencia su parámetro, `forwarded`
-// se lo pasa a `direct` y el constructor también lo usa. `untouched` lo devuelve tal cual y las dos
-// `size` públicas no coinciden; la `exported` que no se ve desde otro paquete no cuenta. Con una sobrecarga de varargs al lado (`all`, `any`) sólo se sabe que corre
-// la fija si recibe un `Object`.
+// se lo pasa a `direct` y el constructor también lo usa; `untouched` lo devuelve tal cual. La
+// sobrecarga sale del tipo de lo que se pasa: un `String` va a `size(String)` y a `all(String)`,
+// no a `size(StringBuilder)` ni a la de varargs. Un `null` escrito no tiene tipo: en `any` corre
+// la fija porque recibe un `Object`, y en `size` las dos públicas no coinciden.
 #[test]
 fn a_nullable_call_passed_to_a_parameter_the_bytecode_dereferences_is_reported() {
     let jar = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/jvm/fixtures/inferred.jar");
@@ -79,8 +82,11 @@ fn a_nullable_call_passed_to_a_parameter_the_bytecode_dereferences_is_reported()
             "37:23 String",
             "39:26 String",
             "40:20 String",
+            "41:24 String",
             "42:28 String",
-            "44:23 Object"
+            "43:23 String",
+            "44:23 Object",
+            "45:23 Object"
         ]
     );
 }

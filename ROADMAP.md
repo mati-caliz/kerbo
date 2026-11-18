@@ -1624,7 +1624,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   de más en los dos. En guava, 851 de los 972 (491 `data-flow-issue`, 311 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
-  (2026-11-18) 1088 de 1258 (987 `data-flow-issue`, 83 `null-argument`, 9 `already-assigned`, 9
+  (2026-11-18) 1092 de 1258 (987 `data-flow-issue`, 87 `null-argument`, 9 `already-assigned`, 9
   `nullable-return`) con
   9 de más: correlaciones que IntelliJ sigue partiendo estados y contratos inferidos
   (`if (!isValidData(data)) return null;`). La última tanda sumó 158: una variable que el archivo no
@@ -1643,16 +1643,18 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   (`NonNullInAnalysis`, en `src/jvm/null_parameters.rs`): el método lo desreferencia, o tira cuando
   es null, en todos los caminos que terminan bien, directo o pasándolo a otro método que lo exige
   (`FileUtils.copyURLToFile(getClass().getResource(..), f)`, `new ExtractResourceSCM(url)`,
-  `IOUtils.toString(stream)`); sumó 27 en jenkins y 2 en guava sin ninguno de más. Sólo vale, como
+  `IOUtils.toString(stream)`); sumó 31 en jenkins, 2 en maven y 2 en guava sin ninguno de más. Sólo vale, como
   en IntelliJ, para un método que nadie puede redefinir (estático, `final`, privado, constructor o
   de clase `final`: `canInferFromByteCode`) y que no tiene contrato escrito a mano
   (`HardcodedContracts`: `requireNonNull`, `checkNotNull`, los asserts; tabla en
-  `src/index/java_hardcoded_contracts.rs`); con sobrecargas, todas las públicas de esa cantidad de
-  parámetros tienen que exigirlo, y con una de varargs al lado sólo si la fija recibe un `Object`.
-  Lo que falta (170): los `Argument might be null` en que hay que elegir la sobrecarga por el tipo
-  del argumento (`new PrintStream(p.stdout())` frente a `PrintStream(String)`,
-  `IOUtils.toString(url, charset)`, `Files.copy(stream, path, opciones...)`: unos 12 entre jenkins
-  y maven), los que salen de una variable (`copyURLToFile(res, f)` dentro de una lambda,
+  `src/index/java_hardcoded_contracts.rs`). La sobrecarga se elige por el tipo de lo que se pasa
+  cuando es una llamada (o una variable asignada desde una) que devuelve una clase de librería
+  (`IOUtils.toString(url, charset)` no es la de `InputStream`, `Files.copy(stream, path,
+  opciones...)` es la de varargs que recibe un `InputStream`; `src/index/java_argument_types.rs`);
+  sin tipo, todas las públicas de esa cantidad de parámetros tienen que exigirlo, y con una de
+  varargs al lado sólo si la fija recibe un `Object`.
+  Lo que falta (166): los `Argument might be null` cuya llamada kerbo todavía no da por
+  posiblemente nula (`p.getStdout()`, `p.stdout()`, `store.load(key)`), los que salen de una variable (`copyURLToFile(res, f)` dentro de una lambda,
   `includePattern.matcher(itemName)`), el `@Nullable` que IntelliJ infiere del bytecode para lo que
   devuelve un método de librería (`FileUtils.toFile(url)` pasado a `Util.loadFile`, 7), el contrato
   `null -> fail` que infiere para un método puro (`hasFailContract`: ahí no anota el parámetro;
@@ -1672,8 +1674,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `boolean` que no se reasigna guarda su chequeo (`boolean colapsado = ... && padre != null; if
   (colapsado) padre.x`), y `ws = b != null ? b.getWorkspace() : null` hace que `ws` no nulo deje
   presente a `b`. Pasar un valor a un método del proyecto que siempre falla con null en ese lugar
-  (cláusula `fail` inferida: `checkGoodName(name)`) lo deja presente después. maven (2026-11-17):
-  118 de 140, ninguno de más: `opcional.orElse(null)` puede dar null aunque no se resuelva lo que
+  (cláusula `fail` inferida: `checkGoodName(name)`) lo deja presente después. maven (2026-11-18):
+  120 de 140, ninguno de más (los dos `Files.copy(pomResource, ...)` salen del bytecode): `opcional.orElse(null)` puede dar null aunque no se resuelva lo que
   está antes en la cadena (sumó 51), una cadena puede empezar en un literal de clase
   (`X.class.getResourceAsStream(...)`) o en una variable sin tipo escrito, y lo que el JDK da por
   posiblemente null vale para los hijos (`Deque.peek()` vía `Queue`, más `peekFirst`/`pollLast`),

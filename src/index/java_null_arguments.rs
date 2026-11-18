@@ -1,6 +1,7 @@
 use super::java::{
     Declaration, Dereferenced, JavaSummary, NullInference, Parameter, ParameterNullness, Position, lint_at,
 };
+use super::java_argument_types::{origin_chain, typed_library_parameter};
 use super::java_dereference::{known_not_null, may_return_null};
 use super::java_inferred_arguments::context_inferred_non_null;
 use super::java_library_arguments::{
@@ -48,7 +49,8 @@ const LIBRARY_NON_NULL: &[(&str, &str, usize, usize, &str)] = &[
 // IntelliJ infiere sin anotaciones: un parámetro que el método desreferencia en todos los caminos es
 // no nulo, si nadie puede redefinir el método. Con sobrecargas, todas tienen que coincidir. También
 // el "Argument might be null": una llamada que puede devolver null, o una variable asignada desde
-// una, pasada así a ese parámetro.
+// una, pasada así a ese parámetro; a uno de librería, con la sobrecarga elegida por lo que devuelve
+// la llamada.
 pub fn null_arguments(
     types: &ProjectTypes<'_>,
     library: &Library,
@@ -59,12 +61,16 @@ pub fn null_arguments(
         .iter()
         .filter(|flow| !flow.arguments.is_empty())
         .filter(|flow| reaches(types, library, summary, flow))
-        .flat_map(|flow| &flow.arguments);
+        .flat_map(|flow| {
+            flow.arguments
+                .iter()
+                .map(|argument| (argument, origin_chain(&flow.origin)))
+        });
     let nullable_calls = summary.chains.iter().filter_map(|chain| {
         let argument = chain.passed_as.as_deref()?;
         let last = chain.steps.last()?;
         (may_return_null(types, library, summary, chain) && !known_not_null(types, library, summary, last))
-            .then_some(argument)
+            .then_some((argument, Some(chain)))
     });
     let nullable_variables = summary.chains.iter().filter_map(|chain| {
         let argument = chain.passed_as.as_deref()?;
@@ -90,10 +96,12 @@ pub fn null_arguments(
     let mut findings: Vec<LintFinding> = summary
         .null_arguments
         .iter()
+        .map(|argument| (argument, None))
         .chain(possibly_null)
         .chain(nullable_calls)
-        .filter_map(|argument| {
-            let parameter = non_null_parameter(types, library, summary, argument)?;
+        .filter_map(|(argument, value)| {
+            let parameter = non_null_parameter(types, library, summary, argument)
+                .or_else(|| typed_library_parameter(types, library, summary, (argument, value?)))?;
             Some(report(argument, parameter))
         })
         .chain(inferred)
@@ -163,7 +171,7 @@ pub(super) fn non_null_parameter(
     {
         return library_non_null(library, &class, argument)
             .or_else(|| library_annotated_non_null(library, &class, argument))
-            .or_else(|| library_inferred_non_null(library, &class, argument))
+            .or_else(|| library_inferred_non_null(library, &class, argument, &[]))
             .or_else(|| {
                 library_substituted_non_null(
                     library,

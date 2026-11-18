@@ -91,13 +91,17 @@ pub(super) fn library_annotated_non_null(
 
 // Un parámetro que IntelliJ infiere no nulo del bytecode del jar o del JDK (`FileUtils.copyURLToFile`
 // desreferencia su `URL`, `new PrintStream(out)` tira si `out` es null), salvo en los métodos con
-// contrato escrito a mano. Como el compilador, primero las sobrecargas sin varargs con esa cantidad
-// de parámetros que se pueden llamar desde afuera, y todas tienen que exigirlo; si también entra una con varargs (`Path.of(String,
-// String...)` junto a `Path.of(URI)`), sólo se sabe cuál corre cuando la fija recibe un `Object`.
+// contrato escrito a mano. Entre las sobrecargas que se pueden llamar desde afuera manda, como en
+// el compilador, la que no es de varargs, y todas las que pueden correr tienen que exigirlo.
+// `passed` son las clases que puede recibir el argumento (su tipo y los de arriba): deja afuera las
+// sobrecargas de otro tipo. Vacío es que no se sabe, y entonces cuentan todas las de esa cantidad
+// de parámetros, y con una de varargs al lado (`Path.of(String, String...)` junto a `Path.of(URI)`)
+// sólo se sabe cuál corre cuando la fija recibe un `Object`.
 pub(super) fn library_inferred_non_null(
     library: &Library,
     class: &str,
     argument: &NullArgument,
+    passed: &[String],
 ) -> Option<String> {
     let name = if argument.is_constructor {
         CONSTRUCTOR
@@ -108,18 +112,42 @@ pub(super) fn library_inferred_non_null(
     if has_hardcoded_contract(&declaring.name, name, argument.arity) {
         return None;
     }
+    let receives = |method: &&Method| {
+        passed.is_empty()
+            || method
+                .parameter_type(argument.index)
+                .is_some_and(|parameter| passed.contains(&parameter))
+    };
     let (variadic, fixed): (Vec<&Method>, Vec<&Method>) = overloads
         .iter()
         .filter(|method| method.is_exported())
+        .filter(receives)
         .partition(|method| method.is_varargs());
-    let first = *fixed.first()?;
-    let parameter = first.parameter_class(argument.index);
-    let is_chosen = variadic.is_empty() || (fixed.len() == 1 && parameter.as_deref() == Some(OBJECT));
-    (is_chosen
-        && fixed
-            .iter()
-            .all(|method| requires_non_null(library, &declaring.name, method, argument.index)))
-    .then(|| parameter.unwrap_or_else(|| format!("{UNNAMED_PARAMETER}{}", argument.index)))
+    let chosen = if fixed.is_empty() && !passed.is_empty() {
+        variadic
+    } else {
+        let is_known = variadic.is_empty()
+            || !passed.is_empty()
+            || (fixed.len() == 1
+                && fixed
+                    .first()
+                    .and_then(|method| method.parameter_class(argument.index))
+                    .as_deref()
+                    == Some(OBJECT));
+        if !is_known {
+            return None;
+        }
+        fixed
+    };
+    let first = *chosen.first()?;
+    chosen
+        .iter()
+        .all(|method| requires_non_null(library, &declaring.name, method, argument.index))
+        .then(|| {
+            first
+                .parameter_class(argument.index)
+                .unwrap_or_else(|| format!("{UNNAMED_PARAMETER}{}", argument.index))
+        })
 }
 
 fn class_variables(library: &Library, class: &str) -> Option<Vec<String>> {

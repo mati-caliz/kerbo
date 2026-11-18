@@ -2,6 +2,8 @@ pub mod ecmascript_taint;
 pub mod go_taint;
 pub mod java;
 pub mod java_annotation_values;
+mod java_argument_types;
+mod java_chain_walk;
 mod java_default_annotation_params;
 mod java_dereference;
 mod java_escapes;

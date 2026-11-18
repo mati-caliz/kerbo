@@ -1,15 +1,11 @@
 use super::java::{Declaration, JavaSummary, NullInference, Position, Purity, lint_at};
-use super::java_exact_classes::exact_class;
+use super::java_chain_walk::nullable_steps;
 use super::java_forwarded_returns::forwards_null;
-use super::java_inherited_returns::{is_annotated_nullable, overrides_nullable};
-use super::java_jdk::{is_always_defined, jdk_method};
+use super::java_inherited_returns::overrides_nullable;
 use super::java_member_types::member_type;
 use super::java_null_arguments::{accepts, non_null_parameter, project_owners, reaches};
-use super::java_nullness::{ProjectTypes, Resolved, library_ancestors, project_lineage, resolve};
-use super::java_optional_returns::with_absent_alternatives;
+use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use super::java_reference_unboxing::unboxed_references;
-use super::java_substituted_returns::returns_nullable_argument;
-use super::java_variable_returns::enclosing_owner;
 use crate::jvm::library::Library;
 use crate::lint::LintFinding;
 use crate::lint::java_calls::{Arity, Body, ReturnType};
@@ -152,86 +148,6 @@ pub(super) fn report(line: usize, column: usize, name: &str) -> LintFinding {
     )
 }
 
-// Por cada paso de la cadena que se pudo resolver en la librería, si devuelve `@Nullable`. El tipo
-// de cada paso sale de la firma del anterior; con sobrecargas del mismo nombre y aridad, sólo si
-// todas dicen lo mismo. Lo del JDK que IntelliJ da por posiblemente null va primero: `ct.sym` no
-// trae anotaciones.
-fn nullable_steps(
-    types: &ProjectTypes<'_>,
-    library: &Library,
-    summary: &JavaSummary,
-    chain: &Chain,
-) -> Vec<bool> {
-    let mut current = enclosing_owner(types, library, chain)
-        .map(Resolved::Project)
-        .or_else(|| exact_class(types, library, summary, chain.exact_root.as_ref()?))
-        .unwrap_or_else(|| resolve_root(types, library, summary, &chain.root));
-    let mut nullable = Vec::new();
-    for (index, step) in chain.steps.iter().enumerate() {
-        let substituted: &[usize] = if index == 0 {
-            &chain.nullable_root_arguments
-        } else {
-            &[]
-        };
-        if let Resolved::Project(owner) = &current
-            && let Some((is_nullable, returned)) = project_step(types, library, owner, step)
-        {
-            nullable.push(
-                is_nullable || returns_nullable_argument(types, library, &current, (step, substituted)),
-            );
-            let Some(returned) = returned else {
-                break;
-            };
-            current = returned;
-            continue;
-        }
-        let classes = match &current {
-            Resolved::Library(class) => library.supertypes(class),
-            Resolved::Project(name) => library_ancestors(types, library, name),
-        };
-        if let Some((returned, is_nullable)) = jdk_method(&classes, &step.name, step.arity) {
-            nullable.push(is_nullable && !is_always_defined(&classes, &step.name, &step.text_arguments));
-            current = Resolved::Library(returned.to_owned());
-            continue;
-        }
-        let overloads = classes
-            .iter()
-            .map(|class| library.overloads(class, &step.name, step.arity))
-            .find(|found| !found.is_empty())
-            .unwrap_or_default();
-        let by_class_arguments: Vec<_> = overloads
-            .iter()
-            .filter(|method| {
-                step.class_arguments
-                    .iter()
-                    .all(|position| method.takes_class_at(*position))
-            })
-            .cloned()
-            .collect();
-        let candidates = if by_class_arguments.is_empty() {
-            overloads
-        } else {
-            by_class_arguments
-        };
-        let Some(first) = candidates.first() else {
-            break;
-        };
-        let annotated_nullable = candidates.iter().all(is_annotated_nullable);
-        nullable.push(
-            annotated_nullable || returns_nullable_argument(types, library, &current, (step, substituted)),
-        );
-        let returned = first.return_class();
-        if candidates.iter().any(|method| method.return_class() != returned) {
-            break;
-        }
-        let Some(returned) = returned else {
-            break;
-        };
-        current = Resolved::Library(returned);
-    }
-    with_absent_alternatives(chain, nullable)
-}
-
 // El tipo de la raíz: el de la variable, la clase, o el de una constante importada con
 // `import static` (`OS_NAME.value()`), que es un valor de su enum o un campo estático.
 pub(super) fn resolve_root(
@@ -280,7 +196,7 @@ fn imported_constant(
 // nadie puede redefinirlo. Sigue por
 // el tipo que declara, si todas las sobrecargas dicen el mismo. Como Java, una sobrecarga de aridad
 // fija gana a una varargs, y la que declara justo el tipo conocido de cada argumento gana al resto.
-fn project_step(
+pub(super) fn project_step(
     types: &ProjectTypes<'_>,
     library: &Library,
     owner: &str,
