@@ -77,6 +77,8 @@ mod java_null_bytecode_argument_tests;
 #[cfg(test)]
 mod java_null_iteration_tests;
 #[cfg(test)]
+mod java_null_lambda_flow_tests;
+#[cfg(test)]
 mod java_null_lambda_return_tests;
 #[cfg(test)]
 mod java_null_library_argument_tests;

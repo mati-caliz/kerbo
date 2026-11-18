@@ -14,7 +14,7 @@ use super::java_null_keys::{
     VolatileField, forget, join, reread, seed_nullable_variables, spellings, tracked_key,
 };
 use super::java_null_literals::{catch_entry, failure_nulls};
-use super::java_null_loops::iterate;
+use super::java_null_loops::{enter_for_each, iterate};
 use super::java_null_returns::{method_marking, note_return};
 use super::java_null_uses::{dereference, passed};
 use super::java_owner::NullMarking;
@@ -101,7 +101,7 @@ pub(super) struct Analysis<'source, 'context> {
 // posiblemente null, los chequeos (`x != null`, `x == null` con
 // salida, `instanceof`, `requireNonNull`, `assertThat(x).isNotNull()`, `hasText`) la dan por
 // presente en el camino que corresponde, y el primer uso sin chequeo en cada camino se anota.
-// Las lambdas y las clases anónimas no se recorren.
+// Las lambdas y las clases anónimas no se recorren acá: van aparte (`lambda_flows`).
 pub fn null_flows(
     method: Node<'_>,
     body: Node<'_>,
@@ -174,7 +174,7 @@ impl Analysis<'_, '_> {
                     Some(iterable) => self.expression(iterable, state),
                     None => state,
                 };
-                let current = dereference(self, node, evaluated);
+                let current = enter_for_each(self, node, evaluated);
                 let after_body = field(BODY_FIELD).and_then(|body| self.statement(body, current.clone()));
                 join(Some(current), after_body)
             }

@@ -3,7 +3,8 @@ use tree_sitter::Node;
 use super::java::{text, unparenthesized};
 use super::java_null_conditions::branch_states;
 use super::java_null_flow::{Analysis, State};
-use super::java_null_keys::join;
+use super::java_null_keys::{forget, join};
+use super::java_null_uses::dereference;
 use crate::syntax::{descendants, named_children};
 
 const LOCAL: &str = "local_variable_declaration";
@@ -43,8 +44,19 @@ const METHODS: &[&str] = &[
 ];
 const EQUAL: &str = "==";
 
-// Un `while` o un `for`: la primera vuelta da el estado al salir (o el del cuerpo, si el `for` da
-// al menos una vuelta) y la siguiente sólo anota usos.
+// Un `for (x : algo)` desreferencia lo que recorre y declara `x`: lo que se sabía de otra variable
+// con ese nombre (la de un bucle anterior) no vale para ésta.
+pub(super) fn enter_for_each(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) -> State {
+    let mut current = dereference(analysis, node, state);
+    if let Some(name) = node.child_by_field_name(NAME_FIELD) {
+        forget(&mut current, text(name, analysis.source));
+    }
+    current
+}
+
+// Un `while` o un `for`: se sale cuando la condición no se cumple, con lo que había al entrar o con
+// lo que dejó una vuelta (`while ((b = buscar()) == null) { esperar(); }` sale con `b` presente), o
+// con lo que dejó el cuerpo si el `for` da al menos una vuelta. La vuelta siguiente sólo anota usos.
 pub(super) fn iterate(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) -> Option<State> {
     let field = |name: &str| node.child_by_field_name(name);
     let mut current = state;
@@ -61,13 +73,11 @@ pub(super) fn iterate(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: St
         (None, after) => after,
         (Some(_), None) => None,
     };
-    if let Some(again) = after_update {
-        next_iteration(analysis, node, again);
-    }
+    let left_later = after_update.map(|again| next_iteration(analysis, node, again));
     if node.kind() == FOR && after_body.is_some() && runs_at_least_once(node, analysis.source) {
         return after_body;
     }
-    join(Some(when_false), after_body)
+    join(Some(when_false), left_later)
 }
 
 // La vuelta siguiente, con lo que dejó la anterior: lo que el cuerpo o el avance asignaron puede
@@ -75,19 +85,20 @@ pub(super) fn iterate(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: St
 // cuentan las desreferencias: en LocalCache Qodana marca `e.getHash()` en el cuerpo de una vuelta y
 // `e.getNext()` en el avance de otra después de `copyEntry(e, ...)`, sin marcar ese argumento ni
 // darlo por presente.
-fn next_iteration(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) {
+fn next_iteration(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) -> State {
     let field = |name: &str| node.child_by_field_name(name);
     let outer = analysis.only_dereferences;
     analysis.only_dereferences = true;
-    let when_true = match field(CONDITION_FIELD) {
-        Some(condition) => branch_states(analysis, condition, state).0,
-        None => state,
+    let (when_true, when_false) = match field(CONDITION_FIELD) {
+        Some(condition) => branch_states(analysis, condition, state),
+        None => (state.clone(), state),
     };
     let after_body = field(BODY_FIELD).and_then(|body| analysis.statement(body, when_true));
     if let (Some(update), Some(after)) = (field(UPDATE_FIELD), after_body) {
         analysis.expression(update, after);
     }
     analysis.only_dereferences = outer;
+    when_false
 }
 
 // Si el `for (i = 0; i < arreglo.length; ...)` da al menos una vuelta porque antes, en el mismo

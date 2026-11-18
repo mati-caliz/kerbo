@@ -9,6 +9,7 @@ use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, PRIVATE, children, modifiers,
 use super::java_chains::{Chain, NullFacts, chain_of};
 use super::java_constants::{Constants, constant_value, constants_in};
 use super::java_implicit_constructor::implicit_enum_constructor;
+use super::java_lambda_flows::lambda_flows;
 use super::java_null_flow::{NullFlow, null_flows};
 use super::java_nullness_annotations::is_recognized;
 use super::java_owner::{Owner, annotation_names, mentioned_name, owner_of};
@@ -188,7 +189,9 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
                     .last()
                     .map(|name| text(*name, source).to_owned()),
             ),
-            _ => {}
+            _ => extracted
+                .null_flows
+                .extend(lambda_flows(node, source, (variables, &imported))),
         }
     }
     extracted

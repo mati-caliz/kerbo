@@ -39,6 +39,7 @@ mod java_javadoc_lexer;
 mod java_javadoc_parse;
 mod java_javadoc_scope;
 mod java_javadoc_tags;
+mod java_lambda_flows;
 pub mod java_lambda_returns;
 pub mod java_lambda_targets;
 mod java_list_sort;

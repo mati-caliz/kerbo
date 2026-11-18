@@ -1621,10 +1621,10 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   crea uno lo pierde. Pendiente: medir spring-boot.
 - `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
   `nullable-return`): commons-lang 131 de 141 y junit4 17 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 851 de los 972 (491 `data-flow-issue`, 311 `null-argument`, 25
+  de más en los dos. En guava, 853 de los 972 (492 `data-flow-issue`, 312 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
-  (2026-11-18) 1092 de 1258 (987 `data-flow-issue`, 87 `null-argument`, 9 `already-assigned`, 9
+  (2026-11-18) 1104 de 1258 (998 `data-flow-issue`, 88 `null-argument`, 9 `already-assigned`, 9
   `nullable-return`) con
   9 de más: correlaciones que IntelliJ sigue partiendo estados y contratos inferidos
   (`if (!isValidData(data)) return null;`). La última tanda sumó 158: una variable que el archivo no
@@ -1653,7 +1653,13 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   opciones...)` es la de varargs que recibe un `InputStream`; `src/index/java_argument_types.rs`);
   sin tipo, todas las públicas de esa cantidad de parámetros tienen que exigirlo, y con una de
   varargs al lado sólo si la fija recibe un `Object`.
-  Lo que falta (166): los `Argument might be null` cuya llamada kerbo todavía no da por
+  El cuerpo de una lambda con bloque se recorre como un método aparte (`sessions.then(r -> { User
+  bob = User.getById("bob", true); bob.setFullName("Bob"); })`, sumó 12 en jenkins y 2 en guava):
+  sigue sólo las variables que declara ella, y una local del método tapa ahí adentro al campo
+  `@Nullable` del mismo nombre. De paso, de un `while` o un `for` se sale por su condición (`while
+  ((b = p.getLastBuild()) == null) { ... }` deja `b` presente) y la variable de un `for (x : algo)`
+  no hereda lo de otra con el mismo nombre.
+  Lo que falta (154): los `Argument might be null` cuya llamada kerbo todavía no da por
   posiblemente nula (`p.getStdout()`, `p.stdout()`, `store.load(key)`), los que salen de una variable (`copyURLToFile(res, f)` dentro de una lambda,
   `includePattern.matcher(itemName)`), el `@Nullable` que IntelliJ infiere del bytecode para lo que
   devuelve un método de librería (`FileUtils.toFile(url)` pasado a `Util.loadFile`, 7), el contrato

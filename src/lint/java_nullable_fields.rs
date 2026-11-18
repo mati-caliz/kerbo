@@ -61,9 +61,10 @@ pub fn return_nullness(method: Option<Node<'_>>, source: &[u8]) -> ReturnNullnes
 
 // Las claves con las que el flujo sigue a cada campo `@Nullable` que el método ve: `this.x` siempre
 // y `x` si el método no declara nada con ese nombre. Las dos de un mismo campo van juntas, con si
-// el campo es `volatile`.
+// el campo es `volatile`. Para una lambda cuenta lo que declara el método que la encierra: la local
+// de afuera tapa al campo también ahí adentro.
 pub(super) fn nullable_field_keys(method: Node<'_>, source: &[u8]) -> Vec<(Vec<String>, Volatility)> {
-    let declared = declared_names(method, source);
+    let declared = declared_names(outermost_scope(method), source);
     nullable_fields(method, source)
         .into_iter()
         .map(|(field, volatility)| {
@@ -250,6 +251,20 @@ fn has_nullable_last_segment(written: Node<'_>, source: &[u8]) -> bool {
     qualified.is_some_and(|scoped| {
         scoped.kind() == SCOPED_TYPE_IDENTIFIER && text(scoped, source).contains(NULLABLE)
     })
+}
+
+// El método, constructor o inicializador que encierra a la lambda, sin salir de su clase.
+fn outermost_scope(method: Node<'_>) -> Node<'_> {
+    let mut outermost = method;
+    let mut current = method;
+    while let Some(parent) = current.parent().filter(|_| method.kind() == LAMBDA) {
+        if CLASS_BODIES.contains(&parent.kind()) {
+            break;
+        }
+        outermost = parent;
+        current = parent;
+    }
+    outermost
 }
 
 // Todo nombre que el método declara: parámetros, locales, variables de for, catch, recursos,
