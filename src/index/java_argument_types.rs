@@ -26,7 +26,7 @@ pub(super) fn typed_library_parameter(
     library_inferred_non_null(library, &class, argument, &library.supertypes(&passed))
 }
 
-fn receiver_library_class(
+pub(super) fn receiver_library_class(
     types: &ProjectTypes<'_>,
     library: &Library,
     summary: &JavaSummary,

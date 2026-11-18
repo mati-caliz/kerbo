@@ -63,7 +63,8 @@ fn walk(
 }
 
 // Si el paso puede devolver null y el tipo de lo que devuelve (si se sabe). `None` si el paso no se
-// pudo resolver.
+// pudo resolver. Un método de librería puede devolver una clase del proyecto
+// (`JenkinsRule.createSlave()` devuelve un `DumbSlave`).
 fn next_step(
     types: &ProjectTypes<'_>,
     library: &Library,
@@ -112,6 +113,10 @@ fn next_step(
                 .iter()
                 .all(|method| method.return_class().as_ref() == Some(returned))
         })
-        .map(Resolved::Library);
+        .map(|returned| {
+            types
+                .qualified(&returned)
+                .map_or(Resolved::Library(returned), Resolved::Project)
+        });
     Some((is_nullable, returned))
 }

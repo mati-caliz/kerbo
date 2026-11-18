@@ -33,6 +33,7 @@ mod java_hidden;
 mod java_implicit_constructor;
 pub mod java_import_shadows;
 pub mod java_inference;
+mod java_inferred_roots;
 mod java_javadoc;
 mod java_javadoc_checks;
 mod java_javadoc_lexer;

@@ -2,6 +2,7 @@ use tree_sitter::Node;
 
 use super::java::text;
 use super::java_chains::{Chain, ChainRoot, call_arguments};
+use super::java_inferred_roots::inferred_root;
 use super::java_null_inference::cast_type;
 use super::java_receiver_arguments::{ArgumentNullness, receiver_arguments};
 use super::java_receivers::{Variables, declared_simple_type, enclosing_types};
@@ -148,7 +149,15 @@ pub(super) fn member_root(access: Node<'_>, source: &[u8], variables: &Variables
     let written = text(current, source);
     let owner = match variables.get(written) {
         Some(Some(declared)) => declared.clone(),
-        Some(None) => declared_simple_type(current, written, source)?,
+        Some(None) => match declared_simple_type(current, written, source) {
+            Some(declared) => declared,
+            None => {
+                return inferred_root(current, source, variables).map(|root| ChainRoot::Field {
+                    of: Box::new(root),
+                    fields,
+                });
+            }
+        },
         None => return Some(inherited_root(current, source, fields)),
     };
     Some(ChainRoot::Member {
@@ -181,9 +190,10 @@ pub(super) fn receiver_root(object: Node<'_>, source: &[u8], variables: &Variabl
             None if written.starts_with(|first: char| first.is_ascii_uppercase()) => {
                 ChainRoot::Class(written.to_owned())
             }
-            Some(None) => {
-                ChainRoot::Instance(declared_simple_type(object, written, source).unwrap_or_default())
-            }
+            Some(None) => declared_simple_type(object, written, source)
+                .map(ChainRoot::Instance)
+                .or_else(|| inferred_root(object, source, variables))
+                .unwrap_or_else(|| ChainRoot::Instance(String::new())),
             None => inherited_root(object, source, Vec::new()),
         }),
         _ => None,

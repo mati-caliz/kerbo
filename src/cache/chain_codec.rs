@@ -14,6 +14,9 @@ const PRESENT: u64 = 1;
 const ROOT_INSTANCE: u64 = 0;
 const ROOT_CLASS: u64 = 1;
 const ROOT_MEMBER: u64 = 2;
+const ROOT_RETURNED: u64 = 3;
+const ROOT_LAMBDA_PARAMETER: u64 = 4;
+const ROOT_FIELD: u64 = 5;
 const ORIGIN_CALL: u64 = 0;
 const ORIGIN_CONSTRUCTION: u64 = 1;
 const NULL_FROM_CALL: u64 = 0;
@@ -21,8 +24,8 @@ const NULL_FROM_ANNOTATED: u64 = 1;
 const NULL_FROM_QUALIFIED_FIELD: u64 = 2;
 const NULL_FROM_LITERAL: u64 = 3;
 
-pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
-    match &chain.root {
+fn write_root(writer: &mut Writer, root: &ChainRoot) {
+    match root {
         ChainRoot::Instance(name) => {
             writer.number(ROOT_INSTANCE);
             writer.text(name);
@@ -36,7 +39,46 @@ pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
             writer.list(owners, |writer, owner| writer.text(owner));
             writer.list(fields, |writer, field| writer.text(field));
         }
+        ChainRoot::Returned(chain) => {
+            writer.number(ROOT_RETURNED);
+            write_chain(writer, chain);
+        }
+        ChainRoot::LambdaParameter { slot, position } => {
+            writer.number(ROOT_LAMBDA_PARAMETER);
+            write_null_argument(writer, slot);
+            writer.size(*position);
+        }
+        ChainRoot::Field { of, fields } => {
+            writer.number(ROOT_FIELD);
+            write_root(writer, of);
+            writer.list(fields, |writer, field| writer.text(field));
+        }
     }
+}
+
+fn read_root(reader: &mut Reader<'_>) -> Result<ChainRoot, Corrupt> {
+    Ok(match reader.number()? {
+        ROOT_INSTANCE => ChainRoot::Instance(reader.text()?),
+        ROOT_CLASS => ChainRoot::Class(reader.text()?),
+        ROOT_MEMBER => ChainRoot::Member {
+            owners: reader.list(Reader::text)?,
+            fields: reader.list(Reader::text)?,
+        },
+        ROOT_RETURNED => ChainRoot::Returned(Box::new(read_chain(reader)?)),
+        ROOT_LAMBDA_PARAMETER => ChainRoot::LambdaParameter {
+            slot: Box::new(read_null_argument(reader)?),
+            position: reader.size()?,
+        },
+        ROOT_FIELD => ChainRoot::Field {
+            of: Box::new(read_root(reader)?),
+            fields: reader.list(Reader::text)?,
+        },
+        _ => return Err(Corrupt),
+    })
+}
+
+pub(super) fn write_chain(writer: &mut Writer, chain: &Chain) {
+    write_root(writer, &chain.root);
     writer.list(&chain.steps, |writer, step| {
         writer.text(&step.name);
         writer.size(step.arity);
@@ -112,15 +154,7 @@ pub(super) fn read_null_return(reader: &mut Reader<'_>) -> Result<NullReturn, Co
 
 pub(super) fn read_chain(reader: &mut Reader<'_>) -> Result<Chain, Corrupt> {
     Ok(Chain {
-        root: match reader.number()? {
-            ROOT_INSTANCE => ChainRoot::Instance(reader.text()?),
-            ROOT_CLASS => ChainRoot::Class(reader.text()?),
-            ROOT_MEMBER => ChainRoot::Member {
-                owners: reader.list(Reader::text)?,
-                fields: reader.list(Reader::text)?,
-            },
-            _ => return Err(Corrupt),
-        },
+        root: read_root(reader)?,
         steps: reader.list(|reader| {
             Ok(ChainStep {
                 name: reader.text()?,

@@ -1,8 +1,9 @@
 use super::java::{Declaration, JavaSummary, NullInference, Position, Purity, lint_at};
-use super::java_chain_walk::nullable_steps;
+use super::java_chain_walk::{chain_class, nullable_steps};
 use super::java_forwarded_returns::forwards_null;
 use super::java_inherited_returns::overrides_nullable;
-use super::java_member_types::member_type;
+use super::java_lambda_parameters::lambda_parameter_class;
+use super::java_member_types::{follow_fields, member_type, unresolved};
 use super::java_null_arguments::{accepts, non_null_parameter, project_owners, reaches};
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use super::java_reference_unboxing::unboxed_references;
@@ -161,6 +162,13 @@ pub(super) fn resolve_root(
         ChainRoot::Class(written) => imported_constant(types, library, summary, written)
             .unwrap_or_else(|| resolve(types, library, summary, written)),
         ChainRoot::Member { owners, fields } => member_type(types, library, summary, (owners, fields)),
+        ChainRoot::Returned(chain) => chain_class(types, library, summary, chain).unwrap_or_else(unresolved),
+        ChainRoot::LambdaParameter { slot, position } => {
+            lambda_parameter_class(types, library, summary, (slot, *position)).unwrap_or_else(unresolved)
+        }
+        ChainRoot::Field { of, fields } => {
+            follow_fields(types, library, resolve_root(types, library, summary, of), fields)
+        }
     }
 }
 

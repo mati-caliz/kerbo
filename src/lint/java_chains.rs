@@ -46,6 +46,18 @@ pub enum ChainRoot {
         owners: Vec<String>,
         fields: Vec<String>,
     },
+    // Una variable `var`: su tipo es lo que devuelve la cadena que la inicializa.
+    Returned(Box<Chain>),
+    // El parámetro sin tipo de una lambda: el de la interfaz funcional que recibe esa llamada.
+    LambdaParameter {
+        slot: Box<NullArgument>,
+        position: usize,
+    },
+    // Los campos leídos desde otra raíz (`r.jenkins` con `r` parámetro de una lambda).
+    Field {
+        of: Box<Self>,
+        fields: Vec<String>,
+    },
 }
 
 // Un paso de una cadena de llamadas: el método, la cantidad de argumentos, dónde está su nombre,

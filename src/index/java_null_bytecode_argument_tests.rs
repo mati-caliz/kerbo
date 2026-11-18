@@ -6,6 +6,22 @@ use super::tests::summary_of;
 use super::{IndexedSummary, project_lints};
 use crate::jvm::library::Library;
 
+fn findings_with_the_jar(source: &str, rule: &str) -> Vec<String> {
+    let jar = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/jvm/fixtures/inferred.jar");
+    let summary = summary_of(source);
+    let files = [IndexedSummary {
+        summary: &summary,
+        in_tests: false,
+    }];
+    let library = Library::load(&[jar]).with_jdk(fixture_jdk());
+    project_lints(&files, &library)
+        .into_iter()
+        .flatten()
+        .filter(|finding| finding.kind.rule().as_str() == rule)
+        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
+        .collect()
+}
+
 const CALLS: &str = r"package app;
 
 import org.jspecify.annotations.Nullable;
@@ -63,19 +79,7 @@ final class Calls {
 // la fija porque recibe un `Object`, y en `size` las dos públicas no coinciden.
 #[test]
 fn a_nullable_call_passed_to_a_parameter_the_bytecode_dereferences_is_reported() {
-    let jar = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/jvm/fixtures/inferred.jar");
-    let summary = summary_of(CALLS);
-    let files = [IndexedSummary {
-        summary: &summary,
-        in_tests: false,
-    }];
-    let library = Library::load(&[jar]).with_jdk(fixture_jdk());
-    let found: Vec<String> = project_lints(&files, &library)
-        .into_iter()
-        .flatten()
-        .filter(|finding| finding.kind.rule().as_str() == "null-argument")
-        .map(|finding| format!("{}:{} {}", finding.line, finding.column, finding.subject))
-        .collect();
+    let found = findings_with_the_jar(CALLS, "null-argument");
     assert_eq!(
         found,
         [
@@ -102,4 +106,32 @@ fn methods_with_a_hardcoded_contract_are_known() {
     assert!(!has_hardcoded_contract("java.util.Objects", "hash", 1));
     assert!(!has_hardcoded_contract("org.junit.Assert", "assertEquals", 2));
     assert!(!has_hardcoded_contract("sample.inferred.Checks", "equals", 2));
+}
+
+const MADE: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+import sample.inferred.Factory;
+
+class Made {
+    @Nullable Made next() {
+        return null;
+    }
+
+    void use() {
+    }
+}
+
+final class Maker {
+    void call(Factory factory) {
+        factory.make().next().use();
+    }
+}
+";
+
+// Un método de un jar puede devolver una clase del proyecto (`Factory.make()` devuelve un
+// `app.Made`): la cadena sigue con los métodos de esa clase.
+#[test]
+fn a_library_method_returning_a_project_class_keeps_the_chain_going() {
+    assert_eq!(findings_with_the_jar(MADE, "data-flow-issue"), ["17:31 use()"]);
 }

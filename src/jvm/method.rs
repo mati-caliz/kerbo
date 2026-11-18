@@ -6,6 +6,7 @@ const ACCESS_PRIVATE: u16 = 0x0002;
 const ACCESS_PROTECTED: u16 = 0x0004;
 const ACCESS_STATIC: u16 = 0x0008;
 const ACCESS_VARARGS: u16 = 0x0080;
+const ACCESS_ABSTRACT: u16 = 0x0400;
 pub(super) const DESCRIPTOR_OPEN: u8 = b'(';
 pub(super) const DESCRIPTOR_CLOSE: u8 = b')';
 pub(super) const OBJECT_START: u8 = b'L';
@@ -39,6 +40,10 @@ impl Method {
 
     pub const fn is_varargs(&self) -> bool {
         self.access & ACCESS_VARARGS != 0
+    }
+
+    pub const fn is_abstract(&self) -> bool {
+        self.access & ACCESS_ABSTRACT != 0
     }
 
     pub const fn is_static(&self) -> bool {

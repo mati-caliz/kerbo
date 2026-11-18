@@ -1624,7 +1624,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   de más en los dos. En guava, 853 de los 972 (492 `data-flow-issue`, 312 `null-argument`, 25
   `failing-call`, 24 `nullable-return`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
-  (2026-11-18) 1104 de 1258 (998 `data-flow-issue`, 88 `null-argument`, 9 `already-assigned`, 9
+  (2026-11-18) 1119 de 1258 (1013 `data-flow-issue`, 88 `null-argument`, 9 `already-assigned`, 9
   `nullable-return`) con
   9 de más: correlaciones que IntelliJ sigue partiendo estados y contratos inferidos
   (`if (!isValidData(data)) return null;`). La última tanda sumó 158: una variable que el archivo no
@@ -1659,7 +1659,14 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   `@Nullable` del mismo nombre. De paso, de un `while` o un `for` se sale por su condición (`while
   ((b = p.getLastBuild()) == null) { ... }` deja `b` presente) y la variable de un `for (x : algo)`
   no hereda lo de otra con el mismo nombre.
-  Lo que falta (154): los `Argument might be null` cuya llamada kerbo todavía no da por
+  Una variable sin tipo escrito también es raíz de una cadena (sumó 15 en jenkins): un `var` toma el
+  tipo de lo que lo inicializa (`var agent = j.createSlave(); var computer = agent.toComputer();`),
+  y el parámetro de una lambda, el del parámetro del único método abstracto de la interfaz que
+  recibe la llamada (`sessions.then(r -> ...)` con `Step.run(JenkinsRule)`), también cuando se le
+  leen campos (`r.jenkins.getItemByFullName(...)`). Y un método de un jar puede devolver una clase
+  del proyecto (`JenkinsRule.createSlave()` devuelve un `DumbSlave`): la cadena sigue con sus
+  métodos.
+  Lo que falta (139): los `Argument might be null` cuya llamada kerbo todavía no da por
   posiblemente nula (`p.getStdout()`, `p.stdout()`, `store.load(key)`), los que salen de una variable (`copyURLToFile(res, f)` dentro de una lambda,
   `includePattern.matcher(itemName)`), el `@Nullable` que IntelliJ infiere del bytecode para lo que
   devuelve un método de librería (`FileUtils.toFile(url)` pasado a `Util.loadFile`, 7), el contrato

@@ -27,7 +27,26 @@ pub(super) fn member_type(
                     field_type(types, library, &current, field)
                 })
         })
-        .unwrap_or_else(|| Resolved::Library(UNRESOLVED.to_owned()))
+        .unwrap_or_else(unresolved)
+}
+
+pub(super) fn unresolved() -> Resolved {
+    Resolved::Library(UNRESOLVED.to_owned())
+}
+
+// Lo mismo desde un tipo ya resuelto (`r.jenkins` con `r` parámetro de una lambda).
+pub(super) fn follow_fields(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    owner: Resolved,
+    fields: &[String],
+) -> Resolved {
+    fields
+        .iter()
+        .try_fold(owner, |current, field| {
+            field_type(types, library, &current, field)
+        })
+        .unwrap_or_else(unresolved)
 }
 
 fn field_type(

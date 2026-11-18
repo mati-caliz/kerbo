@@ -19,6 +19,7 @@ mod java_inherited_returns;
 mod java_inspection_suppressions;
 mod java_jdk;
 mod java_lambda_null_returns;
+mod java_lambda_parameters;
 mod java_library_arguments;
 mod java_member_types;
 mod java_null_arguments;
@@ -74,6 +75,8 @@ mod java_member_type_tests;
 mod java_null_assertion_tests;
 #[cfg(test)]
 mod java_null_bytecode_argument_tests;
+#[cfg(test)]
+mod java_null_inferred_root_tests;
 #[cfg(test)]
 mod java_null_iteration_tests;
 #[cfg(test)]

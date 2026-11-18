@@ -37,7 +37,7 @@ use crate::rules::RuleId;
 use crate::secrets::{PathProfile, SecretFinding};
 
 const FORMAT_DIRECTORY: &str = "analysis-v2";
-const FORMAT_VERSION: u64 = 102;
+const FORMAT_VERSION: u64 = 103;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisSubject<'subject> {
@@ -157,5 +157,7 @@ fn build_salt() -> u64 {
 
 #[cfg(test)]
 mod chain_tests;
+#[cfg(test)]
+mod root_tests;
 #[cfg(test)]
 mod tests;
