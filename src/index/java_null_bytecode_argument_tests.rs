@@ -125,13 +125,19 @@ class Made {
 final class Maker {
     void call(Factory factory) {
         factory.make().next().use();
+        factory.then(inner -> inner.make().next().use());
     }
 }
 ";
 
 // Un método de un jar puede devolver una clase del proyecto (`Factory.make()` devuelve un
-// `app.Made`): la cadena sigue con los métodos de esa clase.
+// `app.Made`): la cadena sigue con los métodos de esa clase. Y el parámetro de una lambda pasada a
+// un método del jar toma su tipo del método abstracto que la interfaz (`Factory.Step`) hereda de
+// otra.
 #[test]
 fn a_library_method_returning_a_project_class_keeps_the_chain_going() {
-    assert_eq!(findings_with_the_jar(MADE, "data-flow-issue"), ["17:31 use()"]);
+    assert_eq!(
+        findings_with_the_jar(MADE, "data-flow-issue"),
+        ["17:31 use()", "18:51 use()"]
+    );
 }

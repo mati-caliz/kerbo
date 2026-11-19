@@ -80,6 +80,7 @@ rule_family!(JavaRule {
     ReadWriteString => "read-write-string",
     Java9CollectionFactory => "java9-collection-factory",
     EnhancedSwitchMigration => "enhanced-switch-migration",
+    RedundantNullable => "redundant-nullable",
     JavadocVariable => "javadoc-variable",
     MissingJavadocMethod => "missing-javadoc-method",
     JavadocMethod => "javadoc-method",

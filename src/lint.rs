@@ -75,6 +75,7 @@ pub mod java_pmd_suppressions;
 mod java_read_write_string;
 pub mod java_receiver_arguments;
 pub mod java_receivers;
+mod java_redundant_nullable;
 mod java_repeat_loop;
 mod java_resource_escapes;
 pub mod java_resources;
@@ -276,6 +277,7 @@ fn java_lints(root: Node<'_>, source: &[u8], limits: &Limits) -> Vec<LintFinding
     findings.extend(java_optional::reported(&nodes, source));
     findings.extend(java_already_assigned::reported(&nodes, source));
     findings.extend(java_returned_operands::reported(&nodes, source));
+    findings.extend(java_redundant_nullable::reported(&nodes, source));
     findings.extend(java_final_fields::reported(root, source));
     findings.extend(java_unicode_escapes::reported(
         root,
@@ -367,6 +369,8 @@ mod java_pattern_variable_tests;
 mod java_pmd_tests;
 #[cfg(test)]
 mod java_read_write_string_tests;
+#[cfg(test)]
+mod java_redundant_nullable_tests;
 #[cfg(test)]
 mod java_sequenced_collection_tests;
 #[cfg(test)]

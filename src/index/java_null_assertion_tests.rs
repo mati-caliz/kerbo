@@ -354,3 +354,33 @@ fn an_impure_inherited_call_is_reported_in_every_chain() {
         ["44:28 isOnline()", "45:28 isOnline()", "46:39 isOnline()"]
     );
 }
+
+const WALKED_UP: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+
+final class Folder {
+    @Nullable Folder getParent() {
+        return null;
+    }
+
+    String getName() {
+        return toString();
+    }
+
+    static void walk(Folder folder) {
+        (folder = folder.getParent()).getName();
+        (folder = folder.getParent()).getName();
+    }
+}
+";
+
+// `folder = folder.getParent()` cambia de quién es el getter: que el primero ya se haya
+// desreferenciado no dice nada del siguiente.
+#[test]
+fn a_getter_assigned_to_its_own_root_is_not_remembered() {
+    assert_eq!(
+        findings_in(WALKED_UP, "data-flow-issue"),
+        ["15:39 getName()", "16:39 getName()"]
+    );
+}

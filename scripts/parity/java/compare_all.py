@@ -17,6 +17,7 @@ PAIRS = [
     ("DataFlowIssue", "already-assigned"),
     ("DataFlowIssue", "failing-call"),
     ("DataFlowIssue", "nullable-return"),
+    ("DataFlowIssue", "redundant-nullable"),
 ]
 COMPARE = pathlib.Path(__file__).with_name("compare.py")
 

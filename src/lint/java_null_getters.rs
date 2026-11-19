@@ -17,11 +17,21 @@ pub(super) struct Getters {
     present: HashSet<String>,
 }
 
-pub(super) fn remember_getter(analysis: &mut Analysis<'_, '_>, flow: usize, chain: &Chain, value: Node<'_>) {
+// Asignado a la misma variable de la que sale (`fp = fp.getParent()`), el getter ya es de otro
+// objeto: no se recuerda. El flujo del getter es el que se crea a continuación.
+pub(super) fn remember_getter(
+    analysis: &mut Analysis<'_, '_>,
+    chain: &Chain,
+    value: Node<'_>,
+    assigned: &[String],
+) {
     let is_getter = chain.steps.last().is_some_and(|step| is_getter_name(&step.name));
-    if is_getter && chain.steps.iter().all(|step| step.arity == 0) {
-        let written = compact(analysis.text(value));
-        analysis.getters.texts.insert(flow, written);
+    let written = compact(analysis.text(value));
+    let reads_what_it_assigns = assigned
+        .iter()
+        .any(|variable| written.starts_with(&format!("{variable}{QUALIFIER_SEPARATOR}")));
+    if is_getter && !reads_what_it_assigns && chain.steps.iter().all(|step| step.arity == 0) {
+        analysis.getters.texts.insert(analysis.flows.len(), written);
     }
 }
 

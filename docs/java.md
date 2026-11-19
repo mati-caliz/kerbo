@@ -176,6 +176,11 @@ De las inspecciones de IntelliJ, kerbo hace:
   `null` escrito, una variable o campo `@Nullable` sin chequear o una llamada que puede devolver
   null. No cuentan los primitivos, `void`/`Void`, los retornos `@Nullable` o `@ParametricNullness`
   ni las variables de tipo con límite `@Nullable`.
+- `DataFlowIssue`, el `@Nullable` de más (`redundant-nullable`): un método que nadie puede
+  redefinir (estático, privado, `final`, o de una clase `final`, anónima o record), anotado
+  `@Nullable` o `@CheckForNull`, cuyos `return` devuelven todos algo que nunca es null: un literal,
+  un `new`, `this`, una operación, o una local asignada una sola vez con algo así. No cuentan los
+  que devuelven un arreglo o `Void`, ni los que tienen una lambda en el cuerpo.
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` encadenado a
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` u `Optional.ofNullable(...)`.
 

@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::JavaRule;
 
-pub const RULE_COUNT: usize = 16;
+pub const RULE_COUNT: usize = 17;
 
 const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
     (
@@ -146,6 +146,15 @@ const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
             "return a switch expression with case ... ->",
             "return switch (kind) { case A -> 1; default -> 0; }; shows that every branch gives a value and the compiler checks none is missing. Like IntelliJ's EnhancedSwitchMigration in its default form: every branch, of up to two statements, ends in return or throw, and without default a return or throw follows the switch.",
             "switch (kind) { case A: return 1; default: return 0; } becomes return switch (kind) { case A -> 1; default -> 0; };.",
+        ),
+    ),
+    (
+        JavaRule::RedundantNullable,
+        RuleText::new(
+            "Method annotated @Nullable that never returns null",
+            "drop the @Nullable (or annotate it @NonNull): callers do not need to check",
+            "Nothing can override it (it is static, private, final or belongs to a final or anonymous class) and every return gives something that is never null: the annotation makes callers check for a null that never comes. Like IntelliJ's DataFlowIssue.",
+            "@Nullable private File file() { return new File(name); } becomes private File file().",
         ),
     ),
 ];

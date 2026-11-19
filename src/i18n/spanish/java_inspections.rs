@@ -1,7 +1,7 @@
 use crate::i18n::catalog::RuleText;
 use crate::rules::JavaRule;
 
-pub const RULE_COUNT: usize = 16;
+pub const RULE_COUNT: usize = 17;
 
 const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
     (
@@ -146,6 +146,15 @@ const RULE_TEXTS: [(JavaRule, RuleText); RULE_COUNT] = [
             "devolvé una expresión switch con case ... ->",
             "return switch (tipo) { case A -> 1; default -> 0; }; muestra que todas las ramas dan un valor y el compilador controla que no falte ninguna. Como EnhancedSwitchMigration de IntelliJ en su forma por defecto: cada rama, de hasta dos sentencias, termina en return o throw, y sin default al switch le sigue un return o un throw.",
             "switch (tipo) { case A: return 1; default: return 0; } se vuelve return switch (tipo) { case A -> 1; default -> 0; };.",
+        ),
+    ),
+    (
+        JavaRule::RedundantNullable,
+        RuleText::new(
+            "Método anotado @Nullable que nunca devuelve null",
+            "sacale el @Nullable (o anotalo @NonNull): quien lo llama no tiene que chequear",
+            "Nadie puede redefinirlo (es estático, privado, final o de una clase final o anónima) y todos sus return devuelven algo que nunca es null: la anotación obliga a quien lo llama a chequear un null que no llega. Como DataFlowIssue de IntelliJ.",
+            "@Nullable private File archivo() { return new File(nombre); } se vuelve private File archivo().",
         ),
     ),
 ];

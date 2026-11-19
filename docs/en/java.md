@@ -118,6 +118,11 @@ From IntelliJ's inspections, kerbo does:
   a literal `null`, an unchecked `@Nullable` variable or field, or a call that may return null.
   Primitives, `void`/`Void`, `@Nullable` or `@ParametricNullness` returns and type variables with
   a `@Nullable` bound do not count.
+- `DataFlowIssue`, the needless `@Nullable` (`redundant-nullable`): a method nothing can override
+  (static, private, `final`, or in a `final` or anonymous class or a record), annotated `@Nullable`
+  or `@CheckForNull`, whose `return`s all give something that is never null: a literal, a `new`,
+  `this`, an operation, or a local assigned only once with one of those. Methods returning an array
+  or `Void`, and those with a lambda in the body, do not count.
 - `OptionalGetWithoutIsPresent` (`optional-get-without-is-present`): `get()` chained to
   `findFirst()`, `findAny()`, `max(...)`, `min(...)` or `Optional.ofNullable(...)`.
 

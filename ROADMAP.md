@@ -1597,8 +1597,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     sin resolver de una anónima anidada y de un overrider sin `throws` (sólo pesa con classpath
     incompleto); una interfaz del proyecto sin métodos no se reconoce en `new X() { }`.
 - `AutoCloseableResource` con el JDK: junit4 0 de 0 (por debajo de Java 7 la inspección no corre),
-  commons-lang 2 de 2, guava 42 de 42 y jenkins 693 de 750, ninguno de más en los cuatro
-  (2026-11-15); maven 75 de 89 con 2 de más. Una sentencia que descarta lo que crea también se
+  commons-lang 2 de 2, guava 42 de 42 y jenkins 712 de 750, ninguno de más en los cuatro
+  (2026-11-19); maven 75 de 89 con 2 de más. Una sentencia que descarta lo que crea también se
   marca (`listener.error(...)` devuelve un `PrintWriter`). Una local también escapa al iniciar el recurso de un
   `try` (`try (InputStream in = is)`), y un `new` que recibe un campo que se cierra (`this.world`) es
   de otro. La API del JDK sale del `release` del pom raíz
@@ -1619,13 +1619,13 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   (`stream.parallel()` sigue siendo un `Stream` ignorado); una llamada por `import static` y una que
   devuelve una clase del proyecto que se cierra crean recursos; y la lambda de `assertThrows` que sólo
   crea uno lo pierde. Pendiente: medir spring-boot.
-- `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call` y
-  `nullable-return`): commons-lang 131 de 141 y junit4 17 de 19 (`failing-call` 15 de 15), ninguno
-  de más en los dos. En guava, 853 de los 972 (492 `data-flow-issue`, 312 `null-argument`, 25
-  `failing-call`, 24 `nullable-return`), con 3
+- `DataFlowIssue` (`data-flow-issue`, `null-argument`, `already-assigned`, `failing-call`,
+  `nullable-return` y `redundant-nullable`): commons-lang 131 de 141 y junit4 17 de 19 (`failing-call` 15 de 15), ninguno
+  de más en los dos. En guava, 854 de los 972 (492 `data-flow-issue`, 312 `null-argument`, 25
+  `failing-call`, 24 `nullable-return`, 1 `redundant-nullable`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
-  (2026-11-18) 1119 de 1258 (1013 `data-flow-issue`, 88 `null-argument`, 9 `already-assigned`, 9
-  `nullable-return`) con
+  (2026-11-19) 1140 de 1258 (1025 `data-flow-issue`, 90 `null-argument`, 9 `already-assigned`, 9
+  `nullable-return`, 7 `redundant-nullable`) con
   9 de más: correlaciones que IntelliJ sigue partiendo estados y contratos inferidos
   (`if (!isValidData(data)) return null;`). La última tanda sumó 158: una variable que el archivo no
   declara es un campo heredado (`j` de la clase de test de arriba, también desde una anónima) y la
@@ -1666,13 +1666,20 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   leen campos (`r.jenkins.getItemByFullName(...)`). Y un método de un jar puede devolver una clase
   del proyecto (`JenkinsRule.createSlave()` devuelve un `DumbSlave`): la cadena sigue con sus
   métodos.
-  Lo que falta (139): los `Argument might be null` cuya llamada kerbo todavía no da por
+  `redundant-nullable` calca "@Nullable method 'x' always returns a non-null value" sin seguir el
+  flujo: el método no se puede redefinir (`PsiUtil.canBeOverridden`) y todos sus `return` dan un
+  literal, un `new`, `this`, una operación o una local asignada una sola vez con algo así (7 de 9
+  en jenkins, 1 de 7 en guava, ninguno de más); faltan los que devuelven una llamada no nula
+  (`(Hudson) Jenkins.get()`, `c.newInstance(args)`, y en guava los métodos `@NullMarked`). El
+  parámetro de una lambda pasada a un método de jar toma el tipo del método abstracto que la
+  interfaz hereda de otra (`JenkinsSessionExtension.Step`), y un getter asignado a su propia raíz
+  (`fp = fp.getParent()`) no se recuerda como ya desreferenciado.
+  Lo que falta (118): los `Argument might be null` cuya llamada kerbo todavía no da por
   posiblemente nula (`p.getStdout()`, `p.stdout()`, `store.load(key)`), los que salen de una variable (`copyURLToFile(res, f)` dentro de una lambda,
   `includePattern.matcher(itemName)`), el `@Nullable` que IntelliJ infiere del bytecode para lo que
   devuelve un método de librería (`FileUtils.toFile(url)` pasado a `Util.loadFile`, 7), el contrato
   `null -> fail` que infiere para un método puro (`hasFailContract`: ahí no anota el parámetro;
-  kerbo no lo calca y no dio de más en el corpus), el mensaje `@Nullable method 'x' always returns a non-null value` (9 acá y 7 en guava:
-  pide una subregla nueva), parámetros que heredan el `@CheckForNull` del método que redefinen,
+  kerbo no lo calca y no dio de más en el corpus), parámetros que heredan el `@CheckForNull` del método que redefinen,
   variables `var` y parámetros de lambda sin tipo como raíz de una cadena, y desreferencias sueltas.
   Para jenkins sumaron: una cadena que empieza en el campo de una variable (`j.jenkins.getView(...)`)
   toma el tipo del campo, de la clase del proyecto o del `.class` del jar (eso sumó 155);

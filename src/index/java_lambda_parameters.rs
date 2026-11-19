@@ -1,8 +1,9 @@
 use super::java::JavaSummary;
 use super::java_argument_types::receiver_library_class;
 use super::java_null_arguments::{accepts, project_owners};
-use super::java_nullness::{ProjectTypes, Resolved, resolve};
+use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::library::Library;
+use crate::jvm::method::Method;
 use crate::lint::java_calls::Body;
 use crate::lint::java_null_inference::NullArgument;
 
@@ -22,9 +23,12 @@ pub(super) fn lambda_parameter_class(
         .or_else(|| library_interface(types, library, summary, slot))?;
     match interface {
         Resolved::Project(name) => {
-            let mut methods = types
-                .declarations_of(&name)
-                .filter(|(_, declaration)| declaration.body == Body::Abstract);
+            let lineage = project_lineage(types, library, &name);
+            let mut methods = lineage.iter().flat_map(|ancestor| {
+                types
+                    .declarations_of(ancestor)
+                    .filter(|(_, declaration)| declaration.body == Body::Abstract)
+            });
             let (declaring, method) = methods.next()?;
             if methods.next().is_some() {
                 return None;
@@ -33,13 +37,7 @@ pub(super) fn lambda_parameter_class(
             Some(resolve(types, library, declaring, &parameter.type_name))
         }
         Resolved::Library(name) => {
-            let class = library.class_or_jdk(&name)?;
-            let mut methods = class.methods.iter().filter(|method| method.is_abstract());
-            let method = methods.next()?;
-            if methods.next().is_some() {
-                return None;
-            }
-            let parameter = method
+            let parameter = single_abstract_method(library, &name)?
                 .parameter_type(position)
                 .filter(|parameter| parameter != OBJECT)?;
             Some(
@@ -49,6 +47,27 @@ pub(super) fn lambda_parameter_class(
             )
         }
     }
+}
+
+// El único método abstracto de la interfaz de librería, propio o heredado de otra
+// (`JenkinsSessionExtension.Step` no declara nada: su `run` viene de `JenkinsSessionFixture.Step`).
+fn single_abstract_method(library: &Library, interface: &str) -> Option<Method> {
+    let mut methods: Vec<Method> = library
+        .supertypes(interface)
+        .iter()
+        .filter_map(|ancestor| library.class_or_jdk(ancestor))
+        .flat_map(|class| {
+            class
+                .methods
+                .iter()
+                .filter(|method| method.is_abstract())
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    methods.dedup_by(|first, second| first.name == second.name && first.descriptor == second.descriptor);
+    let only = methods.pop()?;
+    methods.is_empty().then_some(only)
 }
 
 // La interfaz que declara el parámetro del método del proyecto al que se le pasa la lambda.

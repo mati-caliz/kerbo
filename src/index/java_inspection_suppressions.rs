@@ -10,6 +10,7 @@ const DATA_FLOW_RULES: &[JavaRule] = &[
     JavaRule::AlreadyAssigned,
     JavaRule::FailingCall,
     JavaRule::NullableReturn,
+    JavaRule::RedundantNullable,
 ];
 
 // Saca lo que cae dentro de una declaración con `@SuppressWarnings("ConstantConditions")` (o
