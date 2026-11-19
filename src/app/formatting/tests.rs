@@ -71,3 +71,17 @@ fn a_file_that_does_not_parse_is_left_alone_and_fails() {
     assert_eq!(fmt(&tree, &[]).status, EXIT_FAILURE);
     assert_eq!(read(&tree, "broken.go"), "package main\nfunc {\n");
 }
+
+// El formateador de Python está en construcción: sin el flag oculto no toca los `.py`.
+#[test]
+fn python_files_are_only_formatted_with_the_hidden_flag() {
+    const UNFORMATTED_PYTHON: &str = "import   os\n";
+    let tree = TempTree::new("fmt-python");
+    tree.write("a.py", UNFORMATTED_PYTHON);
+    tree.write("stub.pyi", UNFORMATTED_PYTHON);
+    assert_eq!(fmt(&tree, &[]).status, EXIT_CLEAN);
+    assert_eq!(read(&tree, "a.py"), UNFORMATTED_PYTHON);
+    assert_eq!(fmt(&tree, &["--python"]).status, EXIT_CLEAN);
+    assert_eq!(read(&tree, "a.py"), "import os\n");
+    assert_eq!(read(&tree, "stub.pyi"), UNFORMATTED_PYTHON);
+}

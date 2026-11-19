@@ -48,6 +48,9 @@ pub fn format_notice(notice: &FormatNotice) -> String {
             Unparsable::Unsupported { line } => {
                 format!("{path}:{line}: kerbo does not format this syntax yet; left as it was")
             }
+            Unparsable::UnsupportedSyntax { line, syntax } => {
+                format!("{path}:{line}: kerbo does not format `{syntax}` yet; left as it was")
+            }
         },
     }
 }

@@ -129,6 +129,8 @@ pub struct FmtArgs {
     pub paths: Vec<PathBuf>,
     #[arg(long)]
     pub check: bool,
+    #[arg(long, hide = true)]
+    pub python: bool,
     #[arg(long)]
     pub config: Option<PathBuf>,
 }

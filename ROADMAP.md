@@ -1935,8 +1935,24 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     Docker `fmt-parity`: ahí están las tres versiones del corpus y lo que gofmt deja de cada una,
     porque las rutas no entran en el largo máximo de Windows. El script que desordena se perdió con
     la rama del agente; el corpus desordenado quedó en el volumen, que es la única copia.
-  - Lo que sigue: ruff format (Python), Prettier (JS/TS) y google-java-format (Java), en ese
-    orden y cada uno con su corpus medido antes de recomendarlo.
+- Python (2026-11-19, en curso): `kerbo fmt --python` (opción oculta hasta cerrar la paridad)
+  formatea los `.py` con un port de `ruff_python_formatter` 0.17.4: desde tree-sitter se arma un
+  AST igual al de ruff (`src/formatter/python/`: conversión, trivia, reparto y escritura de
+  comentarios, expresiones, cadenas, sentencias) y se imprime con un port del impresor de
+  `ruff_formatter` (`src/formatter/document/`).
+  - **11.468 de 14.001 archivos formateados, 0 distintos de `ruff format`** (requests, fastapi,
+    flask, django, pydantic, sqlalchemy, ipython, ansible, sympy y `cpython/Lib`). Un archivo con
+    sintaxis que todavía no está portada queda como está y se avisa con la línea y qué sintaxis
+    es; no cuenta como distinto.
+  - Falta para los 2.533 que quedan como están: f-strings (2.432), parámetros de tipo y `type X =`
+    (44), `match` (21), `fmt: off`/`fmt: skip` (21) y cuatro formas sueltas (`except*` con alias,
+    `constrained_type`, un `as_pattern` y una sin nombre); 11 tienen error de sintaxis y ruff
+    tampoco los formatea.
+  - Se mide con `scripts/parity/python/fmt_measure.sh` (por `heavy_lock.py`), sobre el volumen de
+    Docker `fmt-parity-python`.
+  - Lo que sigue: cerrar Python (f-strings primero), sacar la opción oculta y documentarlo;
+    después Prettier (JS/TS) y google-java-format (Java), cada uno con su corpus medido antes de
+    recomendarlo.
 - Con el formateador, compilar los tests con cobertura queda al borde de los 1,5 GB del gate: sin
   la caché caliente lo mata el límite de memoria (SIGKILL). Pasa, pero hay que ganar margen
   (partir el crate o bajar la información de depuración de los tests) antes de que crezca más.

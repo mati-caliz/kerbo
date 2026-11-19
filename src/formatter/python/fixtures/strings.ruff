@@ -1,0 +1,118 @@
+import typing
+from collections import abc
+
+
+def annotated(
+    first: typing.List[int],
+    second: int | str | None,
+    third: abc.Mapping[str, typing.Any],
+    *rest: *Shape,
+    **options: typing.Dict[str, int | float],
+) -> typing.Optional[abc.Sequence[int]]:
+    return None
+
+
+counter: typing.Dict[str, typing.List[int | None]] = {}
+handler: abc.Callable[[int, str], bool] | None = None
+qualified: a.b.c.Type = value
+names: List[int] = []
+either: List[int] | Dict[str, int] | None = None
+inner: Outer[int].Inner = None
+table: Dict[str, List[Tuple[int, ...]]] = {}
+
+
+def generic(
+    *values: *Ts, kind: type[int] = int, pairs: List[Tuple[str, int]] | None = None
+) -> Tuple[int, ...]:
+    return values
+
+
+def tabs():
+    """Resumen.
+
+    Texto con tab.
+            Dos tabs.
+      Tab y espacios.
+    """
+    pass
+
+
+def spaces_then_tabs():
+    """Resumen.
+
+    Texto.
+        Espacios y tab.
+                Espacios y dos tabs.
+                mezclado.
+                 otro mezclado.
+    """
+    pass
+
+
+def only_first_line():
+    """Una sola línea con espacios."""
+
+
+message = (
+    "primera parte de un mensaje bastante largo "
+    "segunda parte del mismo mensaje largo" + suffix
+)
+message = (
+    prefix + "primera parte de un mensaje bastante largo "
+    "segunda parte del mismo mensaje largo"
+)
+message = (
+    prefix + "primera parte de un mensaje bastante largo "
+    "segunda parte del mismo mensaje largo" + suffix + other_suffix
+)
+message = (
+    "plantilla con %s y con %s que ocupa bastante lugar en la línea "
+    "y sigue en otra parte" % (first, second)
+)
+message = (
+    prefix_value + "una parte "
+    "otra parte" + middle_value + "tercera parte que alarga todo "
+    "cuarta parte que lo alarga todavía más" + suffix_value
+)
+message = (
+    prefix  # el prefijo
+    + "primera parte de un mensaje bastante largo "
+    "segunda parte del mismo mensaje largo"  # las partes
+     + suffix
+)
+message = (
+    "primera parte de un mensaje bastante largo "
+    "segunda parte del mismo mensaje largo" + suffix
+    # antes del sufijo
+)
+short = "ab" + c
+data = (
+    b"primera parte de unos bytes bastante largos "
+    b"segunda parte de los mismos bytes largos" + tail
+)
+call(
+    "primera parte de un mensaje bastante largo "
+    "segunda parte del mismo mensaje largo" + suffix,
+    other,
+)
+
+simple = lambda: None
+single = lambda value: value + 1
+defaults = (
+    lambda first, second=[1, 2, 3], third=call(argument, other_argument), *rest, key=(1, 2), **options: (
+        first
+    )
+)
+long_lambda = (
+    lambda first_parameter, second_parameter=some_function(with_argument, and_another_argument), third_parameter={"key": "value"}: (
+        first_parameter
+    )
+)
+nested = lambda outer: lambda inner=[element for element in outer if element]: inner
+conditional = lambda value=first if condition else second, other="ab": value
+sorted(
+    values,
+    key=lambda item, fallback=compute_the_fallback(with_some_argument, and_one_more_argument_here): (
+        item or fallback
+    ),
+)

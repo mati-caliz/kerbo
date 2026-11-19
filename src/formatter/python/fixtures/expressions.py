@@ -1,0 +1,53 @@
+a = 1+2*3**4//5%6@7
+b = not x and y or z
+c = x if y else z
+d = x<y<=z!=w is not None in q not in r
+e = -x ** 2
+e2 = x**-y
+e3 = x[1]**y.z
+e4 = f(x)**2
+g = [1,2,3]
+h = (1,)
+i = {1,2}
+j = {'a':1,**k}
+l = [x for x in y if x]
+m = {k:v for k,v in items}
+n = (x for x in y)
+o = f(a,b=1,*args,**kwargs)
+p = a.b.c(d)[e:f:g]
+q = a[1:2, ::3]
+r = a[x+1 :]
+s = lambda x,y=1,*a,**k: x+y
+t = 'single' "double"
+tb = b'bytes' b"more"
+u = 0XFF + 1E5 + 0O17 + 10J + .5 + 5.
+v = (yield)
+w = await x
+z = (x := 1)
+result = some_function_name(argument_number_one, argument_number_two, argument_number_three)
+result = some_function_name(argument_number_one, argument_number_two, argument_number_three,)
+result = some_object.some_method(argument_number_one).another_method(argument_number_two).third_method()
+value = first_operand_with_a_long_name + second_operand_with_a_long_name + third_operand_with_a_long_name
+value = first_condition_with_a_long_name and second_condition_with_a_long_name or third_condition_x
+value = some_dictionary["a_key_that_is_long"]["another_key_that_is_long"]["yet_another_key_here"]
+value = {"key_number_one": value_number_one, "key_number_two": value_number_two, "key_three": 3}
+value = [element_number_one, element_number_two, element_number_three, element_number_four, e5]
+first_target, second_target = some_function_with_a_long_name(argument_one), another_function(arg)
+some.attribute.chain.that_is.quite_long = another.attribute.chain.that_is_also.quite_long_indeed_yes
+x = "una cadena larga que no entra en la línea porque tiene demasiado texto adentro de las comillas"
+x = ("parte uno de una cadena implícita " "parte dos de la misma cadena " "parte tres que la hace larga de más")
+x = 'it\'s' + "say \"hi\"" + '\x1B\N{bullet}' + r'raw\d' + u'unicode'
+x = """triple
+comillas""" % (a, b)
+call("""una cadena
+de varias líneas""")
+if some_very_long_condition_name and another_very_long_condition_name or yet_another_condition_name:
+    pass
+for element_with_long_name, another_element in some_function_returning_pairs(argument_one, arg_two):
+    pass
+print(a if b else c, [x for x in some_long_iterable_name if x.some_attribute is not None and x.other], k)
+x = some_function(arg)[0].attribute.method(first_argument_value, second_argument_value).final
+assert isinstance(value, (int, float)), f_string_free_message % (value_one, value_two, value_three_x)
+return_value = not (some_condition_number_one and some_condition_number_two) or fallback_value_here_x
+parenthesized = (a + b)
+double = ((a))

@@ -8,11 +8,15 @@ use super::fixing::write_atomically;
 use super::{EXIT_CLEAN, EXIT_FAILURE, EXIT_FINDINGS, Terminal, write_error, write_failures};
 use crate::cli::FmtArgs;
 use crate::config::Config;
-use crate::formatter::{Unparsable, format_go};
+use crate::formatter::{Unparsable, format_go, format_python};
 use crate::i18n::{FormatNotice, Lang, Notice, Problem};
 use crate::language::Language;
 use crate::rules::FileIdentity;
 use crate::scan::{ScanFailure, identities};
+
+type Formatter = fn(&str) -> Result<String, Unparsable>;
+
+const PYTHON_EXTENSION: &str = "py";
 
 #[derive(Debug)]
 enum Formatted {
@@ -29,14 +33,14 @@ pub fn run(
 ) -> Result<u8, Problem> {
     let config = Config::load(arguments.config.as_deref(), directory)?;
     let (files, mut failures) = identities(&arguments.paths, &config);
-    let go_files: Vec<FileIdentity> = files
+    let formattable: Vec<(FileIdentity, Formatter)> = files
         .into_iter()
-        .filter(|file| Language::from_path(&file.absolute) == Some(Language::Go))
+        .filter_map(|file| formatter_of(&file, arguments.python).map(|formatter| (file, formatter)))
         .collect();
     let write = !arguments.check;
-    let results: Vec<(&FileIdentity, Result<Formatted, ScanFailure>)> = go_files
+    let results: Vec<(&FileIdentity, Result<Formatted, ScanFailure>)> = formattable
         .par_iter()
-        .map(|file| (file, format_file(file, write)))
+        .map(|(file, formatter)| (file, format_file(file, *formatter, write)))
         .collect();
     let mut changed = Vec::new();
     let mut unparsable = Vec::new();
@@ -53,7 +57,7 @@ pub fn run(
             writeln!(terminal.report, "{path}").map_err(|error| write_error(&error))?;
         }
     }
-    let total = go_files.len();
+    let total = formattable.len();
     let summary = if arguments.check {
         FormatNotice::Unformatted {
             files: changed.len(),
@@ -86,14 +90,29 @@ fn report_notices(
     for (path, cause) in unparsable {
         let notice = Notice::Format(FormatNotice::Unparsable {
             path: path.clone(),
-            cause: *cause,
+            cause: cause.clone(),
         });
         writeln!(terminal.log, "kerbo: {}", lang.notice(&notice))?;
     }
     writeln!(terminal.log, "kerbo: {}", lang.notice(&Notice::Format(summary)))
 }
 
-fn format_file(file: &FileIdentity, write: bool) -> Result<Formatted, ScanFailure> {
+// El formateador de Python está en construcción: sólo corre con el flag oculto `--python`, hasta
+// que su salida sea idéntica a la de `ruff format` en el corpus.
+fn formatter_of(file: &FileIdentity, with_python: bool) -> Option<Formatter> {
+    let language = Language::from_path(&file.absolute)?;
+    if language == Language::Go {
+        return Some(format_go);
+    }
+    let is_python_source = language == Language::Python
+        && file
+            .absolute
+            .extension()
+            .is_some_and(|extension| extension == PYTHON_EXTENSION);
+    (with_python && is_python_source).then_some(format_python)
+}
+
+fn format_file(file: &FileIdentity, formatter: Formatter, write: bool) -> Result<Formatted, ScanFailure> {
     let failure = |error: &io::Error| ScanFailure {
         problem: Problem::Unreadable {
             path: file.display.clone(),
@@ -101,15 +120,15 @@ fn format_file(file: &FileIdentity, write: bool) -> Result<Formatted, ScanFailur
         },
     };
     let original = fs::read_to_string(&file.absolute).map_err(|error| failure(&error))?;
-    let formatted = match format_go(&original) {
-        Ok(formatted) => formatted,
+    let output = match formatter(&original) {
+        Ok(output) => output,
         Err(cause) => return Ok(Formatted::Unparsable(cause)),
     };
-    if formatted == original {
+    if output == original {
         return Ok(Formatted::Unchanged);
     }
     if write {
-        write_atomically(&file.absolute, &formatted).map_err(|error| failure(&error))?;
+        write_atomically(&file.absolute, &output).map_err(|error| failure(&error))?;
     }
     Ok(Formatted::Changed)
 }

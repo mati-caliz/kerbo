@@ -12,16 +12,14 @@ mod token;
 use std::sync::LazyLock;
 
 use regex::Regex;
-use tree_sitter::{Node, Parser, Tree};
+use tree_sitter::{Parser, Tree};
 
-use super::Unparsable;
+use super::{FIRST_LINE, NO_TREE, Unparsable, line_of, syntax_error};
 use crate::language::Language;
-use crate::syntax::descendants;
 use position::LineTable;
 
 static NEW_CALL: LazyLock<Option<Regex>> = LazyLock::new(|| Regex::new(r"\bnew(\s*\()").ok());
 const NEW_ALIAS: &str = "nev$1";
-const FIRST_LINE: usize = 1;
 const NEWLINE: char = '\n';
 
 // Formatea un archivo Go igual que `gofmt` sin opciones: se parsea con tree-sitter, se arma el
@@ -57,36 +55,22 @@ fn format_terminated(source: &str) -> Result<String, Unparsable> {
     String::from_utf8(nodes::file(&file, &lines)).map_err(|_| Unparsable::Unsupported { line: FIRST_LINE })
 }
 
-fn line_of(node: Node<'_>) -> usize {
-    node.start_position().row + FIRST_LINE
-}
-
-fn syntax_error(tree: &Tree) -> Unparsable {
-    let broken = descendants(tree.root_node())
-        .into_iter()
-        .find(|node| node.is_error() || node.is_missing());
-    Unparsable::SyntaxError {
-        line: broken.map_or(FIRST_LINE, line_of),
-    }
-}
-
 // tree-sitter-go todavía no conoce `new(expresión)` de Go 1.26: si el árbol tiene errores se vuelve
 // a parsear con `new` cambiado por un identificador del mismo largo, que lo lee como una llamada
 // común. Las posiciones no se mueven y el texto se sigue leyendo del fuente original.
 fn parse(source: &str) -> Result<Tree, Unparsable> {
-    let no_tree = Unparsable::SyntaxError { line: FIRST_LINE };
     let mut parser = Parser::new();
-    let grammar = Language::Go.grammar().ok_or(no_tree)?;
-    parser.set_language(&grammar).map_err(|_| no_tree)?;
-    let tree = parser.parse(source, None).ok_or(no_tree)?;
+    let grammar = Language::Go.grammar().ok_or(NO_TREE)?;
+    parser.set_language(&grammar).map_err(|_| NO_TREE)?;
+    let tree = parser.parse(source, None).ok_or(NO_TREE)?;
     if !tree.root_node().has_error() {
         return Ok(tree);
     }
-    let renamed = NEW_CALL.as_ref().ok_or(no_tree)?.replace_all(source, NEW_ALIAS);
+    let renamed = NEW_CALL.as_ref().ok_or(NO_TREE)?.replace_all(source, NEW_ALIAS);
     if renamed == source {
         return Err(syntax_error(&tree));
     }
-    let renamed_tree = parser.parse(renamed.as_ref(), None).ok_or(no_tree)?;
+    let renamed_tree = parser.parse(renamed.as_ref(), None).ok_or(NO_TREE)?;
     if renamed_tree.root_node().has_error() {
         return Err(syntax_error(&renamed_tree));
     }
