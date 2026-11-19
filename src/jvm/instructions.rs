@@ -5,9 +5,9 @@ use super::class_code::{ArgumentType, RawCode, method_shape, type_width};
 use super::class_file::Cursor;
 use super::code_pool::CodePool;
 use super::opcodes::{
-    GETFIELD, GETSTATIC, GOTO, GOTO_W, IFEQ, IFLE, IFNE, IFNONNULL, IFNULL, IINC, INVOKEDYNAMIC,
-    INVOKEINTERFACE, INVOKESPECIAL, INVOKESTATIC, INVOKEVIRTUAL, LOOKUPSWITCH, PUTFIELD, PUTSTATIC,
-    TABLESWITCH, WIDE,
+    ACONST_NULL, ARETURN, GETFIELD, GETSTATIC, GOTO, GOTO_W, IFEQ, IFLE, IFNE, IFNONNULL, IFNULL, IINC,
+    INVOKEDYNAMIC, INVOKEINTERFACE, INVOKESPECIAL, INVOKESTATIC, INVOKEVIRTUAL, LOOKUPSWITCH, PUTFIELD,
+    PUTSTATIC, TABLESWITCH, WIDE,
 };
 use super::plain_instructions::{local_access, plain_operation};
 
@@ -90,10 +90,20 @@ pub(super) struct Handler {
     pub(super) target: usize,
 }
 
+// Lo que el análisis de qué devuelve el método necesita saber de una instrucción además de su
+// operación: si empuja un `null` escrito o si devuelve una referencia.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Mark {
+    Plain,
+    NullConstant,
+    ReferenceReturn,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Body {
     pub(super) max_locals: usize,
     pub(super) operations: Vec<Operation>,
+    pub(super) marks: Vec<Mark>,
     pub(super) handlers: Vec<Handler>,
 }
 
@@ -105,10 +115,16 @@ pub(super) fn decode(pool: &CodePool, code: &RawCode) -> Option<Body> {
     };
     let mut offsets = Vec::new();
     let mut operations = Vec::new();
+    let mut marks = Vec::new();
     while cursor.offset < code.bytes.len() {
         let offset = cursor.offset;
         let opcode = cursor.u8().ok()?;
         offsets.push(offset);
+        marks.push(match opcode {
+            ACONST_NULL => Mark::NullConstant,
+            ARETURN => Mark::ReferenceReturn,
+            _ => Mark::Plain,
+        });
         operations.push(operation(pool, &mut cursor, offset, opcode)?);
     }
     let positions: HashMap<usize, usize> = offsets
@@ -133,6 +149,7 @@ pub(super) fn decode(pool: &CodePool, code: &RawCode) -> Option<Body> {
     Some(Body {
         max_locals: code.max_locals,
         operations,
+        marks,
         handlers,
     })
 }

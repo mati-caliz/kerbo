@@ -51,6 +51,7 @@ pub(super) const GOTO: u8 = 0xa7;
 pub(super) const TABLESWITCH: u8 = 0xaa;
 pub(super) const LOOKUPSWITCH: u8 = 0xab;
 pub(super) const IRETURN: u8 = 0xac;
+pub(super) const ARETURN: u8 = 0xb0;
 pub(super) const RETURN: u8 = 0xb1;
 pub(super) const GETSTATIC: u8 = 0xb2;
 pub(super) const PUTSTATIC: u8 = 0xb3;

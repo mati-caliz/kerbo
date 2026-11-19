@@ -6,7 +6,7 @@ use super::tests::summary_of;
 use super::{IndexedSummary, project_lints};
 use crate::jvm::library::Library;
 
-fn findings_with_the_jar(source: &str, rule: &str) -> Vec<String> {
+pub(super) fn findings_with_the_jar(source: &str, rule: &str) -> Vec<String> {
     let jar = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/jvm/fixtures/inferred.jar");
     let summary = summary_of(source);
     let files = [IndexedSummary {

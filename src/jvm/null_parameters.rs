@@ -102,19 +102,24 @@ fn passed_requires_non_null(library: &Library, passed: &PassedParameter, depth: 
         )
 }
 
-fn parameter_partial(code: &ClassCode, method: &MethodCode, index: usize) -> Option<Partial> {
+// La local donde el método recibe ese parámetro, si es una referencia.
+pub(super) fn parameter_local(method: &MethodCode, index: usize) -> Option<usize> {
     let shape = method_shape(&method.descriptor)?;
     if !shape.arguments.get(index)?.is_reference {
         return None;
     }
     let receiver_slots = usize::from(!method.is_static());
-    let parameter_local: usize = receiver_slots
-        + shape
-            .arguments
-            .iter()
-            .take(index)
-            .map(|argument| argument.width)
-            .sum::<usize>();
+    let preceding: usize = shape
+        .arguments
+        .iter()
+        .take(index)
+        .map(|argument| argument.width)
+        .sum();
+    Some(receiver_slots + preceding)
+}
+
+fn parameter_partial(code: &ClassCode, method: &MethodCode, index: usize) -> Option<Partial> {
+    let parameter_local = parameter_local(method, index)?;
     let body = decode(&code.pool, method.code.as_ref()?)?;
     if is_branching(&body) {
         explore(&body, parameter_local)

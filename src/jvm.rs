@@ -16,6 +16,7 @@ mod null_frames;
 pub mod null_parameters;
 mod null_partial;
 mod null_paths;
+pub mod null_results;
 mod opcodes;
 mod plain_instructions;
 pub mod release;

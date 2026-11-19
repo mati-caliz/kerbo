@@ -1,9 +1,11 @@
 use super::java::{Declaration, JavaSummary, NullInference};
 use super::java_dereference::project_candidates;
+use super::java_hardcoded_contracts::has_hardcoded_contract;
 use super::java_null_origins::may_be_null;
 use super::java_nullness::{ProjectTypes, Resolved, resolve};
 use super::java_variable_returns::enclosing_owner;
 use crate::jvm::library::Library;
+use crate::jvm::null_results::returns_null_for_null;
 use crate::lint::java_calls::Body;
 use crate::lint::java_chains::{Chain, ChainRoot};
 
@@ -21,13 +23,50 @@ pub(super) fn forwards_null(
     if chain.forwarded.is_empty() {
         return false;
     }
-    let Some(returned) = returned_parameter(types, library, summary, chain) else {
+    let returned = returned_parameter(types, library, summary, chain);
+    let library_class = called_library_class(types, library, summary, chain);
+    if returned.is_none() && library_class.is_none() {
+        return false;
+    }
+    chain.forwarded.iter().any(|(position, origin)| {
+        may_be_null(types, library, summary, origin)
+            && (returned == Some(*position)
+                || library_class
+                    .as_deref()
+                    .is_some_and(|class| library_returns_null_for_null(library, class, chain, *position)))
+    })
+}
+
+fn called_library_class(
+    types: &ProjectTypes<'_>,
+    library: &Library,
+    summary: &JavaSummary,
+    chain: &Chain,
+) -> Option<String> {
+    let ([_], ChainRoot::Class(written)) = (chain.steps.as_slice(), &chain.root) else {
+        return None;
+    };
+    match resolve(types, library, summary, written) {
+        Resolved::Library(class) => Some(class),
+        Resolved::Project(_) => None,
+    }
+}
+
+// Un método estático de librería, llamado con su clase, al que IntelliJ le infiere del bytecode el
+// contrato `null -> null` en ese lugar (`FileUtils.toFile(url)`): con un argumento que puede ser
+// null, lo que devuelve también. Todas las sobrecargas de esa cantidad de parámetros lo cumplen.
+fn library_returns_null_for_null(library: &Library, class: &str, chain: &Chain, position: usize) -> bool {
+    let [step] = chain.steps.as_slice() else {
         return false;
     };
-    chain
-        .forwarded
-        .iter()
-        .any(|(position, origin)| *position == returned && may_be_null(types, library, summary, origin))
+    library
+        .declared_overloads(class, &step.name, step.arity)
+        .is_some_and(|(declaring, overloads)| {
+            !has_hardcoded_contract(&declaring.name, &step.name, step.arity)
+                && overloads.iter().all(|method| {
+                    method.is_static() && returns_null_for_null(library, &declaring.name, method, position)
+                })
+        })
 }
 
 // La posición del parámetro que devuelven todas las sobrecargas que la llamada puede elegir: en la

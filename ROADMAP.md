@@ -1624,7 +1624,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   de más en los dos. En guava, 854 de los 972 (492 `data-flow-issue`, 312 `null-argument`, 25
   `failing-call`, 24 `nullable-return`, 1 `redundant-nullable`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
-  (2026-11-19) 1140 de 1258 (1025 `data-flow-issue`, 90 `null-argument`, 9 `already-assigned`, 9
+  (2026-11-19) 1147 de 1258 (1025 `data-flow-issue`, 97 `null-argument`, 9 `already-assigned`, 9
   `nullable-return`, 7 `redundant-nullable`) con
   9 de más: correlaciones que IntelliJ sigue partiendo estados y contratos inferidos
   (`if (!isValidData(data)) return null;`). La última tanda sumó 158: una variable que el archivo no
@@ -1674,10 +1674,16 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   parámetro de una lambda pasada a un método de jar toma el tipo del método abstracto que la
   interfaz hereda de otra (`JenkinsSessionExtension.Step`), y un getter asignado a su propia raíz
   (`fp = fp.getParent()`) no se recuerda como ya desreferenciado.
-  Lo que falta (118): los `Argument might be null` cuya llamada kerbo todavía no da por
+  El contrato `null -> null` que IntelliJ infiere del bytecode (`InOutAnalysis` con el parámetro en
+  null, en `src/jvm/null_results.rs`): en un método estático de librería que nadie redefine, sin
+  `try` ni contrato escrito a mano, si con null en ese parámetro todos los caminos que devuelven
+  algo devuelven null (un `null` escrito o el propio parámetro; el `instanceof` de un null no
+  pasa), la llamada escrita con su clase es tan nula como lo que recibe ahí
+  (`Util.loadFile(FileUtils.toFile(getClass().getResource(..)), ..)`, los 7 de UtilTest en jenkins,
+  ninguno de más en el corpus).
+  Lo que falta (111): los `Argument might be null` cuya llamada kerbo todavía no da por
   posiblemente nula (`p.getStdout()`, `p.stdout()`, `store.load(key)`), los que salen de una variable (`copyURLToFile(res, f)` dentro de una lambda,
-  `includePattern.matcher(itemName)`), el `@Nullable` que IntelliJ infiere del bytecode para lo que
-  devuelve un método de librería (`FileUtils.toFile(url)` pasado a `Util.loadFile`, 7), el contrato
+  `includePattern.matcher(itemName)`), el contrato
   `null -> fail` que infiere para un método puro (`hasFailContract`: ahí no anota el parámetro;
   kerbo no lo calca y no dio de más en el corpus), parámetros que heredan el `@CheckForNull` del método que redefinen,
   variables `var` y parámetros de lambda sin tipo como raíz de una cadena, y desreferencias sueltas.

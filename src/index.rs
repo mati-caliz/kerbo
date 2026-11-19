@@ -76,6 +76,8 @@ mod java_null_assertion_tests;
 #[cfg(test)]
 mod java_null_bytecode_argument_tests;
 #[cfg(test)]
+mod java_null_bytecode_result_tests;
+#[cfg(test)]
 mod java_null_inferred_root_tests;
 #[cfg(test)]
 mod java_null_iteration_tests;
