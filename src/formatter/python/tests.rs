@@ -13,6 +13,12 @@ const TYPES_SOURCE: &str = include_str!("fixtures/types.py");
 const TYPES_EXPECTED: &str = include_str!("fixtures/types.ruff");
 const MATCH_SOURCE: &str = include_str!("fixtures/match.py");
 const MATCH_EXPECTED: &str = include_str!("fixtures/match.ruff");
+const TYPE_CALLS_SOURCE: &str = include_str!("fixtures/types2.py");
+const TYPE_CALLS_EXPECTED: &str = include_str!("fixtures/types2.ruff");
+const MATCH_EDGES_SOURCE: &str = include_str!("fixtures/match2.py");
+const MATCH_EDGES_EXPECTED: &str = include_str!("fixtures/match2.ruff");
+const TSTRINGS_SOURCE: &str = include_str!("fixtures/tstrings.py");
+const TSTRINGS_EXPECTED: &str = include_str!("fixtures/tstrings.ruff");
 const FSTRINGS_SOURCE: &str = include_str!("fixtures/fstrings.py");
 const FSTRINGS_EXPECTED: &str = include_str!("fixtures/fstrings.ruff");
 const FSTRINGS_EDGES_SOURCE: &str = include_str!("fixtures/fstrings2.py");
@@ -108,6 +114,21 @@ fn formats_match_statements_like_ruff() {
 }
 
 #[test]
+fn reads_calls_to_type_like_ruff() {
+    assert_formats_like_ruff(TYPE_CALLS_SOURCE, TYPE_CALLS_EXPECTED);
+}
+
+#[test]
+fn formats_match_edge_cases_like_ruff() {
+    assert_formats_like_ruff(MATCH_EDGES_SOURCE, MATCH_EDGES_EXPECTED);
+}
+
+#[test]
+fn formats_template_strings_like_ruff() {
+    assert_formats_like_ruff(TSTRINGS_SOURCE, TSTRINGS_EXPECTED);
+}
+
+#[test]
 fn keeps_the_line_ending_of_the_first_line() {
     assert_formats_like_ruff(
         "import a\r\nimport   b\r\n\r\n\r\n\r\n\r\npass",
@@ -132,10 +153,10 @@ fn leaves_untouched_what_is_not_ported_yet() {
         })
     );
     assert_eq!(
-        format("pass\n\nx = t'{y}'\n"),
+        format("pass\n\nx = f'{y := 1}'\n"),
         Err(Unparsable::UnsupportedSyntax {
             line: 3,
-            syntax: "string".to_owned()
+            syntax: "interpolation".to_owned()
         })
     );
     assert_eq!(format("import (\n"), Err(Unparsable::SyntaxError { line: 1 }));

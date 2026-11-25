@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
 use super::calls::arguments;
-use super::expressions::{expression, expression_or_tuple};
+use super::expressions::{expression, expression_or_tuple, tuple_of};
 use super::statements::block;
 use super::{
     Converter, Outcome, field, has_token, named, only_named, parameters, patterns, span, type_params, types,
@@ -153,7 +153,10 @@ fn except_handler<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> Ou
             Some(expression(converter, caught)?)
         }
         [exception] => Some(expression(converter, *exception)?),
-        _ => return Err(node),
+        [first, .., last] => {
+            let bounds = Span::new(first.start_byte(), last.end_byte());
+            Some(tuple_of(converter, bounds, &values)?)
+        }
     };
     let body_node = named(node)
         .into_iter()

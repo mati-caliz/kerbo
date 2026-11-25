@@ -72,7 +72,7 @@ pub fn format(source: &str) -> Result<String, Unparsable> {
     if source.starts_with(BYTE_ORDER_MARK) {
         return Err(Unparsable::Unsupported { line: FIRST_LINE });
     }
-    let tree = parse(source)?;
+    let tree = parse(&renamed_type_calls(source))?;
     let root = tree.root_node();
     let comment_ranges = comment_ranges_of(source, root);
     if let Some(suppression) = comment_ranges
@@ -136,6 +136,34 @@ fn comment_ranges_of(source: &str, root: Node<'_>) -> Vec<Span> {
             Span::new(node.start_byte(), node.start_byte().saturating_add(length))
         })
         .collect()
+}
+
+const TYPE_CALL: &str = "type(";
+const RENAMED_TYPE_CALL: &str = "typo(";
+
+// tree-sitter toma `type(x).y = 1` por un alias de tipo; con otro nombre del mismo largo lo lee
+// como la llamada que es. Sólo se usa para parsear: el texto de los nombres sale del fuente.
+fn renamed_type_calls(source: &str) -> String {
+    let mut renamed = String::with_capacity(source.len());
+    let mut rest = source;
+    while let Some(index) = rest.find(TYPE_CALL) {
+        let before = rest.get(..index).unwrap_or_default();
+        renamed.push_str(before);
+        let is_call_name = before
+            .chars()
+            .next_back()
+            .is_none_or(|previous| !(previous.is_alphanumeric() || previous == '_'));
+        renamed.push_str(if is_call_name {
+            RENAMED_TYPE_CALL
+        } else {
+            TYPE_CALL
+        });
+        rest = rest
+            .get(index.saturating_add(TYPE_CALL.len())..)
+            .unwrap_or_default();
+    }
+    renamed.push_str(rest);
+    renamed
 }
 
 fn parse(source: &str) -> Result<Tree, Unparsable> {

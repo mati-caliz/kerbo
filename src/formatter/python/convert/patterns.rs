@@ -256,6 +256,14 @@ pub(super) fn pattern<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -
         DICT_PATTERN => pattern_classes::mapping(converter, node),
         CLASS_PATTERN => pattern_classes::class(converter, node),
         SPLAT_PATTERN => Ok(star(converter, node)),
+        WILDCARD => Ok(add_other(
+            converter,
+            span(node),
+            Other::PatternAs {
+                pattern: None,
+                name: None,
+            },
+        )),
         _ => value_pattern(converter, node, &[node]),
     }
 }

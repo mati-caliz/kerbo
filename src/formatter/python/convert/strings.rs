@@ -10,8 +10,7 @@ const QUOTES: [char; 2] = ['"', '\''];
 const BYTES_PREFIXES: [char; 2] = ['b', 'B'];
 const FORMAT_PREFIXES: [char; 2] = ['f', 'F'];
 
-// Una cadena o varias pegadas (concatenación implícita). Cada parte es un nodo, como en ruff. Las
-// t-strings todavía no se formatean.
+// Una cadena o varias pegadas (concatenación implícita). Cada parte es un nodo, como en ruff.
 pub fn convert<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> Outcome<'tree> {
     let literals = if node.kind() == "string" {
         vec![node]
@@ -42,10 +41,7 @@ fn part<'tree>(converter: &mut Converter<'_>, literal: Node<'tree>) -> Outcome<'
         .find(|child| child.kind() == STRING_START)
         .ok_or(literal)?;
     let prefix = converter.text(*start).trim_end_matches(QUOTES);
-    if prefix.contains(TEMPLATE_PREFIXES) {
-        return Err(literal);
-    }
-    if prefix.contains(FORMAT_PREFIXES) {
+    if prefix.contains(FORMAT_PREFIXES) || prefix.contains(TEMPLATE_PREFIXES) {
         return Ok((fstring_part(converter, literal)?, false));
     }
     let is_bytes = prefix.contains(BYTES_PREFIXES);

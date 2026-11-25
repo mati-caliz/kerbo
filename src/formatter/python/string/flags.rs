@@ -17,14 +17,17 @@ pub enum Family {
     Plain,
     Bytes,
     Format,
+    Template,
 }
 
 impl Family {
     fn of(prefix: &str) -> Self {
         if prefix.contains(['b', 'B']) {
             Self::Bytes
-        } else if prefix.contains(['f', 'F', 't', 'T']) {
+        } else if prefix.contains(['f', 'F']) {
             Self::Format
+        } else if prefix.contains(['t', 'T']) {
+            Self::Template
         } else {
             Self::Plain
         }
@@ -73,7 +76,11 @@ impl StringFlags {
     }
 
     pub const fn is_interpolated(self) -> bool {
-        matches!(self.family, Family::Format)
+        matches!(self.family, Family::Format | Family::Template)
+    }
+
+    pub const fn is_template(self) -> bool {
+        matches!(self.family, Family::Template)
     }
 
     pub const fn is_raw(self) -> bool {
@@ -116,6 +123,9 @@ impl StringFlags {
             (RawPrefix::None, Family::Format) => "f",
             (RawPrefix::Lowercase, Family::Format) => "rf",
             (RawPrefix::Uppercase, Family::Format) => "Rf",
+            (RawPrefix::None, Family::Template) => "t",
+            (RawPrefix::Lowercase, Family::Template) => "rt",
+            (RawPrefix::Uppercase, Family::Template) => "Rt",
         }
     }
 

@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
 use super::patterns::{add_other, case_patterns, dotted_name, pattern, value_expression, value_pattern};
-use super::{Converter, Outcome, named, only_named, parts, span};
+use super::{Converter, Outcome, named, parts, span};
 use crate::formatter::python::ast::{Other, Span};
 
 const CASE_PATTERN: &str = "case_pattern";
@@ -46,8 +46,8 @@ pub(super) fn class<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> 
     let mut positional = Vec::new();
     let mut keywords = Vec::new();
     for argument in case_patterns(node) {
-        let inner = only_named(argument)?;
-        if inner.kind() == KEYWORD_PATTERN {
+        let inner = named(argument).first().copied();
+        if let Some(inner) = inner.filter(|inner| inner.kind() == KEYWORD_PATTERN) {
             keywords.push(keyword(converter, inner)?);
         } else {
             positional.push(pattern(converter, argument)?);

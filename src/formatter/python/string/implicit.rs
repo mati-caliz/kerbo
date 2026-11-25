@@ -17,6 +17,7 @@ use crate::formatter::python::trivia::is_line_break;
 const BYTES_FLAGS_SOURCE: &str = "b\"\"";
 const STRING_FLAGS_SOURCE: &str = "\"\"";
 const FORMAT_FLAGS_SOURCE: &str = "f\"\"";
+const TEMPLATE_FLAGS_SOURCE: &str = "t\"\"";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImplicitLayout {
@@ -77,11 +78,19 @@ fn preserved_quote(f: &Formatter<'_>, parts: &[NodeId]) -> Result<Option<Quote>,
     Ok(required)
 }
 
+fn has_template_part(f: &Formatter<'_>, string: NodeId) -> bool {
+    parts_of(f, string)
+        .iter()
+        .any(|part| StringFlags::of(f.node_text(*part)).is_template())
+}
+
 fn joined_prefix_source(f: &Formatter<'_>, string: NodeId) -> &'static str {
     if matches!(f.ast.expr(string), Some(Expr::BytesLiteral { .. })) {
         BYTES_FLAGS_SOURCE
     } else if is_plain_string(f, string) {
         STRING_FLAGS_SOURCE
+    } else if has_template_part(f, string) {
+        TEMPLATE_FLAGS_SOURCE
     } else {
         FORMAT_FLAGS_SOURCE
     }

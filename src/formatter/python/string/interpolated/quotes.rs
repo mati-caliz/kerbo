@@ -167,6 +167,9 @@ fn has_triple_quoted_literal_with_quotes(f: &Formatter<'_>, part: NodeId) -> boo
 
 pub fn must_preserve_quotes(f: &Formatter<'_>, part: NodeId) -> bool {
     let flags = StringFlags::of(f.node_text(part));
+    if flags.is_template() {
+        return has_quoted_format_spec_and_debug(f, part, flags);
+    }
     has_quoted_debug_expression(f, part, flags)
         || has_triple_quoted_literal_with_quotes(f, part)
         || has_quoted_format_spec_and_debug(f, part, flags)
@@ -174,5 +177,8 @@ pub fn must_preserve_quotes(f: &Formatter<'_>, part: NodeId) -> bool {
 
 pub fn must_preserve_quotes_when_joined(f: &Formatter<'_>, part: NodeId) -> bool {
     let flags = StringFlags::of(f.node_text(part));
+    if flags.is_template() {
+        return has_quoted_format_spec_and_debug(f, part, flags);
+    }
     has_quoted_debug_expression(f, part, flags) || has_triple_quoted_literal_with_quotes(f, part)
 }
