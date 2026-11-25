@@ -37,6 +37,18 @@ impl<'comments> ClauseComments<'comments> {
     }
 }
 
+// Sólo el encabezado de una cláusula: lo que le sigue lo escribe quien la llama.
+pub fn clause_header(
+    f: &mut Formatter<'_>,
+    trailing_colon: &[SourceComment],
+    header: impl FnOnce(&mut Formatter<'_>) -> Formatted,
+) -> Formatted {
+    header(f)?;
+    f.token(COLON);
+    trailing_comments(f, trailing_colon);
+    Ok(())
+}
+
 // `clause` de ruff: el encabezado (`if x`, `else`, `def f()`), los dos puntos y el bloque sangrado.
 // Una función o una clase cuyo cuerpo es sólo `...` queda en una línea.
 pub fn clause(

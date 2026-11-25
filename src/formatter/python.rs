@@ -5,6 +5,7 @@ mod context;
 mod convert;
 mod expression;
 mod parentheses;
+mod pattern;
 mod statement;
 mod string;
 mod trivia;

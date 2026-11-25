@@ -4,6 +4,8 @@ mod compound;
 mod expressions;
 mod interpolated;
 mod parameters;
+mod pattern_classes;
+mod patterns;
 mod statements;
 mod strings;
 mod type_params;

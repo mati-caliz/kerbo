@@ -1,6 +1,6 @@
 use super::bodies::is_separated_by_an_empty_line;
 use super::{Placer, handle_bracketed_end_of_line_comment};
-use crate::formatter::python::ast::{NodeId, Other, Span, Stmt};
+use crate::formatter::python::ast::{NodeId, Other, SequenceKind, Span, Stmt};
 use crate::formatter::python::comments::visitor::{DecoratedComment, Placement};
 use crate::formatter::python::statement::parameters::separators::{
     assign_argument_separator_comment_placement, find_parameter_separators,
@@ -198,9 +198,15 @@ pub fn handle(placer: &Placer<'_>, comment: &DecoratedComment) -> Placement {
         Some(Other::Parameter { name, annotation }) => {
             handle_parameter_comment(placer, comment, (*name, *annotation))
         }
-        Some(Other::Arguments { .. } | Other::TypeParams { .. }) => {
-            handle_bracketed_end_of_line_comment(placer, comment)
-        }
+        Some(
+            Other::Arguments { .. }
+            | Other::TypeParams { .. }
+            | Other::PatternArguments { .. }
+            | Other::PatternSequence {
+                kind: SequenceKind::List | SequenceKind::Tuple,
+                ..
+            },
+        ) => handle_bracketed_end_of_line_comment(placer, comment),
         Some(Other::Comprehension {
             target, iter, ifs, ..
         }) => handle_comprehension_comment(placer, comment, (*target, *iter, ifs)),

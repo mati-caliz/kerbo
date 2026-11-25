@@ -3,6 +3,7 @@ mod clause;
 mod compound;
 mod definition;
 mod imports;
+mod match_statement;
 pub mod parameters;
 mod simple;
 pub mod suite;
@@ -44,6 +45,7 @@ fn fmt_fields(f: &mut Formatter<'_>, statement: NodeId, data: &Stmt) -> Formatte
         Stmt::Global { names } => simple::fmt_names(f, statement, "global", names),
         Stmt::Nonlocal { names } => simple::fmt_names(f, statement, "nonlocal", names),
         Stmt::Expression { value } => simple::fmt_expression(f, statement, *value),
+        Stmt::Match { .. } => match_statement::fmt_match(f, statement),
         Stmt::TypeAlias { .. } => type_params::fmt_type_alias(f, statement),
         Stmt::Pass => {
             f.token("pass");

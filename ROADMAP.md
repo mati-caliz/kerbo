@@ -1940,7 +1940,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   AST igual al de ruff (`src/formatter/python/`: conversión, trivia, reparto y escritura de
   comentarios, expresiones, cadenas, sentencias) y se imprime con un port del impresor de
   `ruff_formatter` (`src/formatter/document/`).
-  - **13.880 de 14.001 archivos formateados, 0 distintos de `ruff format`** (requests, fastapi,
+  - **13.938 de 14.001 archivos formateados, 0 distintos de `ruff format`** (requests, fastapi,
     flask, django, pydantic, sqlalchemy, ipython, ansible, sympy y `cpython/Lib`). Un archivo con
     sintaxis que todavía no está portada queda como está y se avisa con la línea y qué sintaxis
     es; no cuenta como distinto.
@@ -1951,14 +1951,15 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     una asignación y ruff como `a` con formato `= 1`.
   - Ojo: ruff 0.17.4 no es idempotente con `for x in (".." ".."):` (formatear su propia salida cambia
     los paréntesis); por eso los fixtures de ese caso se comparan una sola pasada.
-  - Parámetros de tipo y `type X = ...` portados (2026-11-25). Falta para los 121 que quedan como
-    están: `match` (61), `fmt: off`/`fmt: skip` (21), `type(self).x = ...` (14: tree-sitter lo lee
-    como un alias de tipo), t-strings (6) y formas sueltas (`except*` con alias, `constrained_type`,
-    un `as_pattern`, `{a := 1}` y una sin nombre); 11 tienen error de sintaxis y ruff tampoco los
-    formatea.
+  - Parámetros de tipo, `type X = ...` y `match` con todos sus patrones portados (2026-11-25).
+    Un comentario dentro de un patrón de diccionario con `**resto` deja el archivo como está. Falta
+    para los 63 que quedan como están: `fmt: off`/`fmt: skip` (21), `type(self).x = ...` (14:
+    tree-sitter lo lee como un alias de tipo), t-strings (8), `except*` con alias (4) y formas
+    sueltas (`constrained_type`, un `as_pattern`, un `case_pattern`, `{a := 1}` y una sin nombre);
+    11 tienen error de sintaxis y ruff tampoco los formatea.
   - Se mide con `scripts/parity/python/fmt_measure.sh` (por `heavy_lock.py`), sobre el volumen de
     Docker `fmt-parity-python`.
-  - Lo que sigue: cerrar Python (el distinto del `for`, `match`, tipos y `fmt: off`), sacar la opción oculta y documentarlo;
+  - Lo que sigue: cerrar Python (`fmt: off`/`fmt: skip` y las t-strings), sacar la opción oculta y documentarlo;
     después Prettier (JS/TS) y google-java-format (Java), cada uno con su corpus medido antes de
     recomendarlo.
 - Con el formateador, compilar los tests con cobertura queda al borde de los 1,5 GB del gate: sin

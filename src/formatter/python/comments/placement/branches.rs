@@ -21,9 +21,12 @@ pub fn is_first_statement_in_body(ast: &Ast, node: NodeId, owner: NodeId) -> boo
             | Stmt::FunctionDef { body, .. }
             | Stmt::ClassDef { body, .. },
         )
-        | Data::Other(Other::ElifElseClause { body, .. } | Other::ExceptHandler { body, .. }) => {
-            is_first(node, body)
-        }
+        | Data::Other(
+            Other::ElifElseClause { body, .. }
+            | Other::ExceptHandler { body, .. }
+            | Other::MatchCase { body, .. },
+        ) => is_first(node, body),
+        Data::Stmt(Stmt::Match { cases, .. }) => is_first(node, cases),
         Data::Stmt(_) | Data::Expr(_) | Data::Other(_) => false,
     }
 }
@@ -71,9 +74,12 @@ pub fn last_child_in_body(ast: &Ast, node: NodeId) -> Option<NodeId> {
         Data::Stmt(
             Stmt::FunctionDef { body, .. } | Stmt::ClassDef { body, .. } | Stmt::With { body, .. },
         )
-        | Data::Other(Other::ExceptHandler { body, .. } | Other::ElifElseClause { body, .. }) => {
-            last_of(body)
-        }
+        | Data::Other(
+            Other::ExceptHandler { body, .. }
+            | Other::ElifElseClause { body, .. }
+            | Other::MatchCase { body, .. },
+        ) => last_of(body),
+        Data::Stmt(Stmt::Match { cases, .. }) => last_of(cases),
         Data::Stmt(Stmt::If { body, clauses, .. }) => last_of(last_branch_of_if(ast, body, clauses)),
         Data::Stmt(Stmt::For { body, orelse, .. } | Stmt::While { body, orelse, .. }) => {
             last_of(if orelse.is_empty() { body } else { orelse })

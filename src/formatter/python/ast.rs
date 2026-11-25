@@ -2,7 +2,7 @@ mod children;
 mod data;
 mod operators;
 
-pub use data::{Conversion, Data, DebugText, Expr, Other, Stmt};
+pub use data::{Conversion, Data, DebugText, Expr, Other, SequenceKind, Singleton, Stmt};
 pub use operators::{BoolOperator, CmpOperator, NumberKind, Operator, UnaryOperator};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -116,7 +116,10 @@ impl Ast {
                     | Stmt::If { .. }
                     | Stmt::With { .. }
                     | Stmt::Try { .. }
-            ) | Data::Other(Other::ExceptHandler { .. } | Other::ElifElseClause { .. })
+                    | Stmt::Match { .. }
+            ) | Data::Other(
+                Other::ExceptHandler { .. } | Other::ElifElseClause { .. } | Other::MatchCase { .. }
+            )
         )
     }
 

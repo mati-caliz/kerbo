@@ -90,6 +90,7 @@ fn of_statement(statement: &Stmt) -> Vec<NodeId> {
         } => joined(&[&optional(*first), &optional(*second)]),
         Stmt::Assert { test, msg } => joined(&[&[*test], &optional(*msg)]),
         Stmt::Expression { value } => vec![*value],
+        Stmt::Match { subject, cases } => joined(&[&[*subject], cases]),
         Stmt::TypeAlias {
             name,
             type_params,
@@ -171,7 +172,10 @@ fn of_other(other: &Other) -> Vec<NodeId> {
             target, iter, ifs, ..
         } => joined(&[&[*target, *iter], ifs]),
         Other::Arguments { args, keywords } => joined(&[args, keywords]),
-        Other::Keyword { value: only, .. } | Other::Decorator { expression: only } => vec![*only],
+        Other::Keyword { value: only, .. }
+        | Other::Decorator { expression: only }
+        | Other::PatternValue { value: only }
+        | Other::PatternKeyword { pattern: only, .. } => vec![*only],
         Other::Parameters {
             posonlyargs,
             args,
@@ -202,10 +206,27 @@ fn of_other(other: &Other) -> Vec<NodeId> {
             format_spec,
             ..
         } => joined(&[&[*expression], &optional(*format_spec)]),
+        Other::MatchCase { pattern, guard, body } => joined(&[&[*pattern], &optional(*guard), body]),
+        Other::PatternSequence { patterns: nodes, .. } | Other::PatternOr { patterns: nodes } => {
+            nodes.clone()
+        }
+        Other::PatternMapping { keys, patterns, .. } => keys
+            .iter()
+            .zip(patterns)
+            .flat_map(|(key, pattern)| [*key, *pattern])
+            .collect(),
+        Other::PatternClass { cls, arguments } => vec![*cls, *arguments],
+        Other::PatternArguments { patterns, keywords } => joined(&[patterns, keywords]),
+        Other::PatternAs { pattern, .. } => optional(*pattern),
         Other::TypeParams { params } => params.clone(),
         Other::TypeVar { bound, default, .. } => joined(&[&optional(*bound), &optional(*default)]),
         Other::TypeVarTuple { default, .. } | Other::ParamSpec { default, .. } => optional(*default),
-        Other::Alias { .. } | Other::StringPart | Other::BytesPart | Other::InterpolatedLiteral => Vec::new(),
+        Other::Alias { .. }
+        | Other::StringPart
+        | Other::BytesPart
+        | Other::InterpolatedLiteral
+        | Other::PatternStar { .. }
+        | Other::PatternSingleton(_) => Vec::new(),
     }
 }
 

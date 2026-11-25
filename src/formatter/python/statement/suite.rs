@@ -41,6 +41,7 @@ fn is_compound_statement(f: &Formatter<'_>, statement: NodeId) -> bool {
                 | Stmt::If { .. }
                 | Stmt::Try { .. }
                 | Stmt::With { .. }
+                | Stmt::Match { .. }
         )
     )
 }
@@ -63,7 +64,9 @@ fn last_of_try(statement: &Stmt) -> Option<NodeId> {
 
 fn body_of_other<'ast>(f: &Formatter<'ast>, node: NodeId) -> Option<&'ast [NodeId]> {
     match f.ast.other(node)? {
-        Other::ExceptHandler { body, .. } | Other::ElifElseClause { body, .. } => Some(body),
+        Other::ExceptHandler { body, .. }
+        | Other::ElifElseClause { body, .. }
+        | Other::MatchCase { body, .. } => Some(body),
         Other::Module { .. }
         | Other::Comprehension { .. }
         | Other::Arguments { .. }
@@ -76,6 +79,16 @@ fn body_of_other<'ast>(f: &Formatter<'ast>, node: NodeId) -> Option<&'ast [NodeI
         | Other::Decorator { .. }
         | Other::StringPart
         | Other::BytesPart
+        | Other::PatternValue { .. }
+        | Other::PatternSingleton(_)
+        | Other::PatternSequence { .. }
+        | Other::PatternMapping { .. }
+        | Other::PatternClass { .. }
+        | Other::PatternArguments { .. }
+        | Other::PatternKeyword { .. }
+        | Other::PatternStar { .. }
+        | Other::PatternAs { .. }
+        | Other::PatternOr { .. }
         | Other::TypeParams { .. }
         | Other::TypeVar { .. }
         | Other::TypeVarTuple { .. }
@@ -109,6 +122,9 @@ fn last_child_in_body(f: &Formatter<'_>, node: NodeId) -> Option<NodeId> {
     if let Stmt::FunctionDef { body, .. } | Stmt::ClassDef { body, .. } | Stmt::With { body, .. } = statement
     {
         return body.last().copied();
+    }
+    if let Stmt::Match { cases, .. } = statement {
+        return cases.last().copied();
     }
     None
 }

@@ -11,6 +11,8 @@ const STRINGS_SOURCE: &str = include_str!("fixtures/strings.py");
 const STRINGS_EXPECTED: &str = include_str!("fixtures/strings.ruff");
 const TYPES_SOURCE: &str = include_str!("fixtures/types.py");
 const TYPES_EXPECTED: &str = include_str!("fixtures/types.ruff");
+const MATCH_SOURCE: &str = include_str!("fixtures/match.py");
+const MATCH_EXPECTED: &str = include_str!("fixtures/match.ruff");
 const FSTRINGS_SOURCE: &str = include_str!("fixtures/fstrings.py");
 const FSTRINGS_EXPECTED: &str = include_str!("fixtures/fstrings.ruff");
 const FSTRINGS_EDGES_SOURCE: &str = include_str!("fixtures/fstrings2.py");
@@ -98,6 +100,11 @@ fn formats_a_joined_string_with_a_comment_like_ruff() {
 #[test]
 fn formats_type_parameters_and_aliases_like_ruff() {
     assert_formats_like_ruff(TYPES_SOURCE, TYPES_EXPECTED);
+}
+
+#[test]
+fn formats_match_statements_like_ruff() {
+    assert_formats_like_ruff(MATCH_SOURCE, MATCH_EXPECTED);
 }
 
 #[test]

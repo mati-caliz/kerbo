@@ -113,6 +113,10 @@ pub enum Stmt {
     Expression {
         value: NodeId,
     },
+    Match {
+        subject: NodeId,
+        cases: Vec<NodeId>,
+    },
     TypeAlias {
         name: NodeId,
         type_params: Option<NodeId>,
@@ -285,6 +289,46 @@ pub enum Other {
     },
     StringPart,
     BytesPart,
+    MatchCase {
+        pattern: NodeId,
+        guard: Option<NodeId>,
+        body: Vec<NodeId>,
+    },
+    PatternValue {
+        value: NodeId,
+    },
+    PatternSingleton(Singleton),
+    PatternSequence {
+        patterns: Vec<NodeId>,
+        kind: SequenceKind,
+    },
+    PatternMapping {
+        keys: Vec<NodeId>,
+        patterns: Vec<NodeId>,
+        rest: Option<Span>,
+    },
+    PatternClass {
+        cls: NodeId,
+        arguments: NodeId,
+    },
+    PatternArguments {
+        patterns: Vec<NodeId>,
+        keywords: Vec<NodeId>,
+    },
+    PatternKeyword {
+        attr: Span,
+        pattern: NodeId,
+    },
+    PatternStar {
+        name: Option<Span>,
+    },
+    PatternAs {
+        pattern: Option<NodeId>,
+        name: Option<Span>,
+    },
+    PatternOr {
+        patterns: Vec<NodeId>,
+    },
     TypeParams {
         params: Vec<NodeId>,
     },
@@ -314,6 +358,20 @@ pub enum Other {
     FormatSpec {
         elements: Vec<NodeId>,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Singleton {
+    None,
+    True,
+    False,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SequenceKind {
+    List,
+    Tuple,
+    TupleWithoutParentheses,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

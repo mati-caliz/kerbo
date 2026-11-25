@@ -139,6 +139,7 @@ const fn assigned_value(statement: &Stmt) -> Option<NodeId> {
         | Stmt::Nonlocal { .. }
         | Stmt::Expression { .. }
         | Stmt::TypeAlias { .. }
+        | Stmt::Match { .. }
         | Stmt::Pass
         | Stmt::Break
         | Stmt::Continue => None,

@@ -3,7 +3,9 @@ use tree_sitter::Node;
 use super::calls::arguments;
 use super::expressions::{expression, expression_or_tuple};
 use super::statements::block;
-use super::{Converter, Outcome, field, has_token, named, only_named, parameters, span, type_params, types};
+use super::{
+    Converter, Outcome, field, has_token, named, only_named, parameters, patterns, span, type_params, types,
+};
 use crate::formatter::python::ast::{Data, NodeId, Other, Span, Stmt};
 
 const ASYNC: &str = "async";
@@ -27,6 +29,7 @@ pub fn statement<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> Out
             orelse: else_body(converter, node)?,
         },
         "try_statement" => try_statement(converter, node)?,
+        "match_statement" => patterns::match_statement(converter, node)?,
         "with_statement" => with_statement(converter, node)?,
         _ => return Err(node),
     };
