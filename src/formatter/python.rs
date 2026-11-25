@@ -20,7 +20,7 @@ use comments::format::leading_node_comments;
 use comments::placement::Placer;
 use comments::suppression::is_suppression_comment;
 use comments::visitor;
-use context::{Formatted, Formatter, NodeLevel, TopLevelPosition, Unsupported};
+use context::{Formatted, Formatter, InterpolatedState, NodeLevel, TopLevelPosition, Unsupported};
 use convert::Converter;
 use statement::suite::{SuiteKind, fmt_suite};
 
@@ -106,6 +106,7 @@ pub fn format(source: &str) -> Result<String, Unparsable> {
         node_level: NodeLevel::TopLevel(TopLevelPosition::Other),
         indent_level: 0,
         docstring_quote: None,
+        interpolated: InterpolatedState::Outside,
     };
     fmt_module(&mut formatter, module).map_err(|unsupported| unsupported_at(source, unsupported))?;
     if let Some(unwritten) = comments.first_unformatted() {

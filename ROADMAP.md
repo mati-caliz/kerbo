@@ -1940,17 +1940,27 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   AST igual al de ruff (`src/formatter/python/`: conversión, trivia, reparto y escritura de
   comentarios, expresiones, cadenas, sentencias) y se imprime con un port del impresor de
   `ruff_formatter` (`src/formatter/document/`).
-  - **11.468 de 14.001 archivos formateados, 0 distintos de `ruff format`** (requests, fastapi,
+  - **13.839 de 14.001 archivos formateados, 1 distinto de `ruff format`** (requests, fastapi,
     flask, django, pydantic, sqlalchemy, ipython, ansible, sympy y `cpython/Lib`). Un archivo con
     sintaxis que todavía no está portada queda como está y se avisa con la línea y qué sintaxis
     es; no cuenta como distinto.
-  - Falta para los 2.533 que quedan como están: f-strings (2.432), parámetros de tipo y `type X =`
-    (44), `match` (21), `fmt: off`/`fmt: skip` (21) y cuatro formas sueltas (`except*` con alias,
-    `constrained_type`, un `as_pattern` y una sin nombre); 11 tienen error de sintaxis y ruff
-    tampoco los formatea.
+  - f-strings portados (2026-11-25): una parte sola o varias pegadas, con `=`, `!r`, formato
+    anidado, comillas que alternan adentro de las expresiones, unión en una sola cadena y el
+    reparto en varias líneas de las expresiones. Quedan afuera los comentarios dentro de un
+    f-string (el archivo queda como está) y `{a := 1}` sin paréntesis, que tree-sitter lee como
+    una asignación y ruff como `a` con formato `= 1`.
+  - El distinto es `cpython/Lib/test/test_unicodedata.py`: `for c in ('...' '...'):  # comentario`
+    con la cadena unida que sólo entra si lleva paréntesis. ruff parte los paréntesis del `for` y
+    kerbo parte el nombre de la variable (`for (
+ char
+) in "..."`). Se ve sin f-strings.
+  - Falta para los 162 que quedan como están: parámetros de tipo y `type X =` (61), `match` (55),
+    `fmt: off`/`fmt: skip` (21), t-strings (6) y cinco formas sueltas (`except*` con alias,
+    `constrained_type`, un `as_pattern`, `{a := 1}` y una sin nombre); 11 tienen error de
+    sintaxis y ruff tampoco los formatea.
   - Se mide con `scripts/parity/python/fmt_measure.sh` (por `heavy_lock.py`), sobre el volumen de
     Docker `fmt-parity-python`.
-  - Lo que sigue: cerrar Python (f-strings primero), sacar la opción oculta y documentarlo;
+  - Lo que sigue: cerrar Python (el distinto del `for`, `match`, tipos y `fmt: off`), sacar la opción oculta y documentarlo;
     después Prettier (JS/TS) y google-java-format (Java), cada uno con su corpus medido antes de
     recomendarlo.
 - Con el formateador, compilar los tests con cobertura queda al borde de los 1,5 GB del gate: sin

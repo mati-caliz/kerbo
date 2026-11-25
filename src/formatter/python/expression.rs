@@ -6,6 +6,7 @@ mod collections;
 mod comprehension;
 pub mod conditional;
 pub mod lambda;
+pub mod left_most;
 mod needs_parentheses;
 mod number;
 pub mod own_parentheses;

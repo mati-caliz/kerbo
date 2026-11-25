@@ -2,6 +2,7 @@ mod calls;
 mod collections;
 mod compound;
 mod expressions;
+mod interpolated;
 mod parameters;
 mod statements;
 mod strings;

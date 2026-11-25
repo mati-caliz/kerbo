@@ -53,6 +53,41 @@ impl Quote {
     }
 }
 
+// El f-string que encierra lo que se formatea: sus comillas deciden las de las cadenas de adentro.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InterpolatedContext {
+    pub quote: Quote,
+    pub is_triple_quoted: bool,
+    pub is_multiline: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InterpolatedState {
+    Outside,
+    Inside(InterpolatedContext),
+    Nested(InterpolatedContext),
+}
+
+impl InterpolatedState {
+    pub const fn enter_string(self, context: InterpolatedContext) -> Self {
+        match self {
+            Self::Outside => Self::Inside(context),
+            Self::Inside(_) | Self::Nested(_) => Self::Nested(context),
+        }
+    }
+
+    pub const fn enclosing(self) -> Option<InterpolatedContext> {
+        match self {
+            Self::Inside(context) | Self::Nested(context) => Some(context),
+            Self::Outside => None,
+        }
+    }
+
+    pub const fn is_nested(self) -> bool {
+        matches!(self, Self::Nested(_))
+    }
+}
+
 // Sintaxis que el formateador todavía no escribe: el archivo queda como está.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Unsupported {
@@ -75,6 +110,7 @@ pub struct Formatter<'source> {
     pub node_level: NodeLevel,
     pub indent_level: u16,
     pub docstring_quote: Option<Quote>,
+    pub interpolated: InterpolatedState,
 }
 
 impl<'source> Formatter<'source> {

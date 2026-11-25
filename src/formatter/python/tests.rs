@@ -9,6 +9,12 @@ const COMMENTS_SOURCE: &str = include_str!("fixtures/comments.py");
 const COMMENTS_EXPECTED: &str = include_str!("fixtures/comments.ruff");
 const STRINGS_SOURCE: &str = include_str!("fixtures/strings.py");
 const STRINGS_EXPECTED: &str = include_str!("fixtures/strings.ruff");
+const FSTRINGS_SOURCE: &str = include_str!("fixtures/fstrings.py");
+const FSTRINGS_EXPECTED: &str = include_str!("fixtures/fstrings.ruff");
+const FSTRINGS_EDGES_SOURCE: &str = include_str!("fixtures/fstrings2.py");
+const FSTRINGS_EDGES_EXPECTED: &str = include_str!("fixtures/fstrings2.ruff");
+const CONCATENATION_SOURCE: &str = include_str!("fixtures/concatenation.py");
+const CONCATENATION_EXPECTED: &str = include_str!("fixtures/concatenation.ruff");
 
 fn first_difference(actual: &str, expected: &str) -> String {
     let mismatch = actual
@@ -62,6 +68,21 @@ fn formats_annotations_docstrings_strings_and_lambdas_like_ruff() {
 }
 
 #[test]
+fn formats_fstrings_like_ruff() {
+    assert_formats_like_ruff(FSTRINGS_SOURCE, FSTRINGS_EXPECTED);
+}
+
+#[test]
+fn formats_fstring_edge_cases_like_ruff() {
+    assert_formats_like_ruff(FSTRINGS_EDGES_SOURCE, FSTRINGS_EDGES_EXPECTED);
+}
+
+#[test]
+fn formats_a_concatenation_with_a_trailing_comment_like_ruff() {
+    assert_formats_like_ruff(CONCATENATION_SOURCE, CONCATENATION_EXPECTED);
+}
+
+#[test]
 fn keeps_the_line_ending_of_the_first_line() {
     assert_formats_like_ruff(
         "import a\r\nimport   b\r\n\r\n\r\n\r\n\r\npass",
@@ -86,7 +107,7 @@ fn leaves_untouched_what_is_not_ported_yet() {
         })
     );
     assert_eq!(
-        format("pass\n\nx = f'{y}'\n"),
+        format("pass\n\nx = t'{y}'\n"),
         Err(Unparsable::UnsupportedSyntax {
             line: 3,
             syntax: "string".to_owned()

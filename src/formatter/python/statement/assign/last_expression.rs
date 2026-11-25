@@ -162,7 +162,7 @@ fn record_flat_string(f: &mut Formatter<'_>, value: NodeId) -> Formatted<Option<
         return Ok(None);
     };
     record(f, |f| {
-        fmt_flat(f, value, flags, false);
+        fmt_flat(f, value, flags, false)?;
         Ok(())
     })
     .map(Some)

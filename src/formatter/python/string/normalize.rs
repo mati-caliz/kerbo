@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use super::flags::StringFlags;
+use super::interpolated::quotes::{is_fstring_part, must_preserve_quotes, quote_metadata};
 use super::quotes::QuoteMetadata;
 use crate::formatter::python::ast::NodeId;
 use crate::formatter::python::context::{Formatter, Quote};
@@ -41,14 +42,48 @@ pub fn choose_quotes(raw_content: &str, flags: StringFlags, preferred: Quote) ->
     flags.with_quote(quote)
 }
 
+// Las comillas preferidas de una parte, o `None` si hay que dejar las del fuente: dentro de un
+// f-string las cadenas llevan las contrarias, y un f-string no cambia las suyas si el cambio
+// rompería la sintaxis anterior a Python 3.12.
+pub fn preferred_quote_style(f: &Formatter<'_>, part: NodeId) -> Option<Quote> {
+    let flags = StringFlags::of(f.node_text(part));
+    if f.interpolated.is_nested() {
+        return None;
+    }
+    if let Some(enclosing) = f.interpolated.enclosing()
+        && (!enclosing.is_triple_quoted || flags.is_triple_quoted)
+    {
+        return Some(enclosing.quote.opposite());
+    }
+    if is_fstring_part(f, part) && must_preserve_quotes(f, part) {
+        return None;
+    }
+    Some(preferred_quote(f, flags))
+}
+
+// Las banderas con las comillas de una parte de f-string ya elegidas.
+pub fn fstring_flags(f: &Formatter<'_>, part: NodeId) -> StringFlags {
+    let source_flags = StringFlags::of(f.node_text(part));
+    let Some(preferred) = preferred_quote_style(f, part) else {
+        return source_flags;
+    };
+    let raw_content = f.text_of(source_flags.content_span(f.ast.span(part)));
+    if first_quote_or_normalized_char_offset(raw_content).is_none() {
+        return source_flags.with_quote(preferred);
+    }
+    source_flags.with_quote(quote_metadata(f, part, preferred).choose(preferred))
+}
+
 // Una parte de cadena con sus comillas elegidas y el contenido reescrito para esas comillas.
 pub fn normalize<'source>(f: &Formatter<'source>, part: NodeId) -> NormalizedString<'source> {
     let source_flags = StringFlags::of(f.node_text(part));
     let raw_content = f.text_of(source_flags.content_span(f.ast.span(part)));
-    let flags = choose_quotes(raw_content, source_flags, preferred_quote(f, source_flags));
+    let flags = preferred_quote_style(f, part).map_or(source_flags, |preferred| {
+        choose_quotes(raw_content, source_flags, preferred)
+    });
     let text = first_quote_or_normalized_char_offset(raw_content)
         .map_or(Cow::Borrowed(raw_content), |offset| {
-            normalize_string(raw_content, offset, flags)
+            normalize_string(raw_content, offset, flags, false)
         });
     NormalizedString { flags, text }
 }
@@ -125,7 +160,7 @@ impl Rewriter<'_> {
         }
         let rest = self.input.get(after_escape_start..).unwrap_or_default();
         let normalized =
-            UnicodeEscape::new(next, !self.flags.is_bytes).and_then(|escape| escape.normalize(rest));
+            UnicodeEscape::new(next, !self.flags.is_bytes()).and_then(|escape| escape.normalize(rest));
         if let Some(normalized) = normalized {
             let escape_end = after_escape_start.saturating_add(normalized.len());
             if self.input.get(after_escape_start..escape_end) != Some(normalized.as_str()) {
@@ -159,6 +194,11 @@ impl Rewriter<'_> {
         0
     }
 
+    fn escaped_brace(&mut self, index: usize, brace: char) {
+        self.copy_up_to(index.saturating_add(brace.len_utf8()));
+        self.output.push(brace);
+    }
+
     fn unescaped_preferred_quote(&mut self, index: usize, quote: char) {
         self.copy_up_to(index);
         self.output.push(BACKSLASH);
@@ -169,7 +209,12 @@ impl Rewriter<'_> {
 
 // Reescribe el contenido para las comillas nuevas: escapa las preferidas, desescapa las otras,
 // normaliza los escapes hexadecimales y unicode, y pasa `\r\n` y `\r` a `\n`.
-pub fn normalize_string(input: &str, start_offset: usize, flags: StringFlags) -> Cow<'_, str> {
+pub fn normalize_string(
+    input: &str,
+    start_offset: usize,
+    flags: StringFlags,
+    escape_braces: bool,
+) -> Cow<'_, str> {
     let mut rewriter = Rewriter {
         input,
         output: String::new(),
@@ -185,7 +230,10 @@ pub fn normalize_string(input: &str, start_offset: usize, flags: StringFlags) ->
         }
         let after = index.saturating_add(character.len_utf8());
         let next = input.get(after..).and_then(|rest| rest.chars().next());
-        let skipped = if character == CARRIAGE_RETURN {
+        let skipped = if escape_braces && matches!(character, '{' | '}') {
+            rewriter.escaped_brace(index, character);
+            0
+        } else if character == CARRIAGE_RETURN {
             rewriter.carriage_return(index, next)
         } else if flags.is_raw() {
             0

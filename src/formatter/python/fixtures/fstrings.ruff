@@ -1,0 +1,51 @@
+name = "world"
+a = f"hello {name}"
+b = f"hello {name!r:>10}"
+c = f"{x['key']} and {y[0]}"
+d = f"{x['key']}"
+e = f"it's {x}"
+f = f"{x}" + rf"{y}\d" + Rf"{z}"
+g = f"{{literal}} {value}"
+h = f"{a=}{ b = }{c = !r}"
+i = f"{value:{width}.{precision}}"
+j = f"{ {1: 2}[1] }"
+k = f"{ {1, 2} }"
+l = f"{a, b}{(a,)}"
+m = f"{x:%Y-%m-%d}"
+n = f"{x!s}"
+o = f"plain {x} and {y}"
+p = f"{'nested'}"
+q = f"{lambda_value}{x if y else z}"
+r = f"""triple {x}
+second line {y}"""
+s = f"""triple 'single' {x}"""
+t = f"{x}text with {{braces}}{y}"
+u = f"{a}{b}{c}"
+v = f"{x}"
+w = f"{x + 1}"
+x = f"{foo(a, b)}"
+y = f"a very long f string that goes on and on {with_a_value} and continues past the line width limit {another_value}"
+z = f"short {x}"
+call(
+    f"{first_argument_value} and some more text here",
+    f"{second_argument_value} and even more text here for width",
+)
+
+
+def function():
+    return (
+        f"{x}"
+        f"{y}"
+        f"a long string with {replacement} fields that will definitely exceed the line length limit of 88"
+    )
+
+
+assert isinstance(value, str), (
+    f"expected string but got {type(value).__name__} for {name!r} instead"
+)
+print(f"{a['b']['c']}", f"{a['b']}", f"{x!r}")
+print(f"{'a' if x else 'b'}")
+print(f"{'a' if x else 'b'}")
+print(f"{f'{x}'}")
+print(f"{x:{'a'}}")
+nested = f"{f'{f"{x}"}'}"

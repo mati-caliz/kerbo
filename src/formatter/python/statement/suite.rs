@@ -75,7 +75,11 @@ fn body_of_other<'ast>(f: &Formatter<'ast>, node: NodeId) -> Option<&'ast [NodeI
         | Other::WithItem { .. }
         | Other::Decorator { .. }
         | Other::StringPart
-        | Other::BytesPart => None,
+        | Other::BytesPart
+        | Other::FStringPart { .. }
+        | Other::InterpolatedLiteral
+        | Other::Interpolation { .. }
+        | Other::FormatSpec { .. } => None,
     }
 }
 
@@ -141,7 +145,8 @@ fn is_docstring_statement(f: &Formatter<'_>, statement: NodeId) -> bool {
     let Some(Expr::StringLiteral { parts }) = f.ast.expr(*value) else {
         return false;
     };
-    parts.len() == 1 || !parts.iter().any(|part| f.comments.has(*part))
+    string::is_plain_string(f, *value)
+        && (parts.len() == 1 || !parts.iter().any(|part| f.comments.has(*part)))
 }
 
 fn fmt_docstring(f: &mut Formatter<'_>, statement: NodeId, kind: SuiteKind) -> Formatted {

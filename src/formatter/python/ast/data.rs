@@ -280,4 +280,33 @@ pub enum Other {
     },
     StringPart,
     BytesPart,
+    FStringPart {
+        elements: Vec<NodeId>,
+    },
+    InterpolatedLiteral,
+    Interpolation {
+        expression: NodeId,
+        debug_text: Option<DebugText>,
+        conversion: Conversion,
+        format_spec: Option<NodeId>,
+    },
+    FormatSpec {
+        elements: Vec<NodeId>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Conversion {
+    None,
+    Str,
+    Ascii,
+    Repr,
+}
+
+// El texto que `=` deja pegado a una expresión de f-string: lo que va entre la llave y la
+// expresión, y lo que va entre la expresión y lo que sigue (la `=` con sus espacios).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DebugText {
+    pub leading: Span,
+    pub trailing: Span,
 }

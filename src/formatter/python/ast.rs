@@ -2,7 +2,7 @@ mod children;
 mod data;
 mod operators;
 
-pub use data::{Data, Expr, Other, Stmt};
+pub use data::{Conversion, Data, DebugText, Expr, Other, Stmt};
 pub use operators::{BoolOperator, CmpOperator, NumberKind, Operator, UnaryOperator};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

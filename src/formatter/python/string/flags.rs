@@ -12,11 +12,30 @@ pub enum RawPrefix {
     Uppercase,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Family {
+    Plain,
+    Bytes,
+    Format,
+}
+
+impl Family {
+    fn of(prefix: &str) -> Self {
+        if prefix.contains(['b', 'B']) {
+            Self::Bytes
+        } else if prefix.contains(['f', 'F', 't', 'T']) {
+            Self::Format
+        } else {
+            Self::Plain
+        }
+    }
+}
+
 // El prefijo y las comillas de una parte de cadena, leídos del fuente.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StringFlags {
     pub raw: RawPrefix,
-    pub is_bytes: bool,
+    pub family: Family,
     pub quote: Quote,
     pub is_triple_quoted: bool,
     pub prefix_length: usize,
@@ -41,12 +60,20 @@ impl StringFlags {
             } else {
                 RawPrefix::None
             },
-            is_bytes: prefix.contains(['b', 'B']),
+            family: Family::of(prefix),
             quote,
             is_triple_quoted: quoted.len() >= TRIPLE_QUOTE_LENGTH.saturating_mul(2)
                 && quoted.starts_with(&triple),
             prefix_length,
         }
+    }
+
+    pub const fn is_bytes(self) -> bool {
+        matches!(self.family, Family::Bytes)
+    }
+
+    pub const fn is_interpolated(self) -> bool {
+        matches!(self.family, Family::Format)
     }
 
     pub const fn is_raw(self) -> bool {
@@ -79,13 +106,16 @@ impl StringFlags {
     // El prefijo como lo escribe ruff: `u` desaparece, `b` va en minúscula y después de la `r`,
     // que conserva su mayúscula.
     pub const fn prefix(self) -> &'static str {
-        match (self.raw, self.is_bytes) {
-            (RawPrefix::None, false) => "",
-            (RawPrefix::None, true) => "b",
-            (RawPrefix::Lowercase, false) => "r",
-            (RawPrefix::Uppercase, false) => "R",
-            (RawPrefix::Lowercase, true) => "rb",
-            (RawPrefix::Uppercase, true) => "Rb",
+        match (self.raw, self.family) {
+            (RawPrefix::None, Family::Plain) => "",
+            (RawPrefix::None, Family::Bytes) => "b",
+            (RawPrefix::Lowercase, Family::Plain) => "r",
+            (RawPrefix::Uppercase, Family::Plain) => "R",
+            (RawPrefix::Lowercase, Family::Bytes) => "rb",
+            (RawPrefix::Uppercase, Family::Bytes) => "Rb",
+            (RawPrefix::None, Family::Format) => "f",
+            (RawPrefix::Lowercase, Family::Format) => "rf",
+            (RawPrefix::Uppercase, Family::Format) => "Rf",
         }
     }
 

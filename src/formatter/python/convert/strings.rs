@@ -1,16 +1,17 @@
 use tree_sitter::Node;
 
+use super::interpolated::fstring_part;
 use super::{Converter, Outcome, named};
 use crate::formatter::python::ast::{Expr, NodeId, Other};
 
 const STRING_START: &str = "string_start";
-const INTERPOLATION: &str = "interpolation";
+const TEMPLATE_PREFIXES: [char; 2] = ['t', 'T'];
 const QUOTES: [char; 2] = ['"', '\''];
 const BYTES_PREFIXES: [char; 2] = ['b', 'B'];
-const INTERPOLATED_PREFIXES: [char; 4] = ['f', 'F', 't', 'T'];
+const FORMAT_PREFIXES: [char; 2] = ['f', 'F'];
 
 // Una cadena o varias pegadas (concatenación implícita). Cada parte es un nodo, como en ruff. Las
-// f-strings y las t-strings todavía no se formatean.
+// t-strings todavía no se formatean.
 pub fn convert<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> Outcome<'tree> {
     let literals = if node.kind() == "string" {
         vec![node]
@@ -41,10 +42,11 @@ fn part<'tree>(converter: &mut Converter<'_>, literal: Node<'tree>) -> Outcome<'
         .find(|child| child.kind() == STRING_START)
         .ok_or(literal)?;
     let prefix = converter.text(*start).trim_end_matches(QUOTES);
-    let is_interpolated =
-        prefix.contains(INTERPOLATED_PREFIXES) || children.iter().any(|child| child.kind() == INTERPOLATION);
-    if is_interpolated {
+    if prefix.contains(TEMPLATE_PREFIXES) {
         return Err(literal);
+    }
+    if prefix.contains(FORMAT_PREFIXES) {
+        return Ok((fstring_part(converter, literal)?, false));
     }
     let is_bytes = prefix.contains(BYTES_PREFIXES);
     let added = if is_bytes {

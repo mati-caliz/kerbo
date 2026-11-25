@@ -68,7 +68,7 @@ fn named_needs_parentheses(f: &Formatter<'_>, parent: NodeId) -> OptionalParenth
 fn string_needs_parentheses(f: &Formatter<'_>, expression: NodeId) -> OptionalParentheses {
     if string::is_implicit_concatenated(f, expression) {
         OptionalParentheses::Multiline
-    } else if string::is_multiline(f, expression) {
+    } else if string::is_multiline(f, expression) || string::has_multiline_replacement_field(f, expression) {
         OptionalParentheses::Never
     } else {
         OptionalParentheses::BestFit

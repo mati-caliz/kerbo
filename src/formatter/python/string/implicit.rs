@@ -1,17 +1,22 @@
 use super::docstring::needs_chaperone_space;
 use super::flags::StringFlags;
-use super::normalize::{normalize_string, preferred_quote};
+use super::interpolated::quotes::{
+    elements_of, is_fstring_part, must_preserve_quotes_when_joined, quote_metadata,
+};
+use super::interpolated::{fmt_elements, is_multiline_layout};
+use super::normalize::{normalize_string, preferred_quote_style};
 use super::quotes::QuoteMetadata;
-use super::{fmt_plain_part, is_multiline, parts_of};
+use super::{fmt_plain_part, is_multiline, is_plain_string, parts_of};
 use crate::formatter::document::PrintMode;
 use crate::formatter::python::ast::{Expr, NodeId, Span};
 use crate::formatter::python::comments::format::{leading_comments, trailing_comments};
-use crate::formatter::python::context::{Formatted, Formatter, Quote};
+use crate::formatter::python::context::{Formatted, Formatter, InterpolatedContext, Quote};
 use crate::formatter::python::parentheses::in_parentheses_only_soft_line_break_or_space;
 use crate::formatter::python::trivia::is_line_break;
 
 const BYTES_FLAGS_SOURCE: &str = "b\"\"";
 const STRING_FLAGS_SOURCE: &str = "\"\"";
+const FORMAT_FLAGS_SOURCE: &str = "f\"\"";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImplicitLayout {
@@ -24,17 +29,62 @@ fn content_of<'source>(f: &Formatter<'source>, part: NodeId) -> (&'source str, S
     (f.text_of(flags.content_span(f.ast.span(part))), flags)
 }
 
+fn part_quote_metadata(f: &Formatter<'_>, part: NodeId, preferred: Quote) -> QuoteMetadata {
+    if is_fstring_part(f, part) {
+        return quote_metadata(f, part, preferred);
+    }
+    let (content, flags) = content_of(f, part);
+    QuoteMetadata::from_str(content, flags, preferred)
+}
+
 fn merged_quote(f: &Formatter<'_>, parts: &[NodeId], preferred: Quote) -> Option<Quote> {
     let mut merged: Option<QuoteMetadata> = None;
     for part in parts {
-        let (content, flags) = content_of(f, *part);
-        let metadata = QuoteMetadata::from_str(content, flags, preferred);
+        let metadata = part_quote_metadata(f, *part, preferred);
         merged = Some(match merged {
             Some(previous) => metadata.merge(previous)?,
             None => metadata,
         });
     }
     merged.map(|metadata| metadata.choose(preferred))
+}
+
+fn can_join_part(f: &Formatter<'_>, part: NodeId) -> bool {
+    let flags = StringFlags::of(f.node_text(part));
+    !flags.is_triple_quoted
+        && !flags.is_raw()
+        && !f.comments.has_leading(part)
+        && !f.comments.has_trailing(part)
+}
+
+// Si un f-string pide conservar sus comillas, las partes que se unen tienen que ser todas de las
+// mismas comillas; devuelve las que hay que conservar, o `None` si no se puede unir.
+#[derive(Debug)]
+struct MixedQuotes;
+
+fn preserved_quote(f: &Formatter<'_>, parts: &[NodeId]) -> Result<Option<Quote>, MixedQuotes> {
+    let mut required: Option<Quote> = None;
+    for part in parts {
+        if !is_fstring_part(f, *part) || !must_preserve_quotes_when_joined(f, *part) {
+            continue;
+        }
+        let quote = StringFlags::of(f.node_text(*part)).quote;
+        if required.is_some_and(|previous| previous != quote) {
+            return Err(MixedQuotes);
+        }
+        required = Some(quote);
+    }
+    Ok(required)
+}
+
+fn joined_prefix_source(f: &Formatter<'_>, string: NodeId) -> &'static str {
+    if matches!(f.ast.expr(string), Some(Expr::BytesLiteral { .. })) {
+        BYTES_FLAGS_SOURCE
+    } else if is_plain_string(f, string) {
+        STRING_FLAGS_SOURCE
+    } else {
+        FORMAT_FLAGS_SOURCE
+    }
 }
 
 // Las comillas y el prefijo de la cadena única en que se pueden unir las partes, si se puede: no
@@ -45,35 +95,26 @@ pub fn merged_flags(f: &Formatter<'_>, string: NodeId) -> Option<StringFlags> {
     if parts.len() < 2 || is_multiline(f, string) {
         return None;
     }
-    let comments = f.comments;
-    let can_join = parts.iter().all(|part| {
-        let flags = StringFlags::of(f.node_text(*part));
-        !flags.is_triple_quoted
-            && !flags.is_raw()
-            && !comments.has_leading(*part)
-            && !comments.has_trailing(*part)
-    });
-    if !can_join {
+    if !parts.iter().all(|part| can_join_part(f, *part)) {
         return None;
     }
-    let preferred = preferred_quote(f, StringFlags::of(f.node_text(*first_part)));
-    let quote = merged_quote(f, parts, preferred)?;
-    let is_bytes = matches!(f.ast.expr(string), Some(Expr::BytesLiteral { .. }));
-    let prefix_source = if is_bytes {
-        BYTES_FLAGS_SOURCE
-    } else {
-        STRING_FLAGS_SOURCE
+    let quote = match preserved_quote(f, parts).ok()? {
+        Some(quote) => quote,
+        None => match preferred_quote_style(f, *first_part) {
+            Some(preferred) => merged_quote(f, parts, preferred)?,
+            None => StringFlags::of(f.node_text(*first_part)).quote,
+        },
     };
-    Some(StringFlags::of(prefix_source).with_quote(quote))
+    Some(StringFlags::of(joined_prefix_source(f, string)).with_quote(quote))
 }
 
 fn fmt_literal_content(
     f: &mut Formatter<'_>,
     content: &str,
     flags: StringFlags,
-    (trim_start, trim_end): (bool, bool),
+    (trim_start, trim_end, escape_braces): (bool, bool, bool),
 ) {
-    let normalized = normalize_string(content, 0, flags);
+    let normalized = normalize_string(content, 0, flags, escape_braces);
     let mut text: &str = &normalized;
     if trim_start {
         text = text.trim_start();
@@ -90,8 +131,17 @@ fn fmt_literal_content(
     }
 }
 
+fn fmt_interpolated_part(f: &mut Formatter<'_>, part: NodeId, flags: StringFlags) -> Formatted {
+    let context = InterpolatedContext {
+        quote: flags.quote,
+        is_triple_quoted: false,
+        is_multiline: is_multiline_layout(f, part),
+    };
+    fmt_elements(f, elements_of(f, part), flags, context)
+}
+
 // Las partes unidas en una sola cadena. En un docstring se recortan los espacios de las puntas.
-pub fn fmt_flat(f: &mut Formatter<'_>, string: NodeId, flags: StringFlags, is_docstring: bool) {
+pub fn fmt_flat(f: &mut Formatter<'_>, string: NodeId, flags: StringFlags, is_docstring: bool) -> Formatted {
     f.token(flags.prefix());
     f.token(flags.quotes());
     let mut parts = parts_of(f, string);
@@ -105,14 +155,20 @@ pub fn fmt_flat(f: &mut Formatter<'_>, string: NodeId, flags: StringFlags, is_do
     }
     let mut first_non_empty = is_docstring;
     for (index, part) in parts.iter().enumerate() {
+        if is_fstring_part(f, *part) {
+            fmt_interpolated_part(f, *part, flags)?;
+            continue;
+        }
         let content = content_of(f, *part).0;
         let is_last = index.saturating_add(1) == parts.len();
-        fmt_literal_content(f, content, flags, (first_non_empty, is_docstring && is_last));
+        let trims = (first_non_empty, is_docstring && is_last, flags.is_interpolated());
+        fmt_literal_content(f, content, flags, trims);
         if first_non_empty {
             first_non_empty = content.trim_start().is_empty();
         }
     }
     f.token(flags.quotes());
+    Ok(())
 }
 
 fn has_line_break_between_parts(f: &Formatter<'_>, parts: &[NodeId]) -> bool {
@@ -147,7 +203,7 @@ pub fn fmt_implicit_concatenated_string(f: &mut Formatter<'_>, string: NodeId) -
         return fmt_expanded(f, string, ImplicitLayout::Multipart);
     };
     f.start_conditional_content(PrintMode::Flat, None);
-    fmt_flat(f, string, flags, false);
+    fmt_flat(f, string, flags, false)?;
     f.end_conditional_content();
     f.start_conditional_content(PrintMode::Expanded, None);
     fmt_expanded(f, string, ImplicitLayout::MaybeFlat)?;

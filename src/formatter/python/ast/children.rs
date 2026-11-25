@@ -158,7 +158,6 @@ fn of_expression(expression: &Expr) -> Vec<NodeId> {
 
 fn of_other(other: &Other) -> Vec<NodeId> {
     match other {
-        Other::Module { body: nodes } => nodes.clone(),
         Other::ExceptHandler {
             type_: head, body, ..
         }
@@ -190,7 +189,15 @@ fn of_other(other: &Other) -> Vec<NodeId> {
             context_expr: first,
             optional_vars: second,
         } => joined(&[&[*first], &optional(*second)]),
-        Other::Alias { .. } | Other::StringPart | Other::BytesPart => Vec::new(),
+        Other::Module { body: nodes }
+        | Other::FStringPart { elements: nodes }
+        | Other::FormatSpec { elements: nodes } => nodes.clone(),
+        Other::Interpolation {
+            expression,
+            format_spec,
+            ..
+        } => joined(&[&[*expression], &optional(*format_spec)]),
+        Other::Alias { .. } | Other::StringPart | Other::BytesPart | Other::InterpolatedLiteral => Vec::new(),
     }
 }
 
