@@ -62,6 +62,11 @@ pub enum NullOrigin {
         field: String,
         after_call: bool,
     },
+    InheritedParameter {
+        line: usize,
+        column: usize,
+        index: usize,
+    },
 }
 
 // En el lugar de un varargs, si el valor puede ser el arreglo entero o es siempre un elemento: el

@@ -43,7 +43,7 @@ pub(super) fn overrides_nullable(
 
 // El mismo nombre y los mismos tipos escritos: un parámetro genérico que la clase de abajo concreta
 // no coincide, y la anotación no se hereda.
-fn has_same_signature(inherited: &Declaration, declaration: &Declaration) -> bool {
+pub(super) fn has_same_signature(inherited: &Declaration, declaration: &Declaration) -> bool {
     !inherited.is_constructor
         && inherited.name == declaration.name
         && inherited.arity == declaration.arity

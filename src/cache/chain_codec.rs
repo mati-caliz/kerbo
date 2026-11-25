@@ -23,6 +23,7 @@ const NULL_FROM_CALL: u64 = 0;
 const NULL_FROM_ANNOTATED: u64 = 1;
 const NULL_FROM_QUALIFIED_FIELD: u64 = 2;
 const NULL_FROM_LITERAL: u64 = 3;
+const NULL_FROM_INHERITED_PARAMETER: u64 = 4;
 
 fn write_root(writer: &mut Writer, root: &ChainRoot) {
     match root {
@@ -228,6 +229,12 @@ fn write_origin(writer: &mut Writer, origin: &NullOrigin) {
             writer.text(field);
             writer.number(u64::from(*after_call));
         }
+        NullOrigin::InheritedParameter { line, column, index } => {
+            writer.number(NULL_FROM_INHERITED_PARAMETER);
+            writer.size(*line);
+            writer.size(*column);
+            writer.size(*index);
+        }
     }
 }
 
@@ -278,6 +285,11 @@ fn read_origin(reader: &mut Reader<'_>) -> Result<NullOrigin, Corrupt> {
             via: reader.list(Reader::text)?.into_iter().next(),
             field: reader.text()?,
             after_call: reader.number()? != 0,
+        },
+        NULL_FROM_INHERITED_PARAMETER => NullOrigin::InheritedParameter {
+            line: reader.size()?,
+            column: reader.size()?,
+            index: reader.size()?,
         },
         _ => return Err(Corrupt),
     })

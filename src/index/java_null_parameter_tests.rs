@@ -192,3 +192,42 @@ fn a_project_parameter_annotated_non_null_rejects_null() {
     arguments.sort();
     assert_eq!(arguments, ["17:22 target", "18:22 target"]);
 }
+
+const OVERRIDDEN: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+
+abstract class Formatter {
+    abstract void translate(@Nullable String markup);
+}
+
+final class Escaped extends Formatter {
+    @Override
+    void translate(String markup) {
+        markup.length();
+    }
+}
+
+final class Plain extends Formatter {
+    void translate(String markup) {
+        markup.length();
+    }
+}
+
+final class Declared extends Formatter {
+    @Override
+    void translate(@NonNull String markup) {
+        markup.length();
+    }
+}
+";
+
+// Un parámetro sin anotación hereda el `@Nullable` del método que redefine, con `@Override` o sin él
+// no importa para IntelliJ; acá sólo se sigue con `@Override`. Uno anotado `@NonNull` no lo hereda.
+#[test]
+fn a_parameter_inherits_nullable_from_the_overridden_method() {
+    assert_eq!(
+        findings_in_files(&[OVERRIDDEN], "data-flow-issue"),
+        ["12:16 length()"]
+    );
+}

@@ -1,6 +1,7 @@
 use tree_sitter::Node;
 
 use super::java_fields::Volatility;
+use super::java_inherited_parameters::inherited_parameters;
 use super::java_null_flow::{Analysis, IDENTIFIER, NullFlow, NullOrigin, OBJECT_FIELD, State};
 use super::java_nullable_fields::{nullable_element_parameters, nullable_field_keys, nullable_parameters};
 use crate::syntax::descendants;
@@ -120,6 +121,13 @@ pub(super) fn seed_nullable_variables(analysis: &mut Analysis<'_, '_>, method: N
     for parameter in nullable_parameters(method, analysis.source) {
         state.insert(parameter, analysis.flows.len());
         analysis.flows.push(NullFlow::new(NullOrigin::Annotated));
+    }
+    for inherited in inherited_parameters(method, analysis.source) {
+        if state.contains_key(&inherited.name) {
+            continue;
+        }
+        state.insert(inherited.name, analysis.flows.len());
+        analysis.flows.push(NullFlow::new(inherited.origin));
     }
     for (keys, volatility) in nullable_field_keys(method, analysis.source) {
         if volatility == Volatility::Volatile {

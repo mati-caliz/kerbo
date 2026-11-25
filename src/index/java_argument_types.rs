@@ -52,6 +52,9 @@ pub(super) fn receiver_library_class(
 pub(super) fn origin_chain(origin: &NullOrigin) -> Option<&Chain> {
     match origin {
         NullOrigin::Call(chain) => Some(chain),
-        NullOrigin::Literal | NullOrigin::Annotated | NullOrigin::QualifiedField { .. } => None,
+        NullOrigin::Literal
+        | NullOrigin::Annotated
+        | NullOrigin::QualifiedField { .. }
+        | NullOrigin::InheritedParameter { .. } => None,
     }
 }

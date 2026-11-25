@@ -1,5 +1,6 @@
 use super::java::{Declaration, JavaSummary};
 use super::java_dereference::may_return_null;
+use super::java_inherited_parameters::overrides_nullable_parameter;
 use super::java_null_arguments::{accepts, project_owners};
 use super::java_nullness::{ProjectTypes, Resolved, project_lineage, resolve};
 use crate::jvm::library::Library;
@@ -33,6 +34,9 @@ pub(super) fn may_be_null(
             summary,
             (owner, via.as_deref(), field, *after_call),
         ),
+        NullOrigin::InheritedParameter { line, column, index } => {
+            overrides_nullable_parameter(types, library, summary, (*line, *column, *index))
+        }
     }
 }
 
