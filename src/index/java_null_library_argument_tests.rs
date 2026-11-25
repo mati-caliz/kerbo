@@ -340,6 +340,7 @@ const EXTERNAL: &str = r"package app;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Writer;
 import java.util.Collection;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -354,12 +355,13 @@ final class External {
         return elements.length;
     }
 
-    void call(Collection<Object> keys, OutputStream stream) throws IOException {
+    void call(Collection<Object> keys, OutputStream stream, Writer writer) throws IOException {
         keys.toArray((Object[]) null);
         stream.write(null);
         stream.write(null, 0, 1);
         wrap((String[]) null);
         spread((String) null);
+        writer.write((String) null);
     }
 }
 ";
@@ -371,5 +373,8 @@ final class External {
 fn external_annotations_and_arrays_of_nullable_variables_reject_null() {
     let mut found = findings_in(EXTERNAL, "null-argument");
     found.sort();
-    assert_eq!(found, ["20:33 a", "21:22 b", "22:22 b", "23:25 array"]);
+    assert_eq!(
+        found,
+        ["21:33 a", "22:22 b", "23:22 b", "24:25 array", "26:31 str"]
+    );
 }

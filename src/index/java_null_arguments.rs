@@ -39,6 +39,7 @@ const LIBRARY_NON_NULL: &[(&str, &str, usize, usize, &str)] = &[
     ("java.util.Collection", "toArray", 1, 0, "a"),
     ("java.io.OutputStream", "write", 1, 0, "b"),
     ("java.io.OutputStream", "write", 3, 0, "b"),
+    ("java.io.Writer", "write", 1, 0, "str"),
     ("java.lang.Comparable", "compareTo", 1, 0, "o"),
     ("java.util.regex.Pattern", "matcher", 1, 0, "input"),
     ("java.lang.String", "endsWith", 1, 0, "suffix"),
