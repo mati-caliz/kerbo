@@ -75,6 +75,9 @@ fn fmt_target_with_equal_operator(
 
 // Lo que va justo antes del operador cuando la sentencia se arma de derecha a izquierda.
 pub fn fmt_before_operator(f: &mut Formatter<'_>, expression: NodeId) -> Formatted {
+    if matches!(f.ast.other(expression), Some(Other::TypeParams { .. })) {
+        return super::type_params::fmt_type_params(f, expression);
+    }
     let comments = f.comments;
     if comments.has_leading(expression) || comments.has_trailing(expression) {
         return format_expr_preserving(f, expression);

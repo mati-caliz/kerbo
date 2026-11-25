@@ -6,6 +6,7 @@ mod interpolated;
 mod parameters;
 mod statements;
 mod strings;
+mod type_params;
 mod types;
 
 use tree_sitter::Node;

@@ -6,6 +6,7 @@ mod imports;
 pub mod parameters;
 mod simple;
 pub mod suite;
+mod type_params;
 mod with;
 
 use super::ast::{NodeId, Stmt};
@@ -43,6 +44,7 @@ fn fmt_fields(f: &mut Formatter<'_>, statement: NodeId, data: &Stmt) -> Formatte
         Stmt::Global { names } => simple::fmt_names(f, statement, "global", names),
         Stmt::Nonlocal { names } => simple::fmt_names(f, statement, "nonlocal", names),
         Stmt::Expression { value } => simple::fmt_expression(f, statement, *value),
+        Stmt::TypeAlias { .. } => type_params::fmt_type_alias(f, statement),
         Stmt::Pass => {
             f.token("pass");
             Ok(())

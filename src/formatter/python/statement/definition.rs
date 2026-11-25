@@ -1,6 +1,7 @@
 use super::clause::{ClauseComments, clause};
 use super::parameters::{ParametersParentheses, fmt_parameters, parameters_are_empty};
 use super::suite::SuiteKind;
+use super::type_params::fmt_optional_type_params;
 use crate::formatter::document::LineMode;
 use crate::formatter::python::ast::{Expr, NodeId, Other, Span, Stmt};
 use crate::formatter::python::builders::group;
@@ -108,9 +109,6 @@ pub fn fmt_function(f: &mut Formatter<'_>, statement: NodeId) -> Formatted {
     else {
         return Err(f.unsupported(statement, DEFINITION));
     };
-    if let Some(type_params) = type_params {
-        return Err(f.unsupported(*type_params, "parámetros de tipo"));
-    }
     let comments = f.comments;
     let (leading_definition_comments, trailing_definition_comments) = split_definition_comments(f, statement);
     empty_lines_after_leading_comments(f, comments.leading(statement));
@@ -127,6 +125,7 @@ pub fn fmt_function(f: &mut Formatter<'_>, statement: NodeId) -> Formatted {
             f.token("def");
             f.space();
             f.source_text(*name);
+            fmt_optional_type_params(f, *type_params)?;
             group(f, |f| {
                 format_node_with(f, *parameters, |f| {
                     fmt_parameters(f, *parameters, ParametersParentheses::Preserve)
@@ -141,10 +140,15 @@ pub fn fmt_function(f: &mut Formatter<'_>, statement: NodeId) -> Formatted {
     Ok(())
 }
 
-fn fmt_class_header(f: &mut Formatter<'_>, name: Span, arguments: Option<NodeId>) -> Formatted {
+fn fmt_class_header(
+    f: &mut Formatter<'_>,
+    (name, type_params): (Span, Option<NodeId>),
+    arguments: Option<NodeId>,
+) -> Formatted {
     f.token("class");
     f.space();
     f.source_text(name);
+    fmt_optional_type_params(f, type_params)?;
     let Some(arguments) = arguments else {
         return Ok(());
     };
@@ -168,9 +172,6 @@ pub fn fmt_class(f: &mut Formatter<'_>, statement: NodeId) -> Formatted {
     else {
         return Err(f.unsupported(statement, DEFINITION));
     };
-    if let Some(type_params) = type_params {
-        return Err(f.unsupported(*type_params, "parámetros de tipo"));
-    }
     let comments = f.comments;
     let (leading_definition_comments, trailing_definition_comments) = split_definition_comments(f, statement);
     empty_lines_after_leading_comments(f, comments.leading(statement));
@@ -179,7 +180,7 @@ pub fn fmt_class(f: &mut Formatter<'_>, statement: NodeId) -> Formatted {
         f,
         ClauseComments::trailing(trailing_definition_comments),
         (body, SuiteKind::Class),
-        |f| fmt_class_header(f, *name, *arguments),
+        |f| fmt_class_header(f, (*name, *type_params), *arguments),
     )?;
     empty_lines_before_trailing_comments(f, comments.trailing(statement));
     Ok(())

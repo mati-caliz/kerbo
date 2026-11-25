@@ -76,6 +76,10 @@ fn body_of_other<'ast>(f: &Formatter<'ast>, node: NodeId) -> Option<&'ast [NodeI
         | Other::Decorator { .. }
         | Other::StringPart
         | Other::BytesPart
+        | Other::TypeParams { .. }
+        | Other::TypeVar { .. }
+        | Other::TypeVarTuple { .. }
+        | Other::ParamSpec { .. }
         | Other::FStringPart { .. }
         | Other::InterpolatedLiteral
         | Other::Interpolation { .. }

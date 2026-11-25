@@ -11,9 +11,12 @@ fn handle_leading_function_with_decorators_comment(
     let follows_a_decorator = comment
         .preceding
         .is_some_and(|preceding| matches!(placer.ast.other(preceding), Some(Other::Decorator { .. })));
-    let precedes_the_parameters = comment
-        .following
-        .is_some_and(|following| matches!(placer.ast.other(following), Some(Other::Parameters { .. })));
+    let precedes_the_parameters = comment.following.is_some_and(|following| {
+        matches!(
+            placer.ast.other(following),
+            Some(Other::Parameters { .. } | Other::TypeParams { .. })
+        )
+    });
     if comment.is_own_line() && follows_a_decorator && precedes_the_parameters {
         Placement::Dangling(comment.enclosing)
     } else {
@@ -135,6 +138,7 @@ const fn assigned_value(statement: &Stmt) -> Option<NodeId> {
         | Stmt::Global { .. }
         | Stmt::Nonlocal { .. }
         | Stmt::Expression { .. }
+        | Stmt::TypeAlias { .. }
         | Stmt::Pass
         | Stmt::Break
         | Stmt::Continue => None,

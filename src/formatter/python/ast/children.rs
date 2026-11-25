@@ -90,6 +90,11 @@ fn of_statement(statement: &Stmt) -> Vec<NodeId> {
         } => joined(&[&optional(*first), &optional(*second)]),
         Stmt::Assert { test, msg } => joined(&[&[*test], &optional(*msg)]),
         Stmt::Expression { value } => vec![*value],
+        Stmt::TypeAlias {
+            name,
+            type_params,
+            value,
+        } => joined(&[&[*name], &optional(*type_params), &[*value]]),
         Stmt::FunctionDef { .. } | Stmt::ClassDef { .. } | Stmt::Try { .. } | Stmt::For { .. } => {
             of_definition(statement)
         }
@@ -197,6 +202,9 @@ fn of_other(other: &Other) -> Vec<NodeId> {
             format_spec,
             ..
         } => joined(&[&[*expression], &optional(*format_spec)]),
+        Other::TypeParams { params } => params.clone(),
+        Other::TypeVar { bound, default, .. } => joined(&[&optional(*bound), &optional(*default)]),
+        Other::TypeVarTuple { default, .. } | Other::ParamSpec { default, .. } => optional(*default),
         Other::Alias { .. } | Other::StringPart | Other::BytesPart | Other::InterpolatedLiteral => Vec::new(),
     }
 }

@@ -9,6 +9,8 @@ const COMMENTS_SOURCE: &str = include_str!("fixtures/comments.py");
 const COMMENTS_EXPECTED: &str = include_str!("fixtures/comments.ruff");
 const STRINGS_SOURCE: &str = include_str!("fixtures/strings.py");
 const STRINGS_EXPECTED: &str = include_str!("fixtures/strings.ruff");
+const TYPES_SOURCE: &str = include_str!("fixtures/types.py");
+const TYPES_EXPECTED: &str = include_str!("fixtures/types.ruff");
 const FSTRINGS_SOURCE: &str = include_str!("fixtures/fstrings.py");
 const FSTRINGS_EXPECTED: &str = include_str!("fixtures/fstrings.ruff");
 const FSTRINGS_EDGES_SOURCE: &str = include_str!("fixtures/fstrings2.py");
@@ -91,6 +93,11 @@ fn formats_a_concatenation_with_a_trailing_comment_like_ruff() {
 #[test]
 fn formats_a_joined_string_with_a_comment_like_ruff() {
     assert_formats_once_like_ruff(CONCATENATION_COMMENT_SOURCE, CONCATENATION_COMMENT_EXPECTED);
+}
+
+#[test]
+fn formats_type_parameters_and_aliases_like_ruff() {
+    assert_formats_like_ruff(TYPES_SOURCE, TYPES_EXPECTED);
 }
 
 #[test]

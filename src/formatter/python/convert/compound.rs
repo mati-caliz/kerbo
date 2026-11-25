@@ -3,7 +3,7 @@ use tree_sitter::Node;
 use super::calls::arguments;
 use super::expressions::{expression, expression_or_tuple};
 use super::statements::block;
-use super::{Converter, Outcome, field, has_token, named, only_named, parameters, span, types};
+use super::{Converter, Outcome, field, has_token, named, only_named, parameters, span, type_params, types};
 use crate::formatter::python::ast::{Data, NodeId, Other, Span, Stmt};
 
 const ASYNC: &str = "async";
@@ -38,9 +38,7 @@ fn function<'tree>(
     node: Node<'tree>,
     decorators: Vec<NodeId>,
 ) -> Outcome<'tree, Stmt> {
-    if let Some(type_parameters) = node.child_by_field_name("type_parameters") {
-        return Err(type_parameters);
-    }
+    let type_params = type_params::optional(converter, node)?;
     let returns = node
         .child_by_field_name("return_type")
         .map(|annotation| types::annotation(converter, annotation))
@@ -49,7 +47,7 @@ fn function<'tree>(
         is_async: has_token(node, ASYNC),
         decorators,
         name: span(field(node, "name")?),
-        type_params: None,
+        type_params,
         parameters: parameters::convert(converter, field(node, "parameters")?)?,
         returns,
         body: block(converter, field(node, "body")?)?,
@@ -61,9 +59,7 @@ fn class<'tree>(
     node: Node<'tree>,
     decorators: Vec<NodeId>,
 ) -> Outcome<'tree, Stmt> {
-    if let Some(type_parameters) = node.child_by_field_name("type_parameters") {
-        return Err(type_parameters);
-    }
+    let type_params = type_params::optional(converter, node)?;
     let superclasses = node
         .child_by_field_name("superclasses")
         .map(|superclasses| arguments(converter, superclasses))
@@ -71,7 +67,7 @@ fn class<'tree>(
     Ok(Stmt::ClassDef {
         decorators,
         name: span(field(node, "name")?),
-        type_params: None,
+        type_params,
         arguments: superclasses,
         body: block(converter, field(node, "body")?)?,
     })

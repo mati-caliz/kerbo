@@ -113,6 +113,11 @@ pub enum Stmt {
     Expression {
         value: NodeId,
     },
+    TypeAlias {
+        name: NodeId,
+        type_params: Option<NodeId>,
+        value: NodeId,
+    },
     Pass,
     Break,
     Continue,
@@ -280,6 +285,22 @@ pub enum Other {
     },
     StringPart,
     BytesPart,
+    TypeParams {
+        params: Vec<NodeId>,
+    },
+    TypeVar {
+        name: Span,
+        bound: Option<NodeId>,
+        default: Option<NodeId>,
+    },
+    TypeVarTuple {
+        name: Span,
+        default: Option<NodeId>,
+    },
+    ParamSpec {
+        name: Span,
+        default: Option<NodeId>,
+    },
     FStringPart {
         elements: Vec<NodeId>,
     },

@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
 use super::expressions::{expression, expression_or_tuple, tuple_of};
-use super::{Converter, Outcome, compound, field, has_token, named, parts, span, token, types};
+use super::{Converter, Outcome, compound, field, has_token, named, parts, span, token, type_params, types};
 use crate::formatter::python::ast::{NodeId, Operator, Other, Span, Stmt};
 
 const COMMA: &str = ",";
@@ -31,6 +31,7 @@ pub fn statement<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> Out
         "delete_statement" => delete(converter, node)?,
         "raise_statement" => raise(converter, node)?,
         "assert_statement" => assert(converter, node)?,
+        "type_alias_statement" => type_params::alias(converter, node)?,
         "pass_statement" => Stmt::Pass,
         "break_statement" => Stmt::Break,
         "continue_statement" => Stmt::Continue,

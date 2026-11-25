@@ -198,7 +198,9 @@ pub fn handle(placer: &Placer<'_>, comment: &DecoratedComment) -> Placement {
         Some(Other::Parameter { name, annotation }) => {
             handle_parameter_comment(placer, comment, (*name, *annotation))
         }
-        Some(Other::Arguments { .. }) => handle_bracketed_end_of_line_comment(placer, comment),
+        Some(Other::Arguments { .. } | Other::TypeParams { .. }) => {
+            handle_bracketed_end_of_line_comment(placer, comment)
+        }
         Some(Other::Comprehension {
             target, iter, ifs, ..
         }) => handle_comprehension_comment(placer, comment, (*target, *iter, ifs)),

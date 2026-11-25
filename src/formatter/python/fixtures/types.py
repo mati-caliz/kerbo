@@ -1,0 +1,23 @@
+type X = int
+type   Y[T] = list[T]
+type Z[T: int, *Ts, **P] = Callable[P, tuple[T, *Ts]]
+type W[T: (int, str) = int, *Ts = *tuple[int], **P = [int, str]] = None
+def f[T](x: T) -> T: pass
+def g[ T : int , *Ts , **P ] (x): pass
+async def h[T, U](x): pass
+class A[T]: pass
+class B[T: int, U](Base, metaclass=M): pass
+class C[
+    T,
+    U,
+]: pass
+def very_long_function_name[TypeVariableNumberOne, TypeVariableNumberTwo, TypeVariableNumberThree](a, b): pass
+type VeryLongAlias[TypeVariableNumberOne, TypeVariableNumberTwo, TypeVariableNumberThree] = dict[TypeVariableNumberOne, TypeVariableNumberTwo]
+type Alias = SomeVeryLongTypeName[WithManyArguments, AndMoreArguments, AndEvenMoreArguments, AndStillMore]
+def k[  # comment
+    T,
+](): pass
+@decorator
+def m[T](): pass
+type A = (yield)
+type B = (await x)
