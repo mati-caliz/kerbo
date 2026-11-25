@@ -15,6 +15,8 @@ const FSTRINGS_EDGES_SOURCE: &str = include_str!("fixtures/fstrings2.py");
 const FSTRINGS_EDGES_EXPECTED: &str = include_str!("fixtures/fstrings2.ruff");
 const CONCATENATION_SOURCE: &str = include_str!("fixtures/concatenation.py");
 const CONCATENATION_EXPECTED: &str = include_str!("fixtures/concatenation.ruff");
+const CONCATENATION_COMMENT_SOURCE: &str = include_str!("fixtures/concatenation_comment.py");
+const CONCATENATION_COMMENT_EXPECTED: &str = include_str!("fixtures/concatenation_comment.ruff");
 
 fn first_difference(actual: &str, expected: &str) -> String {
     let mismatch = actual
@@ -37,9 +39,13 @@ fn first_difference(actual: &str, expected: &str) -> String {
     }
 }
 
-fn assert_formats_like_ruff(source: &str, expected: &str) {
+fn assert_formats_once_like_ruff(source: &str, expected: &str) {
     let actual = format(source).expect("el formateador conoce toda la sintaxis del fixture");
     assert!(actual == expected, "{}", first_difference(&actual, expected));
+}
+
+fn assert_formats_like_ruff(source: &str, expected: &str) {
+    assert_formats_once_like_ruff(source, expected);
     assert_eq!(
         format(expected).as_deref(),
         Ok(expected),
@@ -80,6 +86,11 @@ fn formats_fstring_edge_cases_like_ruff() {
 #[test]
 fn formats_a_concatenation_with_a_trailing_comment_like_ruff() {
     assert_formats_like_ruff(CONCATENATION_SOURCE, CONCATENATION_EXPECTED);
+}
+
+#[test]
+fn formats_a_joined_string_with_a_comment_like_ruff() {
+    assert_formats_once_like_ruff(CONCATENATION_COMMENT_SOURCE, CONCATENATION_COMMENT_EXPECTED);
 }
 
 #[test]

@@ -1940,7 +1940,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   AST igual al de ruff (`src/formatter/python/`: conversión, trivia, reparto y escritura de
   comentarios, expresiones, cadenas, sentencias) y se imprime con un port del impresor de
   `ruff_formatter` (`src/formatter/document/`).
-  - **13.839 de 14.001 archivos formateados, 1 distinto de `ruff format`** (requests, fastapi,
+  - **13.839 de 14.001 archivos formateados, 0 distintos de `ruff format`** (requests, fastapi,
     flask, django, pydantic, sqlalchemy, ipython, ansible, sympy y `cpython/Lib`). Un archivo con
     sintaxis que todavía no está portada queda como está y se avisa con la línea y qué sintaxis
     es; no cuenta como distinto.
@@ -1949,11 +1949,8 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     reparto en varias líneas de las expresiones. Quedan afuera los comentarios dentro de un
     f-string (el archivo queda como está) y `{a := 1}` sin paréntesis, que tree-sitter lee como
     una asignación y ruff como `a` con formato `= 1`.
-  - El distinto es `cpython/Lib/test/test_unicodedata.py`: `for c in ('...' '...'):  # comentario`
-    con la cadena unida que sólo entra si lleva paréntesis. ruff parte los paréntesis del `for` y
-    kerbo parte el nombre de la variable (`for (
- char
-) in "..."`). Se ve sin f-strings.
+  - Ojo: ruff 0.17.4 no es idempotente con `for x in (".." ".."):` (formatear su propia salida cambia
+    los paréntesis); por eso los fixtures de ese caso se comparan una sola pasada.
   - Falta para los 162 que quedan como están: parámetros de tipo y `type X =` (61), `match` (55),
     `fmt: off`/`fmt: skip` (21), t-strings (6) y cinco formas sueltas (`except*` con alias,
     `constrained_type`, un `as_pattern`, `{a := 1}` y una sin nombre); 11 tienen error de

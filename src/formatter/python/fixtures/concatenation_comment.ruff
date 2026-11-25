@@ -1,0 +1,8 @@
+class A:
+    def f(self):
+        for char in (
+            "\U0002a6e0\U0002fa20\U0003134b\U0003fffd\ufa6e\ufada"
+        ):  # New in 5.2.0
+            self.assertEqual(eaw(char), "W")
+            self.assertIs(self.db.name(char, None), None)
+            pass
