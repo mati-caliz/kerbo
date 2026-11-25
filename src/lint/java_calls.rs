@@ -9,7 +9,7 @@ use super::java::{CONSTRUCTOR, METHOD, NAME_FIELD, PRIVATE, children, modifiers,
 use super::java_chains::{Chain, NullFacts, chain_of};
 use super::java_constants::{Constants, constant_value, constants_in};
 use super::java_implicit_constructor::implicit_enum_constructor;
-use super::java_lambda_flows::lambda_flows;
+use super::java_lambda_flows::{STATIC_INITIALIZER, lambda_flows};
 use super::java_null_flow::{NullFlow, null_flows};
 use super::java_nullness_annotations::is_recognized;
 use super::java_owner::{Owner, annotation_names, mentioned_name, owner_of};
@@ -139,7 +139,7 @@ pub fn extract<'tree>(top_level: Node<'tree>, source: &[u8]) -> Extracted<'tree>
         while scopes.last().is_some_and(|(end, _)| *end <= node.start_byte()) {
             scopes.pop();
         }
-        if node.kind() == METHOD || node.kind() == CONSTRUCTOR {
+        if node.kind() == METHOD || node.kind() == CONSTRUCTOR || node.kind() == STATIC_INITIALIZER {
             scopes.push((node.end_byte(), method_variables(node, source, &file_variables)));
         }
         let variables = scopes.last().map_or(&file_variables, |(_, scoped)| scoped);

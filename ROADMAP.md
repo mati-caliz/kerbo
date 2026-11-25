@@ -1624,7 +1624,7 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
   de más en los dos. En guava, 854 de los 972 (492 `data-flow-issue`, 312 `null-argument`, 25
   `failing-call`, 24 `nullable-return`, 1 `redundant-nullable`), con 3
   `null-argument` de más en LocalCacheTest (el `entry` que sale de `getEntry`, ver abajo). En jenkins
-  (2026-11-25) 1149 de 1258 (1025 `data-flow-issue`, 99 `null-argument`, 9 `already-assigned`, 9
+  (2026-11-25) 1150 de 1258 (1025 `data-flow-issue`, 100 `null-argument`, 9 `already-assigned`, 9
   `nullable-return`, 7 `redundant-nullable`) con
   9 de más: correlaciones que IntelliJ sigue partiendo estados y contratos inferidos
   (`if (!isValidData(data)) return null;`). La última tanda sumó 158: una variable que el archivo no

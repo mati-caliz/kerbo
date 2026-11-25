@@ -103,3 +103,28 @@ fn loops_leave_through_their_condition_and_locals_shadow_fields_inside_lambdas()
         ["35:14 length()", "39:24 length()"]
     );
 }
+
+const STATIC_BLOCK: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+
+final class Holder {
+    static final int SIZE;
+
+    static @Nullable String maybe() {
+        return null;
+    }
+
+    static {
+        String name = maybe();
+        SIZE = name.length();
+    }
+}
+";
+
+// El bloque `static` se recorre como un método: una variable asignada desde una llamada nula y
+// usada sin chequear se marca igual.
+#[test]
+fn a_static_initializer_block_is_analyzed() {
+    assert_eq!(findings_in(STATIC_BLOCK, "data-flow-issue"), ["14:21 length()"]);
+}
