@@ -19,6 +19,8 @@ const MATCH_EDGES_SOURCE: &str = include_str!("fixtures/match2.py");
 const MATCH_EDGES_EXPECTED: &str = include_str!("fixtures/match2.ruff");
 const TSTRINGS_SOURCE: &str = include_str!("fixtures/tstrings.py");
 const TSTRINGS_EXPECTED: &str = include_str!("fixtures/tstrings.ruff");
+const VERBATIM_SOURCE: &str = include_str!("fixtures/verbatim.py");
+const VERBATIM_EXPECTED: &str = include_str!("fixtures/verbatim.ruff");
 const FSTRINGS_SOURCE: &str = include_str!("fixtures/fstrings.py");
 const FSTRINGS_EXPECTED: &str = include_str!("fixtures/fstrings.ruff");
 const FSTRINGS_EDGES_SOURCE: &str = include_str!("fixtures/fstrings2.py");
@@ -129,6 +131,11 @@ fn formats_template_strings_like_ruff() {
 }
 
 #[test]
+fn leaves_suppressed_statements_as_written_like_ruff() {
+    assert_formats_like_ruff(VERBATIM_SOURCE, VERBATIM_EXPECTED);
+}
+
+#[test]
 fn keeps_the_line_ending_of_the_first_line() {
     assert_formats_like_ruff(
         "import a\r\nimport   b\r\n\r\n\r\n\r\n\r\npass",
@@ -146,7 +153,7 @@ fn an_empty_file_stays_empty_and_blank_lines_become_one() {
 #[test]
 fn leaves_untouched_what_is_not_ported_yet() {
     assert_eq!(
-        format("import a\n# fmt: off\n"),
+        format("import a\n# fmt: on\npass\n"),
         Err(Unparsable::UnsupportedSyntax {
             line: 2,
             syntax: "comentario que apaga el formateo".to_owned()

@@ -75,18 +75,6 @@ pub fn format(source: &str) -> Result<String, Unparsable> {
     let tree = parse(&renamed_type_calls(source))?;
     let root = tree.root_node();
     let comment_ranges = comment_ranges_of(source, root);
-    if let Some(suppression) = comment_ranges
-        .iter()
-        .find(|comment| is_suppression_comment(source.get(comment.start..comment.end).unwrap_or_default()))
-    {
-        return Err(unsupported_at(
-            source,
-            Unsupported {
-                offset: suppression.start,
-                syntax: SUPPRESSION,
-            },
-        ));
-    }
     let mut converter = Converter::new(source);
     let module = convert::module(&mut converter, root).map_err(unsupported_node)?;
     let placer = Placer {
@@ -108,6 +96,8 @@ pub fn format(source: &str) -> Result<String, Unparsable> {
         indent_level: 0,
         docstring_quote: None,
         interpolated: InterpolatedState::Outside,
+        handled_suppressions: Vec::new(),
+        verbatim_ranges: Vec::new(),
     };
     fmt_module(&mut formatter, module).map_err(|unsupported| unsupported_at(source, unsupported))?;
     if let Some(unwritten) = comments.first_unformatted() {
@@ -119,9 +109,31 @@ pub fn format(source: &str) -> Result<String, Unparsable> {
             },
         ));
     }
+    if let Some(unhandled) = unhandled_suppression(&formatter, &comment_ranges) {
+        return Err(unsupported_at(
+            source,
+            Unsupported {
+                offset: unhandled.start,
+                syntax: SUPPRESSION,
+            },
+        ));
+    }
     let printed = print(&formatter.builder.finish())
         .map_err(|_invalid| Unparsable::Unsupported { line: FIRST_LINE })?;
     Ok(trivia::with_the_line_ending_of(source, &printed))
+}
+
+// Un comentario que apaga el formateo y que ningún tramo escrito tal cual cubrió: el archivo
+// queda como está.
+fn unhandled_suppression(formatter: &Formatter<'_>, comment_ranges: &[Span]) -> Option<Span> {
+    comment_ranges.iter().copied().find(|comment| {
+        is_suppression_comment(formatter.text_of(*comment))
+            && !formatter.handled_suppressions.contains(&comment.start)
+            && !formatter
+                .verbatim_ranges
+                .iter()
+                .any(|range| range.start <= comment.start && comment.end <= range.end)
+    })
 }
 
 // Los comentarios del archivo en orden. tree-sitter deja adentro el `\r` de un salto de línea de

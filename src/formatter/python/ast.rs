@@ -5,7 +5,7 @@ mod operators;
 pub use data::{Conversion, Data, DebugText, Expr, Other, SequenceKind, Singleton, Stmt};
 pub use operators::{BoolOperator, CmpOperator, NumberKind, Operator, UnaryOperator};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct NodeId(usize);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

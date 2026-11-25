@@ -95,6 +95,12 @@ pub struct Unsupported {
     pub syntax: &'static str,
 }
 
+impl Unsupported {
+    pub const fn at(offset: usize, syntax: &'static str) -> Self {
+        Self { offset, syntax }
+    }
+}
+
 pub type Formatted<T = ()> = Result<T, Unsupported>;
 
 // El `PyFormatter` de ruff con su contexto: el documento que se va armando, el fuente, el AST y
@@ -111,6 +117,8 @@ pub struct Formatter<'source> {
     pub indent_level: u16,
     pub docstring_quote: Option<Quote>,
     pub interpolated: InterpolatedState,
+    pub handled_suppressions: Vec<usize>,
+    pub verbatim_ranges: Vec<Span>,
 }
 
 impl<'source> Formatter<'source> {

@@ -1,4 +1,5 @@
 use super::format_statement;
+use super::verbatim::write_if_suppressed;
 use crate::formatter::document::LineMode;
 use crate::formatter::python::ast::{Expr, NodeId, Other, Stmt};
 use crate::formatter::python::comments::format::{leading_comments, trailing_comments};
@@ -262,6 +263,23 @@ fn separate(
     }
 }
 
+// Una sentencia de un bloque tal como la escribe `fmt_suite`: la primera puede ser un docstring.
+pub fn fmt_suite_child(
+    f: &mut Formatter<'_>,
+    statements: &[NodeId],
+    index: usize,
+    kind: SuiteKind,
+) -> Formatted {
+    let Some(statement) = statements.get(index).copied() else {
+        return Ok(());
+    };
+    if index == 0 && kind != SuiteKind::Other && is_docstring_statement(f, statement) {
+        fmt_docstring(f, statement, kind)
+    } else {
+        format_statement(f, statement)
+    }
+}
+
 fn fmt_first(f: &mut Formatter<'_>, first: NodeId, kind: SuiteKind) -> Formatted<bool> {
     let is_docstring = kind != SuiteKind::Other && is_docstring_statement(f, first);
     if kind == SuiteKind::Other && is_class_or_function_definition(f, first) && !f.comments.has_leading(first)
@@ -299,15 +317,32 @@ pub fn fmt_suite(f: &mut Formatter<'_>, statements: &[NodeId], kind: SuiteKind) 
     };
     let saved_level = f.enter(node_level);
     f.indent_level = f.indent_level.saturating_add(1);
-    let mut empty_line_after_docstring = fmt_first(f, *first, kind)?;
-    let mut preceding = *first;
-    for (index, following) in rest.iter().enumerate() {
-        if kind == SuiteKind::TopLevel && index.saturating_add(1) == rest.len() {
+    let (mut last_index, mut empty_line_after_docstring) =
+        if let Some(last) = write_if_suppressed(f, statements, (0, kind))? {
+            let docstring_in_front = matches!(kind, SuiteKind::TopLevel | SuiteKind::Class)
+                && statements
+                    .get(last)
+                    .is_some_and(|statement| is_docstring_statement(f, *statement));
+            (last, docstring_in_front)
+        } else {
+            (0, fmt_first(f, *first, kind)?)
+        };
+    let mut preceding = statements.get(last_index).copied().unwrap_or(*first);
+    while let Some(following_index) = last_index.checked_add(1).filter(|next| *next < statements.len()) {
+        let Some(following) = statements.get(following_index).copied() else {
+            break;
+        };
+        if kind == SuiteKind::TopLevel && following_index.saturating_add(1) == statements.len() {
             f.node_level = NodeLevel::TopLevel(TopLevelPosition::Last);
         }
-        separate(f, (preceding, *following), kind, empty_line_after_docstring);
-        format_statement(f, *following)?;
-        preceding = *following;
+        separate(f, (preceding, following), kind, empty_line_after_docstring);
+        if let Some(last) = write_if_suppressed(f, statements, (following_index, kind))? {
+            last_index = last;
+        } else {
+            format_statement(f, following)?;
+            last_index = following_index;
+        }
+        preceding = statements.get(last_index).copied().unwrap_or(following);
         empty_line_after_docstring = false;
     }
     f.indent_level = f.indent_level.saturating_sub(1);

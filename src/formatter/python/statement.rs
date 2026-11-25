@@ -8,6 +8,7 @@ pub mod parameters;
 mod simple;
 pub mod suite;
 mod type_params;
+mod verbatim;
 mod with;
 
 use super::ast::{NodeId, Stmt};

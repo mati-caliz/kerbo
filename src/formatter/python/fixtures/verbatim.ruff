@@ -1,0 +1,57 @@
+x = [
+    1,   2,
+]  # fmt: skip
+y = 1;  z   = 2  # fmt: skip
+w = 3
+
+
+def f():
+    a = 1
+    # fmt: off
+    b   =   [1,2,
+      3]
+
+    s   = """
+  keep   this
+"""
+    # fmt: on
+    c = 3
+
+
+class A:
+    # fmt: off
+    x   = 1
+    y  =  2
+    # fmt: on
+    z = 3
+
+
+# fmt: off
+matrix = [
+    1, 0,
+    0, 1,
+]
+# fmt: on
+
+
+def g():
+    pass
+    # fmt: off
+    h  = 2
+    # trailing
+
+
+def k():
+    value = 1
+    # fmt: off
+    value2   =   2
+    # fmt: on
+    # after on
+    value3 = 3
+    # fmt: off
+    value4   =   4
+
+
+if x:
+    q   =  1  # fmt: skip
+    r = 2

@@ -1,5 +1,5 @@
 mod bodies;
-mod branches;
+pub mod branches;
 mod expressions;
 mod others;
 mod statements;
