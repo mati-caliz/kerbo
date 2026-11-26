@@ -42,3 +42,10 @@ x = f"{ a if b else c }"
 x = f'{a}\{b}'
 x = f"\{a}"
 x = r"\{a}"
+x = f"{a := 1}"
+x = f"{a:= 1}"
+with (open(f) as g):
+    pass
+with (open(f) as g, a as b):
+    pass
+y = container[int:obj, int]

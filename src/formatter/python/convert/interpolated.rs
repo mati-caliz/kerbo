@@ -1,6 +1,6 @@
 use tree_sitter::Node;
 
-use super::expressions::expression_or_tuple;
+use super::expressions::{expression, expression_or_tuple};
 use super::{Converter, Outcome, field, named, token};
 use crate::formatter::python::ast::{Conversion, Data, DebugText, NodeId, Other, Span};
 
@@ -10,6 +10,7 @@ const INTERPOLATION: &str = "interpolation";
 const FORMAT_EXPRESSION: &str = "format_expression";
 const NAMED_EXPRESSION: &str = "named_expression";
 const EQUALS: &str = "=";
+const WALRUS: &str = ":=";
 const OPENING_BRACE: &str = "{";
 const CONVERSION_FIELD: &str = "type_conversion";
 const FORMAT_SPEC_FIELD: &str = "format_specifier";
@@ -47,7 +48,7 @@ fn debug_text_of(node: Node<'_>, expression_span: Span) -> Option<DebugText> {
 fn interpolation<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> Outcome<'tree> {
     let expression_node = field(node, "expression")?;
     if expression_node.kind() == NAMED_EXPRESSION {
-        return Err(node);
+        return walrus_as_format_spec(converter, node, expression_node);
     }
     let expression = expression_or_tuple(converter, expression_node)?;
     let expression_span = converter.ast.span(expression);
@@ -67,6 +68,39 @@ fn interpolation<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> Out
             format_spec,
         },
     ))
+}
+
+// `{a := 1}` es `a` con el formato `= 1`: los dos puntos de adentro empiezan el formato.
+fn walrus_as_format_spec<'tree>(
+    converter: &mut Converter<'_>,
+    node: Node<'tree>,
+    walrus: Node<'tree>,
+) -> Outcome<'tree> {
+    let operator = token(walrus, WALRUS).ok_or(node)?;
+    let content = Span::new(
+        operator.start_byte().saturating_add(COLON_LENGTH),
+        node.end_byte().saturating_sub(CLOSING_BRACE_LENGTH),
+    );
+    if converter.text(walrus).contains(['{', '}']) || token(node, EQUALS).is_some() {
+        return Err(node);
+    }
+    let expression = expression(converter, field(walrus, "name")?)?;
+    let elements = elements_between(converter, content, &[])?;
+    let spec = add_other(converter, content, Other::FormatSpec { elements });
+    Ok(add_other(
+        converter,
+        span_of(node),
+        Other::Interpolation {
+            expression,
+            debug_text: None,
+            conversion: Conversion::None,
+            format_spec: Some(spec),
+        },
+    ))
+}
+
+fn span_of(node: Node<'_>) -> Span {
+    Span::new(node.start_byte(), node.end_byte())
 }
 
 fn format_spec<'tree>(converter: &mut Converter<'_>, specifier: Node<'tree>) -> Outcome<'tree> {

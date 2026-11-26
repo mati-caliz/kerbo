@@ -192,6 +192,8 @@ fn try_statement<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> Out
     })
 }
 
+const PARENTHESIZED_EXPRESSION: &str = "parenthesized_expression";
+
 fn with_item<'tree>(converter: &mut Converter<'_>, node: Node<'tree>, item_span: Span) -> Outcome<'tree> {
     let item = if node.kind() == AS_PATTERN {
         let alias = field(node, "alias")?;
@@ -221,6 +223,12 @@ fn with_items<'tree>(converter: &mut Converter<'_>, clause: Node<'tree>) -> Outc
     {
         let value = field(*item, "value")?;
         let elements = named(value);
+        if let [alias] = elements.as_slice()
+            && value.kind() == PARENTHESIZED_EXPRESSION
+            && alias.kind() == AS_PATTERN
+        {
+            return Ok(vec![with_item(converter, *alias, span(*alias))?]);
+        }
         let is_item_list = value.kind() == TUPLE && (elements.len() > 1 || has_token(value, COMMA));
         if is_item_list {
             return elements

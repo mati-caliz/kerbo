@@ -21,7 +21,8 @@ pub fn annotation<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> Ou
         "splat_type" if has_token(inner, STAR) => Expr::Starred {
             value: expression(converter, only_named(inner)?)?,
         },
-        "constrained_type" | "splat_type" => return Err(inner),
+        "constrained_type" => slice(converter, inner)?,
+        "splat_type" => return Err(inner),
         _ => return expression(converter, inner),
     };
     Ok(converter.expression(inner, added))
@@ -47,6 +48,18 @@ fn union<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> Outcome<'tr
         left: annotation(converter, *left)?,
         op: Operator::BitOr,
         right: annotation(converter, *right)?,
+    })
+}
+
+fn slice<'tree>(converter: &mut Converter<'_>, node: Node<'tree>) -> Outcome<'tree, Expr> {
+    let children = named(node);
+    let [lower, upper] = children.as_slice() else {
+        return Err(node);
+    };
+    Ok(Expr::Slice {
+        lower: Some(annotation(converter, *lower)?),
+        upper: Some(annotation(converter, *upper)?),
+        step: None,
     })
 }
 

@@ -69,9 +69,10 @@ fn fmt_module(f: &mut Formatter<'_>, module: NodeId) -> Formatted {
 // que se imprime con un port de su impresor. Está en construcción: un archivo con sintaxis que
 // todavía no se portó queda como está.
 pub fn format(source: &str) -> Result<String, Unparsable> {
-    if source.starts_with(BYTE_ORDER_MARK) {
-        return Err(Unparsable::Unsupported { line: FIRST_LINE });
-    }
+    format_without_byte_order_mark(source.strip_prefix(BYTE_ORDER_MARK).unwrap_or(source))
+}
+
+fn format_without_byte_order_mark(source: &str) -> Result<String, Unparsable> {
     let tree = parse(&renamed_type_calls(source))?;
     let root = tree.root_node();
     let comment_ranges = comment_ranges_of(source, root);

@@ -160,12 +160,12 @@ fn leaves_untouched_what_is_not_ported_yet() {
         })
     );
     assert_eq!(
-        format("pass\n\nx = f'{y := 1}'\n"),
+        format("pass\n\nx = f'''{y  # c\n}'''\n"),
         Err(Unparsable::UnsupportedSyntax {
             line: 3,
-            syntax: "interpolation".to_owned()
+            syntax: "comentario dentro de un f-string".to_owned()
         })
     );
     assert_eq!(format("import (\n"), Err(Unparsable::SyntaxError { line: 1 }));
-    assert_eq!(format("\u{feff}pass\n"), Err(Unparsable::Unsupported { line: 1 }));
+    assert_eq!(format("\u{feff}pass\n").as_deref(), Ok("pass\n"));
 }
