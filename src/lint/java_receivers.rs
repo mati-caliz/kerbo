@@ -5,6 +5,7 @@ use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_receiver_arguments::getter_type;
+use super::java_type_bounds::bounded_type;
 use crate::syntax::{descendants, named_children};
 
 pub use super::java_static_imports::StaticImports;
@@ -75,7 +76,7 @@ pub fn variable_types(nodes: &[Node<'_>], source: &[u8]) -> Variables {
     let mut variables = Variables::new();
     let mut declare = |variable: Node<'_>, written: Option<Node<'_>>| {
         let declared = written
-            .map(|node| simple_type_name(text(node, source)))
+            .map(|node| bounded_type(node, simple_type_name(text(node, source)), source))
             .filter(|declared| declared != INFERRED);
         match variables.entry(text(variable, source).to_owned()) {
             Entry::Vacant(entry) => {

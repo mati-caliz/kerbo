@@ -100,6 +100,7 @@ mod java_text_block;
 pub mod java_throws;
 mod java_tokens;
 pub mod java_type_arguments;
+pub mod java_type_bounds;
 pub mod java_type_variables;
 mod java_unboxing;
 mod java_unicode_escapes;

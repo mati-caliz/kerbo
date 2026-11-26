@@ -231,3 +231,72 @@ fn a_parameter_inherits_nullable_from_the_overridden_method() {
         ["12:16 length()"]
     );
 }
+
+const BOUNDED: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+
+abstract class Build {
+    abstract @Nullable Node builtOn();
+}
+
+abstract class Node {
+    abstract void run();
+}
+
+abstract class Project<B extends Build> {
+    abstract B last();
+
+    void use() {
+        B build = last();
+        build.builtOn().run();
+    }
+
+    <T extends Build> void generic(T build) {
+        build.builtOn().run();
+    }
+}
+";
+
+// Una variable cuyo tipo es una variable de tipo con límite llama a lo que declara el límite.
+#[test]
+fn a_variable_of_a_bounded_type_variable_uses_the_bound() {
+    assert_eq!(
+        findings_in_files(&[BOUNDED], "data-flow-issue"),
+        ["18:25 run()", "22:25 run()"]
+    );
+}
+
+const GUARDED_GETTER: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+
+abstract class Run {
+    abstract @Nullable String getResult();
+    abstract boolean isBuilding();
+    abstract int getNumber();
+}
+
+abstract class Job<R extends Run> {
+    abstract R last();
+
+    void check(int skipped) {
+        R run = last();
+        while (run != null) {
+            if (!run.isBuilding() && run.getResult() != null && run.getNumber() != skipped) {
+                String text = run.getResult();
+                text.length();
+            }
+        }
+    }
+}
+";
+
+// `run.getResult() != null` en la condición vale para la misma llamada de más adelante.
+#[test]
+fn a_getter_checked_in_the_condition_stays_present_for_a_bounded_variable() {
+    assert_eq!(
+        findings_in_files(&[GUARDED_GETTER], "data-flow-issue"),
+        Vec::<String>::new()
+    );
+}

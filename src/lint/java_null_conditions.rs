@@ -7,6 +7,7 @@ use super::java_null_flow::{
     NOT_EQUAL, NULL, OBJECT_FIELD, OPERAND_FIELD, OPERATOR_FIELD, OR, PARENTHESIZED, RIGHT_FIELD, State,
     UNARY,
 };
+use super::java_null_getters::{begin_condition, end_condition, note_checked};
 use super::java_null_keys::{forget, join, tracked_key};
 use crate::syntax::named_children;
 
@@ -45,6 +46,27 @@ const CREATION: &str = "object_creation_expression";
 const LITERAL_SUFFIX: &str = "_literal";
 
 // Los estados si la condición da verdadero y si da falso.
+const CONDITION_FIELD: &str = "condition";
+const CONSEQUENCE_FIELD: &str = "consequence";
+const ALTERNATIVE_FIELD: &str = "alternative";
+
+// Un `if`: un getter comparado con null en la condición vale lo mismo recién adentro de la rama
+// que lo cumple, no en el `else` ni después.
+pub(super) fn if_statement(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) -> Option<State> {
+    let checked_before = begin_condition(analysis);
+    let (when_true, when_false) = branch_states(analysis, node.child_by_field_name(CONDITION_FIELD)?, state);
+    let taken = match node.child_by_field_name(CONSEQUENCE_FIELD) {
+        Some(branch) => analysis.statement(branch, when_true),
+        None => Some(when_true),
+    };
+    end_condition(analysis, checked_before);
+    let other = match node.child_by_field_name(ALTERNATIVE_FIELD) {
+        Some(branch) => analysis.statement(branch, when_false),
+        None => Some(when_false),
+    };
+    join(taken, other)
+}
+
 pub(super) fn branch_states(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: State) -> (State, State) {
     if let Some(condition) = stored_condition(analysis, node) {
         return branch_states(analysis, condition, state);
@@ -151,7 +173,8 @@ fn binary_condition(analysis: &mut Analysis<'_, '_>, node: Node<'_>, state: Stat
     }
 }
 // Los estados si `x == null` da verdadero y si da falso.
-fn compared_with_null(analysis: &Analysis<'_, '_>, compared: Node<'_>, after: State) -> (State, State) {
+fn compared_with_null(analysis: &mut Analysis<'_, '_>, compared: Node<'_>, after: State) -> (State, State) {
+    note_checked(analysis, compared);
     let mut present = after.clone();
     if let Some(tested) = compared_key(analysis, compared) {
         forget(&mut present, &tested);

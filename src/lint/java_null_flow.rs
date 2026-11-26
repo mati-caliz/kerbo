@@ -4,8 +4,8 @@ use tree_sitter::Node;
 
 use super::java::{NAME_FIELD, text};
 use super::java_null_conditions::{
-    always_fails, asserted_condition, asserted_present, branch_states, condition_asserted, is_logical,
-    without_cast,
+    always_fails, asserted_condition, asserted_present, branch_states, condition_asserted, if_statement,
+    is_logical, without_cast,
 };
 use super::java_null_correlations::{Correlations, note_assignment, note_condition};
 use super::java_null_forwarding::forwarding_chain;
@@ -151,18 +151,7 @@ impl Analysis<'_, '_> {
                 let after = self.expression_statement(node, state);
                 (!always_fails(node, self.source)).then_some(after)
             }
-            IF => {
-                let (when_true, when_false) = branch_states(self, field(CONDITION_FIELD)?, state);
-                let taken = match field(CONSEQUENCE_FIELD) {
-                    Some(branch) => self.statement(branch, when_true),
-                    None => Some(when_true),
-                };
-                let other = match field(ALTERNATIVE_FIELD) {
-                    Some(branch) => self.statement(branch, when_false),
-                    None => Some(when_false),
-                };
-                join(taken, other)
-            }
+            IF => if_statement(self, node, state),
             WHILE | FOR => iterate(self, node, state),
             DO => {
                 let after_body = field(BODY_FIELD).and_then(|body| self.statement(body, state.clone()));
