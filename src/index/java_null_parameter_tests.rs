@@ -300,3 +300,28 @@ fn a_getter_checked_in_the_condition_stays_present_for_a_bounded_variable() {
         Vec::<String>::new()
     );
 }
+
+const CREATED_RECEIVER: &str = r"package app;
+
+import org.jspecify.annotations.Nullable;
+
+final class Source {
+    @Nullable Source next() {
+        return null;
+    }
+
+    void use(Source[] sources) {
+        new Source().next().next();
+        sources[0].next().next();
+    }
+}
+";
+
+// El receptor puede ser un `new` o un elemento de un arreglo de variable conocida.
+#[test]
+fn a_created_object_or_an_array_element_can_be_the_receiver() {
+    assert_eq!(
+        findings_in_files(&[CREATED_RECEIVER], "data-flow-issue"),
+        ["11:29 next()", "12:27 next()"]
+    );
+}

@@ -5,7 +5,7 @@ use super::java_chains::{Chain, ChainRoot, call_arguments};
 use super::java_inferred_roots::inferred_root;
 use super::java_null_inference::cast_type;
 use super::java_receiver_arguments::{ArgumentNullness, receiver_arguments};
-use super::java_receivers::{Variables, declared_simple_type, enclosing_types};
+use super::java_receivers::{Variables, declared_simple_type, enclosing_types, simple_type_name};
 use crate::syntax::{named_children, one_based};
 
 const INVOCATION: &str = "method_invocation";
@@ -22,6 +22,11 @@ const OBJECT_FIELD: &str = "object";
 const NAME_FIELD: &str = "name";
 const CONDITION_FIELD: &str = "condition";
 const IDENTIFIER: &str = "identifier";
+const CREATION: &str = "object_creation_expression";
+const CLASS_BODY: &str = "class_body";
+const TYPE_FIELD: &str = "type";
+const ARRAY_ACCESS: &str = "array_access";
+const ARRAY_FIELD: &str = "array";
 const GUARDING_STATEMENTS: &[&str] = &["while_statement", "if_statement"];
 const EMPTY_SENSITIVE: &[&str] = &["poll", "peek"];
 const NOT_EMPTY_SUFFIX: &str = ".isEmpty()";
@@ -196,6 +201,19 @@ pub(super) fn receiver_root(object: Node<'_>, source: &[u8], variables: &Variabl
                 .unwrap_or_else(|| ChainRoot::Instance(String::new())),
             None => inherited_root(object, source, Vec::new()),
         }),
+        CREATION
+            if object
+                .named_children(&mut object.walk())
+                .all(|child| child.kind() != CLASS_BODY) =>
+        {
+            object
+                .child_by_field_name(TYPE_FIELD)
+                .map(|created| ChainRoot::Instance(simple_type_name(text(created, source))))
+        }
+        ARRAY_ACCESS => object
+            .child_by_field_name(ARRAY_FIELD)
+            .filter(|array| array.kind() == IDENTIFIER)
+            .and_then(|array| receiver_root(array, source, variables)),
         _ => None,
     }
 }
