@@ -1961,7 +1961,9 @@ contra Qodana en junit4 (Java 1.5) y commons-lang (Java 8) con `scripts/parity/j
     están: dos `fmt: off` adentro de una expresión y dos comentarios dentro de un f-string; 11 tienen
     error de sintaxis y ruff tampoco los formatea.
   - Se mide con `scripts/parity/python/fmt_measure.sh` (por `heavy_lock.py`), sobre el volumen de
-    Docker `fmt-parity-python`.
+    Docker `fmt-parity-python`, en tres versiones: el corpus como está, con CRLF y lo que deja ruff
+    formateado otra vez (la segunda pasada). 0 distintos en las tres y los mismos 15 archivos
+    como están en cada una.
   - Lo que sigue: cerrar Python (esos cuatro), sacar la opción oculta y documentarlo;
     después Prettier (JS/TS) y google-java-format (Java), cada uno con su corpus medido antes de
     recomendarlo.
